@@ -16,8 +16,9 @@ A = TypeVar('A')
 
 class NvimFacade(object):
 
-    def __init__(self, vim: neovim.Nvim) -> None:
+    def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
         self.vim = vim
+        self.prefix = prefix
 
     @may
     def var(self, name) -> Maybe[str]:
@@ -27,7 +28,7 @@ class NvimFacade(object):
         return v
 
     def pvar(self, name) -> Maybe[str]:
-        return self.var('proteome_{}'.format(name))
+        return self.var('{}_{}'.format(self.prefix, name))
 
     def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
         @may
