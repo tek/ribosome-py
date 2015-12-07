@@ -30,6 +30,9 @@ class NvimFacade(object):
         self.vim = vim
         self.prefix = prefix
 
+    def prefixed(self, name: str):
+        return '{}_{}'.format(self.prefix, name)
+
     @may
     def var(self, name) -> Maybe[str]:
         v = self.vim.vars.get(name)
@@ -38,7 +41,7 @@ class NvimFacade(object):
         return v
 
     def pvar(self, name) -> Maybe[str]:
-        return self.var('{}_{}'.format(self.prefix, name))
+        return self.var(self.prefixed(name))
 
     def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
         @may
@@ -89,8 +92,11 @@ class NvimFacade(object):
     def echoerr(self, text: str):
         self.echohl('ErrorMsg', text)
 
-    def switch_root(self, path: Path):
-        self.vim.command('cd {}'.format(path))
+    def autocmd(self, name):
+        self.vim.command('doautocmd <nomodeline> User {}'.format(name))
+
+    def pautocmd(self, name):
+        self.autocmd('{}{}'.format(camelcaseify(self.prefix), name))
 
 
 class LogFacade(object):
