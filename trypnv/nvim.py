@@ -49,7 +49,7 @@ class NvimFacade(object):
                 msg = 'invalid type {} for variable {} (wanted {})'.format(
                     type(v), v, tpe)
                 Log.error(msg)
-        return value.flatMap(check)
+        return value.flat_map(check)
 
     def s(self, name):
         return self.typed(str, self.var(name))
