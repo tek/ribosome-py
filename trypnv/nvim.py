@@ -1,5 +1,4 @@
 from typing import TypeVar, Any
-from pathlib import Path
 
 import neovim  # type: ignore
 
@@ -29,6 +28,7 @@ class NvimFacade(object):
     def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
         self.vim = vim
         self.prefix = prefix
+        self._vars = set()  # type: set
 
     def prefixed(self, name: str):
         return '{}_{}'.format(self.prefix, name)
@@ -40,8 +40,20 @@ class NvimFacade(object):
             Log.error('variable not found: {}'.format(name))
         return v
 
+    def set_var(self, name, value):
+        self.vim.vars[name] = value
+        self._vars.add(name)
+
     def pvar(self, name) -> Maybe[str]:
         return self.var(self.prefixed(name))
+
+    def set_pvar(self, name, value):
+        self.set_var(self.prefixed(name), value)
+
+    def clean(self):
+        for name in self._vars:
+            del self.vim.vars[name]
+        self._vars = set()
 
     def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
         @may
