@@ -10,6 +10,7 @@ from tryp import List, Maybe, may, Just
 
 from tek.tools import camelcaseify  # type: ignore
 
+import trypnv
 from trypnv.nvim import Log
 
 
@@ -122,16 +123,44 @@ class Command(object):
         Log.error(err)
         return err
 
+    def _call_fun(self, obj, *args):
+        return self._fun(obj, *args)
+
     @property
-    def decorated(self):
+    def wrapper(self):
         @wraps(self._fun)
-        def neovim_cmd_wrapper(obj, args: 'typing.List[str]'):  # type: ignore
+        def neovim_cmd_wrapper(obj, *rpc_args):
+            args = List.wrap(rpc_args).lift(0).get_or_else(List())
             if self.check_length(args):
-                return self._fun(obj, *args)
+                return self._call_fun(obj, *args)
             else:
                 return self.error(args)
-        return neovim.command(self.name, nargs=self.nargs,
-                              **self._kw)(neovim_cmd_wrapper)
+        return neovim_cmd_wrapper
+
+    @property
+    def decorated(self):
+        return neovim.command(self.name, nargs=self.nargs, **self._kw)(
+            self.wrapper)
+
+
+class MessageCommand(Command):
+
+    def __init__(self, fun: Callable[..., Any], msg: type, **kw) -> None:
+        self._message = msg
+        self._fun_name = fun.__name__
+        super(MessageCommand, self).__init__(
+            self._message.__class__.__init__, **kw)  # type: ignore
+
+    @property
+    def _infer_name(self):
+        return camelcaseify(self._fun_name)
+
+    def _call_fun(self, obj, *args):
+        if isinstance(obj, trypnv.NvimStatePlugin):
+            obj.state().send(self._message(*args))
+        else:
+            msg = 'msg_command can only be used on NvimStatePlugin ({})'
+            Log.error(msg.format(obj))
 
 
 def command(**kw):
@@ -139,5 +168,12 @@ def command(**kw):
         handler = Command(fun, **kw)
         return handler.decorated
     return neovim_cmd_decorator
+
+
+def msg_command(msg: type, **kw):
+    def neovim_msg_cmd_decorator(fun):
+        handler = MessageCommand(fun, msg, **kw)
+        return handler.decorated
+    return neovim_msg_cmd_decorator
 
 __all__ = ['command']
