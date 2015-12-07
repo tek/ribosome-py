@@ -7,9 +7,19 @@ from tryp import Maybe, may, List, Map
 
 from trypnv.log import VimLog, DebugLog
 
+from tek.tools import camelcaseify  # type: ignore
+
+
+def squote(text):
+    return text.replace("'", "''")
+
+
+def dquote(text):
+    return text.replace('"', '\\"')
+
 
 def quote(text):
-    return text.replace('"', '\\"').replace("'", "''")
+    return dquote(squote(text))
 
 A = TypeVar('A')
 
@@ -64,10 +74,13 @@ class NvimFacade(object):
             .map(Map.wrap)
 
     def echo(self, text: str):
-        self.vim.command('echo "{}"'.format(quote(text)))
+        self.vim.command('echo "{}"'.format(dquote(text)))
+
+    def echom(self, text: str):
+        self.vim.command('echom "{}"'.format(dquote(text)))
 
     def echohl(self, hl: str, text: str):
-        cmd = 'echo "{}"'.format(quote(text))
+        cmd = 'echo "{}"'.format(dquote(text))
         self.vim.command('echohl {} | ' + cmd + ' | echohl None'.format(hl))
 
     def echowarn(self, text: str):

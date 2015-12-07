@@ -15,8 +15,8 @@ class VimLog(object):
     def error(self, msg: str):
         self.vim.echoerr(msg)
 
-    def debug(self, msg):
-        pass
+    def debug(self, msg: str):
+        self.vim.echom(msg)
 
 
 class DebugLog(object):
