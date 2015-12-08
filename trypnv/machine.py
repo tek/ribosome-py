@@ -33,26 +33,47 @@ class Handler(object):
 
     @staticmethod
     def create(name, fun):
-        return Handler(name, fun._message, fun)
+        return Handler(name, getattr(fun, Machine.message_attr), fun)
 
 
-class MachineMeta(GenericMeta):  # type: ignore
+class Machine(Generic[A]):
+    machine_attr = '_machine'
+    message_attr = '_message'
 
-    def __new__(mcs, name, bases, dct, **kw):
-        inst = super(MachineMeta, mcs)\
-            .__new__(mcs, name, bases, dct, **kw)  # type: ignore
-        handlers = inspect.getmembers(inst, lambda a: hasattr(a, '_machine'))
+    def __init__(self):
+        handlers = inspect.getmembers(self,
+                                      lambda a: hasattr(a, self.machine_attr))
         handler_map = List.wrap(handlers)\
             .smap(lambda a, b: Handler.create(a, b))\
             .map(lambda a: (a.message, a))
-        inst._message_handlers.update(Map(handler_map))
-        return inst
+        self._message_handlers = Map(handler_map)
+        self._default_handler = Handler('unhandled', None, self.unhandled)
+
+    def process(self, data: A, msg):
+        handler = self._message_handlers.get(type(msg))\
+            .get_or_else(self._default_handler)
+        try:
+            new_data = handler.fun(data, msg)
+            return new_data\
+                .flat_map(lambda a: Maybe.typed(a, tuple))\
+                .smap(self.process)\
+                .or_else(new_data)\
+                .get_or_else(data)
+        except Exception as e:
+            msg = 'transition "{}" failed for {}: {}'
+            Log.error(msg.format(handler.name, msg, e))
+            if trypnv.development:
+                raise e
+            return Just(data)
+
+    def unhandled(self, data: A, msg: Message):
+        return Maybe(data)
 
 
 def handle(msg: type):
     def add_handler(func: Callable[[A, Any], Maybe[A]]):
-        setattr(func, '_machine', True)
-        setattr(func, '_message', msg)
+        setattr(func, Machine.machine_attr, True)
+        setattr(func, Machine.message_attr, msg)
         return func
     return add_handler
 
@@ -63,44 +84,18 @@ def may_handle(msg: type):
     return may_wrap
 
 
-class Machine(Generic[A], metaclass=MachineMeta):
-
-    _message_handlers = Map()  # type: Map[type, Handler]
-
-    def process(self, data: A, msg):
-        handler = self._message_handlers.get(type(msg))
-        try:
-            name = handler.map(_.name).get_or_else('unhandled')
-            if handler.isJust:
-                new_data = handler._get.fun(self, data, msg)
-            else:
-                new_data = self.unhandled(data, msg)
-            return new_data\
-                .flat_map(lambda a: Maybe.typed(a, tuple))\
-                .smap(self.process)\
-                .or_else(new_data)\
-                .get_or_else(data)
-        except Exception as e:
-            Log.error('transition "{}" failed for {}: {}'.format(name, msg, e))
-            if trypnv.development:
-                raise e
-            return Just(data)
-
-    def unhandled(self, data: A, msg: Message):
-        return Maybe(data)
-
-
 B = TypeVar('B')
 
 
-class StateMachine(Generic[B], Machine[B], metaclass=abc.ABCMeta):
+class StateMachine(Machine, metaclass=abc.ABCMeta):
+
+    def __init__(self):
+        self.restart()
+        Machine.__init__(self)
 
     @abc.abstractmethod
     def init(self) -> A:
         ...
-
-    def __init__(self):
-        self.restart()
 
     def restart(self):
         self._data = self.init()
@@ -108,4 +103,4 @@ class StateMachine(Generic[B], Machine[B], metaclass=abc.ABCMeta):
     def send(self, msg: Message):
         self._data = self.process(self._data, msg)
 
-__all__ = ['Machine', 'Message', 'ProteomeComponent']
+__all__ = ['Machine', 'Message', 'StateMachine']
