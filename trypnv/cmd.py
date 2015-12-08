@@ -118,29 +118,27 @@ class Command(object):
             )
 
     def error(self, args):
-        msg = 'argument count "{}" to command "{}" is {}, must be {}'
-        err = msg.format(args, self.name, len(args), self.count_spec)
+        msg = 'argument count for command "{}" is {}, must be {} ({})'
+        err = msg.format(self.name, len(args), self.count_spec, args)
         Log.error(err)
         return err
 
     def _call_fun(self, obj, *args):
         return self._fun(obj, *args)
 
-    @property
-    def wrapper(self):
-        @wraps(self._fun)
-        def neovim_cmd_wrapper(obj, *rpc_args):
-            args = List.wrap(rpc_args).lift(0).get_or_else(List())
-            if self.check_length(args):
-                return self._call_fun(obj, *args)
-            else:
-                return self.error(args)
-        return neovim_cmd_wrapper
+    def dispatch(self, obj, rpc_args):
+        args = List.wrap(rpc_args).lift(0).get_or_else(List())
+        if self.check_length(args):
+            return self._call_fun(obj, *args)
+        else:
+            return self.error(args)
 
     @property
-    def decorated(self):
-        return neovim.command(self.name, nargs=self.nargs, **self._kw)(
-            self.wrapper)
+    def neovim_cmd(self):
+        @neovim.command(self.name, nargs=self.nargs, **self._kw)
+        def neovim_cmd_wrapper(obj, *rpc_args):
+            return self.dispatch(obj, rpc_args)
+        return neovim_cmd_wrapper
 
 
 class MessageCommand(Command):
@@ -162,18 +160,36 @@ class MessageCommand(Command):
             msg = 'msg_command can only be used on NvimStatePlugin ({})'
             Log.error(msg.format(obj))
 
+    @property
+    def msg_dispatch(self):
+        def msg_dispatch_wrapper(obj, *rpc_args):
+            return self.dispatch(obj, rpc_args)
+        return msg_dispatch_wrapper
+
+
+class StateCommand(MessageCommand):
+
+    def __init__(self, msg: type, **kw) -> None:
+        def fun():
+            pass
+        super(StateCommand, self).__init__(fun, msg, **kw)
+
+    def _call_fun(self, obj, *args):
+        return self._message(*args)
+
 
 def command(**kw):
     def neovim_cmd_decorator(fun):
         handler = Command(fun, **kw)
-        return handler.decorated
+        return handler.neovim_cmd
     return neovim_cmd_decorator
 
 
 def msg_command(msg: type, **kw):
     def neovim_msg_cmd_decorator(fun):
         handler = MessageCommand(fun, msg, **kw)
-        return handler.decorated
+        return handler.neovim_cmd
     return neovim_msg_cmd_decorator
 
-__all__ = ['command']
+
+__all__ = ['command', 'msg_command']
