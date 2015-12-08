@@ -45,11 +45,11 @@ class MachineMeta(GenericMeta):  # type: ignore
         handler_map = List.wrap(handlers)\
             .smap(lambda a, b: Handler.create(a, b))\
             .map(lambda a: (a.message, a))
-        setattr(inst, '_message_handlers', Map(handler_map))
+        inst._message_handlers.update(Map(handler_map))
         return inst
 
 
-def handle_wrap(msg: type):
+def handle(msg: type):
     def add_handler(func: Callable[[A, Any], Maybe[A]]):
         setattr(func, '_machine', True)
         setattr(func, '_message', msg)
@@ -57,19 +57,15 @@ def handle_wrap(msg: type):
     return add_handler
 
 
-def handle(msg: type):
-    return handle_wrap(msg)
-
-
 def may_handle(msg: type):
     def may_wrap(func: Callable[[A, Any], Maybe[A]]):
-        return handle_wrap(msg)(may(func))
+        return handle(msg)(may(func))
     return may_wrap
 
 
 class Machine(Generic[A], metaclass=MachineMeta):
 
-    _message_handlers = None  # type: Map[type, Handler]
+    _message_handlers = Map()  # type: Map[type, Handler]
 
     def process(self, data: A, msg):
         handler = self._message_handlers.get(type(msg))
