@@ -8,10 +8,11 @@ from fn import _  # type: ignore
 
 from tryp import List, Maybe, may, Just
 
+from trypnv.logging import log
+
 from tek.tools import camelcaseify  # type: ignore
 
 import trypnv
-from trypnv.nvim import Log
 
 
 def try_int(val):
@@ -120,7 +121,7 @@ class Command(object):
     def error(self, args):
         msg = 'argument count for command "{}" is {}, must be {} ({})'
         err = msg.format(self.name, len(args), self.count_spec, args)
-        Log.error(err)
+        log.error(err)
         return err
 
     def _call_fun(self, obj, *args):
@@ -158,7 +159,7 @@ class MessageCommand(Command):
             obj.state().send(self._message(*args))
         else:
             msg = 'msg_command can only be used on NvimStatePlugin ({})'
-            Log.error(msg.format(obj))
+            log.error(msg.format(obj))
 
     @property
     def msg_dispatch(self):

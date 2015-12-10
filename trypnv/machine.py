@@ -6,7 +6,7 @@ import inspect
 from fn import _  # type: ignore
 
 import trypnv
-from trypnv.nvim import Log
+from trypnv.logging import Logging
 
 from tryp import Maybe, Just, List, Map, may
 
@@ -36,7 +36,7 @@ class Handler(object):
         return Handler(name, getattr(fun, Machine.message_attr), fun)
 
 
-class Machine(Generic[A]):
+class Machine(Generic[A], Logging):
     machine_attr = '_machine'
     message_attr = '_message'
 
@@ -50,8 +50,9 @@ class Machine(Generic[A]):
         self._default_handler = Handler('unhandled', None, self.unhandled)
 
     def process(self, data: A, msg):
-        handler = self._message_handlers.get(type(msg))\
-            .get_or_else(self._default_handler)
+        handler = self._message_handlers\
+            .get(type(msg))\
+            .get_or_else(lambda: self._default_handler)
         try:
             new_data = handler.fun(data, msg)
             return new_data\
@@ -61,7 +62,7 @@ class Machine(Generic[A]):
                 .get_or_else(data)
         except Exception as e:
             msg = 'transition "{}" failed for {}: {}'
-            Log.error(msg.format(handler.name, msg, e))
+            self.log.error(msg.format(handler.name, msg, e))
             if trypnv.development:
                 raise e
             return Just(data)

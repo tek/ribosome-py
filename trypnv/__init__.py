@@ -1,17 +1,19 @@
 import abc
 
-from trypnv.nvim import Log, NvimFacade
+from trypnv.nvim import NvimFacade
 from trypnv.cmd import command, msg_command
 from trypnv.machine import Machine, StateMachine
-
-development = False
+from trypnv.logging import nvim_logging
 
 
 class NvimPlugin(object):
 
     def __init__(self, nvim: NvimFacade) -> None:
         self.vim = nvim
-        Log._vim = nvim
+        self.setup_logging()
+
+    def setup_logging(self):
+        nvim_logging(self.vim)
 
 
 class NvimStatePlugin(NvimPlugin):

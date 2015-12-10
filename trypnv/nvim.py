@@ -1,10 +1,12 @@
-from typing import TypeVar, Any
+from typing import TypeVar
+import logging
+from pathlib import Path
+
+from fn import _  # type: ignore
 
 import neovim  # type: ignore
 
-from tryp import Maybe, may, List, Map
-
-from trypnv.log import VimLog, DebugLog
+from tryp import Maybe, may, List, Map, Boolean
 
 from tek.tools import camelcaseify  # type: ignore
 
@@ -23,12 +25,24 @@ def quote(text):
 A = TypeVar('A')
 
 
+def echo(text, cmd='echom'):
+    return '{} "{}"'.format(cmd, dquote(text))
+
+
+def echohl(text, hl):
+    return 'echohl {} | {} | echohl None'.format(hl, echo(text))
+
+
 class NvimFacade(object):
 
     def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
         self.vim = vim
         self.prefix = prefix
         self._vars = set()  # type: set
+
+    @property
+    def log(self):
+        return logging.root
 
     def prefixed(self, name: str):
         return '{}_{}'.format(self.prefix, name)
@@ -37,7 +51,7 @@ class NvimFacade(object):
     def var(self, name) -> Maybe[str]:
         v = self.vim.vars.get(name)
         if v is None:
-            Log.error('variable not found: {}'.format(name))
+            self.log.debug('variable not found: {}'.format(name))
         return v
 
     def set_var(self, name, value):
@@ -63,7 +77,7 @@ class NvimFacade(object):
             else:
                 msg = 'invalid type {} for variable {} (wanted {})'.format(
                     type(v), v, tpe)
-                Log.error(msg)
+                self.log.error(msg)
         return value.flat_map(check)
 
     def s(self, name):
@@ -88,15 +102,17 @@ class NvimFacade(object):
         return self.typed(dict, self.pvar(name))\
             .map(Map.wrap)
 
+    def cmd(self, line: str):
+        return self.vim.command(line, async=True)
+
     def echo(self, text: str):
-        self.vim.command('echo "{}"'.format(dquote(text)))
+        self.cmd(echo(text, 'echo'))
 
     def echom(self, text: str):
-        self.vim.command('echom "{}"'.format(dquote(text)))
+        self.cmd(echo(text))
 
     def echohl(self, hl: str, text: str):
-        cmd = 'echo "{}"'.format(dquote(text))
-        self.vim.command('echohl {} | ' + cmd + ' | echohl None'.format(hl))
+        self.cmd(echohl(text, hl))
 
     def echowarn(self, text: str):
         self.echohl('WarningMsg', text)
@@ -105,33 +121,18 @@ class NvimFacade(object):
         self.echohl('ErrorMsg', text)
 
     def autocmd(self, name):
-        self.vim.command('doautocmd <nomodeline> User {}'.format(name))
+        self.cmd('silent doautocmd <nomodeline> User {}'.format(name))
 
     def pautocmd(self, name):
         self.autocmd('{}{}'.format(camelcaseify(self.prefix), name))
 
 
-class LogFacade(object):
 
-    _vim = None  # type: NvimFacade
 
-    def log(self):
-        return Maybe(Log._vim)\
-            .map(lambda a: VimLog(a))\
-            .get_or_else(DebugLog())
 
-    def info(self, msg: Any):
-        self.log().info(str(msg))
 
-    def warn(self, msg: Any):
-        self.log().warn(str(msg))
 
-    def error(self, msg: Any):
-        self.log().error(str(msg))
 
-    def debug(self, msg: Any):
-        self.log().debug(str(msg))
 
-Log = LogFacade()  # type: LogFacade
 
 __all__ = ['NvimFacade']
