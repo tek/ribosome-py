@@ -143,6 +143,8 @@ class NvimFacade(object):
     def pautocmd(self, name):
         self.autocmd('{}{}'.format(camelcaseify(self.prefix), name))
 
+    def call(self, name, *a, **kw):
+        return Maybe.from_call(self.vim.call, name, *a, **kw)
 
 
 
