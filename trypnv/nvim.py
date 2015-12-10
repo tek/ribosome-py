@@ -64,6 +64,23 @@ class NvimFacade(object):
     def set_pvar(self, name, value):
         self.set_var(self.prefixed(name), value)
 
+    def path(self, name: str) -> Maybe[Path]:
+        return self.var(name).map(Path)
+
+    def ppath(self, name: str) -> Maybe[Path]:
+        return self.path(self.prefixed(name))
+
+    def dir(self, name: str) -> Maybe[Path]:
+        var = self.path(name)
+        val = var.filter(_.call('is_dir'))
+        if not val.isJust:
+            msg = 'g:{} is not a directory ({})'
+            self.log.error(msg.format(name, var))
+        return val
+
+    def pdir(self, name: str) -> Maybe[Path]:
+        return self.dir(self.prefixed(name))
+
     def clean(self):
         for name in self._vars:
             del self.vim.vars[name]
