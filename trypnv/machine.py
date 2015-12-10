@@ -1,11 +1,9 @@
-from typing import TypeVar, Callable, Generic, GenericMeta, Any  # type: ignore
+from typing import TypeVar, Callable, Generic, Any  # type: ignore
 from collections import namedtuple  # type: ignore
 import abc
 import inspect
 
-from fn import _  # type: ignore
-
-import trypnv
+import tryp
 from trypnv.logging import Logging
 
 from tryp import Maybe, Just, List, Map, may
@@ -63,7 +61,7 @@ class Machine(Generic[A], Logging):
         except Exception as e:
             msg = 'transition "{}" failed for {}: {}'
             self.log.error(msg.format(handler.name, msg, e))
-            if trypnv.development:
+            if tryp.development:
                 raise e
             return Just(data)
 
