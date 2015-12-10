@@ -147,11 +147,27 @@ class NvimFacade(object):
         return Maybe.from_call(self.vim.call, name, *a, **kw)
 
 
+class Flags(object):
+
+    def __init__(self, vim: NvimFacade, prefix: bool) -> None:
+        self.vim = vim
+        self.prefix = prefix
+
+    def get(self, name, default=False):
+        v = (self.vim.pvar(name) if self.prefix else self.vim.var(name))\
+            .get_or_else(False)
+        return Boolean(v)
+
+    def __getattr__(self, name):
+        return self.get(name)
 
 
+class HasNvim(object):
+
+    def __init__(self, vim: NvimFacade) -> None:
+        self.vim = vim
+        self.flags = Flags(vim, False)
+        self.pflags = Flags(vim, True)
 
 
-
-
-
-__all__ = ['NvimFacade']
+__all__ = ['NvimFacade', 'HasNvim']
