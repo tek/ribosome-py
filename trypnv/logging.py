@@ -26,6 +26,7 @@ class NvimHandler(logging.Handler):
 
 
 log = trypnv_root_logger = tryp_logger('nvim')
+_nvim_logging_initialized = False
 
 
 def trypnv_logger(name: str):
@@ -33,10 +34,13 @@ def trypnv_logger(name: str):
 
 
 def nvim_logging(vim: NvimFacade):
-    handler = NvimHandler(vim)
-    trypnv_root_logger.addHandler(handler)
-    if not tryp.development:
-        handler.setLevel(logging.INFO)
+    global _nvim_logging_initialized
+    if not _nvim_logging_initialized:
+        handler = NvimHandler(vim)
+        trypnv_root_logger.addHandler(handler)
+        if not tryp.development:
+            handler.setLevel(logging.INFO)
+        _nvim_logging_initialized = True
 
 
 class Logging(object):
