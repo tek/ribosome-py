@@ -59,8 +59,8 @@ class Machine(Generic[A], Logging):
                 .or_else(new_data)\
                 .get_or_else(data)
         except Exception as e:
-            msg = 'transition "{}" failed for {}: {}'
-            self.log.error(msg.format(handler.name, msg, e))
+            errmsg = 'transition "{}" failed for {}: {}'
+            self.log.error(errmsg.format(handler.name, msg, e))
             if tryp.development:
                 raise e
             return Just(data)
