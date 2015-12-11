@@ -38,7 +38,8 @@ class Machine(Generic[A], Logging):
     machine_attr = '_machine'
     message_attr = '_message'
 
-    def __init__(self):
+    def __init__(self, name: str) -> None:
+        self.name = name
         handlers = inspect.getmembers(self,
                                       lambda a: hasattr(a, self.machine_attr))
         handler_map = List.wrap(handlers)\
@@ -59,8 +60,8 @@ class Machine(Generic[A], Logging):
                 .or_else(new_data)\
                 .get_or_else(data)
         except Exception as e:
-            errmsg = 'transition "{}" failed for {}: {}'
-            self.log.error(errmsg.format(handler.name, msg, e))
+            errmsg = 'transition "{}" failed for {} in {}: {}'
+            self.log.error(errmsg.format(handler.name, msg, self.name, e))
             if tryp.development:
                 raise e
             return Just(data)
@@ -88,9 +89,9 @@ B = TypeVar('B')
 
 class StateMachine(Machine, metaclass=abc.ABCMeta):
 
-    def __init__(self):
+    def __init__(self, name: str) -> None:
         self.restart()
-        Machine.__init__(self)
+        Machine.__init__(self, name)
 
     @abc.abstractmethod
     def init(self) -> A:
