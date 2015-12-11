@@ -43,7 +43,7 @@ class Machine(Generic[A], Logging):
         handlers = inspect.getmembers(self,
                                       lambda a: hasattr(a, self.machine_attr))
         handler_map = List.wrap(handlers)\
-            .smap(lambda a, b: Handler.create(a, b))\
+            .smap(Handler.create)\
             .map(lambda a: (a.message, a))
         self._message_handlers = Map(handler_map)
         self._default_handler = Handler('unhandled', None, self.unhandled)
