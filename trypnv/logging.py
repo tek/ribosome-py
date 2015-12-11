@@ -2,8 +2,7 @@ import logging
 
 from tryp.lazy import lazy
 
-import tryp
-from tryp.logging import tryp_logger
+from tryp.logging import tryp_logger, tryp_root_logger, init_loglevel
 
 from trypnv.nvim import NvimFacade
 
@@ -33,13 +32,13 @@ def trypnv_logger(name: str):
     return trypnv_root_logger.getChild(name)
 
 
-def nvim_logging(vim: NvimFacade):
+def nvim_logging(vim: NvimFacade, level: int=None):
     global _nvim_logging_initialized
     if not _nvim_logging_initialized:
         handler = NvimHandler(vim)
         trypnv_root_logger.addHandler(handler)
-        if not tryp.development:
-            handler.setLevel(logging.INFO)
+        handler.setLevel(logging.INFO)
+        init_loglevel(tryp_root_logger)
         _nvim_logging_initialized = True
 
 
