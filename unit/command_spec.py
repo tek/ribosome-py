@@ -143,6 +143,6 @@ class Command_(Spec, ):
         wrap.when.called_with([]).should.return_value(default)
         val = 2
         wrap.when.called_with([val]).should.return_value(val)
-        wrap([1, 2]).endswith('between 0 and 1').should.be.ok
+        wrap([1, 2]).endswith('between 0 and 1 ([1, 2])').should.be.ok
 
 __all__ = ['Command_']
