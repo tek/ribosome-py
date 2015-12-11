@@ -65,7 +65,8 @@ class NvimFacade(object):
         self.set_var(self.prefixed(name), value)
 
     def path(self, name: str) -> Maybe[Path]:
-        return self.var(name).map(Path)
+        return self.var(name)\
+            .map(lambda a: Path(a).expanduser())  # type: ignore
 
     def ppath(self, name: str) -> Maybe[Path]:
         return self.path(self.prefixed(name))
