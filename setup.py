@@ -3,7 +3,7 @@ from setuptools import setup, find_packages  # type: ignore
 setup(
     name='tryp-nvim',
     description='neovim helpers',
-    version='0.0.1',
+    version='0.1.0',
     author='Torsten Schmits',
     author_email='torstenschmits@gmail.com',
     license='MIT',
