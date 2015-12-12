@@ -153,7 +153,10 @@ class StateMachine(Machine, metaclass=abc.ABCMeta):
 
     def _send(self, data: Data, msg: Message):
         d2, pub = self.process(data, msg)
-        return pub.map(_.message).fold_left(d2)(self._send)
+        return self._publish_results(d2, pub)
+
+    def _publish_results(self, data: Data, pub: List[Publish]):
+        return pub.map(_.message).fold_left(data)(self._send)
 
     @may
     def unhandled(self, data, msg):
