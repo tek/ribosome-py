@@ -129,18 +129,17 @@ class NvimComponent(object):
     def options(self, name: str):
         return self.typed(str, self.option(name))
 
-    def optionl(self, name: str) -> Maybe[List[str]]:
+    def optionl(self, name: str) -> List[str]:
         return self.options(name)\
             .map(lambda a: a.split(','))\
-            .map(List.wrap)
+            .map(List.wrap)\
+            .get_or_else(List())
 
     def amend_optionl(self, name: str, value):
         if not isinstance(value, list):
             value = List(value)
-        self.optionl(name)\
-            .map(_ + list(map(str, value)))\
-            .map(_.distinct)\
-            .foreach(partial(self.set_optionl, name))
+        new_value = (self.optionl(name) + list(map(str, value))).distinct
+        self.set_optionl(name, new_value)
 
     def set_optionl(self, name: str, value: List[str]):
         print('set_optionl: ' + str(value))
