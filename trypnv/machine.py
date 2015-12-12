@@ -1,12 +1,17 @@
-from typing import TypeVar, Callable, Generic, Any  # type: ignore
+from typing import (TypeVar, Callable, Generic, Any, Tuple, Sequence
+                    )  # type: ignore
 from collections import namedtuple  # type: ignore
 import abc
 import inspect
 
+from toolz.itertoolz import cons  # type: ignore
+
+from fn import _  # type: ignore
+
 import tryp
 from trypnv.logging import Logging
 
-from tryp import Maybe, Just, List, Map, may
+from tryp import Maybe, List, Map, may, Empty, curried
 
 
 class Message(object):
@@ -14,12 +19,27 @@ class Message(object):
     def __str__(self):
         return 'Message({})'.format(self.__class__.__name__)
 
+    @property
+    def pub(self):
+        return Publish(self)
+
 
 def message(name, *fields):
     return type.__new__(type, name, (Message, namedtuple(name, fields)), {})
 
 
-A = TypeVar('A')
+class Publish(Message):
+
+    def __init__(self, message: Message) -> None:
+        self.message = message
+
+
+def is_seq(a):
+    return isinstance(a, Sequence)
+
+
+def is_message(a):
+    return isinstance(a, Message)
 
 
 class Handler(object):
@@ -34,9 +54,14 @@ class Handler(object):
         return Handler(name, getattr(fun, Machine.message_attr), fun)
 
 
-class Machine(Generic[A], Logging):
+class Data(object):
+    pass
+
+
+class Machine(Logging):
     machine_attr = '_machine'
     message_attr = '_message'
+    _data_type = Data
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -48,26 +73,50 @@ class Machine(Generic[A], Logging):
         self._message_handlers = Map(handler_map)
         self._default_handler = Handler('unhandled', None, self.unhandled)
 
-    def process(self, data: A, msg):
+    def process(self, data: Data, msg) -> Tuple[Data, List[Publish]]:
         handler = self._message_handlers\
             .get(type(msg))\
             .get_or_else(lambda: self._default_handler)
         try:
-            new_data = handler.fun(data, msg)
-            return new_data\
-                .flat_map(lambda a: Maybe.typed(a, tuple))\
-                .smap(self.process)\
-                .or_else(new_data)\
-                .get_or_else(data)
+            ret = handler.fun(data, msg)\
+                .map(self._process_result(data))\
+                .smap(self._resend)
         except Exception as e:
-            errmsg = 'transition "{}" failed for {} in {}: {}'
-            self.log.error(errmsg.format(handler.name, msg, self.name, e))
+            err = 'transition "{}" failed for {} in {}: {}'
+            self.log.error(err.format(handler.name, msg, self.name, e))
             if tryp.development:
                 raise e
-            return Just(data)
+            ret = Empty()
+        return ret.get_or_else((data, List()))
 
-    def unhandled(self, data: A, msg: Message):
-        return Maybe(data)
+    @curried
+    def _process_result(self, old_data: Data, result
+                        ) -> Tuple[Data, List[Publish]]:
+        if isinstance(result, self._data_type):
+            return result, List()
+        elif isinstance(result, Message) or not is_seq(result):
+            result = List(result)
+        datas, rest = List.wrap(result).split_type(self._data_type)
+        msgs, rest = rest.split_type(Message)
+        if rest:
+            err = 'invalid transition result parts in {}: {}'
+            self.log.error(err.format(self.name, rest))
+        return datas.head | old_data, msgs
+
+    def _resend(self, env, msgs: List[Message]) -> Tuple[Data, List[Publish]]:
+        def sender(z, m):
+            e, p = z
+            e2, p2 = self.process(e, m)
+            return e2, p + p2
+        pub, send = msgs.split_type(Publish)
+        return send.fold_left((env, pub))(sender)
+
+    @may
+    def unhandled(self, data: Data, msg: Message):
+        pass
+
+
+A = TypeVar('A')
 
 
 def handle(msg: type):
@@ -84,23 +133,35 @@ def may_handle(msg: type):
     return may_wrap
 
 
-B = TypeVar('B')
-
-
 class StateMachine(Machine, metaclass=abc.ABCMeta):
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, sub: List[Machine]=List()) -> None:
         self.restart()
+        self.sub = sub
         Machine.__init__(self, name)
 
     @abc.abstractmethod
-    def init(self) -> A:
+    def init(self) -> Data:
         ...
 
     def restart(self):
         self._data = self.init()
 
     def send(self, msg: Message):
-        self._data = self.process(self._data, msg)
+        self._data = self._send(self._data, msg)
+        return self._data
+
+    def _send(self, data: Data, msg: Message):
+        d2, pub = self.process(data, msg)
+        return pub.map(_.message).fold_left(d2)(self._send)
+
+    @may
+    def unhandled(self, data, msg):
+        def send(z, s):
+            d1, p1 = z
+            d2, p2 = s.process(d1, msg)
+            return d2, p1 + p2
+        d, m = self.sub.fold_left((data, List()))(send)
+        return List(*cons(d, m))
 
 __all__ = ['Machine', 'Message', 'StateMachine']
