@@ -186,6 +186,10 @@ class NvimFacade(NvimComponent):
     def current_buffer(self):
         return Buffer(self.current.buffer, self.prefix)
 
+    @property
+    def buffers(self):
+        return List(*self.vim.buffers).map(lambda a: Buffer(a, self.prefix))
+
 
 class Buffer(NvimComponent):
     pass
