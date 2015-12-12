@@ -1,10 +1,9 @@
 from typing import TypeVar
 import logging
 from pathlib import Path
+from functools import partial  # type: ignore
 
 from fn import _  # type: ignore
-
-import neovim  # type: ignore
 
 from tryp import Maybe, may, List, Map, Boolean
 
@@ -33,19 +32,16 @@ def echohl(text, hl):
     return 'echohl {} | {} | echohl None'.format(hl, echo(text))
 
 
-class NvimFacade(object):
+class NvimComponent(object):
 
-    def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
-        self.vim = vim
+    def __init__(self, comp, prefix: str) -> None:
+        self.vim = comp
         self.prefix = prefix
         self._vars = set()  # type: set
 
     @property
     def log(self):
         return logging.root
-
-    def prefixed(self, name: str):
-        return '{}_{}'.format(self.prefix, name)
 
     @may
     def var(self, name) -> Maybe[str]:
@@ -120,6 +116,42 @@ class NvimFacade(object):
         return self.typed(dict, self.pvar(name))\
             .map(Map.wrap)
 
+    @may
+    def option(self, name: str) -> Maybe[str]:
+        v = self.vim.options.get(name)
+        if v is None:
+            self.log.debug('variable not found: {}'.format(name))
+        return v
+
+    def set_option(self, name: str, value: str):
+        self.vim.options[name] = str(value)
+
+    def options(self, name: str):
+        return self.typed(str, self.option(name))
+
+    def optionl(self, name: str) -> Maybe[List[str]]:
+        return self.options(name)\
+            .map(lambda a: a.split(','))\
+            .map(List.wrap)
+
+    def amend_optionl(self, name: str, value):
+        if not isinstance(value, list):
+            value = List(value)
+        self.optionl(name)\
+            .map(_ + list(map(str, value)))\
+            .map(_.distinct)\
+            .foreach(partial(self.set_optionl, name))
+
+    def set_optionl(self, name: str, value: List[str]):
+        print('set_optionl: ' + str(value))
+        self.vim.options[name] = ','.join(value)
+
+
+class NvimFacade(NvimComponent):
+
+    def prefixed(self, name: str):
+        return '{}_{}'.format(self.prefix, name)
+
     def cmd(self, line: str):
         return self.vim.command(line, async=True)
 
@@ -146,6 +178,18 @@ class NvimFacade(object):
 
     def call(self, name, *a, **kw):
         return Maybe.from_call(self.vim.call, name, *a, **kw)
+
+    @property
+    def current(self):
+        return self.vim.current
+
+    @property
+    def current_buffer(self):
+        return Buffer(self.current.buffer, self.prefix)
+
+
+class Buffer(NvimComponent):
+    pass
 
 
 class Flags(object):
