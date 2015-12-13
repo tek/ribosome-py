@@ -1,5 +1,4 @@
 from typing import Callable, Any
-from functools import wraps
 import inspect
 
 import neovim  # type: ignore
@@ -144,11 +143,11 @@ class Command(object):
 
 class MessageCommand(Command):
 
-    def __init__(self, fun: Callable[..., Any], msg: type, **kw) -> None:
+    def __init__(self, fun: Callable[[], Any], msg: type, **kw) -> None:
         self._message = msg
         self._fun_name = fun.__name__
         super(MessageCommand, self).__init__(
-            self._message.__class__.__init__, **kw)  # type: ignore
+            self._message.__init__, **kw)  # type: ignore
 
     @property
     def _infer_name(self):

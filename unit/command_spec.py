@@ -3,9 +3,16 @@ from flexmock import flexmock  # NOQA
 
 from tek import Spec  # type: ignore
 
-from trypnv.cmd import Command, command
+from trypnv.cmd import Command, command, MessageCommand
+from trypnv.machine import Message
 
 from tryp import Just
+
+
+class BasicMessage(Message):
+
+    def __init__(self, a, b, c=1, d=2):
+        pass
 
 
 class Command_(Spec, ):
@@ -144,5 +151,15 @@ class Command_(Spec, ):
         val = 2
         wrap.when.called_with([val]).should.return_value(val)
         wrap([1, 2]).endswith('between 0 and 1 ([1, 2])').should.be.ok
+
+    def message(self):
+        def cmd_name():
+            pass
+        c = MessageCommand(cmd_name, BasicMessage)
+        c.check_length(['a']).should_not.be.ok
+        c.check_length(['a', 'b']).should.be.ok
+        c.check_length(['a', 'b', 'c']).should.be.ok
+        c.check_length(['a', 'b', 'c', 'd']).should.be.ok
+        c.check_length(['a', 'b', 'c', 'd', 'e']).should_not.be.ok
 
 __all__ = ['Command_']
