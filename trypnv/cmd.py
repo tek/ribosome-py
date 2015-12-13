@@ -1,5 +1,6 @@
 from typing import Callable, Any
 import inspect
+import json
 
 import neovim  # type: ignore
 
@@ -167,6 +168,38 @@ class MessageCommand(Command):
         return msg_dispatch_wrapper
 
 
+class JsonMessageCommand(MessageCommand):
+
+    def __init__(self, fun: Callable[[], Any], msg: type, **kw) -> None:
+        super(JsonMessageCommand, self).__init__(fun, msg, **kw)
+
+    @property
+    def nargs(self):
+        return '+'
+
+    @property
+    def min(self):
+        return self._param_count
+
+    @property  # type: ignore
+    @may
+    def max(self):
+        pass
+
+    def _extract_args(self, args: List[str]):
+        pos_args, json_args = args[:self.min - 1], args[self.min - 1:]
+        return pos_args + [json.loads(' '.join(json_args))]
+
+    def _call_fun(self, obj, *args):
+        try:
+            real_args = self._extract_args(args)
+        except json.JSONDecodeError as e:
+            msg = 'invalid json in parameters to command {}: {}'
+            log.error(msg.format(self.name, e))
+        else:
+            super(JsonMessageCommand, self)._call_fun(obj, *real_args)
+
+
 class StateCommand(MessageCommand):
 
     def __init__(self, msg: type, **kw) -> None:
@@ -192,4 +225,11 @@ def msg_command(msg: type, **kw):
     return neovim_msg_cmd_decorator
 
 
-__all__ = ['command', 'msg_command']
+def json_msg_command(msg: type, **kw):
+    def neovim_json_msg_cmd_decorator(fun):
+        handler = JsonMessageCommand(fun, msg, **kw)
+        return handler.neovim_cmd
+    return neovim_json_msg_cmd_decorator
+
+
+__all__ = ['command', 'msg_command', 'json_msg_command']

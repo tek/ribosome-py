@@ -1,9 +1,11 @@
+import json
+
 import sure  # NOQA
 from flexmock import flexmock  # NOQA
 
 from tek import Spec  # type: ignore
 
-from trypnv.cmd import Command, command, MessageCommand
+from trypnv.cmd import Command, command, JsonMessageCommand, MessageCommand
 from trypnv.machine import Message
 
 from tryp import Just
@@ -12,6 +14,12 @@ from tryp import Just
 class BasicMessage(Message):
 
     def __init__(self, a, b, c=1, d=2):
+        pass
+
+
+class JsonMessage(Message):
+
+    def __init__(self, a, b, json):
         pass
 
 
@@ -161,5 +169,16 @@ class Command_(Spec, ):
         c.check_length(['a', 'b', 'c']).should.be.ok
         c.check_length(['a', 'b', 'c', 'd']).should.be.ok
         c.check_length(['a', 'b', 'c', 'd', 'e']).should_not.be.ok
+
+    def json_message(self):
+        def cmd_name():
+            pass
+        c = JsonMessageCommand(cmd_name, JsonMessage)
+        c.check_length(['a', 'b']).should_not.be.ok
+        c.check_length(['a', 'b', '{}']).should.be.ok
+        json_arg = dict(a=dict(b=2, c=[4, 5]), d=5, e=['a', 'z'])
+        regular = [2, 3]
+        args = c._extract_args(regular + json.dumps(json_arg).split())
+        args.should.equal(regular + [json_arg])
 
 __all__ = ['Command_']
