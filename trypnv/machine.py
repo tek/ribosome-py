@@ -59,6 +59,10 @@ class Data(object):
     pass
 
 
+class MachineError(RuntimeError):
+    pass
+
+
 class Machine(Logging):
     machine_attr = '_machine'
     message_attr = '_message'
@@ -83,17 +87,23 @@ class Machine(Logging):
         handler = self._message_handlers\
             .get(type(msg))\
             .get_or_else(lambda: self._default_handler)
+        return self._execute_transition(handler, data, msg)\
+            .map(self._process_result(data))\
+            .smap(self._resend)\
+            .get_or_else((data, List()))
+
+    def _execute_transition(self, handler, data, msg):
         try:
-            ret = handler.fun(data, msg)\
-                .map(self._process_result(data))\
-                .smap(self._resend)
+            result = handler.fun(data, msg)
+            if not isinstance(result, Maybe):
+                raise MachineError('result is not Maybe: {}'.format(result))
         except Exception as e:
             err = 'transition "{}" failed for {} in {}: {}'
             self.log.error(err.format(handler.name, msg, self.name, e))
             if tryp.development:
                 raise e
-            ret = Empty()
-        return ret.get_or_else((data, List()))
+            result = Empty()
+        return result
 
     @curried
     def _process_result(
