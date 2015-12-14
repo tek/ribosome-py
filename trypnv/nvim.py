@@ -142,7 +142,6 @@ class NvimComponent(object):
         self.set_optionl(name, new_value)
 
     def set_optionl(self, name: str, value: List[str]):
-        print('set_optionl: ' + str(value))
         self.vim.options[name] = ','.join(value)
 
 
