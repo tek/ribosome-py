@@ -65,6 +65,9 @@ class NvimComponent(object):
     def log(self):
         return logging.root
 
+    def prefixed(self, name: str):
+        return '{}_{}'.format(self.prefix, name)
+
     @may
     def var(self, name) -> Maybe[str]:
         v = self.vim.vars.get(name)
@@ -164,9 +167,6 @@ class NvimComponent(object):
 
 
 class NvimFacade(NvimComponent):
-
-    def prefixed(self, name: str):
-        return '{}_{}'.format(self.prefix, name)
 
     def cmd(self, line: str):
         return self.vim.command(line, async=True)
