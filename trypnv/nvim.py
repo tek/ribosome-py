@@ -1,7 +1,7 @@
 from typing import TypeVar
 import logging
 from pathlib import Path
-from functools import partial  # type: ignore
+from functools import singledispatch  # type: ignore
 
 from fn import _  # type: ignore
 
@@ -32,6 +32,28 @@ def echohl(text, hl):
     return 'echohl {} | {} | echohl None'.format(hl, echo(text))
 
 
+@singledispatch
+def decode(value):
+    return value
+
+
+@decode.register(bytes)
+def decode_bytes(value):
+    return value.decode()
+
+
+@decode.register(list)
+def decode_list(value):
+    return List.wrap(value).map(decode)
+
+
+@decode.register(dict)
+def decode_dict(value):
+    return Map.wrap(value)\
+        .keymap(decode)\
+        .valmap(decode)
+
+
 class NvimComponent(object):
 
     def __init__(self, comp, prefix: str) -> None:
@@ -48,7 +70,7 @@ class NvimComponent(object):
         v = self.vim.vars.get(name)
         if v is None:
             self.log.debug('variable not found: {}'.format(name))
-        return v
+        return decode(v)
 
     def set_var(self, name, value):
         self.vim.vars[name] = value
@@ -101,20 +123,16 @@ class NvimComponent(object):
         return self.typed(str, self.pvar(name))
 
     def l(self, name):
-        return self.typed(list, self.var(name))\
-            .map(List.wrap)
+        return self.typed(list, self.var(name))
 
     def pl(self, name):
-        return self.typed(list, self.pvar(name))\
-            .map(List.wrap)
+        return self.typed(list, self.pvar(name))
 
     def d(self, name):
-        return self.typed(dict, self.var(name))\
-            .map(Map.wrap)
+        return self.typed(dict, self.var(name))
 
     def pd(self, name):
-        return self.typed(dict, self.pvar(name))\
-            .map(Map.wrap)
+        return self.typed(dict, self.pvar(name))
 
     @may
     def option(self, name: str) -> Maybe[str]:
