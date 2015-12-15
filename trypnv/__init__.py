@@ -15,6 +15,10 @@ class NvimPlugin(object):
     def setup_logging(self):
         nvim_logging(self.vim)
 
+    @property
+    def loop(self):
+        return self.vim.loop
+
 
 class NvimStatePlugin(NvimPlugin):
 

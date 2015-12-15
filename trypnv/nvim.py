@@ -2,6 +2,7 @@ from typing import TypeVar
 import logging
 from pathlib import Path
 from functools import singledispatch  # type: ignore
+from threading import Timer  # type: ignore
 
 from fn import _  # type: ignore
 
@@ -206,6 +207,14 @@ class NvimFacade(NvimComponent):
     @property
     def buffers(self):
         return List(*self.vim.buffers).map(lambda a: Buffer(a, self.prefix))
+
+    @property
+    def loop(self):
+        return self.vim.session._session._async_session._msgpack_stream\
+            ._event_loop._loop
+
+    def delay(self, f, timeout):
+        Timer(1.0, lambda: self.vim.session.threadsafe_call(f)).start()
 
 
 class Buffer(NvimComponent):
