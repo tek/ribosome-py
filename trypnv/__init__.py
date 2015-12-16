@@ -1,30 +1,12 @@
-import abc
-
 from trypnv.nvim import NvimFacade
 from trypnv.cmd import command, msg_command
-from trypnv.machine import Machine, StateMachine
-from trypnv.logging import nvim_logging
+from trypnv.machine import Machine, StateMachine  # type: ignore
+from trypnv.machine import PluginStateMachine  # type: ignore
+from trypnv.process import ProcessExecutor, Job  # type: ignore
+from trypnv.plugin import NvimStatePlugin, NvimPlugin
 
-
-class NvimPlugin(object):
-
-    def __init__(self, nvim: NvimFacade) -> None:
-        self.vim = nvim
-        self.setup_logging()
-
-    def setup_logging(self):
-        nvim_logging(self.vim)
-
-    @property
-    def loop(self):
-        return self.vim.loop
-
-
-class NvimStatePlugin(NvimPlugin):
-
-    @abc.abstractmethod
-    def state(self) -> StateMachine:
-        ...
+in_vim = True
 
 __all__ = ['Plugin', 'command', 'NvimFacade', 'Machine', 'StateMachine',
-           'development', 'NvimStatePlugin', 'msg_command']
+           'development', 'NvimStatePlugin', 'msg_command', 'ProcessExecutor',
+           'Job', 'NvimPlugin', 'PluginStateMachine', 'in_vim']

@@ -4,12 +4,17 @@ from collections import namedtuple  # type: ignore
 import abc
 import inspect
 import threading
+import asyncio
+import concurrent.futures
+import importlib
+from contextlib import contextmanager
 
 from toolz.itertoolz import cons  # type: ignore
 
 from fn import _  # type: ignore
 
 import tryp
+import trypnv
 from trypnv.logging import Logging
 
 from tryp import Maybe, List, Map, may, Empty, curried
@@ -19,6 +24,9 @@ class Message(object):
 
     def __str__(self):
         return 'Message({})'.format(self.__class__.__name__)
+
+    def __repr__(self):
+        return str(self)
 
     @property
     def pub(self):
@@ -33,6 +41,17 @@ class Publish(Message):
 
     def __init__(self, message: Message) -> None:
         self.message = message
+
+    def __str__(self):
+        return 'Publish({})'.format(str(self.message))
+
+
+class Nop(Message):
+    pass
+
+
+class Quit(Message):
+    pass
 
 
 def is_seq(a):
@@ -59,6 +78,12 @@ class Data(object):
     pass
 
 
+class Callback(Message):
+
+    def __init__(self, func: Callable[[Data], Any]):
+        self.func = func
+
+
 class MachineError(RuntimeError):
     pass
 
@@ -77,13 +102,8 @@ class Machine(Logging):
             .map(lambda a: (a.message, a))
         self._message_handlers = Map(handler_map)
         self._default_handler = Handler('unhandled', None, self.unhandled)
-        self._lock = threading.RLock()
 
     def process(self, data: Data, msg) -> Tuple[Data, List[Publish]]:
-        with self._lock:
-            return self._unsafe_process(data, msg)
-
-    def _unsafe_process(self, data: Data, msg) -> Tuple[Data, List[Publish]]:
         handler = self._message_handlers\
             .get(type(msg))\
             .get_or_else(lambda: self._default_handler)
@@ -98,8 +118,10 @@ class Machine(Logging):
             if not isinstance(result, Maybe):
                 raise MachineError('result is not Maybe: {}'.format(result))
         except Exception as e:
+            import traceback
             err = 'transition "{}" failed for {} in {}: {}'
             self.log.error(err.format(handler.name, msg, self.name, e))
+            self.log.error(traceback.format_exc())
             if tryp.development:
                 raise e
             result = Empty()
@@ -122,7 +144,7 @@ class Machine(Logging):
     def _resend(self, env, msgs: List[Message]) -> Tuple[Data, List[Publish]]:
         def sender(z, m):
             e, p = z
-            e2, p2 = self._unsafe_process(e, m)
+            e2, p2 = self.process(e, m)
             return e2, p + p2
         pub, send = msgs.split_type(Publish)
         return send.fold_left((env, pub))(sender)
@@ -149,10 +171,14 @@ def may_handle(msg: type):
     return may_wrap
 
 
-class StateMachine(Machine, metaclass=abc.ABCMeta):
+class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
 
     def __init__(self, name: str, sub: List[Machine]=List()) -> None:
-        self.restart()
+        threading.Thread.__init__(self)
+        self.done = None
+        self._loop = asyncio.new_event_loop()  # type: ignore
+        self._messages = asyncio.Queue(loop=self._loop)
+        self.data = self.init()
         self.sub = sub
         Machine.__init__(self, name)
 
@@ -160,19 +186,57 @@ class StateMachine(Machine, metaclass=abc.ABCMeta):
     def init(self) -> Data:
         ...
 
-    def restart(self):
-        self._data = self.init()
+    def run(self):
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_until_complete(self.main())
+
+    def stop(self):
+        if self.done is not None:
+            self.send(Quit())
+            self.done.result(10)
+
+    async def main(self):
+        self.done = concurrent.futures.Future()
+        try:
+            while not self.done.done():
+                msg = await self._messages.get()
+                for pub in self._send(msg):
+                    await self._messages.put(pub)
+                self._messages.task_done()
+        except Exception as e:
+            self.log.error('error while running state machine: {}'.format(e))
 
     def send(self, msg: Message):
-        self._data = self._send(self._data, msg)
-        return self._data
+        status = asyncio.run_coroutine_threadsafe(
+            self._messages.put(msg), self._loop)
+        if not trypnv.in_vim:
+            status.result(10)
 
-    def _send(self, data: Data, msg: Message):
-        d2, pub = self.process(data, msg)
-        return self._publish_results(d2, pub)
+    def send_wait(self, msg: Message):
+        self.send(msg)
+        return self.await_state()
 
-    def _publish_results(self, data: Data, pub: List[Publish]):
-        return pub.map(_.message).fold_left(data)(self._send)
+    def await_state(self):
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(self._messages.join())
+        loop.close()
+        return self.data
+
+    def _send(self, msg: Message):
+        self.data, pub = self.process(self.data, msg)
+        return pub.map(_.message)
+
+    @may_handle(Nop)
+    def _nop(self, data: Data, msg: Quit):
+        pass
+
+    @may_handle(Quit)
+    def _quit(self, data: Data, msg: Quit):
+        self.done.set_result(True)
+
+    @may_handle(Callback)
+    def message_callback(self, data: Data, msg: Callback):
+        return msg.func(data)
 
     @may
     def unhandled(self, data, msg):
@@ -183,4 +247,44 @@ class StateMachine(Machine, metaclass=abc.ABCMeta):
         d, m = self.sub.fold_left((data, List()))(send)
         return List(*cons(d, m))
 
-__all__ = ['Machine', 'Message', 'StateMachine']
+    @contextmanager
+    def transient(self):
+        self.start()
+        self.send(Nop())
+        yield self
+        self.stop()
+
+
+class PluginStateMachine(StateMachine):
+
+    def __init__(self, name, plugins: List[str]):
+        StateMachine.__init__(self, name)
+        self.sub = plugins.flat_map(self.start_plugin)
+
+    @may
+    def start_plugin(self, path: str):
+        try:
+            mod = importlib.import_module(path)
+        except ImportError as e:
+            msg = 'invalid {} plugin module "{}": {}'
+            self.log.error(msg.format(self.name, path, e))
+        else:
+            if hasattr(mod, 'Plugin'):
+                name = path.split('.')[-1]
+                return getattr(mod, 'Plugin')(name, self.vim)
+
+    def plugin(self, name):
+        return self.sub.find(_.name == name)
+
+    def plug_command(self, plug_name: str, cmd_name: str, args: list):
+        plug = self.plugin(plug_name)
+        cmd = plug.flat_map(lambda a: a.command(cmd_name, List(args)))
+        plug.zip(cmd).smap(self.send_plug_command)
+
+    def send_plug_command(self, plug, msg):
+        self.log.debug('sending command {} to plugin {}'.format(msg,
+                                                                plug.name))
+        self.data, pub = plug.process(self.data, msg)
+        pub.map(_.message).foreach(self._messages.put_nowait)
+
+__all__ = ['Machine', 'Message', 'StateMachine', 'PluginStateMachine']
