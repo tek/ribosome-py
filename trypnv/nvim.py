@@ -7,6 +7,8 @@ import concurrent.futures
 from contextlib import contextmanager
 import asyncio
 
+import neovim
+
 from fn import _  # type: ignore
 
 from tryp import Maybe, may, List, Map, Boolean
@@ -204,11 +206,14 @@ class NvimComponent(object):
 
 class NvimFacade(NvimComponent):
 
-    def __init__(self, vim, prefix: str) -> None:
+    def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
         super(NvimFacade, self).__init__(vim, vim, prefix)
 
     def cmd(self, line: str):
         return self.vim.command(line, async=True)
+
+    def cmd_sync(self, line: str):
+        return self.vim.command(line, async=False)
 
     def echo(self, text: str):
         self.cmd(echo(text, 'echo'))
