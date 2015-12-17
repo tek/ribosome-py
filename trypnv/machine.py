@@ -119,9 +119,8 @@ class Machine(Logging):
                 raise MachineError('result is not Maybe: {}'.format(result))
         except Exception as e:
             import traceback
-            err = 'transition "{}" failed for {} in {}: {}'
-            self.log.error(err.format(handler.name, msg, self.name, e))
-            self.log.error(traceback.format_exc())
+            err = 'transition "{}" failed for {} in {}'
+            self.log.exception(err.format(handler.name, msg, self.name))
             if tryp.development:
                 raise e
             result = Empty()
