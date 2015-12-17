@@ -107,8 +107,13 @@ class NvimComponent(object):
         return decode(v)
 
     def set_var(self, name, value):
-        self.target.vars[name] = value
-        self._vars.add(name)
+        try:
+            self.target.vars[name] = value
+        except:
+            msg = 'setting vim variable {} to {}'
+            self.log.exception(msg.format(name, value))
+        else:
+            self._vars.add(name)
 
     def pvar(self, name) -> Maybe[str]:
         return self.var(self.prefixed(name))
