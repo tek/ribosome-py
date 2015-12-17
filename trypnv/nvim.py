@@ -130,6 +130,10 @@ class NvimComponent(object):
     def ppath(self, name: str) -> Maybe[Path]:
         return self.path(self.prefixed(name))
 
+    def ppathl(self, name: str) -> Maybe[Path]:
+        return self.pl(name)\
+            .map(lambda l: l.map(lambda a: Path(a).expanduser()))
+
     def dir(self, name: str) -> Maybe[Path]:
         var = self.path(name)
         val = var.filter(_.call('is_dir'))
