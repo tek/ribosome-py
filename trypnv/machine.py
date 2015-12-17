@@ -216,9 +216,8 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         return self.await_state()
 
     def await_state(self):
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(self._messages.join())
-        loop.close()
+        asyncio.run_coroutine_threadsafe(self._messages.join(), self._loop)\
+            .result(5)
         return self.data
 
     def _send(self, msg: Message):
