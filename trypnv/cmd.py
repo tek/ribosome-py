@@ -1,4 +1,4 @@
-from typing import Callable, Any
+from typing import Callable, Any, Tuple
 import inspect
 import json
 
@@ -6,7 +6,7 @@ import neovim  # type: ignore
 
 from fn import _  # type: ignore
 
-from tryp import List, Maybe, may, Just
+from tryp import List, Maybe, may, Just, Map
 
 from trypnv.logging import log
 
@@ -179,16 +179,17 @@ class JsonMessageCommand(MessageCommand):
 
     @property
     def min(self):
-        return self._param_count
+        return self._param_count - 1
 
     @property  # type: ignore
     @may
     def max(self):
         pass
 
-    def _extract_args(self, args: List[str]):
-        pos_args, json_args = args[:self.min - 1], args[self.min - 1:]
-        return pos_args + [json.loads(' '.join(json_args))]
+    def _extract_args(self, args: Tuple[str]):
+        pos_args, json_args = args[:self.min], args[self.min:]
+        params = json.loads(' '.join(json_args)) if json_args else {}
+        return pos_args + (Map(params),)
 
     def _call_fun(self, obj, *args):
         try:
