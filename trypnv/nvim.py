@@ -215,6 +215,9 @@ class NvimFacade(NvimComponent):
     def cmd_sync(self, line: str):
         return self.vim.command(line, async=False)
 
+    def runtime(self, path: str):
+        return self.cmd('runtime! {}.vim'.format(path))
+
     def echo(self, text: str):
         self.cmd(echo(text, 'echo'))
 
