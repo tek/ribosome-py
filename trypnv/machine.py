@@ -11,13 +11,16 @@ from contextlib import contextmanager
 
 from toolz.itertoolz import cons  # type: ignore
 
-from fn import _  # type: ignore
+from fn import F, _  # type: ignore
 
 import tryp
 import trypnv
 from trypnv.logging import Logging
+from trypnv.cmd import StateCommand
 
 from tryp import Maybe, List, Map, may, Empty, curried
+
+from tek.tools import camelcaseify
 
 
 class Message(object):
@@ -151,6 +154,22 @@ class Machine(Logging):
     @may
     def unhandled(self, data: Data, msg: Message):
         pass
+
+    def _command_by_message_name(self, name: str):
+        msg_name = camelcaseify(name)
+        return self._message_handlers\
+            .find_key(lambda a: a.__name__ == msg_name)
+
+    def command(self, name: str, args: list):
+        return self._command_by_message_name(name)\
+            .map(lambda a: StateCommand(a[0]))\
+            .map(_.call('dispatch', self, args))\
+            .or_else(F(self._invalid_command, name))
+
+    def _invalid_command(self, name):
+        self.log.error(
+            'plugin "{}" has no command "{}"'.format(self.name, name))
+        return Empty()
 
 
 A = TypeVar('A')
