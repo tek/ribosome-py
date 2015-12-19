@@ -7,23 +7,85 @@ import threading
 import asyncio
 import concurrent.futures
 import importlib
+import functools
+from copy import copy
+import time
 from contextlib import contextmanager
 
 from toolz.itertoolz import cons  # type: ignore
 
 from fn import F, _  # type: ignore
 
+from pyrsistent import PRecord, field
+from pyrsistent._precord import _PRecordMeta
+
 import tryp
 import trypnv
 from trypnv.logging import Logging
 from trypnv.cmd import StateCommand
 
-from tryp import Maybe, List, Map, may, Empty, curried
+from tryp import Maybe, List, Map, may, Empty, curried, Just
+from tryp.lazy import lazy
 
 from tek.tools import camelcaseify
 
 
-class Message(object):
+class MessageMeta(_PRecordMeta):
+
+    @classmethod
+    def __prepare__(cls, name, bases, **kw):
+        return super().__prepare__(cls, name, bases, **kw)
+
+    # FIXME opt_fields order is lost
+    def __new__(
+            cls, name, bases, namespace, fields=[], opt_fields=[],
+            varargs=None, **kw
+    ):
+        ''' create a subclass of PRecord
+        **fields** is a list of strings used as names of mandatory
+        PRecord fields
+        **opt_fields** is a list of (string, default) used as fields
+        with initial values
+        the order of the names is preserved in **_field_order**
+        **_field_count_min** and **_field_count_max** are used by
+        `MessageCommand`
+        '''
+        for fname in fields:
+            namespace[fname] = field(mandatory=True)
+        for fname, val in opt_fields:
+            namespace[fname] = field(mandatory=True, initial=val)
+        if varargs:
+            namespace[varargs] = field(mandatory=True, initial=List())
+        inst = super().__new__(cls, name, bases, namespace, **kw)
+        inst._field_varargs = varargs
+        inst._field_order = list(fields) + List(*opt_fields).map(_[0])
+        inst._field_count_min = len(fields)
+        inst._field_count_max = (Empty() if varargs else
+                                 Just(inst._field_count_min + len(opt_fields)))
+        return inst
+
+    def __init__(cls, name, bases, namespace, **kw):
+        super().__init__(name, bases, namespace)
+
+
+@functools.total_ordering
+class Message(PRecord, metaclass=MessageMeta):
+    time = field(type=float, mandatory=True)
+    prio = field(type=float, mandatory=True, initial=0.5)
+
+    def __new__(cls, *fields, **kw):
+        field_map = (
+            Map({cls._field_varargs: fields}) if cls._field_varargs
+            else Map(zip(cls._field_order, fields))
+        )
+        ext_kw = field_map ** kw + ('time', time.time())
+        return super().__new__(cls, **ext_kw)
+
+    def __init__(self, *args, **kw):
+        ''' this is necessary to catch the call from pyrsistent's
+        evolver that is initializing instances
+        '''
+        pass
 
     def __str__(self):
         return 'Message({})'.format(self.__class__.__name__)
@@ -35,15 +97,25 @@ class Message(object):
     def pub(self):
         return Publish(self)
 
+    def __lt__(self, other):
+        if isinstance(other, Message):
+            if self.prio == other.prio:
+                return self.time < self.time
+            else:
+                return self.prio < other.prio
+        else:
+            return True
 
-def message(name, *fields):
-    return type.__new__(type, name, (Message, namedtuple(name, fields)), {})
+    def at(self, prio):
+        return self.set(prio=float(prio))
 
 
-class Publish(Message):
+def message(name, *fields, **kw):
+    return MessageMeta.__new__(MessageMeta, name, (Message,), {},
+                               fields=fields, **kw)
 
-    def __init__(self, message: Message) -> None:
-        self.message = message
+
+class Publish(Message, fields=('message',)):
 
     def __str__(self):
         return 'Publish({})'.format(str(self.message))
@@ -91,6 +163,10 @@ class MachineError(RuntimeError):
     pass
 
 
+class TransitionFailed(MachineError):
+    pass
+
+
 class Machine(Logging):
     machine_attr = '_machine'
     message_attr = '_message'
@@ -125,7 +201,7 @@ class Machine(Logging):
             err = 'transition "{}" failed for {} in {}'
             self.log.exception(err.format(handler.name, msg, self.name))
             if tryp.development:
-                raise e
+                raise TransitionFailed() from e
             result = Empty()
         return result
 
@@ -158,7 +234,7 @@ class Machine(Logging):
     def _command_by_message_name(self, name: str):
         msg_name = camelcaseify(name)
         return self._message_handlers\
-            .find_key(lambda a: a.__name__ == msg_name)
+            .find_key(lambda a: a.__name__ in [name, msg_name])
 
     def command(self, name: str, args: list):
         return self._command_by_message_name(name)\
@@ -195,9 +271,10 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         threading.Thread.__init__(self)
         self.done = None
         self._loop = asyncio.new_event_loop()  # type: ignore
-        self._messages = asyncio.Queue(loop=self._loop)
+        self._messages = asyncio.PriorityQueue(loop=self._loop)
         self.data = self.init()
         self.sub = sub
+        self._wait_for_message = Map()
         Machine.__init__(self, name)
 
     @abc.abstractmethod
@@ -222,9 +299,10 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
                     await self._messages.put(pub)
                 self._messages.task_done()
         except Exception as e:
-            self.log.error('error while running state machine: {}'.format(e))
+            self.log.exception('while running state machine')
 
-    def send(self, msg: Message):
+    def send(self, msg: Message, prio=0.5):
+        self.log.verbose('send {}'.format(msg))
         status = asyncio.run_coroutine_threadsafe(
             self._messages.put(msg), self._loop)
         if not trypnv.in_vim:
@@ -240,8 +318,12 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         return self.data
 
     def _send(self, msg: Message):
-        self.data, pub = self.process(self.data, msg)
-        return pub.map(_.message)
+        try:
+            self.data, pub = self.process(self.data, msg)
+        except TransitionFailed as e:
+            return []
+        else:
+            return pub.map(_.message)
 
     @may_handle(Nop)
     def _nop(self, data: Data, msg: Quit):

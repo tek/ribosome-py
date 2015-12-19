@@ -154,6 +154,14 @@ class MessageCommand(Command):
     def _infer_name(self):
         return camelcaseify(self._fun_name)
 
+    @property
+    def min(self):
+        return self._message._field_count_min
+
+    @property
+    def max(self):
+        return self._message._field_count_max
+
     def _call_fun(self, obj, *args):
         if isinstance(obj, trypnv.NvimStatePlugin):
             obj.state().send(self._message(*args))
@@ -179,7 +187,7 @@ class JsonMessageCommand(MessageCommand):
 
     @property
     def min(self):
-        return self._param_count - 1
+        return super().min - 1
 
     @property  # type: ignore
     @may

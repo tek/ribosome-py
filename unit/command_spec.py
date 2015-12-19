@@ -137,7 +137,7 @@ class Command_(Spec, ):
             pass
         c = Command(fun)
         c.min.should.equal(1)
-        c.max.isJust.should_not.be.ok
+        c.max.is_just.should_not.be.ok
         c.check_length([]).should_not.be.ok
         c.check_length([1]).should.be.ok
         c.check_length([1, 2]).should.be.ok

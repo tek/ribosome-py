@@ -137,7 +137,7 @@ class NvimComponent(object):
     def dir(self, name: str) -> Maybe[Path]:
         var = self.path(name)
         val = var.filter(_.call('is_dir'))
-        if not val.isJust:
+        if not val.is_just:
             msg = 'g:{} is not a directory ({})'
             self.log.error(msg.format(name, var))
         return val
