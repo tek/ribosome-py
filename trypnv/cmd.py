@@ -195,7 +195,7 @@ class JsonMessageCommand(MessageCommand):
         pass
 
     def _extract_args(self, args: Tuple[str]):
-        pos_args, json_args = args[:self.min], args[self.min:]
+        pos_args, json_args = tuple(args[:self.min]), tuple(args[self.min:])
         params = json.loads(' '.join(json_args)) if json_args else {}
         return pos_args + (Map(params),)
 
