@@ -184,7 +184,7 @@ class NvimComponent(object):
         v = self.target.options.get(name)
         if v is None:
             self.log.debug('variable not found: {}'.format(name))
-        return v
+        return decode(v)
 
     def set_option(self, name: str, value: str):
         self.target.options[name] = str(value)
