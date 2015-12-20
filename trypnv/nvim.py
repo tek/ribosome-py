@@ -12,7 +12,7 @@ from neovim.api import NvimError
 
 from fn import _  # type: ignore
 
-from tryp import Maybe, may, List, Map, Boolean
+from tryp import Maybe, may, List, Map, Boolean, Empty, Just
 
 from tek.tools import camelcaseify  # type: ignore
 
@@ -31,11 +31,12 @@ def quote(text):
 A = TypeVar('A')
 
 
-def echo(text, cmd='echom'):
-    return '{} "{}"'.format(cmd, dquote(text))
+def echo(text, cmd='echom', prefix=Empty()):
+    pre = prefix.map(_ + ': ') | ''
+    return '{} "{}{}"'.format(cmd, pre, dquote(text))
 
 
-def echohl(text, hl):
+def echohl(text, hl, prefix=Empty()):
     return 'echohl {} | {} | echohl None'.format(hl, echo(text))
 
 
@@ -227,13 +228,13 @@ class NvimFacade(NvimComponent):
         return self.cmd('runtime! {}.vim'.format(path))
 
     def echo(self, text: str):
-        self.cmd(echo(text, 'echo'))
+        self.cmd(echo(text, 'echo', prefix=Empty()))
 
     def echom(self, text: str):
-        self.cmd(echo(text))
+        self.cmd(echo(text, prefix=Just(self.prefix)))
 
     def echohl(self, hl: str, text: str):
-        self.cmd(echohl(text, hl))
+        self.cmd(echohl(text, hl, prefix=Just(self.prefix)))
 
     def echowarn(self, text: str):
         self.echohl('WarningMsg', text)

@@ -77,6 +77,7 @@ class Job(object):
     def run(self):
         self.loop.run_until_complete(self.status)
 
+
 class ProcessExecutor(Logging):
     ''' Handler for subprocess execution
     Because python handles signals only on the main thread and
