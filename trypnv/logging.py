@@ -38,7 +38,7 @@ def nvim_logging(vim: NvimFacade, level: int=None):
         handler = NvimHandler(vim)
         trypnv_root_logger.addHandler(handler)
         handler.setLevel(logging.INFO)
-        init_loglevel(tryp_root_logger)
+        init_loglevel(trypnv_root_logger, logging.INFO)
         _nvim_logging_initialized = True
 
 
