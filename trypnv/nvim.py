@@ -8,6 +8,7 @@ from contextlib import contextmanager
 import asyncio
 
 import neovim
+from neovim.api import NvimError
 
 from fn import _  # type: ignore
 
@@ -187,7 +188,10 @@ class NvimComponent(object):
         return decode(v)
 
     def set_option(self, name: str, value: str):
-        self.target.options[name] = str(value)
+        try:
+            self.target.options[name] = str(value)
+        except NvimError as e:
+            self.log.error(e)
 
     def options(self, name: str):
         return self.typed(str, self.option(name))
