@@ -23,6 +23,7 @@ import tryp
 import trypnv
 from trypnv.logging import Logging
 from trypnv.cmd import StateCommand
+from trypnv.data import Data
 
 from tryp import Maybe, List, Map, may, Empty, curried, Just
 from tryp.lazy import lazy
@@ -147,10 +148,6 @@ class Handler(object):
     @staticmethod
     def create(name, fun):
         return Handler(name, getattr(fun, Machine.message_attr), fun)
-
-
-class Data(object):
-    pass
 
 
 class Callback(Message):
