@@ -156,6 +156,9 @@ class Callback(Message):
         self.func = func
 
 
+Error = message('Error', 'message')
+
+
 class MachineError(RuntimeError):
     pass
 
