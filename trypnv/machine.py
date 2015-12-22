@@ -386,4 +386,4 @@ class PluginStateMachine(StateMachine):
         self.data, pub = plug.process(self.data, msg)
         pub.map(_.message).foreach(self._messages.put_nowait)
 
-__all__ = ['Machine', 'Message', 'StateMachine', 'PluginStateMachine']
+__all__ = ['Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Error']
