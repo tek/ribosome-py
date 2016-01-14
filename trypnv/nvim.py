@@ -317,7 +317,7 @@ class Flags(object):
 
     def get(self, name, default=False):
         v = (self.vim.pvar(name) if self.prefix else self.vim.var(name))\
-            .get_or_else(False)
+            .get_or_else(default)
         return Boolean(v)
 
     def __getattr__(self, name):
