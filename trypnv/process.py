@@ -114,10 +114,10 @@ class ProcessExecutor(Logging):
             out = await proc.stdout.read()
             err = await proc.stderr.read()
             msg = '{} executed successfully ({}, {})'.format(job, out, err)
-            self.log.verbose(msg)
+            self.log.debug(msg)
             return proc.returncode, out.decode(), err.decode()
         except Exception as e:
-            self.log.verbose('{} failed with {}'.format(job, e))
+            self.log.error('{} failed with {}'.format(job, e))
             return -111, '', 'exception: {}'.format(e)
 
     def run(self, job: Job) -> Future[Result]:
@@ -125,7 +125,7 @@ class ProcessExecutor(Logging):
         returned by ensure_future(), obtainable via task.result()
         '''
         if self._can_execute(job):
-            self.log.verbose('executing {}'.format(job))
+            self.log.debug('executing {}'.format(job))
             task = asyncio.ensure_future(self._execute(job), loop=self.loop)
             task.add_done_callback(job.finish)
             task.add_done_callback(F(self.job_done, job))
@@ -139,7 +139,7 @@ class ProcessExecutor(Logging):
         return job.owner not in self.current and job.valid
 
     def job_done(self, job, status):
-        self.log.verbose('{} is done with status {}'.format(job, status))
+        self.log.debug('{} is done with status {}'.format(job, status))
         if job.owner in self.current:
             self.current.pop(job.owner)
 
