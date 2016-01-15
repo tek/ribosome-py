@@ -149,6 +149,9 @@ class Handler(object):
     def create(name, fun):
         return Handler(name, getattr(fun, Machine.message_attr), fun)
 
+    def run(self, data, msg):
+        return self.fun(data, msg)
+
 
 class Callback(Message):
 
@@ -174,6 +177,9 @@ class Machine(Logging):
 
     def __init__(self, name: str) -> None:
         self.name = name
+        self._setup_handlers()
+
+    def _setup_handlers(self):
         handlers = inspect.getmembers(self,
                                       lambda a: hasattr(a, self.machine_attr))
         handler_map = List.wrap(handlers)\
@@ -183,21 +189,23 @@ class Machine(Logging):
         self._default_handler = Handler('unhandled', None, self.unhandled)
 
     def process(self, data: Data, msg) -> Tuple[Data, List[Publish]]:
-        handler = self._message_handlers\
-            .get(type(msg))\
-            .get_or_else(lambda: self._default_handler)
+        handler = self._resolve_handler(msg)
         return self._execute_transition(handler, data, msg)\
             .map(self._process_result(data))\
             .smap(self._resend)\
             .get_or_else((data, List()))
 
+    def _resolve_handler(self, msg):
+        return self._message_handlers\
+            .get(type(msg))\
+            .get_or_else(lambda: self._default_handler)
+
     def _execute_transition(self, handler, data, msg):
         try:
-            result = handler.fun(data, msg)
+            result = handler.run(data, msg)
             if not isinstance(result, Maybe):
                 raise MachineError('result is not Maybe: {}'.format(result))
         except Exception as e:
-            import traceback
             err = 'transition "{}" failed for {} in {}'
             self.log.exception(err.format(handler.name, msg, self.name))
             if tryp.development:
@@ -248,6 +256,69 @@ class Machine(Logging):
         return Empty()
 
 
+class Transitions(object):
+    State = Map
+
+    def __init__(self, machine: Machine, data: Data, msg: Message):
+        self.machine = machine
+        self.data = data
+        self.msg = msg
+
+    @property
+    def name(self):
+        return self.machine.name
+
+    @property
+    def log(self):
+        return self.machine.log
+
+    @lazy
+    def local(self):
+        if isinstance(self.data, Data):
+            return self.data.sub_state(self.name, lambda: self._mk_state)
+        else:
+            return self._mk_state
+
+    @property
+    def _mk_state(self):
+        return self.State()
+
+    def with_local(self, new_data):
+        return self.data.with_sub_state(self.name, new_data)
+
+
+class WrappedHandler(object):
+
+    def __init__(self, machine, name, message, tpe, fun):
+        self.machine = machine
+        self.name = name
+        self.message = message
+        self.tpe = tpe
+        self.fun = fun
+
+    @staticmethod
+    def create(machine, name, tpe, fun):
+        return WrappedHandler(machine, name,
+                              getattr(fun, Machine.message_attr), tpe, fun)
+
+    def run(self, data, msg):
+        return self.fun(self.tpe(self.machine, data, msg))
+
+
+class ModularMachine(Machine):
+    Transitions = Transitions
+
+    def _setup_handlers(self):
+        super()._setup_handlers()
+        handlers = inspect.getmembers(self.Transitions,
+                                      lambda a: hasattr(a, self.machine_attr))
+        handler_map = List.wrap(handlers)\
+            .smap(lambda n, f: WrappedHandler.create(self, n, self.Transitions,
+                                                     f))\
+            .map(lambda a: (a.message, a))
+        self._message_handlers = self._message_handlers ** handler_map
+
+
 A = TypeVar('A')
 
 
@@ -277,9 +348,8 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         self._wait_for_message = Map()
         Machine.__init__(self, name)
 
-    @abc.abstractmethod
     def init(self) -> Data:
-        ...
+        return self._data_type()
 
     def run(self):
         asyncio.set_event_loop(self._loop)
@@ -305,8 +375,6 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         self.log.verbose('send {}'.format(msg))
         status = asyncio.run_coroutine_threadsafe(
             self._messages.put(msg), self._loop)
-        if not trypnv.in_vim:
-            status.result(10)
 
     def send_wait(self, msg: Message):
         self.send(msg)
