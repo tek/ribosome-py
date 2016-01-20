@@ -505,17 +505,51 @@ class AsyncVimProxy(object):
         else:
             return getattr(self.vim, name)
 
-    @property
-    def current_buffer(self):
-        return self.async_relay('current_buffer').proxy
+
+class ScratchBuilder(PRecord):
+    params = dfield(Map())
 
     @property
-    def buffers(self):
-        return self.async_relay('buffers').map(_.proxy)
+    def tab(self):
+        return self.copy(tab=True)
+
+    def copy(self, **kw):
+        return ScratchBuilder(self.params ** kw)
+
+    @property
+    def build(self):
+        return (
+            NvimIO(self._setup_tab) /
+            self._setup_buffer /
+            (lambda a: ScratchBuffer(*a))
+        )
+
+    def _setup_tab(self, vim):
+        tab = vim.tabnew()
+        tab.window.set_optionb('wrap', False)
+        return tab
+
+    def _setup_buffer(self, tab):
+        buffer = tab.bufnew()
+        buffer.set_options('buftype', 'nofile')
+        buffer.set_options('bufhidden', 'wipe')
+        buffer.set_optionb('buflisted', False)
+        buffer.set_optionb('swapfile', False)
+        return (tab, buffer)
 
 
-class Buffer(NvimComponent):
-    pass
+class ScratchBuffer(HasTab):
+
+    def __init__(self, tab, buffer):
+        self._tab = tab
+        self._buffer = buffer
+
+    @property
+    def _internal_tab(self):
+        return self._tab
+
+    def set_content(self, text):
+        return self._buffer.set_content(text)
 
 
 class Flags(object):
