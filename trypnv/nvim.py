@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import asyncio
 from datetime import datetime
 import abc
+from types import FunctionType
 
 import neovim
 from neovim.api import NvimError
@@ -470,20 +471,20 @@ class NvimIO(Generic[A]):
 
 class AsyncVimCallProxy(object):
 
-    def __init__(self, vim, name):
-        self.vim = vim
+    def __init__(self, target, name):
+        self._target = target
         self.name = name
 
     def __call__(self, *a, **kw):
-        return self.vim.async(lambda v: getattr(v, self.name)(*a, **kw))
+        return self._target.async(lambda v: getattr(v, self.name)(*a, **kw))
 
 
 class AsyncVimProxy(object):
     allow_async_relay = True
 
-    def __init__(self, vim):
-        self.vim = vim
-        self.vim_tpe = type(vim)
+    def __init__(self, target):
+        self._target = target
+        self._target_tpe = type(target)
 
     @property
     def _need_relay(self):
@@ -494,16 +495,22 @@ class AsyncVimProxy(object):
         if self._need_relay:
             return self.async_relay(name)
         else:
-            return getattr(self.vim, name)
+            return getattr(self._target, name)
 
     def async_relay(self, name):
-        if (hasattr(self.vim_tpe, name) and
-                isinstance(getattr(self.vim_tpe, name), property)):
-            return self.vim.async(lambda v: getattr(v, name))
-        elif hasattr(self.vim, name):
-            return AsyncVimCallProxy(self.vim, name)
+        if (hasattr(self._target_tpe, name)):
+            attr = getattr(self._target_tpe, name)
+            if isinstance(attr, FunctionType):
+                return AsyncVimCallProxy(self._target, name)
+            elif isinstance(attr, property):
+                return self._async_attr(name)
+        elif hasattr(self._target, name):
+            return self._async_attr(name)
         else:
-            return getattr(self.vim, name)
+            return getattr(self._target, name)
+
+    def _async_attr(self, name):
+        return self._target.async(lambda v: getattr(v, name))
 
 
 class ScratchBuilder(PRecord):
