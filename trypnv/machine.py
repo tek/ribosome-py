@@ -377,8 +377,11 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         self.send(msg)
         return self.await_state()
 
+    async def join(self):
+        await self._messages.join()
+
     def await_state(self):
-        asyncio.run_coroutine_threadsafe(self._messages.join(), self._loop)\
+        asyncio.run_coroutine_threadsafe(self.join(), self._loop)\
             .result(5)
         return self.data
 
