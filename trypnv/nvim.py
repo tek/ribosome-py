@@ -479,13 +479,19 @@ class AsyncVimCallProxy(object):
 
 
 class AsyncVimProxy(object):
+    allow_async_relay = True
 
     def __init__(self, vim):
         self.vim = vim
         self.vim_tpe = type(vim)
 
+    @property
+    def _need_relay(self):
+        return (self.allow_async_relay and
+                threading.current_thread() != threading.main_thread())
+
     def __getattr__(self, name):
-        if threading.current_thread() != threading.main_thread():
+        if self._need_relay:
             return self.async_relay(name)
         else:
             return getattr(self.vim, name)
