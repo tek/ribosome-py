@@ -1,6 +1,6 @@
 import pyrsistent  # type: ignore
 
-from tryp import List, Empty, Maybe, Map
+from tryp import List, Empty, Maybe, Map, Boolean
 
 from typing import Callable
 
@@ -23,6 +23,10 @@ def maybe_field(tpe, initial=Empty(), **kw):
     return field(Maybe, initial=initial, invariant=inv, **kw)
 
 
+def bool_field(**kw):
+    return field(Boolean, factory=Boolean.wrap, **kw)
+
+
 class Data(pyrsistent.PRecord):
     sub_states = field(Map, initial=Map())
 
@@ -33,4 +37,5 @@ class Data(pyrsistent.PRecord):
         new_states = self.sub_states + (name, state)
         return self.set(sub_states=new_states)
 
-__all__ = ('field', 'Data', 'list_field', 'dfield', 'maybe_field')
+__all__ = ('field', 'Data', 'list_field', 'dfield', 'maybe_field',
+           'bool_field')
