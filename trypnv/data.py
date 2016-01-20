@@ -18,7 +18,8 @@ def dfield(default, **kw):
 
 
 def maybe_field(tpe, initial=Empty(), **kw):
-    inv = lambda a: not a.exists(lambda b: not isinstance(b, tpe))
+    err = 'must be Maybe[{}]'.format(tpe)
+    inv = lambda a: (not a.exists(lambda b: not isinstance(b, tpe)), err)
     return field(Maybe, initial=initial, invariant=inv, **kw)
 
 
