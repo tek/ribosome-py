@@ -443,7 +443,7 @@ class PluginStateMachine(StateMachine):
     def plugin(self, name):
         return self.sub.find(_.name == name)
 
-    def plug_command(self, plug_name: str, cmd_name: str, args: list):
+    def plug_command(self, plug_name: str, cmd_name: str, args: list=[]):
         plug = self.plugin(plug_name)
         cmd = plug.flat_map(lambda a: a.command(cmd_name, List(args)))
         plug.zip(cmd).smap(self.send_plug_command)
@@ -454,4 +454,4 @@ class PluginStateMachine(StateMachine):
         self.data, pub = plug.process(self.data, msg)
         pub.map(_.message).foreach(self._messages.put_nowait)
 
-__all__ = ['Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Error']
+__all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Error')
