@@ -34,10 +34,6 @@ from tek.tools import camelcaseify
 
 class MessageMeta(_PRecordMeta):
 
-    @classmethod
-    def __prepare__(cls, name, bases, **kw):
-        return super().__prepare__(cls, name, bases, **kw)
-
     # FIXME opt_fields order is lost
     def __new__(
             cls, name, bases, namespace, fields=[], opt_fields=[],
