@@ -369,7 +369,7 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
             self.log.exception('while running state machine')
 
     def send(self, msg: Message, prio=0.5):
-        self.log.verbose('send {}'.format(msg))
+        self.log.debug('send {}'.format(msg))
         status = asyncio.run_coroutine_threadsafe(
             self._messages.put(msg), self._loop)
 
