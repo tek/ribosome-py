@@ -389,6 +389,15 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def echoerr(self, text: str):
         self.echohl('ErrorMsg', text)
 
+    def multi_line_info(self, text: List[str]):
+        ''' as a workaround for possible bug in embedded nvim,
+        only write in bulk when in production
+        '''
+        if tryp.integration_test:
+            text.foreach(self.log.info)
+        else:
+            self.log.info('\n'.join(text))
+
     def autocmd(self, name):
         self.cmd('silent doautocmd <nomodeline> User {}'.format(name))
 
