@@ -27,6 +27,7 @@ from trypnv.data import Data
 
 from tryp import Maybe, List, Map, may, Empty, curried, Just
 from tryp.lazy import lazy
+from tryp.tc.monad import Monad
 
 from tek.tools import camelcaseify
 
@@ -203,8 +204,8 @@ class Machine(Logging):
     def _execute_transition(self, handler, data, msg):
         try:
             result = handler.run(data, msg)
-            if not isinstance(result, Maybe):
-                raise MachineError('result is not Maybe: {}'.format(result))
+            if not Monad.exists(type(result)):
+                raise MachineError('result has no Monad: {}'.format(result))
         except Exception as e:
             err = 'transition "{}" failed for {} in {}'
             self.log.exception(err.format(handler.name, msg, self.name))
