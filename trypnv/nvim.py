@@ -1,20 +1,28 @@
-from typing import TypeVar, Callable, Any
-import logging
+from typing import TypeVar, Callable, Any, Generic
 from pathlib import Path
 from functools import singledispatch  # type: ignore
 import threading
 import concurrent.futures
 from contextlib import contextmanager
 import asyncio
+from datetime import datetime
+import abc
 
 import neovim
 from neovim.api import NvimError
 
-from fn import _  # type: ignore
+from fn import _, F  # type: ignore
 
-from tryp import Maybe, may, List, Map, Boolean, Empty, Just
+from pyrsistent import PRecord
 
 from tek.tools import camelcaseify  # type: ignore
+
+import tryp
+from tryp import Maybe, may, List, Map, Boolean, Empty, Just, __
+from tryp.either import Either, Right, Left
+
+from trypnv.data import dfield
+from trypnv.logging import Logging
 
 
 def squote(text):
@@ -62,17 +70,13 @@ def decode_dict(value):
         .valmap(decode)
 
 
-class NvimComponent(object):
+class NvimComponent(Logging):
 
     def __init__(self, vim, target, prefix: str) -> None:
         self.vim = vim
         self.target = target
         self.prefix = prefix
         self._vars = set()  # type: set
-
-    @property
-    def log(self):
-        return logging.root
 
     @property
     def loop(self):
@@ -188,14 +192,17 @@ class NvimComponent(object):
             self.log.debug('variable not found: {}'.format(name))
         return decode(v)
 
-    def set_option(self, name: str, value: str):
+    def set_option(self, name: str, value):
         try:
-            self.target.options[name] = str(value)
+            self.target.options[name] = value
         except NvimError as e:
             self.log.error(e)
 
     def options(self, name: str):
         return self.typed(str, self.option(name))
+
+    def set_options(self, name: str, value):
+        return self.set_option(name, str(value))
 
     def optionl(self, name: str) -> List[str]:
         return self.options(name)\
@@ -212,17 +219,157 @@ class NvimComponent(object):
     def set_optionl(self, name: str, value: List[str]):
         self.target.options[name] = ','.join(value)
 
+    def optionb(self, name: str):
+        return self.typed(bool, self.option(name))
 
-class NvimFacade(NvimComponent):
-
-    def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
-        super(NvimFacade, self).__init__(vim, vim, prefix)
+    def set_optionb(self, name: str, value):
+        return self.set_option(name, bool(value))
 
     def cmd(self, line: str):
         return self.vim.command(line, async=True)
 
     def cmd_sync(self, line: str):
         return self.vim.command(line, async=False)
+
+
+class HasBuffer(NvimComponent, metaclass=abc.ABCMeta):
+
+    @property
+    def buffer(self):
+        return Buffer(self.vim, self._internal_buffer, self.prefix).proxy
+
+    @abc.abstractproperty
+    def _internal_buffer(self):
+        ...
+
+
+class HasBuffers(HasBuffer):
+
+    @property
+    def buffers(self):
+        return List(*self._internal_buffers)\
+            .map(lambda a: Buffer(self.vim, a, self.prefix).proxy)
+
+    @property
+    def _internal_buffers(self):
+        return self.vim.buffers
+
+    def bufnew(self):
+        self.cmd('bufnew')
+        return self.buffer
+
+
+class HasWindow(HasBuffer):
+
+    @property
+    def window(self):
+        return Window(self.vim, self._internal_window, self.prefix).proxy
+
+    @abc.abstractproperty
+    def _internal_window(self):
+        ...
+
+    @property
+    def _internal_buffer(self):
+        return self._internal_window.buffer
+
+
+class HasWindows(HasBuffers, HasWindow):
+
+    @property
+    def windows(self):
+        return List(*self._internal_windows)\
+            .map(lambda a: Window(self.vim, a, self.prefix).proxy)
+
+    @property
+    def _internal_windows(self):
+        return self.vim.windows
+
+
+class HasTab(HasWindow):
+
+    @property
+    def tab(self):
+        return Tab(self.vim, self._internal_tab, self.prefix).proxy
+
+    @abc.abstractproperty
+    def _internal_tab(self):
+        ...
+
+    @property
+    def _internal_window(self):
+        return self._internal_tab.window
+
+
+class HasTabs(HasTab):
+
+    @property
+    def tabs(self):
+        return List(*self._internal_tabs)\
+            .map(lambda a: Tab(self.vim, a, self.prefix).proxy)
+
+    @property
+    def _internal_tabs(self):
+        return self.vim.tabpages
+
+    def tabnew(self):
+        self.cmd('tabnew')
+        return self.tab
+
+
+class Buffer(HasWindow):
+
+    @property
+    def _internal_buffer(self):
+        return self.target
+
+    @property
+    def _internal_window(self):
+        return self.window
+
+    @property
+    def modified(self):
+        return self.option('modified').contains(True)
+
+    def set_content(self, text):
+        self.target[:] = text
+
+
+class Window(HasTab):
+
+    @property
+    def _internal_buffer(self):
+        return self.target.buffer
+
+    @property
+    def _internal_tab(self):
+        return self.tabpage
+
+    @property
+    def _internal_window(self):
+        return self.target
+
+    def reload(self):
+        self.focus()
+        if not self.buffer.modified:
+            self.cmd('silent edit')
+
+    # FIXME not constrained to visible tab
+    def focus(self):
+        self.vim.current.window = self.target
+
+
+class Tab(HasWindows):
+
+    @property
+    def _internal_window(self):
+        return self.target.window
+
+
+class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
+
+    def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
+        super(NvimFacade, self).__init__(vim, vim, prefix)
 
     def runtime(self, path: str):
         return self.cmd('runtime! {}.vim'.format(path))
@@ -256,13 +403,27 @@ class NvimFacade(NvimComponent):
         return self.vim.current
 
     @property
-    def current_buffer(self):
-        return Buffer(self.vim, self.current.buffer, self.prefix)
+    def _internal_tab(self):
+        return self.current.tabpage
 
     @property
-    def buffers(self):
-        return List(*self.vim.buffers)\
-            .map(lambda a: Buffer(self.vim, a, self.prefix))
+    def _internal_window(self):
+        return self.current.window
+
+    @property
+    def _internal_buffer(self):
+        return self.current.buffer
+
+    @property
+    def modified(self):
+        return self.buffer.modified
+
+    def reload_window(self):
+        self.window.reload()
+
+    def reload_windows(self):
+        self.windows.foreach(__.reload())
+
 
 
 class AsyncVimCallProxy(object):
@@ -332,4 +493,4 @@ class HasNvim(object):
         self.pflags = Flags(vim, True)
 
 
-__all__ = ['NvimFacade', 'HasNvim']
+__all__ = ('NvimFacade', 'HasNvim')
