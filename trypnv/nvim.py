@@ -528,7 +528,7 @@ class ScratchBuilder(PRecord):
         return (
             NvimIO(self._setup_tab) /
             self._setup_buffer /
-            (lambda a: ScratchBuffer(*a))
+            self._create
         )
 
     def _setup_tab(self, vim):
@@ -544,10 +544,15 @@ class ScratchBuilder(PRecord):
         buffer.set_optionb('swapfile', False)
         return (tab, buffer)
 
+    def _create(self, args):
+        tab, buffer = args
+        return ScratchBuffer(tab.vim, tab, buffer)
+
 
 class ScratchBuffer(HasTab):
 
-    def __init__(self, tab, buffer):
+    def __init__(self, vim, tab, buffer):
+        super().__init__(vim, buffer.target, buffer.prefix)
         self._tab = tab
         self._buffer = buffer
 
