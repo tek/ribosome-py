@@ -349,6 +349,9 @@ class Buffer(HasWindow):
     def modified(self):
         return self.option('modified').contains(True)
 
+    @property
+    def content(self):
+        return List.wrap(self.target[:]).map(decode)
     def set_content(self, text):
         self.target[:] = text
 
