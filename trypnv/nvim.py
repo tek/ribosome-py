@@ -552,6 +552,9 @@ class AsyncVimProxy(object):
     def __eq__(self, other):
         return self.__getattr__('__eq__')(other)
 
+    def __str__(self):
+        return '{}({})'.format(self.__class__.__name__, str(self._target))
+
 
 class ScratchBuilder(PRecord):
     params = dfield(Map())
