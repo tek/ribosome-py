@@ -238,6 +238,9 @@ class NvimComponent(Logging):
     def cmd_sync(self, line: str):
         return self.vim.command(line, async=False)
 
+    def cmd_output(self, line: str):
+        return self.vim.command_output(line)
+
     @property
     def syntax(self):
         return Syntax(self)
