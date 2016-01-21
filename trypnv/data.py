@@ -2,7 +2,7 @@ import pyrsistent  # type: ignore
 
 from tryp import List, Empty, Maybe, Map, Boolean
 
-from typing import Callable
+from typing import Callable, Any
 
 
 def field(tpe, **kw):
@@ -30,7 +30,7 @@ def bool_field(**kw):
 class Data(pyrsistent.PRecord):
     sub_states = field(Map, initial=Map())
 
-    def sub_state(self, name, default: Callable):
+    def sub_state(self, name, default: Callable[[], Any]):
         return self.sub_states.get_or_else(name, default)
 
     def with_sub_state(self, name, state):

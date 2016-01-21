@@ -97,7 +97,7 @@ def main_looped(fun):
     @wraps(fun)
     def wrapper(self):
         loop = asyncio.get_event_loop()
-        done = asyncio.Future()
+        done = asyncio.Future(loop=loop)
 
         def runner():
             fun(self)
