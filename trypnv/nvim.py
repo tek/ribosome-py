@@ -21,6 +21,7 @@ from tek.tools import camelcaseify  # type: ignore
 import tryp
 from tryp import Maybe, may, List, Map, Boolean, Empty, Just, __
 from tryp.either import Either, Right, Left  # type: ignore
+from tryp.util.string import decode
 
 from trypnv.data import dfield
 from trypnv.logging import Logging
@@ -47,28 +48,6 @@ def echo(text, cmd='echom', prefix=Empty()):
 
 def echohl(text, hl, prefix=Empty()):
     return 'echohl {} | {} | echohl None'.format(hl, echo(text))
-
-
-@singledispatch
-def decode(value):
-    return value
-
-
-@decode.register(bytes)
-def decode_bytes(value):
-    return value.decode()
-
-
-@decode.register(list)
-def decode_list(value):
-    return List.wrap(value).map(decode)
-
-
-@decode.register(dict)
-def decode_dict(value):
-    return Map.wrap(value)\
-        .keymap(decode)\
-        .valmap(decode)
 
 
 class NvimComponent(Logging):
