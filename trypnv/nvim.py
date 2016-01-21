@@ -416,11 +416,15 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         else:
             self.log.info('\n'.join(text))
 
-    def autocmd(self, name):
-        self.cmd('silent doautocmd <nomodeline> User {}'.format(name))
+    def doautocmd(self, name, pat=''):
+        c = 'silent doautocmd <nomodeline> {} {}'.format(name, pat)
+        self.cmd(c)
+
+    def uautocmd(self, name):
+        self.doautocmd('User', name)
 
     def pautocmd(self, name):
-        self.autocmd('{}{}'.format(camelcaseify(self.prefix), name))
+        self.uautocmd('{}{}'.format(camelcaseify(self.prefix), name))
 
     def call(self, name, *a, **kw):
         return Maybe.from_call(self.vim.call, name, *a, **kw)
