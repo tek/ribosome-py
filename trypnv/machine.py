@@ -1,6 +1,4 @@
-from typing import (TypeVar, Callable, Generic, Any, Tuple, Sequence
-                    )  # type: ignore
-from collections import namedtuple  # type: ignore
+from typing import TypeVar, Callable, Any, Tuple, Sequence  # type: ignore
 import abc
 import inspect
 import threading
@@ -8,7 +6,6 @@ import asyncio
 import concurrent.futures
 import importlib
 import functools
-from copy import copy
 import time
 from contextlib import contextmanager
 
@@ -20,7 +17,6 @@ from pyrsistent import PRecord, field
 from pyrsistent._precord import _PRecordMeta
 
 import tryp
-import trypnv
 from trypnv.logging import Logging
 from trypnv.cmd import StateCommand
 from trypnv.data import Data
@@ -144,18 +140,14 @@ class Handler(object):
 
     @staticmethod
     def create(name, fun):
-        return Handler(name, getattr(fun, Machine.message_attr), fun)
+        return Handler(name, getattr(fun, _message_attr), fun)
 
     def run(self, data, msg):
         return self.fun(data, msg)
 
 
-class Callback(Message):
-
-    def __init__(self, func: Callable[[Data], Any]):
-        self.func = func
-
-
+Callback = message('Callback', 'func')
+IO = message('IO', 'perform')
 Error = message('Error', 'message')
 
 
@@ -167,9 +159,27 @@ class TransitionFailed(MachineError):
     pass
 
 
+A = TypeVar('A')
+
+_machine_attr = '_machine'
+_message_attr = '_message'
+
+
+def handle(msg: type):
+    def add_handler(func: Callable[[A, Any], Maybe[A]]):
+        setattr(func, _machine_attr, True)
+        setattr(func, _message_attr, msg)
+        return func
+    return add_handler
+
+
+def may_handle(msg: type):
+    def may_wrap(func: Callable[[A, Any], Maybe[A]]):
+        return handle(msg)(may(func))
+    return may_wrap
+
+
 class Machine(Logging):
-    machine_attr = '_machine'
-    message_attr = '_message'
     _data_type = Data
 
     def __init__(self, name: str) -> None:
@@ -178,7 +188,7 @@ class Machine(Logging):
 
     def _setup_handlers(self):
         handlers = inspect.getmembers(self,
-                                      lambda a: hasattr(a, self.machine_attr))
+                                      lambda a: hasattr(a, _machine_attr))
         handler_map = List.wrap(handlers)\
             .smap(Handler.create)\
             .map(lambda a: (a.message, a))
@@ -252,6 +262,10 @@ class Machine(Logging):
             'plugin "{}" has no command "{}"'.format(self.name, name))
         return Empty()
 
+    @may_handle(IO)
+    def message_callback(self, data: Data, msg: IO):
+        msg.perform()
+
 
 class Transitions(object):
     State = Map
@@ -296,7 +310,7 @@ class WrappedHandler(object):
     @staticmethod
     def create(machine, name, tpe, fun):
         return WrappedHandler(machine, name,
-                              getattr(fun, Machine.message_attr), tpe, fun)
+                              getattr(fun, _message_attr), tpe, fun)
 
     def run(self, data, msg):
         return self.fun(self.tpe(self.machine, data, msg))
@@ -308,29 +322,12 @@ class ModularMachine(Machine):
     def _setup_handlers(self):
         super()._setup_handlers()
         handlers = inspect.getmembers(self.Transitions,
-                                      lambda a: hasattr(a, self.machine_attr))
+                                      lambda a: hasattr(a, _machine_attr))
         handler_map = List.wrap(handlers)\
             .smap(lambda n, f: WrappedHandler.create(self, n, self.Transitions,
                                                      f))\
             .map(lambda a: (a.message, a))
         self._message_handlers = self._message_handlers ** handler_map
-
-
-A = TypeVar('A')
-
-
-def handle(msg: type):
-    def add_handler(func: Callable[[A, Any], Maybe[A]]):
-        setattr(func, Machine.machine_attr, True)
-        setattr(func, Machine.message_attr, msg)
-        return func
-    return add_handler
-
-
-def may_handle(msg: type):
-    def may_wrap(func: Callable[[A, Any], Maybe[A]]):
-        return handle(msg)(may(func))
-    return may_wrap
 
 
 class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
@@ -363,10 +360,13 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
             while not self.done.done():
                 msg = await self._messages.get()
                 for pub in self._send(msg):
-                    await self._messages.put(pub)
+                    await self._publish(pub)
                 self._messages.task_done()
         except Exception as e:
             self.log.exception('while running state machine')
+
+    def _publish(self, msg):
+        return self._messages.put(msg)
 
     def send(self, msg: Message, prio=0.5):
         self.log.debug('send {}'.format(msg))
