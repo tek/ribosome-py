@@ -1,26 +1,26 @@
 from typing import TypeVar, Callable, Any, Generic
 from pathlib import Path
-from functools import singledispatch  # type: ignore
 import threading
-import concurrent.futures
+import concurrent.futures  # type: ignore
 from contextlib import contextmanager
 import asyncio
-from datetime import datetime
 import abc
 from types import FunctionType
+import inspect
+import traceback
 
-import neovim
-from neovim.api import NvimError
+import neovim  # type: ignore
+from neovim.api import NvimError  # type: ignore
 
 from fn import _, F  # type: ignore
 
-from pyrsistent import PRecord
+from pyrsistent import PRecord  # type: ignore
 
 from tek.tools import camelcaseify  # type: ignore
 
 import tryp
 from tryp import Maybe, may, List, Map, Boolean, Empty, Just, __
-from tryp.either import Either, Right, Left
+from tryp.either import Either, Right, Left  # type: ignore
 
 from trypnv.data import dfield
 from trypnv.logging import Logging
@@ -88,20 +88,44 @@ class NvimComponent(Logging):
             ._event_loop._loop
 
     def delay(self, f, timeout):
-        threading.Timer(
-            1.0, lambda: self.vim.session.threadsafe_call(f)).start()
+        cb = lambda: self.__run_on_main_thread(f)
+        threading.Timer(1.0, cb).start()
 
-    def async(self, f: Callable[['NvimFacade'], Any]):
+    def async(self, f: Callable[['NvimComponent'], Any]):
+        ''' run a callback function on the main thread and return its
+        value (blocking). the callback receives 'self' as an argument.
+        '''
         result = concurrent.futures.Future()
-        self.vim.session.threadsafe_call(lambda: result.set_result(f(self)))
+        cb = lambda: result.set_result(f(self))
+        self._run_on_main_thread(cb)
         return result.result()
+
+    def _run_on_main_thread(self, f: Callable[..., Any]):
+        ''' run a callback function on the host's main thread
+        '''
+        frame = inspect.currentframe()  # type: ignore
+
+        def dispatch():
+            try:
+                f()
+            except NvimError as e:
+                self._report_nvim_error(e, frame)
+        self.vim.session.threadsafe_call(dispatch)
+
+    def _report_nvim_error(self, err, frame):
+        self.log.error('async vim call failed with \'{}\''.format(decode(err)))
+        self.log.verbose(''.join(traceback.format_stack(frame)[:-5]))
 
     @contextmanager
     def main_event_loop(self):
+        ''' inject the current thread's asyncio main loop into vim's
+        pyuv main thread, then yield the loop to the with statement and
+        finally gracefully stop the main loop.
+        '''
         main = self.async(lambda v: asyncio.get_event_loop())
         fut = asyncio.Future(loop=main)
-        self.vim.session.threadsafe_call(lambda: main.run_until_complete(fut))
-        yield
+        self._run_on_main_thread(lambda: main.run_until_complete(fut))
+        yield main
         main.call_soon_threadsafe(lambda: fut.set_result(True))
 
     @property
@@ -439,14 +463,20 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         self.window.reload()
 
     def reload_windows(self):
-        self.windows.foreach(__.reload())
+        self.tab.windows.foreach(__.reload())
+
+    def cursor(self, line, col):
+        return self.call('cursor', line, col)
+
+    def feedkeys(self, keyseq):
+        self.vim.feedkeys(keyseq)
 
 B = TypeVar('B')
 
 
 class NvimIO(Generic[A]):
 
-    def __init__(self, apply: Callable[[NvimComponent], A]):
+    def __init__(self, apply: Callable[[NvimComponent], A]) -> None:
         self._apply = apply
 
     def unsafe_perform_io(self, vim) -> Either[Exception, A]:
@@ -509,7 +539,7 @@ class AsyncVimProxy(object):
             attr = getattr(self._target_tpe, name)
             if isinstance(attr, FunctionType):
                 return AsyncVimCallProxy(self._target, name)
-            elif isinstance(attr, property):
+            else:
                 return self._async_attr(name)
         elif hasattr(self._target, name):
             return self._async_attr(name)
