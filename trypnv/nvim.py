@@ -289,7 +289,7 @@ class HasWindow(HasBuffer):
 
     @property
     def _internal_buffer(self):
-        return self._internal_window.buffer
+        return self.window._internal_buffer
 
 
 class HasWindows(HasBuffers, HasWindow):
@@ -316,7 +316,7 @@ class HasTab(HasWindow):
 
     @property
     def _internal_window(self):
-        return self._internal_tab.window
+        return self.tab._internal_window
 
 
 class HasTabs(HasTab):
@@ -343,7 +343,7 @@ class Buffer(HasWindow):
 
     @property
     def _internal_window(self):
-        return self.window
+        return self.window.target
 
     @property
     def modified(self):
@@ -588,7 +588,11 @@ class ScratchBuffer(HasTab):
 
     @property
     def _internal_tab(self):
-        return self._tab
+        return self._tab.target
+
+    @property
+    def _internal_buffer(self):
+        return self._buffer.target
 
     def set_content(self, text):
         return self._buffer.set_content(text)
