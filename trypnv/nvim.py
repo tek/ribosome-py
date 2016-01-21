@@ -74,6 +74,9 @@ def decode_dict(value):
 class NvimComponent(Logging):
 
     def __init__(self, vim, target, prefix: str) -> None:
+        if isinstance(target, (AsyncVimProxy, NvimComponent)):
+            msg = '{} created with non-native target {}'
+            raise Exception(msg.format(self, target))
         self.vim = vim
         self.target = target
         self.prefix = prefix
