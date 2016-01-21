@@ -390,6 +390,9 @@ class Tab(HasWindows):
     def _internal_window(self):
         return self.target.window
 
+    def close(self):
+        self.cmd('tabclose')
+
 
 class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
