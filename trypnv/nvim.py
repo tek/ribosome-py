@@ -256,6 +256,10 @@ class HasBuffer(NvimComponent, metaclass=abc.ABCMeta):
     def _internal_buffer(self):
         ...
 
+    def __eq__(self, other):
+        if hasattr(other, '_internal_buffer'):
+            return self._internal_buffer == other._internal_buffer
+
 
 class HasBuffers(HasBuffer):
 
@@ -530,6 +534,9 @@ class AsyncVimProxy(object):
 
     def _async_attr(self, name):
         return self._target.async(lambda v: getattr(v, name))
+
+    def __eq__(self, other):
+        return self.__getattr__('__eq__')(other)
 
 
 class ScratchBuilder(PRecord):
