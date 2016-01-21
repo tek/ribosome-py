@@ -232,6 +232,10 @@ class NvimComponent(Logging):
     def cmd_sync(self, line: str):
         return self.vim.command(line, async=False)
 
+    @property
+    def syntax(self):
+        return Syntax(self)
+
 
 class HasBuffer(NvimComponent, metaclass=abc.ABCMeta):
 
@@ -586,5 +590,22 @@ class HasNvim(object):
         self.flags = Flags(vim, False)
         self.pflags = Flags(vim, True)
 
+
+class Syntax(Logging):
+
+    def __init__(self, target):
+        self.target = target
+
+    def match(self, group, pat, *a, **kw):
+        return self.cmd('match', group, pat, *a, **kw)
+
+    def cmd(self, cmdname, group, pat, *a, **kw):
+        opts = List.wrap(a) + Map(kw).toList.smap('{}={}'.format)
+        c = 'syntax {} {} /{}/ {}'.format(cmdname, group, pat, ' '.join(opts))
+        self.target.cmd(c)
+
+    def link(self, group, to):
+        c = 'highlight link {} {}'.format(group, to)
+        self.target.cmd(c)
 
 __all__ = ('NvimFacade', 'HasNvim')
