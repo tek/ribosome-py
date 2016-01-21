@@ -145,7 +145,7 @@ class NvimComponent(Logging):
 
     def ppathl(self, name: str) -> Maybe[Path]:
         return self.pl(name)\
-            .map(lambda l: l.map(lambda a: Path(a).expanduser()))
+            .map(lambda l: l.map(Path).map(__.expanduser()))
 
     def dir(self, name: str) -> Maybe[Path]:
         var = self.path(name)
@@ -252,7 +252,7 @@ class HasBuffer(NvimComponent, metaclass=abc.ABCMeta):
     def buffer(self):
         return Buffer(self.vim, self._internal_buffer, self.prefix).proxy
 
-    @abc.abstractproperty
+    @abc.abstractproperty  # type: ignore
     def _internal_buffer(self):
         ...
 
@@ -279,7 +279,7 @@ class HasWindow(HasBuffer):
     def window(self):
         return Window(self.vim, self._internal_window, self.prefix).proxy
 
-    @abc.abstractproperty
+    @abc.abstractproperty  # type: ignore
     def _internal_window(self):
         ...
 
@@ -306,7 +306,7 @@ class HasTab(HasWindow):
     def tab(self):
         return Tab(self.vim, self._internal_tab, self.prefix).proxy
 
-    @abc.abstractproperty
+    @abc.abstractproperty  # type: ignore
     def _internal_tab(self):
         ...
 
