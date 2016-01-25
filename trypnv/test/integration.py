@@ -97,14 +97,19 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
 def main_looped(fun):
     @wraps(fun)
     def wrapper(self):
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         done = asyncio.Future(loop=loop)
 
         def runner():
+            local_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(local_loop)
             fun(self)
             loop.call_soon_threadsafe(lambda: done.set_result(True))
+            local_loop.close()
         Thread(target=runner).start()
         loop.run_until_complete(done)
+        loop.close()
     return wrapper
 
 __all__ = ('IntegrationSpec')
