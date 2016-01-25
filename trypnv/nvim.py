@@ -54,7 +54,8 @@ def echohl(text, hl, prefix=Empty()):
 class NvimComponent(Logging):
 
     def __init__(self, vim, target, prefix: str) -> None:
-        if isinstance(target, (AsyncVimProxy, NvimComponent)):
+        if trypnv.in_vim and isinstance(target, (AsyncVimProxy,
+                                                 NvimComponent)):
             msg = '{} created with non-native target {}'
             raise Exception(msg.format(self, target))
         self.vim = vim
