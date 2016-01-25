@@ -435,7 +435,10 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         if self.done is not None:
             self.send(Quit())
             self.done.result(10)
-            self._loop.close()
+            try:
+                self._loop.close()
+            except Exception as e:
+                self.log.error(e)
 
     def _publish(self, msg):
         return self._messages.put(msg)
