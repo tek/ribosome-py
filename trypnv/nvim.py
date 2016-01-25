@@ -95,13 +95,13 @@ class NvimComponent(Logging):
 
     def _report_nvim_error(self, err, frame):
         self.log.error('async vim call failed with \'{}\''.format(decode(err)))
-        self.log.verbose(''.join(traceback.format_stack(frame)[:-5]))
+        self.log.error(''.join(traceback.format_stack(frame)[:-5]))
 
     @contextmanager
     def main_event_loop(self):
-        ''' inject the current thread's asyncio main loop into vim's
-        pyuv main thread, then yield the loop to the with statement and
-        finally gracefully stop the main loop.
+        ''' run the asyncio main loop on vim's pyuv main thread, then
+        yield the loop to the with statement in the current thread, and
+        finally, gracefully stop the main loop.
         '''
         main = self.async(lambda v: asyncio.get_event_loop())
         fut = asyncio.Future(loop=main)
