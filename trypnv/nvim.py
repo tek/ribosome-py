@@ -651,7 +651,7 @@ class Syntax(Logging):
         return self.cmd('match', group, pat, *a, **kw)
 
     def cmd(self, cmdname, group, pat, *a, **kw):
-        opts = List.wrap(a) + Map(kw).toList.smap('{}={}'.format)
+        opts = List.wrap(a) + Map(kw).to_list.smap('{}={}'.format)
         c = 'syntax {} {} /{}/ {}'.format(cmdname, group, pat, ' '.join(opts))
         self.target.cmd(c)
 
