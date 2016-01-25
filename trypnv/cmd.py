@@ -219,6 +219,10 @@ class StateCommand(MessageCommand):
     def _call_fun(self, obj, *args):
         return self._message(*args)
 
+    @property
+    def _infer_name(self):
+        return self._message.__name__
+
 
 def command(**kw):
     def neovim_cmd_decorator(fun):
