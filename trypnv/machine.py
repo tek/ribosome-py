@@ -8,8 +8,7 @@ import importlib
 import functools
 import time
 from contextlib import contextmanager
-
-from toolz.itertoolz import cons  # type: ignore
+from inspect import iscoroutine, iscoroutinefunction
 
 from fn import F, _  # type: ignore
 
@@ -20,12 +19,12 @@ import tryp
 from trypnv.logging import Logging
 from trypnv.cmd import StateCommand
 from trypnv.data import Data
+from trypnv.record import Record, any_field, list_field
 
 from tryp import Maybe, List, Map, may, Empty, curried, Just
 from tryp.lazy import lazy
 from tryp.tc.monad import Monad
-
-from tek.tools import camelcaseify
+from tryp.util.string import camelcaseify
 
 
 class MessageMeta(_PRecordMeta):
@@ -115,12 +114,10 @@ class Publish(Message, fields=('message',)):
         return 'Publish({})'.format(str(self.message))
 
 
-class Nop(Message):
-    pass
-
-
-class Quit(Message):
-    pass
+Nop = message('Nop')
+Quit = message('Quit')
+Coroutine = message('Coroutine', 'coro')
+PlugCommand = message('PlugCommand', 'plug', 'msg')
 
 
 def is_seq(a):
@@ -140,11 +137,68 @@ class Handler(object):
 
     @staticmethod
     def create(name, fun):
-        return Handler(name, getattr(fun, _message_attr), fun)
+        tpe = CoroHandler if iscoroutinefunction(fun) else Handler
+        return tpe(name, getattr(fun, _message_attr), fun)
 
     def run(self, data, msg):
-        return self.fun(data, msg)
+        result = self.fun(data, msg)
+        if not Monad.exists(type(result)):
+            err = 'in {}: result has no Monad: {}'
+            raise MachineError(err.format(self, result))
+        return result
 
+    def __str__(self):
+        return '{}({}, {}, {})'.format(self.__class__.__name__, self.name,
+                                       self.message, self.fun)
+
+
+class CoroHandler(Handler):
+
+    def run(self, data, msg):
+        return Maybe(Coroutine(self.fun(data, msg)))
+
+
+class TransitionResult(Record):
+    data = any_field()
+    resend = list_field()
+
+    @staticmethod
+    def empty(data):
+        return StrictTransitionResult(data=data)
+
+    def fold(self, f):
+        return self
+
+    async def await_coro(self, process_result):
+        return self
+
+    def accum(self, other: 'TransitionResult'):
+        if isinstance(other, CoroTransitionResult):
+            return self.accum(StrictTransitionResult(data=other.data,
+                                                     pub=other.pub))
+        else:
+            return other.set(
+                pub=self.pub + other.pub,
+            )
+
+
+class StrictTransitionResult(TransitionResult):
+    pub = list_field()
+
+    def fold(self, f):
+        return self.resend.fold_left(self)(f)
+
+
+class CoroTransitionResult(TransitionResult):
+    coro = field(Coroutine)
+
+    async def await_coro(self, process_result):
+        result = await self.coro.coro
+        return result / process_result(self.data) | self.empty(self.data)
+
+    @property
+    def pub(self):
+        return [self.coro]
 
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
@@ -193,14 +247,22 @@ class Machine(Logging):
             .smap(Handler.create)\
             .map(lambda a: (a.message, a))
         self._message_handlers = Map(handler_map)
-        self._default_handler = Handler('unhandled', None, self.unhandled)
 
-    def process(self, data: Data, msg) -> Tuple[Data, List[Publish]]:
+    @property
+    def _default_handler(self):
+        return Handler('unhandled', None, self.unhandled)
+
+    def process(self, data: Data, msg) -> TransitionResult:
         handler = self._resolve_handler(msg)
-        return self._execute_transition(handler, data, msg)\
-            .map(self._process_result(data))\
-            .smap(self._resend)\
-            .get_or_else((data, List()))
+        return (
+            self._execute_transition(handler, data, msg) /
+            self._process_result(data) |
+            TransitionResult.empty(data)
+        )
+
+    def loop_process(self, data, msg):
+        sender = lambda z, m: z.accum(self.loop_process(z.data, m))
+        return self.process(data, msg).fold(sender)
 
     def _resolve_handler(self, msg):
         return self._message_handlers\
@@ -209,38 +271,45 @@ class Machine(Logging):
 
     def _execute_transition(self, handler, data, msg):
         try:
-            result = handler.run(data, msg)
-            if not Monad.exists(type(result)):
-                raise MachineError('result has no Monad: {}'.format(result))
+            return handler.run(data, msg)
         except Exception as e:
-            err = 'transition "{}" failed for {} in {}'
-            self.log.exception(err.format(handler.name, msg, self.name))
-            if tryp.development:
-                raise TransitionFailed() from e
-            result = Empty()
-        return result
+            return self._handle_transition_error(handler, msg, e)
+
+    def _handle_transition_error(self, handler, msg, e):
+        err = 'transition "{}" failed for {} in {}'
+        self.log.exception(err.format(handler.name, msg, self.name))
+        if tryp.development:
+            raise TransitionFailed() from e
+        return Empty()
 
     @curried
-    def _process_result(
-            self, old_data: Data, result) -> Tuple[Data, List[Publish]]:
-        if isinstance(result, self._data_type):
-            return result, List()
+    def _process_result(self, old_data: Data, result) -> TransitionResult:
+        if isinstance(result, Coroutine):
+            return CoroTransitionResult(data=old_data, coro=result)
+        elif isinstance(result, TransitionResult):
+            return result
+        elif isinstance(result, self._data_type):
+            return TransitionResult.empty(result)
         elif isinstance(result, Message) or not is_seq(result):
             result = List(result)
         datas, rest = List.wrap(result).split_type(self._data_type)
-        msgs, rest = rest.split_type(Message)
+        strict, rest = rest.split_type(Message)
+        coro, rest = rest.split(iscoroutine)
+        msgs = strict + coro.map(Coroutine).map(_.pub)
         if rest:
-            err = 'invalid transition result parts in {}: {}'
-            self.log.error(err.format(self.name, rest))
-        return datas.head | old_data, msgs
+            tpl = 'invalid transition result parts in {}: {}'
+            msg = tpl.format(self.name, rest)
+            if tryp.development:
+                raise MachineError(msg)
+            else:
+                self.log.error(msg)
+        new_data = datas.head | old_data
+        return self._create_result(new_data, msgs)
 
-    def _resend(self, env, msgs: List[Message]) -> Tuple[Data, List[Publish]]:
-        def sender(z, m):
-            e, p = z
-            e2, p2 = self.process(e, m)
-            return e2, p + p2
-        pub, send = msgs.split_type(Publish)
-        return send.fold_left((env, pub))(sender)
+    def _create_result(self, data, msgs):
+        pub, resend = msgs.split_type(Publish)
+        pub_msgs = pub.map(_.message)
+        return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)
 
     @may
     def unhandled(self, data: Data, msg: Message):
@@ -335,66 +404,67 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
     def __init__(self, name: str, sub: List[Machine]=List()) -> None:
         threading.Thread.__init__(self)
         self.done = None
-        self._loop = asyncio.new_event_loop()  # type: ignore
-        self._messages = asyncio.PriorityQueue(loop=self._loop)
-        self.data = self.init()
+        self.data = None
+        self.running = concurrent.futures.Future()
         self.sub = sub
-        self._wait_for_message = Map()
         Machine.__init__(self, name)
 
     def init(self) -> Data:
         return self._data_type()
 
     def run(self):
+        self._loop = asyncio.new_event_loop()  # type: ignore
+        self._messages = asyncio.PriorityQueue(loop=self._loop)
         asyncio.set_event_loop(self._loop)
-        self._loop.run_until_complete(self.main())
+        self.done = concurrent.futures.Future()
+        self.running.set_result(True)
+        try:
+            self._loop.run_until_complete(self._main(self.init()))
+        except Exception as e:
+            self.log.exception('while running state machine')
+        self.running = concurrent.futures.Future()
+
+    def wait_for_running(self):
+        self.running.result(3)
+
+    def start_wait(self):
+        self.start()
+        self.wait_for_running()
 
     def stop(self):
         if self.done is not None:
             self.send(Quit())
             self.done.result(10)
-
-    async def main(self):
-        self.done = concurrent.futures.Future()
-        try:
-            while not self.done.done():
-                msg = await self._messages.get()
-                for pub in self._send(msg):
-                    await self._publish(pub)
-                self._messages.task_done()
-        except Exception as e:
-            self.log.exception('while running state machine')
+            self._loop.close()
 
     def _publish(self, msg):
         return self._messages.put(msg)
 
     def send(self, msg: Message, prio=0.5):
         self.log.debug('send {}'.format(msg))
-        status = asyncio.run_coroutine_threadsafe(
-            self._messages.put(msg), self._loop)
+        return asyncio.run_coroutine_threadsafe(self._messages.put(msg),
+                                                self._loop)
 
-    def send_wait(self, msg: Message):
+    def send_sync(self, msg: Message):
         self.send(msg)
         return self.await_state()
 
-    async def join(self):
-        await self._messages.join()
+    send_wait = send_sync
 
     def await_state(self):
         asyncio.run_coroutine_threadsafe(self.join(), self._loop)\
-            .result(5)
+            .result(2)
         return self.data
 
-    def _send(self, msg: Message):
-        try:
-            self.data, pub = self.process(self.data, msg)
-        except TransitionFailed as e:
-            return []
-        else:
-            return pub.map(_.message)
+    def _send(self, data, msg: Message):
+        return (
+            Maybe.from_call(
+                self.loop_process, data, msg, exc=TransitionFailed) |
+            TransitionResult.empty(data)
+        )
 
     @may_handle(Nop)
-    def _nop(self, data: Data, msg: Quit):
+    def _nop(self, data: Data, msg: Nop):
         pass
 
     @may_handle(Quit)
@@ -405,21 +475,46 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
     def message_callback(self, data: Data, msg: Callback):
         return msg.func(data)
 
-    @may
+    @may_handle(Coroutine)
+    def _couroutine(self, data: Data, msg: Coroutine):
+        return msg
+
     def unhandled(self, data, msg):
-        def send(z, s):
-            d1, p1 = z
-            d2, p2 = s.process(d1, msg)
-            return d2, p1 + p2
-        d, m = self.sub.fold_left((data, List()))(send)
-        return List(*cons(d, m))
+        return self._fold_sub(data, msg)
+
+    @may
+    def _fold_sub(self, data, msg):
+        ''' send **msg** to all sub-machines, passing the transformed
+        data from each machine to the next and accumulating published
+        messages.
+        '''
+        send = lambda z, s: z.accum(s.loop_process(z.data, msg))
+        return self.sub.fold_left(TransitionResult.empty(data))(send)
 
     @contextmanager
     def transient(self):
         self.start()
+        self.wait_for_running()
         self.send(Nop())
         yield self
         self.stop()
+
+    async def _main(self, data):
+        self.data = data
+        while not self.done.done():
+            self.data = data = await self._process_one_message(data)
+
+    async def _process_one_message(self, data):
+        msg = await self._messages.get()
+        sent = self._send(data, msg)
+        result = await sent.await_coro(self._process_result)
+        for pub in result.pub:
+            await self._publish(pub)
+        self._messages.task_done()
+        return result.data
+
+    async def join(self):
+        await self._messages.join()
 
 
 class PluginStateMachine(StateMachine):
@@ -443,15 +538,20 @@ class PluginStateMachine(StateMachine):
     def plugin(self, name):
         return self.sub.find(_.name == name)
 
-    def plug_command(self, plug_name: str, cmd_name: str, args: list=[]):
+    def plug_command(self, plug_name: str, cmd_name: str, args: list=[],
+                     sync=False):
+        sender = self.send_sync if sync else self.send
         plug = self.plugin(plug_name)
         cmd = plug.flat_map(lambda a: a.command(cmd_name, List(args)))
-        plug.zip(cmd).smap(self.send_plug_command)
+        plug.map2(cmd, PlugCommand) % sender
 
-    def send_plug_command(self, plug, msg):
-        self.log.debug('sending command {} to plugin {}'.format(msg,
-                                                                plug.name))
-        self.data, pub = plug.process(self.data, msg)
-        pub.map(_.message).foreach(self._messages.put_nowait)
+    def plug_command_sync(self, *a, **kw):
+        return self.plug_command(*a, sync=True, **kw)
+
+    @may_handle(PlugCommand)
+    def _plug_command(self, data, msg):
+        self.log.debug(
+            'sending command {} to plugin {}'.format(msg.msg, msg.plug.name))
+        return msg.plug.process(data, msg.msg)
 
 __all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Error')
