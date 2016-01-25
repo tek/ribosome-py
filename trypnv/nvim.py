@@ -361,6 +361,9 @@ class Buffer(HasWindow):
     def nmap(self, keyseq, dispatch):
         return self.cmd('nmap <buffer><silent> {} {}'.format(keyseq, dispatch))
 
+    def set_modifiable(self, value):
+        self.set_optionb('modifiable', value)
+
 
 class Window(HasTab):
 
@@ -587,6 +590,7 @@ class ScratchBuilder(PRecord):
         buffer.set_options('bufhidden', 'wipe')
         buffer.set_optionb('buflisted', False)
         buffer.set_optionb('swapfile', False)
+        buffer.set_modifiable(False)
         return (tab, buffer)
 
     def _create(self, args):
@@ -610,7 +614,9 @@ class ScratchBuffer(HasTab):
         return self._buffer.target
 
     def set_content(self, text):
-        return self._buffer.set_content(text)
+        self._buffer.set_modifiable(True)
+        self._buffer.set_content(text)
+        self._buffer.set_modifiable(False)
 
 
 class Flags(object):
