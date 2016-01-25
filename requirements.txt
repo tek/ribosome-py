@@ -1,4 +1,3 @@
 tryp
 neovim
 pyrsistent
-git+git://github.com/ingolemo/python-lenses.git
