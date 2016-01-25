@@ -88,7 +88,8 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
 
     def _log_line(self, index, checker):
         def check():
-            len(self._log_out).should.be.greater_than(abs(index))
+            minlen = index if index >= 0 else abs(index + 1)
+            len(self._log_out).should.be.greater_than(minlen)
             return checker(self._log_out[index]).should.be.ok
         later(check)
 
