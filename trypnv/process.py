@@ -1,18 +1,20 @@
-from typing import Tuple, Callable, Any
 from pathlib import Path
 import shutil
 import threading
+from contextlib import contextmanager
 
 from fn import F, _  # type: ignore
 
 import asyncio
 from asyncio.subprocess import PIPE  # type: ignore
 
-from tryp import Map, List, Future
+from tryp import Map, Future, __
+from tryp.lazy import lazy
 
 import trypnv
 from trypnv.logging import Logging
 from trypnv.nvim import NvimFacade
+from trypnv.record import Record, any_field, field, list_field, maybe_field
 
 
 class Result(object):
@@ -33,20 +35,20 @@ class Result(object):
         return self.err if self.err else self.out
 
 
-class Job(object):
+class Job(Record):
+    owner = any_field()
+    exe = field(str)
+    args = list_field()
+    loop = any_field()
+    pipe_in = maybe_field(str)
 
-    def __init__(
-            self,
-            owner,
-            exe: str,
-            args: List[str],
-            loop,
-    ) -> None:
-        self.owner = owner
-        self.exe = exe
-        self.args = args
-        self.loop = loop
-        self.status = Future(loop=loop)  # type: Future
+    @lazy
+    def status(self):
+        return Future(loop=self.loop)
+
+    @lazy
+    def stdin(self):
+        return self.pipe_in.map(__.encode()) | None
 
     def finish(self, f):
         code, out, err = f.result()
@@ -77,6 +79,14 @@ class Job(object):
     def run(self):
         self.loop.run_until_complete(self.status)
 
+    @property
+    def result(self):
+        return self.status.result()
+
+    @property
+    def success(self):
+        return self.status.done() and self.result.success
+
 
 class ProcessExecutor(Logging):
     ''' Handler for subprocess execution
@@ -94,13 +104,14 @@ class ProcessExecutor(Logging):
 
     def __init__(self, vim: NvimFacade, loop=None) -> None:
         self.vim = vim
-        self.loop = loop or asyncio.new_event_loop()
+        self.loop = loop or asyncio.get_event_loop()
         self.current = Map()  # type: Map[Any, Job]
 
     async def process(self, job: Job):
         return await asyncio.create_subprocess_exec(
             job.exe,
             *job.args,
+            stdin=PIPE,
             stdout=PIPE,
             stderr=PIPE,
             cwd=str(job.cwd),
@@ -109,15 +120,14 @@ class ProcessExecutor(Logging):
 
     async def _execute(self, job: Job):
         try:
-            proc = await self.process(job)
-            await proc.wait()
-            out = await proc.stdout.read()
-            err = await proc.stderr.read()
+            with self._main_event_loop():
+                proc = await self.process(job)
+                (out, err) = await proc.communicate(job.stdin)
             msg = '{} executed successfully ({}, {})'.format(job, out, err)
             self.log.debug(msg)
             return proc.returncode, out.decode(), err.decode()
         except Exception as e:
-            self.log.error('{} failed with {}'.format(job, e))
+            self.log.exception('{} failed with {}'.format(job, repr(e)))
             return -111, '', 'exception: {}'.format(e)
 
     def run(self, job: Job) -> Future[Result]:
@@ -147,12 +157,13 @@ class ProcessExecutor(Logging):
     def ready(self):
         return self.current.is_empty
 
-    def exec(self):
-        if trypnv.in_vim:
-            with self.vim.main_event_loop():
-                self._run_jobs()
-        else:
-            threading.Thread(target=lambda: self._run_jobs()).start()
+    def _main_event_loop(self):
+        return (self.vim.main_event_loop() if trypnv.in_vim else
+                self._dummy_ctx())
+
+    @contextmanager
+    def _dummy_ctx(self):
+        yield
 
     def _run_jobs(self):
         self.current.valmap(lambda job: job.run())
@@ -167,4 +178,4 @@ class ProcessExecutor(Logging):
                 await asyncio.sleep(0.001)
         loop.run_until_complete(waiter())
 
-__all__ = ['ProcessExecutor', 'Result', 'Job']
+__all__ = ('ProcessExecutor', 'Result', 'Job')
