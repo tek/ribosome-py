@@ -6,7 +6,7 @@ from functools import wraps
 
 import neovim  # type: ignore
 
-from tek.test import fixture_path, temp_dir, later  # type: ignore
+from tryp.test import fixture_path, temp_dir, later  # type: ignore
 
 from tryp import List
 from tryp.test import IntegrationSpec as TrypIntegrationSpec
