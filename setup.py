@@ -13,5 +13,6 @@ setup(
         'tryp>=3.0.0',
         'neovim',
         'pyrsistent',
+        'git+git://github.com/ingolemo/python-lenses.git',
     ]
 )

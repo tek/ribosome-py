@@ -23,7 +23,8 @@ from tryp import Maybe, may, List, Map, Boolean, Empty, Just, __
 from tryp.either import Either, Right, Left  # type: ignore
 from tryp.util.string import decode
 
-from trypnv.data import dfield
+import trypnv
+from trypnv.record import dfield
 from trypnv.logging import Logging
 
 
