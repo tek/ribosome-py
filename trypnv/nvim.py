@@ -16,7 +16,7 @@ from fn import _, F  # type: ignore
 
 from pyrsistent import PRecord  # type: ignore
 
-from tek.tools import camelcaseify  # type: ignore
+from tryp.util.string import camelcaseify
 
 import tryp
 from tryp import Maybe, may, List, Map, Boolean, Empty, Just, __

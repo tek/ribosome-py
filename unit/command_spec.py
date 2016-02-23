@@ -1,14 +1,10 @@
 import json
 
-import sure  # NOQA
-from flexmock import flexmock  # NOQA
-
-from tek import Spec  # type: ignore
+from tryp import Just
+from tryp.test import Spec
 
 from trypnv.cmd import Command, command, JsonMessageCommand, MessageCommand
-from trypnv.machine import Message, message
-
-from tryp import Just, List
+from trypnv.machine import message  # type: ignore
 
 
 BasicMessage = message(
@@ -150,9 +146,9 @@ class Command_(Spec, ):
 
         def wrap(args):
             return c.cmd_name(args)
-        wrap.when.called_with([]).should.return_value(default)
+        wrap([]).should.equal(default)
         val = 2
-        wrap.when.called_with([val]).should.return_value(val)
+        wrap([val]).should.equal(val)
         wrap([1, 2]).endswith('between 0 and 1 ([1, 2])').should.be.ok
 
     def message(self):

@@ -10,7 +10,7 @@ from tryp import List, Maybe, may, Just, Map
 
 from trypnv.logging import log
 
-from tek.tools import camelcaseify  # type: ignore
+from tryp.util.string import camelcaseify
 
 import trypnv
 
@@ -186,7 +186,7 @@ class JsonMessageCommand(MessageCommand):
         return '+'
 
     @property
-    def min(self):
+    def min(self) -> int:
         return super().min - 1
 
     @property  # type: ignore
@@ -195,7 +195,8 @@ class JsonMessageCommand(MessageCommand):
         pass
 
     def _extract_args(self, args: Tuple[str]):
-        pos_args, json_args = tuple(args[:self.min]), tuple(args[self.min:])
+        pos_args, json_args = (tuple(args[:self.min]),  # type: ignore
+                               tuple(args[self.min:]))  # type: ignore
         params = json.loads(' '.join(json_args)) if json_args else {}
         return pos_args + (Map(params),)
 

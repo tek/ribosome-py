@@ -1,10 +1,9 @@
-import tek  # type: ignore
-
 import tryp
+import tryp.test
 from tryp.logging import tryp_stdout_logging
 
 
-class Spec(tek.Spec):
+class Spec(tryp.test.Spec):
 
     def setup(self, *a, **kw):
         tryp.development = True
