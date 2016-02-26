@@ -82,6 +82,10 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
     def _pvar_becomes(self, name, value):
         return self._wait_for(lambda: self.vim.pvar(name).contains(value))
 
+    def _pvar_becomes_map(self, name, value, f):
+        return self._wait_for(
+            lambda: self.vim.pvar(name).map(f).contains(value))
+
     @property
     def _log_out(self):
         return List.wrap(self.logfile.read_text().splitlines())
