@@ -49,5 +49,9 @@ class Record(pyrsistent.PClass, Lazy, metaclass=RecordMeta):
     def setter(self, name: str) -> FieldSetter:
         return FieldSetter(name, self)
 
+    def mod(self, name: str, modder):
+        par = { name: modder(getattr(self, name)) }
+        return self.set(**par)
+
 __all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field',
            'bool_field', 'any_field')
