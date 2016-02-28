@@ -10,7 +10,7 @@ setup(
     url='https://github.com/tek/tryp-nvim',
     packages=find_packages(exclude=['unit', 'unit.*']),
     install_requires=[
-        'tryp>=5.0.0',
+        'tryp>=5.1.0',
         'neovim',
         'pyrsistent',
     ]
