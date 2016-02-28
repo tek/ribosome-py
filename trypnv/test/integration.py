@@ -28,7 +28,6 @@ class IntegrationSpec(TrypIntegrationSpec, Spec):
 class VimIntegrationSpec(TrypIntegrationSpec, Logging):
 
     def setup(self):
-        self.cwd = Path.cwd()
         super().setup()
         self._debug = False
         self._rplugin_path = None
@@ -74,7 +73,6 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
     # without quitting, specs with subprocesses block in the end
     def teardown(self):
         # self.neovim.quit()
-        os.chdir(str(self.cwd))
         if self._debug:
             self._log_out.foreach(self.log.info)
 
