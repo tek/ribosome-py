@@ -405,6 +405,7 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         threading.Thread.__init__(self)
         self.done = None
         self.data = None
+        self._messages = None
         self.running = concurrent.futures.Future()
         self.sub = sub
         Machine.__init__(self, name)
@@ -420,7 +421,7 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         self.running.set_result(True)
         try:
             self._loop.run_until_complete(self._main(self.init()))
-        except Exception as e:
+        except Exception:
             self.log.exception('while running state machine')
         self.running = concurrent.futures.Future()
 
@@ -445,8 +446,9 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
 
     def send(self, msg: Message, prio=0.5):
         self.log.debug('send {}'.format(msg))
-        return asyncio.run_coroutine_threadsafe(self._messages.put(msg),
-                                                self._loop)
+        if self._messages is not None:
+            return asyncio.run_coroutine_threadsafe(self._messages.put(msg),
+                                                    self._loop)
 
     def send_sync(self, msg: Message):
         self.send(msg)
