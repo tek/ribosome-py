@@ -52,7 +52,14 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
         '''
         argv = ['nvim', '--embed', '-V{}'.format(self.vimlog), '-u', 'NONE']
         self.neovim = neovim.attach('child', argv=argv)
-        self.vim = NvimFacade(self.neovim)
+        self.vim = self._nvim_facade(self.neovim)
+
+    def _nvim_facade(self, vim):
+        return NvimFacade(vim, self._prefix)
+
+    @property
+    def _prefix(self):
+        return ''
 
     def _setup_handlers(self):
         self.vim.call(
