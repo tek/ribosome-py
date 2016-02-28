@@ -34,6 +34,7 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
         self._rplugin_path = None
         self._handlers = []
         self.logfile = temp_dir('log') / self.__class__.__name__
+        self.logfile.touch()
         os.environ['TRYPNV_LOG_FILE'] = str(self.logfile)
         self.vimlog = temp_dir('log') / 'vim'
         self._pre_start_neovim()
