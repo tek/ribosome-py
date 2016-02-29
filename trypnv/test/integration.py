@@ -15,10 +15,8 @@ from trypnv.logging import Logging
 from trypnv import NvimFacade
 from trypnv.nvim import AsyncVimProxy
 
-from proteome.test import Spec
 
-
-class IntegrationSpec(TrypIntegrationSpec, Spec):
+class IntegrationSpec(TrypIntegrationSpec):
 
     def setup(self):
         super().setup()
