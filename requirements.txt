@@ -1,3 +1,6 @@
 tryp
 neovim
 pyrsistent
+spec
+sure
+flexmock

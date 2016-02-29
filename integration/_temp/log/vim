@@ -1,0 +1,54 @@
+
+Reading ShaDa file "/home/tek/.local/share/nvim/shada/main.shada" info marks oldfiles
+Searching for "autoload/remote/host.vim" in "/home/tek/.config/nvim,/etc/xdg/nvim,/home/tek/.local/share/nvim/site,/usr/local/share/nvim/site,/usr/share/nvim/site,/usr/share/nvim/runtime,/usr/share/nvim/site/after,/usr/local/share/nvim/site/after,/home/tek/.local/share/nvim/site/after,/etc/xdg/nvim/after,/home/tek/.config/nvim/after,/home/tek/code/python/tryp-nvim/integration/_fixtures/config/rtp"
+Searching for "/home/tek/.config/nvim/autoload/remote/host.vim"
+Searching for "/etc/xdg/nvim/autoload/remote/host.vim"
+Searching for "/home/tek/.local/share/nvim/site/autoload/remote/host.vim"
+Searching for "/usr/local/share/nvim/site/autoload/remote/host.vim"
+Searching for "/usr/share/nvim/site/autoload/remote/host.vim"
+Searching for "/usr/share/nvim/runtime/autoload/remote/host.vim"
+chdir(/home/tek/code/python/tryp-nvim)
+chdir(/usr/share/nvim/runtime/autoload/remote)
+chdir(/home/tek/code/python/tryp-nvim)
+sourcing "/usr/share/nvim/runtime/autoload/remote/host.vim"
+finished sourcing /usr/share/nvim/runtime/autoload/remote/host.vim
+Searching for "autoload/remote/define.vim" in "/home/tek/.config/nvim,/etc/xdg/nvim,/home/tek/.local/share/nvim/site,/usr/local/share/nvim/site,/usr/share/nvim/site,/usr/share/nvim/runtime,/usr/share/nvim/site/after,/usr/local/share/nvim/site/after,/home/tek/.local/share/nvim/site/after,/etc/xdg/nvim/after,/home/tek/.config/nvim/after,/home/tek/code/python/tryp-nvim/integration/_fixtures/config/rtp"
+Searching for "/home/tek/.config/nvim/autoload/remote/define.vim"
+Searching for "/etc/xdg/nvim/autoload/remote/define.vim"
+Searching for "/home/tek/.local/share/nvim/site/autoload/remote/define.vim"
+Searching for "/usr/local/share/nvim/site/autoload/remote/define.vim"
+Searching for "/usr/share/nvim/site/autoload/remote/define.vim"
+Searching for "/usr/share/nvim/runtime/autoload/remote/define.vim"
+chdir(/home/tek/code/python/tryp-nvim)
+chdir(/usr/share/nvim/runtime/autoload/remote)
+chdir(/home/tek/code/python/tryp-nvim)
+line 23: sourcing "/usr/share/nvim/runtime/autoload/remote/define.vim"
+finished sourcing /usr/share/nvim/runtime/autoload/remote/define.vim
+continuing in function remote#host#RegisterPlugin
+Searching for "autoload/provider/python3.vim" in "/home/tek/.config/nvim,/etc/xdg/nvim,/home/tek/.local/share/nvim/site,/usr/local/share/nvim/site,/usr/share/nvim/site,/usr/share/nvim/runtime,/usr/share/nvim/site/after,/usr/local/share/nvim/site/after,/home/tek/.local/share/nvim/site/after,/etc/xdg/nvim/after,/home/tek/.config/nvim/after,/home/tek/code/python/tryp-nvim/integration/_fixtures/config/rtp"
+Searching for "/home/tek/.config/nvim/autoload/provider/python3.vim"
+Searching for "/etc/xdg/nvim/autoload/provider/python3.vim"
+Searching for "/home/tek/.local/share/nvim/site/autoload/provider/python3.vim"
+Searching for "/usr/local/share/nvim/site/autoload/provider/python3.vim"
+Searching for "/usr/share/nvim/site/autoload/provider/python3.vim"
+Searching for "/usr/share/nvim/runtime/autoload/provider/python3.vim"
+chdir(/home/tek/code/python/tryp-nvim)
+chdir(/usr/share/nvim/runtime/autoload/provider)
+chdir(/home/tek/code/python/tryp-nvim)
+line 13: sourcing "/usr/share/nvim/runtime/autoload/provider/python3.vim"
+Searching for "autoload/provider/pythonx.vim" in "/home/tek/.config/nvim,/etc/xdg/nvim,/home/tek/.local/share/nvim/site,/usr/local/share/nvim/site,/usr/share/nvim/site,/usr/share/nvim/runtime,/usr/share/nvim/site/after,/usr/local/share/nvim/site/after,/home/tek/.local/share/nvim/site/after,/etc/xdg/nvim/after,/home/tek/.config/nvim/after,/home/tek/code/python/tryp-nvim/integration/_fixtures/config/rtp"
+Searching for "/home/tek/.config/nvim/autoload/provider/pythonx.vim"
+Searching for "/etc/xdg/nvim/autoload/provider/pythonx.vim"
+Searching for "/home/tek/.local/share/nvim/site/autoload/provider/pythonx.vim"
+Searching for "/usr/local/share/nvim/site/autoload/provider/pythonx.vim"
+Searching for "/usr/share/nvim/site/autoload/provider/pythonx.vim"
+Searching for "/usr/share/nvim/runtime/autoload/provider/pythonx.vim"
+chdir(/home/tek/code/python/tryp-nvim)
+chdir(/usr/share/nvim/runtime/autoload/provider)
+chdir(/home/tek/code/python/tryp-nvim)
+line 12: sourcing "/usr/share/nvim/runtime/autoload/provider/pythonx.vim"
+finished sourcing /usr/share/nvim/runtime/autoload/provider/pythonx.vim
+continuing in /usr/share/nvim/runtime/autoload/provider/python3.vim
+finished sourcing /usr/share/nvim/runtime/autoload/provider/python3.vim
+continuing in function remote#define#CommandBootstrap[1]..remote#host#Require[10]..<SNR>1_RequirePythonHost
+TestPlugin test message
