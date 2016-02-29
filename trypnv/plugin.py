@@ -1,5 +1,8 @@
 import abc
 import asyncio
+from typing import Union
+
+import neovim  # type: ignore
 
 from trypnv.nvim import NvimFacade
 from trypnv.machine import StateMachine  # type: ignore
@@ -8,7 +11,9 @@ from trypnv.logging import nvim_logging
 
 class NvimPlugin(object):
 
-    def __init__(self, nvim: NvimFacade) -> None:
+    def __init__(self, nvim: Union[NvimFacade, neovim.Nvim]) -> None:
+        if isinstance(nvim, neovim.Nvim):
+            nvim = NvimFacade(nvim, 'trypnv')
         self.vim = nvim
         self.setup_logging()
         self.setup_asyncio()
