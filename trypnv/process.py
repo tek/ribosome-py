@@ -1,6 +1,5 @@
 from pathlib import Path
 import shutil
-import threading
 from contextlib import contextmanager
 
 from fn import F, _  # type: ignore
@@ -35,8 +34,13 @@ class Result(object):
         return self.err if self.err else self.out
 
 
+class JobClient(Record):
+    cwd = field(Path)
+    name = field(str)
+
+
 class Job(Record):
-    owner = any_field()
+    client = field(JobClient)
     exe = field(str)
     args = list_field()
     loop = any_field()
@@ -70,10 +74,10 @@ class Job(Record):
 
     @property
     def cwd(self):
-        return self.owner.root
+        return self.client.cwd
 
     def __str__(self):
-        return 'Job({}, {}, {})'.format(self.owner.name, self.exe,
+        return 'Job({}, {}, {})'.format(self.client.name, self.exe,
                                         ' '.join(self.args))
 
     def run(self):
@@ -139,19 +143,19 @@ class ProcessExecutor(Logging):
             task = asyncio.ensure_future(self._execute(job), loop=self.loop)
             task.add_done_callback(job.finish)
             task.add_done_callback(F(self.job_done, job))
-            self.current[job.owner] = job
+            self.current[job.client] = job
         else:
             self.log.error('invalid execution job: {}'.format(job))
             job.cancel('invalid')
         return job.status
 
     def _can_execute(self, job: Job):
-        return job.owner not in self.current and job.valid
+        return job.client not in self.current and job.valid
 
     def job_done(self, job, status):
         self.log.debug('{} is done with status {}'.format(job, status))
-        if job.owner in self.current:
-            self.current.pop(job.owner)
+        if job.client in self.current:
+            self.current.pop(job.client)
 
     @property
     def ready(self):
