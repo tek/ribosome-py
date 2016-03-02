@@ -10,7 +10,7 @@ import time
 from contextlib import contextmanager
 from inspect import iscoroutine, iscoroutinefunction
 
-from fn import F, _  # type: ignore
+from fn import _  # type: ignore
 
 from pyrsistent import PRecord, field
 from pyrsistent._precord import _PRecordMeta
@@ -21,10 +21,10 @@ from trypnv.cmd import StateCommand
 from trypnv.data import Data
 from trypnv.record import Record, any_field, list_field
 
-from tryp import Maybe, List, Map, may, Empty, curried, Just
+from tryp import Maybe, List, Map, may, Empty, curried, Just, __, F
 from tryp.lazy import lazy
-from tryp.tc.monad import Monad
 from tryp.util.string import camelcaseify
+from tryp.tc.optional import Optional
 
 
 class MessageMeta(_PRecordMeta):
@@ -128,6 +128,18 @@ def is_message(a):
     return isinstance(a, Message)
 
 
+def _recover_error(handler, result):
+    if not Optional.exists(type(result)):
+        err = 'in {}: result has no Optional: {}'
+        raise MachineError(err.format(handler, result))
+    to_error = F(Maybe) / Error / _.pub >> __.to_either(None)
+    return (
+        result
+        .to_either(None)
+        .recover_with(to_error)
+    )
+
+
 class Handler(object):
 
     def __init__(self, name, message, fun):
@@ -141,11 +153,7 @@ class Handler(object):
         return tpe(name, getattr(fun, _message_attr), fun)
 
     def run(self, data, msg):
-        result = self.fun(data, msg)
-        if not Monad.exists(type(result)):
-            err = 'in {}: result has no Monad: {}'
-            raise MachineError(err.format(self, result))
-        return result
+        return _recover_error(self, self.fun(data, msg))
 
     def __str__(self):
         return '{}({}, {}, {})'.format(self.__class__.__name__, self.name,
@@ -169,7 +177,7 @@ class TransitionResult(Record):
     def fold(self, f):
         return self
 
-    async def await_coro(self, process_result):
+    async def await_coro(self, callback):
         return self
 
     def accum(self, other: 'TransitionResult'):
@@ -189,12 +197,16 @@ class StrictTransitionResult(TransitionResult):
         return self.resend.fold_left(self)(f)
 
 
-class CoroTransitionResult(TransitionResult):
+class CoroTransitionResult(TransitionResult, Logging):
     coro = field(Coroutine)
 
-    async def await_coro(self, process_result):
-        result = await self.coro.coro
-        return result / process_result(self.data) | self.empty(self.data)
+    async def await_coro(self, callback):
+        value = await self.coro.coro
+        result = callback(self.data, _recover_error(self, value))
+        if result.resend:
+            msg = 'Cannot resend {} from coro {}, use .pub on messages'
+            self.log.warn(msg.format(result.resend, self.coro))
+        return result
 
     @property
     def pub(self):
@@ -252,10 +264,16 @@ class Machine(Logging):
     def _default_handler(self):
         return Handler('unhandled', None, self.unhandled)
 
+    # TODO instead of get_or_else, check for Left and transform into error
+    # message
     def process(self, data: Data, msg) -> TransitionResult:
         handler = self._resolve_handler(msg)
+        result = self._execute_transition(handler, data, msg)
+        return self._dispatch_transition_result(data, result)
+
+    def _dispatch_transition_result(self, data, result):
         return (
-            self._execute_transition(handler, data, msg) /
+            result /
             self._process_result(data) |
             TransitionResult.empty(data)
         )
@@ -512,7 +530,7 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
     async def _process_one_message(self, data):
         msg = await self._messages.get()
         sent = self._send(data, msg)
-        result = await sent.await_coro(self._process_result)
+        result = await sent.await_coro(self._dispatch_transition_result)
         for pub in result.pub:
             await self._publish(pub)
         self._messages.task_done()
