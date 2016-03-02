@@ -7,8 +7,9 @@ from fn import F, _  # type: ignore
 import asyncio
 from asyncio.subprocess import PIPE  # type: ignore
 
-from tryp import Map, Future, __
+from tryp import Map, Future, __, Boolean
 from tryp.lazy import lazy
+from tryp.either import Right, Left
 
 import trypnv
 from trypnv.logging import Logging
@@ -20,7 +21,7 @@ class Result(object):
 
     def __init__(self, job: 'Job', success: bool, out: str, err: str) -> None:
         self.job = job
-        self.success = success
+        self.success = Boolean(success)
         self.out = out
         self.err = err
 
@@ -32,6 +33,9 @@ class Result(object):
     @property
     def msg(self):
         return self.err if self.err else self.out
+
+    def either(self, good, bad):
+        return self.success.maybe(Right(good)) | Left(bad)
 
 
 class JobClient(Record):
