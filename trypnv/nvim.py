@@ -151,7 +151,7 @@ class NvimComponent(Logging):
 
     def dir(self, name: str) -> Maybe[Path]:
         var = self.path(name)
-        val = var.filter(_.call('is_dir'))
+        val = var.filter(__.is_dir())
         if not val.is_just:
             msg = 'g:{} is not a directory ({})'
             self.log.error(msg.format(name, var))
@@ -443,6 +443,9 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
     def call(self, name, *a, **kw):
         return Maybe.from_call(self.vim.call, name, *a, **kw)
+
+    def eval(self, expr):
+        return self.vim.eval(expr)
 
     @property
     def current(self):
