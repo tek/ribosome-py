@@ -264,12 +264,14 @@ class Machine(Logging):
     def _default_handler(self):
         return Handler('unhandled', None, self.unhandled)
 
-    # TODO instead of get_or_else, check for Left and transform into error
-    # message
     def process(self, data: Data, msg) -> TransitionResult:
+        self.prepare(msg)
         handler = self._resolve_handler(msg)
         result = self._execute_transition(handler, data, msg)
         return self._dispatch_transition_result(data, result)
+
+    def prepare(self, msg):
+        pass
 
     def _dispatch_transition_result(self, data, result):
         return (
