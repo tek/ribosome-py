@@ -480,8 +480,8 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def cursor(self, line, col):
         return self.call('cursor', line, col)
 
-    def feedkeys(self, keyseq):
-        self.vim.feedkeys(keyseq)
+    def feedkeys(self, keyseq, *a, **kw):
+        self.vim.feedkeys(keyseq, *a, **kw)
 
 B = TypeVar('B')
 
