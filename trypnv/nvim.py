@@ -388,6 +388,10 @@ class Window(HasTab):
     def focus(self):
         self.vim.current.window = self.target
 
+    @property
+    def cursor(self):
+        return List.wrap(self.target.cursor)
+
 
 class Tab(HasWindows):
 
@@ -402,7 +406,7 @@ class Tab(HasWindows):
 class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
     def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
-        super(NvimFacade, self).__init__(vim, vim, prefix)
+        super().__init__(vim, vim, prefix)
 
     def runtime(self, path: str):
         return self.cmd('runtime! {}.vim'.format(path))
