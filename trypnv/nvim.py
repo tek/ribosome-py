@@ -241,7 +241,7 @@ class NvimComponent(Logging):
         return self.vim.command(line, async=False)
 
     def cmd_output(self, line: str):
-        return self.vim.command_output(line)
+        return List.wrap(self.vim.command_output(line).split('\n'))
 
     @property
     def syntax(self):
