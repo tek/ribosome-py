@@ -2,6 +2,7 @@ import pyrsistent  # type: ignore
 
 from tryp import List, Empty, Maybe, Boolean
 from tryp.lazy import LazyMeta, Lazy
+from tryp.lazy_list import LazyList  # type: ignore
 
 
 def any_field(**kw):
@@ -14,6 +15,10 @@ def field(tpe, **kw):
 
 def list_field(**kw):
     return field(List, initial=List(), factory=List.wrap, **kw)
+
+
+def lazy_list_field(**kw):
+    return field(LazyList, initial=LazyList([]), factory=LazyList, **kw)
 
 
 def dfield(default, **kw):
