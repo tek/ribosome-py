@@ -30,6 +30,10 @@ class Result(object):
                 if self.success
                 else 'subprocess failed: {} ({})'.format(self.msg, self.job))
 
+    def __repr__(self):
+        return '{}({}, {}, {})'.format(self.__class__.__name__, self.job,
+                                       self.success, self.msg)
+
     @property
     def msg(self):
         return self.err if self.err else self.out
