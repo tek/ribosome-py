@@ -1,8 +1,8 @@
-import pyrsistent  # type: ignore
+import pyrsistent
 
 from tryp import List, Empty, Maybe, Boolean
 from tryp.lazy import LazyMeta, Lazy
-from tryp.lazy_list import LazyList  # type: ignore
+from tryp.lazy_list import LazyList
 
 
 def any_field(**kw):

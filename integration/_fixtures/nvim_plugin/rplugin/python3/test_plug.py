@@ -2,7 +2,7 @@ import os
 import logging
 from pathlib import Path
 
-import neovim  # type: ignore
+import neovim
 
 import tryp
 

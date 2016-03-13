@@ -1,7 +1,7 @@
 from typing import Callable, Any
 from contextlib import contextmanager
 
-from flexmock import flexmock  # type: ignore
+from flexmock import flexmock
 
 from tryp import may, Maybe, List
 from tryp.test import Spec

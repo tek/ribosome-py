@@ -1,4 +1,4 @@
-from typing import TypeVar, Callable, Any, Tuple, Sequence  # type: ignore
+from typing import TypeVar, Callable, Any, Tuple, Sequence
 import abc
 import inspect
 import threading
@@ -10,7 +10,7 @@ import time
 from contextlib import contextmanager
 from inspect import iscoroutine, iscoroutinefunction
 
-from fn import _  # type: ignore
+from fn import _
 
 from pyrsistent import PRecord, field
 from pyrsistent._precord import _PRecordMeta

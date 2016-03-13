@@ -4,7 +4,7 @@ from tryp import Just
 from tryp.test import Spec
 
 from trypnv.cmd import Command, command, JsonMessageCommand, MessageCommand
-from trypnv.machine import message  # type: ignore
+from trypnv.machine import message
 
 
 BasicMessage = message(

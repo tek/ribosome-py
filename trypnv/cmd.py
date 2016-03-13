@@ -2,9 +2,9 @@ from typing import Callable, Any, Tuple
 import inspect
 import json
 
-import neovim  # type: ignore
+import neovim
 
-from fn import _  # type: ignore
+from fn import _
 
 from tryp import List, Maybe, may, Just, Map
 

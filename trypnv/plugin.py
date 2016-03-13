@@ -2,10 +2,10 @@ import abc
 import asyncio
 from typing import Union
 
-import neovim  # type: ignore
+import neovim
 
 from trypnv.nvim import NvimFacade
-from trypnv.machine import StateMachine  # type: ignore
+from trypnv.machine import StateMachine
 from trypnv.logging import nvim_logging
 
 

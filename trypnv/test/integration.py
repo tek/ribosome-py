@@ -4,9 +4,9 @@ from threading import Thread
 import asyncio
 from functools import wraps
 
-import neovim  # type: ignore
+import neovim
 
-from tryp.test import fixture_path, temp_dir, later  # type: ignore
+from tryp.test import fixture_path, temp_dir, later
 
 from tryp import List
 from tryp.test import IntegrationSpec as TrypIntegrationSpec

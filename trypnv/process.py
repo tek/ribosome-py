@@ -2,10 +2,10 @@ from pathlib import Path
 import shutil
 from contextlib import contextmanager
 
-from fn import F, _  # type: ignore
+from fn import F, _
 
 import asyncio
-from asyncio.subprocess import PIPE  # type: ignore
+from asyncio.subprocess import PIPE
 
 from tryp import Map, Future, __, Boolean
 from tryp.lazy import lazy

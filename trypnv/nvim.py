@@ -1,7 +1,7 @@
 from typing import TypeVar, Callable, Any, Generic
 from pathlib import Path
 import threading
-import concurrent.futures  # type: ignore
+import concurrent.futures
 from contextlib import contextmanager
 import asyncio
 import abc
@@ -9,18 +9,18 @@ from types import FunctionType
 import inspect
 import traceback
 
-import neovim  # type: ignore
-from neovim.api import NvimError  # type: ignore
+import neovim
+from neovim.api import NvimError
 
-from fn import _, F  # type: ignore
+from fn import _, F
 
-from pyrsistent import PRecord  # type: ignore
+from pyrsistent import PRecord
 
 from tryp.util.string import camelcaseify
 
 import tryp
 from tryp import Maybe, may, List, Map, Boolean, Empty, Just, __
-from tryp.either import Either, Right, Left  # type: ignore
+from tryp.either import Either, Right, Left
 from tryp.util.string import decode
 
 import trypnv
