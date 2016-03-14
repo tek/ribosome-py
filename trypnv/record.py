@@ -1,6 +1,6 @@
 import pyrsistent
 
-from tryp import List, Empty, Maybe, Boolean
+from tryp import List, Empty, Maybe, Boolean, _
 from tryp.lazy import LazyMeta, Lazy
 from tryp.lazy_list import LazyList
 
@@ -57,6 +57,9 @@ class Record(pyrsistent.PClass, Lazy, metaclass=RecordMeta):
     def mod(self, name: str, modder):
         par = { name: modder(getattr(self, name)) }
         return self.set(**par)
+
+    def append(self, name: str, item):
+        return self.mod(name, _ + item)
 
 __all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field',
            'bool_field', 'any_field')
