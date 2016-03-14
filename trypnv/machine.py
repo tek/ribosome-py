@@ -12,14 +12,14 @@ from inspect import iscoroutine, iscoroutinefunction
 
 from fn import _
 
-from pyrsistent import PRecord, field
+from pyrsistent import PRecord
 from pyrsistent._precord import _PRecordMeta
 
 import tryp
-from trypnv.logging import Logging
+from trypnv.logging import Logging, log
 from trypnv.cmd import StateCommand
 from trypnv.data import Data
-from trypnv.record import Record, any_field, list_field
+from trypnv.record import Record, any_field, list_field, field, dfield
 
 from tryp import Maybe, List, Map, may, Empty, curried, Just, __, F
 from tryp.lazy import lazy
@@ -27,12 +27,43 @@ from tryp.util.string import camelcaseify
 from tryp.tc.optional import Optional
 
 
+def _field_namespace(fields, opt_fields, varargs):
+    namespace = Map()
+    for fname in fields:
+        namespace[fname] = any_field()
+    for fname, val in opt_fields:
+        namespace[fname] = dfield(val)
+    if varargs:
+        namespace[varargs] = list_field()
+    return namespace
+
+
+def _init_message_cls_metadata(inst):
+    def set_missing(name, default):
+        if not hasattr(inst, name):
+            setattr(inst, name, default)
+    List(
+        ('_field_varargs', None),
+        ('_field_order', []),
+        ('_field_count_min', 0),
+    ).map2(set_missing)
+
+
+def _set_field_metadata(inst, fields, opt_fields, varargs):
+    if varargs is not None:
+        inst._field_varargs = varargs
+    inst._field_order += list(fields) + List(*opt_fields).map(_[0])
+    inst._field_count_min += len(fields)
+    inst._field_count_max = (
+        Empty() if inst._field_varargs
+        else Just(inst._field_count_min + len(opt_fields)))
+
+
 class MessageMeta(_PRecordMeta):
 
-    # FIXME opt_fields order is lost
     def __new__(
             cls, name, bases, namespace, fields=[], opt_fields=[],
-            varargs=None, **kw
+            varargs=None, skip_fields=False, **kw
     ):
         ''' create a subclass of PRecord
         **fields** is a list of strings used as names of mandatory
@@ -40,21 +71,21 @@ class MessageMeta(_PRecordMeta):
         **opt_fields** is a list of (string, default) used as fields
         with initial values
         the order of the names is preserved in **_field_order**
+        **varargs** is an optional field name where unmatched args are
+        stored.
+        **skip_fields** indicates that the current class is a base class
+        (like Message). If those classes were processed here, all their
+        subclasses would share the metadata, and get all fields set by
+        other subclasses.
         **_field_count_min** and **_field_count_max** are used by
         `MessageCommand`
         '''
-        for fname in fields:
-            namespace[fname] = field(mandatory=True)
-        for fname, val in opt_fields:
-            namespace[fname] = field(mandatory=True, initial=val)
-        if varargs:
-            namespace[varargs] = field(mandatory=True, initial=List())
-        inst = super().__new__(cls, name, bases, namespace, **kw)
-        inst._field_varargs = varargs
-        inst._field_order = list(fields) + List(*opt_fields).map(_[0])
-        inst._field_count_min = len(fields)
-        inst._field_count_max = (Empty() if varargs else
-                                 Just(inst._field_count_min + len(opt_fields)))
+        ns = Map() if skip_fields else _field_namespace(fields, opt_fields,
+                                                        varargs)
+        inst = super().__new__(cls, name, bases, ns ** namespace, **kw)
+        if not skip_fields:
+            _init_message_cls_metadata(inst)
+            _set_field_metadata(inst, fields, opt_fields, varargs)
         return inst
 
     def __init__(cls, name, bases, namespace, **kw):
@@ -62,9 +93,9 @@ class MessageMeta(_PRecordMeta):
 
 
 @functools.total_ordering
-class Message(PRecord, metaclass=MessageMeta):
-    time = field(type=float, mandatory=True)
-    prio = field(type=float, mandatory=True, initial=0.5)
+class Message(PRecord, metaclass=MessageMeta, skip_fields=True):
+    time = field(float)
+    prio = dfield(0.5)
 
     def __new__(cls, *fields, **kw):
         field_map = (
@@ -473,8 +504,6 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
     def send_sync(self, msg: Message):
         self.send(msg)
         return self.await_state()
-
-    send_wait = send_sync
 
     def await_state(self):
         asyncio.run_coroutine_threadsafe(self.join(), self._loop)\
