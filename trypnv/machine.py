@@ -244,6 +244,7 @@ class CoroTransitionResult(TransitionResult, Logging):
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
 Error = message('Error', 'message')
+Info = message('Info', 'message')
 
 
 class MachineError(RuntimeError):
