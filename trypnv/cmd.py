@@ -7,11 +7,9 @@ import neovim
 from fn import _
 
 from tryp import List, Maybe, may, Just, Map
-
-from trypnv.logging import log
-
 from tryp.util.string import camelcaseify
 
+from trypnv.logging import Logging
 import trypnv
 
 
@@ -23,7 +21,7 @@ def numeric(val):
     return isinstance(val, int)
 
 
-class Command(object):
+class Command(Logging):
 
     def __init__(
             self,
@@ -121,7 +119,7 @@ class Command(object):
     def error(self, args):
         msg = 'argument count for command "{}" is {}, must be {} ({})'
         err = msg.format(self.name, len(args), self.count_spec, args)
-        log.error(err)
+        self.log.error(err)
         return err
 
     def _call_fun(self, obj, *args):
@@ -147,8 +145,7 @@ class MessageCommand(Command):
     def __init__(self, fun: Callable[[], Any], msg: type, **kw) -> None:
         self._message = msg
         self._fun_name = fun.__name__
-        super(MessageCommand, self).__init__(
-            self._message.__init__, **kw)  # type: ignore
+        super().__init__(self._message.__init__, **kw)  # type: ignore
 
     @property
     def _infer_name(self):
@@ -167,7 +164,7 @@ class MessageCommand(Command):
             obj.state().send(self._message(*args))
         else:
             msg = 'msg_command can only be used on NvimStatePlugin ({})'
-            log.error(msg.format(obj))
+            self.log.error(msg.format(obj))
 
     @property
     def msg_dispatch(self):
@@ -205,7 +202,7 @@ class JsonMessageCommand(MessageCommand):
             real_args = self._extract_args(args)
         except json.JSONDecodeError as e:
             msg = 'invalid json in parameters to command {}: {}'
-            log.error(msg.format(self.name, e))
+            self.log.error(msg.format(self.name, e))
         else:
             super(JsonMessageCommand, self)._call_fun(obj, *real_args)
 

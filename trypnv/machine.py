@@ -38,7 +38,7 @@ def _field_namespace(fields, opt_fields, varargs):
     return namespace
 
 
-def _init_message_cls_metadata(inst):
+def _init_field_metadata(inst):
     def set_missing(name, default):
         if not hasattr(inst, name):
             setattr(inst, name, default)
@@ -49,7 +49,7 @@ def _init_message_cls_metadata(inst):
     ).map2(set_missing)
 
 
-def _set_field_metadata(inst, fields, opt_fields, varargs):
+def _update_field_metadata(inst, fields, opt_fields, varargs):
     if varargs is not None:
         inst._field_varargs = varargs
     inst._field_order += list(fields) + List(*opt_fields).map(_[0])
@@ -61,10 +61,8 @@ def _set_field_metadata(inst, fields, opt_fields, varargs):
 
 class MessageMeta(_PRecordMeta):
 
-    def __new__(
-            cls, name, bases, namespace, fields=[], opt_fields=[],
-            varargs=None, skip_fields=False, **kw
-    ):
+    def __new__(cls, name, bases, namespace, fields=[], opt_fields=[],
+                varargs=None, skip_fields=False, **kw):
         ''' create a subclass of PRecord
         **fields** is a list of strings used as names of mandatory
         PRecord fields
@@ -84,8 +82,8 @@ class MessageMeta(_PRecordMeta):
                                                         varargs)
         inst = super().__new__(cls, name, bases, ns ** namespace, **kw)
         if not skip_fields:
-            _init_message_cls_metadata(inst)
-            _set_field_metadata(inst, fields, opt_fields, varargs)
+            _init_field_metadata(inst)
+            _update_field_metadata(inst, fields, opt_fields, varargs)
         return inst
 
     def __init__(cls, name, bases, namespace, **kw):
