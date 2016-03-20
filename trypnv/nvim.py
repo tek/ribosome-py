@@ -352,6 +352,10 @@ class Buffer(HasWindow):
         return self.option('modified').contains(True)
 
     @property
+    def name(self):
+        return self._internal_buffer.name
+
+    @property
     def content(self):
         return List.wrap(self.target[:]).map(decode)
 
