@@ -1,4 +1,4 @@
-from typing import TypeVar, Callable, Any, Tuple, Sequence
+from typing import TypeVar, Callable, Any, Sequence
 import abc
 import inspect
 import threading
@@ -16,7 +16,7 @@ from pyrsistent import PRecord
 from pyrsistent._precord import _PRecordMeta
 
 import tryp
-from trypnv.logging import Logging, log
+from trypnv.logging import Logging
 from trypnv.cmd import StateCommand
 from trypnv.data import Data
 from trypnv.record import Record, any_field, list_field, field, dfield
@@ -92,13 +92,17 @@ class MessageMeta(_PRecordMeta):
 
 @functools.total_ordering
 class Message(PRecord, metaclass=MessageMeta, skip_fields=True):
+    ''' Interface between vim commands and state.
+    Provides a constructor that allows specification of fields via
+    positional arguments.
+    '''
     time = field(float)
     prio = dfield(0.5)
 
-    def __new__(cls, *fields, **kw):
+    def __new__(cls, *args, **kw):
         field_map = (
-            Map({cls._field_varargs: fields}) if cls._field_varargs
-            else Map(zip(cls._field_order, fields))
+            Map({cls._field_varargs: args}) if cls._field_varargs
+            else Map(zip(cls._field_order, args))
         )
         ext_kw = field_map ** kw + ('time', time.time())
         return super().__new__(cls, **ext_kw)
