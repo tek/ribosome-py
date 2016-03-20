@@ -249,6 +249,7 @@ Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
 Error = message('Error', 'message')
 Info = message('Info', 'message')
+RunTask = message('RunTask', 'task')
 
 
 class MachineError(RuntimeError):
@@ -386,8 +387,20 @@ class Machine(Logging):
         return Empty()
 
     @may_handle(IO)
-    def message_callback(self, data: Data, msg: IO):
+    def message_io(self, data: Data, msg: IO):
         msg.perform()
+
+    @may_handle(RunTask)
+    def message_run_task(self, data: Data, msg: RunTask):
+        success = lambda r: r if isinstance(r, Message) else None
+        return (
+            msg.task
+            .unsafe_perform_sync()
+            .cata(
+                F(Error) >> _.pub,
+                success
+            )
+        )
 
 
 class Transitions(object):
@@ -611,4 +624,5 @@ class PluginStateMachine(StateMachine):
             'sending command {} to plugin {}'.format(msg.msg, msg.plug.name))
         return msg.plug.process(data, msg.msg)
 
-__all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Error')
+__all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Error',
+           'Info', 'ModularMachine', 'Transitions')
