@@ -600,7 +600,7 @@ class PluginStateMachine(StateMachine):
         sender = self.send_sync if sync else self.send
         plug = self.plugin(plug_name)
         cmd = plug.flat_map(lambda a: a.command(cmd_name, List(args)))
-        plug.map2(cmd, PlugCommand) % sender
+        plug.ap2(cmd, PlugCommand) % sender
 
     def plug_command_sync(self, *a, **kw):
         return self.plug_command(*a, sync=True, **kw)
