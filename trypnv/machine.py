@@ -20,6 +20,7 @@ from trypnv.logging import Logging
 from trypnv.cmd import StateCommand
 from trypnv.data import Data
 from trypnv.record import Record, any_field, list_field, field, dfield
+from trypnv.nvim import NvimIO
 
 from tryp import Maybe, List, Map, may, Empty, curried, Just, __, F
 from tryp.lazy import lazy
@@ -151,6 +152,7 @@ Nop = message('Nop')
 Quit = message('Quit')
 Coroutine = message('Coroutine', 'coro')
 PlugCommand = message('PlugCommand', 'plug', 'msg')
+NvimIOTask = message('NvimIOTask', 'io')
 
 
 def is_seq(a):
@@ -171,6 +173,10 @@ def _recover_error(handler, result):
         .to_either(None)
         .recover_with(to_error)
     )
+
+
+def io(f: Callable):
+    return NvimIOTask(NvimIO(f))
 
 
 class Handler(object):
@@ -389,6 +395,10 @@ class Machine(Logging):
     @may_handle(IO)
     def message_io(self, data: Data, msg: IO):
         msg.perform()
+
+    @may_handle(NvimIOTask)
+    def nvim_io(self, data: Data, msg: NvimIOTask):
+        msg.io.unsafe_perform_io(self.vim)
 
     @may_handle(RunTask)
     def message_run_task(self, data: Data, msg: RunTask):
