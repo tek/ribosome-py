@@ -3,6 +3,7 @@ from pathlib import Path
 from threading import Thread
 import asyncio
 from functools import wraps
+import json
 
 import neovim
 
@@ -100,6 +101,11 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
             len(self._log_out).should.be.greater_than(minlen)
             return checker(self._log_out[index]).should.be.ok
         later(check)
+
+    def json_cmd(self, cmd, **data):
+        j = json.dumps(data).replace('"', '\\"')
+        cmd = '{} {}'.format(cmd, j)
+        self.vim.cmd(cmd)
 
 
 def main_looped(fun):
