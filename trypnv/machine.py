@@ -26,6 +26,7 @@ from tryp import Maybe, List, Map, may, Empty, curried, Just, __, F
 from tryp.lazy import lazy
 from tryp.util.string import camelcaseify
 from tryp.tc.optional import Optional
+from tryp.task import Task
 
 
 def _field_namespace(fields, opt_fields, varargs):
@@ -256,6 +257,7 @@ IO = message('IO', 'perform')
 Error = message('Error', 'message')
 Info = message('Info', 'message')
 RunTask = message('RunTask', 'task')
+DataTask = message('DataTask', 'cons')
 
 
 class MachineError(RuntimeError):
@@ -397,7 +399,7 @@ class Machine(Logging):
         msg.perform()
 
     @may_handle(NvimIOTask)
-    def nvim_io(self, data: Data, msg: NvimIOTask):
+    def message_nvim_io(self, data: Data, msg: NvimIOTask):
         msg.io.unsafe_perform_io(self.vim)
 
     @may_handle(RunTask)
@@ -410,6 +412,14 @@ class Machine(Logging):
                 F(Error) >> _.pub,
                 success
             )
+        )
+
+    @may_handle(DataTask)
+    def message_data_task(self, data: Data, msg: DataTask):
+        return (
+            msg.cons(Task.now(data))
+            .unsafe_perform_sync()
+            .right_or_map(F(Error) >> _.pub)
         )
 
 
