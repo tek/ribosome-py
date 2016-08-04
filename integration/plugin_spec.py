@@ -1,28 +1,21 @@
-import sure  # NOQA
-from flexmock import flexmock  # NOQA
-
-from tryp.test.path import fixture_path
+from tryp import Right, List
 
 from trypnv.test import VimIntegrationSpec
+
+from integration._support.plugin import TestPlugin
 
 
 class PluginSpec(VimIntegrationSpec):
 
-    def _pre_start_neovim(self):
-        self.rtp = fixture_path('nvim_plugin')
-        self._rplugin_path = (self.rtp / 'rplugin' / 'python3' /
-                              'test_plug.py')
-        self._handlers = [
-            {
-                'sync': 1,
-                'name': 'Go',
-                'type': 'command',
-                'opts': {'nargs': 0},
-            },
-        ]
+    @property
+    def plugin_class(self):
+        return Right(TestPlugin)
 
     def startup(self):
-        self._debug = True
+        i = 99932
         self.vim.cmd_sync('Go')
+        val = TestPlugin.test_value.format(i)
+        self.vim.call('Value', i).should.contain(val)
+        self._log_out.should.equal(List(TestPlugin.test_go))
 
 __all__ = ('PluginSpec',)
