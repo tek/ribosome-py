@@ -194,15 +194,16 @@ class JsonMessageCommand(MessageCommand):
     def _extract_args(self, args: Tuple[str]):
         pos_args, json_args = (tuple(args[:self.min]),  # type: ignore
                                tuple(args[self.min:]))  # type: ignore
-        params = json.loads(' '.join(json_args)) if json_args else {}
+        js = ' '.join(json_args).replace('\\"', '"')
+        params = json.loads(js) if json_args else {}
         return pos_args + (Map(params),)
 
     def _call_fun(self, obj, *args):
         try:
             real_args = self._extract_args(args)
         except json.JSONDecodeError as e:
-            msg = 'invalid json in parameters to command {}: {}'
-            self.log.error(msg.format(self.name, e))
+            msg = 'invalid json in parameters to command {}: {}, {}'
+            self.log.error(msg.format(self.name, e, ' '.join(args[self.min:])))
         else:
             super(JsonMessageCommand, self)._call_fun(obj, *real_args)
 
