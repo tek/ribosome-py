@@ -61,7 +61,7 @@ class PublishSpec(Spec):
 
     def publish(self):
         with _Z('z', List(_A('a'), _B('b'))).transient() as z:
-            res = z.send_wait(M1())
+            res = z.send_sync(M1())
             z.goal.result().should.be.ok
         res.should.have.key('a').being.ok
         res.should.have.key('b').being.ok
@@ -92,7 +92,7 @@ class ModularSpec(Spec):
         data = 'data'
         name = 'c'
         with _Z('z', List(_C(name, data))).transient() as z:
-            res = z.send_wait(M1())
+            res = z.send_sync(M1())
             z.goal.result().should.equal(data)
             res.sub_states[name][data].should.equal(data)
 
