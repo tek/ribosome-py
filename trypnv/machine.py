@@ -22,7 +22,7 @@ from trypnv.data import Data
 from trypnv.record import Record, any_field, list_field, field, dfield
 from trypnv.nvim import NvimIO
 
-from tryp import Maybe, List, Map, may, Empty, curried, Just, __, F
+from tryp import Maybe, List, Map, may, Empty, curried, Just, __, F, Either
 from tryp.lazy import lazy
 from tryp.util.string import camelcaseify
 from tryp.tc.optional import Optional
@@ -288,6 +288,10 @@ def may_handle(msg: type):
     return may_wrap
 
 
+def either_msg(e: Either):
+    return e.right_or_map(F(Error) >> _.pub)
+
+
 class Machine(Logging):
     _data_type = Data
 
@@ -394,10 +398,6 @@ class Machine(Logging):
             'plugin "{}" has no command "{}"'.format(self.name, name))
         return Empty()
 
-    @may_handle(IO)
-    def message_io(self, data: Data, msg: IO):
-        msg.perform()
-
     @may_handle(NvimIOTask)
     def message_nvim_io(self, data: Data, msg: NvimIOTask):
         msg.io.unsafe_perform_io(self.vim)
@@ -416,10 +416,9 @@ class Machine(Logging):
 
     @may_handle(DataTask)
     def message_data_task(self, data: Data, msg: DataTask):
-        return (
+        return either_msg(
             msg.cons(Task.now(data))
             .unsafe_perform_sync()
-            .right_or_map(F(Error) >> _.pub)
         )
 
 
