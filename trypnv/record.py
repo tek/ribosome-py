@@ -4,6 +4,8 @@ from tryp import List, Empty, Maybe, Boolean, _, Map
 from tryp.lazy import LazyMeta, Lazy, lazy
 from tryp.lazy_list import LazyList
 
+from trypnv.logging import Logging
+
 
 def any_field(**kw):
     return pyrsistent.field(mandatory=True, **kw)
@@ -81,7 +83,7 @@ class RecordMeta(LazyMeta, pyrsistent.PClassMeta):
     pass
 
 
-class Record(pyrsistent.PClass, Lazy, metaclass=RecordMeta):
+class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
 
     @lazy
     def setter(self):
