@@ -1,3 +1,5 @@
+import uuid
+
 import pyrsistent
 
 from tryp import List, Empty, Maybe, Boolean, _, Map
@@ -39,6 +41,10 @@ def bool_field(**kw):
 
 def map_field(**kw):
     return dfield(Map(), **kw)
+
+
+def uuid_field():
+    return field(uuid.UUID, initial=lambda: uuid.uuid4())
 
 
 class FieldMutator(object):
