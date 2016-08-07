@@ -182,7 +182,7 @@ class ProcessExecutor(Logging):
 
     @property
     def futures(self):
-        return self.current.values.map(_.status)
+        return self.current.v.map(_.status)
 
     def await_threadsafe(self, loop):
         async def waiter():
