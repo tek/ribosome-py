@@ -2,7 +2,7 @@ import uuid
 
 import pyrsistent
 
-from tryp import List, Empty, Maybe, Boolean, _, Map
+from tryp import List, Empty, Maybe, Boolean, _, Map, Left, L, __, Either
 from tryp.lazy import LazyMeta, Lazy, lazy
 from tryp.lazy_list import LazyList
 
@@ -33,6 +33,13 @@ def maybe_field(tpe, initial=Empty(), **kw):
     err = 'must be Maybe[{}]'.format(tpe)
     inv = lambda a: (not a.exists(lambda b: not isinstance(b, tpe)), err)
     return field(Maybe, initial=initial, invariant=inv, **kw)
+
+
+def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw):
+    err = 'must be Either[{}, {}]'.format(ltpe, rtpe)
+    check = lambda t, a: (isinstance(a, t), err)
+    inv = __.cata(L(check)(ltpe, _), L(check)(rtpe, _))
+    return field(Either, initial=initial, invariant=inv, **kw)
 
 
 def bool_field(**kw):
