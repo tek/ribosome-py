@@ -115,12 +115,6 @@ class Message(PRecord, metaclass=MessageMeta, skip_fields=True):
         '''
         pass
 
-    def __str__(self):
-        return 'Message({})'.format(self.__class__.__name__)
-
-    def __repr__(self):
-        return str(self)
-
     @property
     def pub(self):
         return Publish(self)
@@ -150,7 +144,9 @@ class Publish(Message, fields=('message',)):
 
 
 Nop = message('Nop')
+Stop = message('Stop')
 Quit = message('Quit')
+Done = message('Done')
 Coroutine = message('Coroutine', 'coro')
 PlugCommand = message('PlugCommand', 'plug', 'msg')
 NvimIOTask = message('NvimIOTask', 'io')
@@ -399,11 +395,11 @@ class Machine(Logging):
         return Empty()
 
     @may_handle(NvimIOTask)
-    def message_nvim_io(self, data: Data, msg: NvimIOTask):
+    def message_nvim_io(self, data: Data, msg):
         msg.io.unsafe_perform_io(self.vim)
 
     @may_handle(RunTask)
-    def message_run_task(self, data: Data, msg: RunTask):
+    def message_run_task(self, data: Data, msg):
         success = lambda r: r if isinstance(r, Message) else None
         return (
             msg.task
@@ -415,7 +411,7 @@ class Machine(Logging):
         )
 
     @may_handle(DataTask)
-    def message_data_task(self, data: Data, msg: DataTask):
+    def message_data_task(self, data: Data, msg):
         return either_msg(
             msg.cons(Task.now(data))
             .unsafe_perform_sync()
@@ -425,7 +421,7 @@ class Machine(Logging):
 class Transitions(object):
     State = Map
 
-    def __init__(self, machine: Machine, data: Data, msg: Message):
+    def __init__(self, machine: Machine, data: Data, msg: Message) -> None:
         self.machine = machine
         self.data = data
         self.msg = msg
@@ -489,7 +485,7 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
 
     def __init__(self, name: str, sub: List[Machine]=List()) -> None:
         threading.Thread.__init__(self)
-        self.done = None
+        self.done = None  # type: Optional[concurrent.futures.Future]
         self.data = None
         self._messages = None
         self.running = concurrent.futures.Future()
@@ -520,7 +516,7 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
 
     def stop(self):
         if self.done is not None:
-            self.send(Quit())
+            self.send(Stop())
             self.done.result(10)
             try:
                 self._loop.close()
@@ -553,19 +549,23 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
         )
 
     @may_handle(Nop)
-    def _nop(self, data: Data, msg: Nop):
+    def _nop(self, data: Data, msg):
         pass
 
-    @may_handle(Quit)
-    def _quit(self, data: Data, msg: Quit):
+    @may_handle(Stop)
+    def _stop(self, data: Data, msg):
+        return Quit(), Done().at(1)
+
+    @may_handle(Done)
+    def _done(self, data: Data, msg):
         self.done.set_result(True)
 
     @may_handle(Callback)
-    def message_callback(self, data: Data, msg: Callback):
+    def message_callback(self, data: Data, msg):
         return msg.func(data)
 
     @may_handle(Coroutine)
-    def _couroutine(self, data: Data, msg: Coroutine):
+    def _couroutine(self, data: Data, msg):
         return msg
 
     def unhandled(self, data, msg):
@@ -608,7 +608,7 @@ class StateMachine(threading.Thread, Machine, metaclass=abc.ABCMeta):
 
 class PluginStateMachine(StateMachine):
 
-    def __init__(self, name, plugins: List[str]):
+    def __init__(self, name, plugins: List[str]) -> None:
         StateMachine.__init__(self, name)
         self.sub = plugins.flat_map(self.start_plugin)
 
