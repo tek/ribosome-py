@@ -6,7 +6,7 @@ import neovim
 
 from fn import _
 
-from tryp import List, Maybe, may, Just, Map
+from tryp import List, Maybe, may, Just, Map, Try
 from tryp.util.string import camelcaseify
 
 from trypnv.logging import Logging
@@ -173,6 +173,10 @@ class MessageCommand(Command):
         return msg_dispatch_wrapper
 
 
+class ParseError(Exception):
+    pass
+
+
 class JsonMessageCommand(MessageCommand):
 
     def __init__(self, fun: Callable[[], Any], msg: type, **kw) -> None:
@@ -192,18 +196,26 @@ class JsonMessageCommand(MessageCommand):
         pass
 
     def _extract_args(self, args: Tuple[str]):
-        pos_args, json_args = (tuple(args[:self.min]),  # type: ignore
+        def parse(d):
+            def fail(err):
+                raise ParseError('neither valid json nor python: {}'.format(d))
+            return (
+                Try(json.loads, d)
+                .or_else(Try(eval, d))
+                .or_else(Try(json.loads, d.replace('\\"', '"')))
+                .right_or_map(fail)
+            )
+        pos_args, data_args = (tuple(args[:self.min]),  # type: ignore
                                tuple(args[self.min:]))  # type: ignore
-        js = ' '.join(json_args).replace('\\"', '"')
-        params = json.loads(js) if json_args else {}
+        data = ' '.join(data_args)
+        params = parse(data) if data else {}
         return pos_args + (Map(params),)
 
     def _call_fun(self, obj, *args):
         try:
             real_args = self._extract_args(args)
-        except json.JSONDecodeError as e:
-            msg = 'invalid json in parameters to command {}: {}, {}'
-            self.log.error(msg.format(self.name, e, ' '.join(args[self.min:])))
+        except ParseError as e:
+            self.log.error(e)
         else:
             super(JsonMessageCommand, self)._call_fun(obj, *real_args)
 
