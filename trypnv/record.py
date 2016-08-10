@@ -42,8 +42,8 @@ def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw):
     return field(Either, initial=initial, invariant=inv, **kw)
 
 
-def bool_field(**kw):
-    return field(Boolean, factory=Boolean.wrap, **kw)
+def bool_field(initial=Boolean(False), **kw):
+    return field(Boolean, factory=Boolean.wrap, initial=initial, **kw)
 
 
 def map_field(**kw):
