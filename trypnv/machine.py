@@ -291,8 +291,9 @@ def either_msg(e: Either):
 class Machine(Logging):
     _data_type = Data
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, parent: 'Machine'=None) -> None:
         self.name = name
+        self.parent = Maybe(parent)
         self._setup_handlers()
 
     def _setup_handlers(self):
@@ -526,12 +527,13 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
 
 class StateMachine(AsyncIOThread, ModularMachine):
 
-    def __init__(self, name: str, sub: List[Machine]=List()) -> None:
+    def __init__(self, name: str, sub: List[Machine]=List(), parent=None
+                 ) -> None:
         AsyncIOThread.__init__(self)
         self.data = None
         self._messages = None
         self.sub = sub
-        Machine.__init__(self, name)
+        ModularMachine.__init__(self, name, parent)
 
     @property
     def init(self) -> Data:
@@ -646,7 +648,7 @@ class PluginStateMachine(StateMachine):
         else:
             if hasattr(mod, 'Plugin'):
                 name = path.split('.')[-1]
-                return getattr(mod, 'Plugin')(name, self.vim)
+                return getattr(mod, 'Plugin')(name, self.vim, self)
 
     def plugin(self, name):
         return self.sub.find(_.name == name)
