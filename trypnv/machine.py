@@ -524,7 +524,7 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
         pass
 
 
-class StateMachine(AsyncIOThread, Machine):
+class StateMachine(AsyncIOThread, ModularMachine):
 
     def __init__(self, name: str, sub: List[Machine]=List()) -> None:
         AsyncIOThread.__init__(self)
