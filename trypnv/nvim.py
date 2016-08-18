@@ -249,6 +249,9 @@ class NvimComponent(Logging):
     def cmd_output(self, line: str) -> List[str]:
         return List.wrap(self.vim.command_output(line).split('\n'))
 
+    def vcmd(self, line: str, sync=False):
+        return self.cmd(line, verbose=True, sync=sync)
+
     @property
     def syntax(self):
         return Syntax(self)
@@ -422,13 +425,13 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         return self.cmd('runtime! {}.vim'.format(path))
 
     def echo(self, text: str):
-        self.cmd(echo(text, 'echo', prefix=Empty()))
+        self.vcmd(echo(text, 'echo', prefix=Empty()))
 
     def echom(self, text: str):
-        self.cmd(echo(text, prefix=Just(self.prefix)))
+        self.vcmd(echo(text, prefix=Just(self.prefix)))
 
     def echohl(self, hl: str, text: str):
-        self.cmd(echohl(text, hl, prefix=Just(self.prefix)))
+        self.vcmd(echohl(text, hl, prefix=Just(self.prefix)))
 
     def echowarn(self, text: str):
         self.echohl('WarningMsg', text)
@@ -446,7 +449,7 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
             self.log.info('\n'.join(text))
 
     def doautocmd(self, name, pat=''):
-        c = 'silent doautocmd <nomodeline> {} {}'.format(name, pat)
+        c = 'doautocmd <nomodeline> {} {}'.format(name, pat)
         self.cmd(c)
 
     def uautocmd(self, name):
