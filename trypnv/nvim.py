@@ -1,7 +1,7 @@
 from typing import TypeVar, Callable, Any, Generic
 from pathlib import Path
 import threading
-import concurrent.futures
+from concurrent import futures
 from contextlib import contextmanager
 import asyncio
 import abc
@@ -22,6 +22,7 @@ import tryp
 from tryp import Maybe, may, List, Map, Boolean, Empty, Just, __
 from tryp.either import Either, Right, Left
 from tryp.util.string import decode
+from tryp.anon import format_funcall
 
 import trypnv
 from trypnv.record import dfield
@@ -76,7 +77,7 @@ class NvimComponent(Logging):
         ''' run a callback function on the main thread and return its
         value (blocking). the callback receives 'self' as an argument.
         '''
-        result = concurrent.futures.Future()
+        result = futures.Future()  # type: futures.Future
         cb = lambda: result.set_result(f(self))
         self._run_on_main_thread(cb)
         return result.result()
@@ -85,7 +86,6 @@ class NvimComponent(Logging):
         ''' run a callback function on the host's main thread
         '''
         frame = inspect.currentframe()  # type: ignore
-
         def dispatch():
             try:
                 f()
@@ -234,13 +234,19 @@ class NvimComponent(Logging):
     def set_optionb(self, name: str, value):
         return self.set_option(name, bool(value))
 
-    def cmd(self, line: str):
-        return self.vim.command(line, async=True)
+    def cmd(self, line: str, verbose=False, sync=False):
+        ''' Wrap **Nvim.command**, default to async.
+        **verbose** prevents the use of **silent**, which is used by
+        default because headless nvim will deadlock if a command's
+        output requires user input to proceed (e.g. multiline output)
+        '''
+        l = line if verbose else 'silent {}'.format(line)
+        return self.vim.command(l, async=not sync)
 
-    def cmd_sync(self, line: str):
-        return self.vim.command(line, async=False)
+    def cmd_sync(self, line: str, verbose=False):
+        return self.cmd(line, verbose=verbose, sync=True)
 
-    def cmd_output(self, line: str):
+    def cmd_output(self, line: str) -> List[str]:
         return List.wrap(self.vim.command_output(line).split('\n'))
 
     @property
@@ -450,7 +456,11 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         self.uautocmd('{}{}'.format(camelcaseify(self.prefix), name))
 
     def call(self, name, *a, **kw):
-        return Maybe.from_call(self.vim.call, name, *a, **kw)
+        return (
+            Maybe.from_call(self.vim.call, name, *a, exc=NvimError, **kw)
+            .to_either(lambda: 'vim call failed: {}'.format(
+                format_funcall(name, a, kw)))
+        )
 
     def eval(self, expr):
         return self.vim.eval(expr)
