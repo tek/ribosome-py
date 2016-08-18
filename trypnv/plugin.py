@@ -13,7 +13,7 @@ class NvimPlugin(object):
 
     def __init__(self, nvim: Union[NvimFacade, neovim.Nvim]) -> None:
         if isinstance(nvim, neovim.Nvim):
-            nvim = NvimFacade(nvim, 'trypnv')
+            nvim = NvimFacade(nvim, self.name)
         self.vim = nvim
         self.setup_logging()
         self.setup_asyncio()
@@ -33,6 +33,10 @@ class NvimPlugin(object):
     @property
     def loop(self):
         return self.vim.loop
+
+    @property
+    def name(self):
+        return 'trypnv'
 
 
 class NvimStatePlugin(NvimPlugin):
