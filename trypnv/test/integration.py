@@ -10,7 +10,7 @@ import neovim
 from tryp.test import fixture_path, temp_dir, later, temp_file
 
 from tryp import List, Maybe, Either, Left, __, Map
-from tryp.test import IntegrationSpec as TrypIntegrationSpec
+from tryp.test import IntegrationSpec as IntegrationSpecBase
 
 from trypnv.logging import Logging
 from trypnv import NvimFacade
@@ -18,14 +18,14 @@ from trypnv.nvim import AsyncVimProxy
 from trypnv.test.fixtures import rplugin_template
 
 
-class IntegrationSpec(TrypIntegrationSpec):
+class IntegrationSpec(IntegrationSpecBase):
 
     def setup(self):
         super().setup()
         AsyncVimProxy.allow_async_relay = False
 
 
-class VimIntegrationSpec(TrypIntegrationSpec, Logging):
+class VimIntegrationSpec(IntegrationSpecBase, Logging):
 
     def setup(self):
         super().setup()
@@ -37,9 +37,6 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
         self._pre_start_neovim()
         self._start_neovim()
         self._post_start_neovim()
-        rtp = fixture_path('config', 'rtp')
-        self.vim.amend_optionl('runtimepath', rtp)
-        self._setup_handlers()
         self._pre_start()
 
     def _start_neovim(self):
@@ -59,16 +56,6 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
     def _prefix(self):
         return ''
 
-    def _setup_handlers(self):
-        rp_path = self.rplugin_path.get_or_raise
-        rp_handlers = self.handlers.get_or_raise
-        self.vim.call(
-            'remote#host#RegisterPlugin',
-            'python3',
-            str(rp_path),
-            rp_handlers,
-        )
-
     # FIXME quitting neovim blocks sometimes
     # without quitting, specs with subprocesses block in the end
     def teardown(self):
@@ -80,7 +67,8 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
         pass
 
     def _post_start_neovim(self):
-        pass
+        rtp = fixture_path('config', 'rtp')
+        self.vim.amend_optionl('runtimepath', rtp)
 
     def _pre_start(self):
         pass
@@ -103,42 +91,6 @@ class VimIntegrationSpec(TrypIntegrationSpec, Logging):
             return checker(self._log_out[index]).should.be.ok
         later(check)
 
-    def json_cmd(self, cmd, **data):
-        j = json.dumps(data).replace('"', '\\"')
-        cmd = '{} {}'.format(cmd, j)
-        self.vim.cmd(cmd)
-
-    @property
-    def plugin_class(self) -> Either[str, type]:
-        name = self.__class__.__name__
-        e = 'property {}.plugin_class must return tryp.Right(YourPluginClass)'
-        return Left(e.format(name))
-
-    @property
-    def handlers(self):
-        return self.plugin_class / self._auto_handlers
-
-    def _auto_handlers(self, cls):
-        import inspect
-        return List.wrap(inspect.getmembers(cls)).flat_map2(self._auto_handler)
-
-    def _auto_handler(self, method_name, fun):
-        fix = lambda v: int(v) if isinstance(v, bool) else v
-        m = Maybe(getattr(fun, '_nvim_rpc_spec', None))
-        return m / Map / __.valmap(fix)
-
-    @property
-    def rplugin_path(self) -> Either[str, Path]:
-        return self.plugin_class / self._auto_rplugin
-
-    def _auto_rplugin(self, cls):
-        mod = cls.__module__
-        name = cls.__name__
-        rp_path = temp_file('trypnv', 'spec', 'plugin.py')
-        rp_path.write_text(rplugin_template.format(plugin_module=mod,
-                                                   plugin_class=name))
-        return rp_path
-
 
 def main_looped(fun):
     @wraps(fun)
@@ -158,4 +110,57 @@ def main_looped(fun):
         loop.close()
     return wrapper
 
-__all__ = ('IntegrationSpec')
+
+class PluginIntegrationSpec(VimIntegrationSpec):
+
+    def _post_start_neovim(self):
+        super()._post_start_neovim()
+        self._setup_handlers()
+
+    def _setup_handlers(self):
+        rp_path = self.rplugin_path.get_or_raise
+        rp_handlers = self.handlers.get_or_raise
+        self.vim.call(
+            'remote#host#RegisterPlugin',
+            'python3',
+            str(rp_path),
+            rp_handlers,
+        )
+
+    def json_cmd(self, cmd, **data):
+        j = json.dumps(data).replace('"', '\\"')
+        cmd = '{} {}'.format(cmd, j)
+        self.vim.cmd(cmd)
+
+    @property
+    def plugin_class(self) -> Either[str, type]:
+        name = self.__class__.__name__
+        e = 'property {}.plugin_class must return tryp.Right(YourPluginClass)'
+        return Left(e.format(name))
+
+    @property
+    def rplugin_path(self) -> Either[str, Path]:
+        return self.plugin_class / self._auto_rplugin
+
+    @property
+    def handlers(self):
+        return self.plugin_class / self._auto_handlers
+
+    def _auto_handlers(self, cls):
+        import inspect
+        return List.wrap(inspect.getmembers(cls)).flat_map2(self._auto_handler)
+
+    def _auto_handler(self, method_name, fun):
+        fix = lambda v: int(v) if isinstance(v, bool) else v
+        m = Maybe(getattr(fun, '_nvim_rpc_spec', None))
+        return m / Map / __.valmap(fix)
+
+    def _auto_rplugin(self, cls):
+        mod = cls.__module__
+        name = cls.__name__
+        rp_path = temp_file('trypnv', 'spec', 'plugin.py')
+        rp_path.write_text(rplugin_template.format(plugin_module=mod,
+                                                   plugin_class=name))
+        return rp_path
+
+__all__ = ('IntegrationSpec', 'VimIntegrationSpec', 'PluginIntegrationSpec')
