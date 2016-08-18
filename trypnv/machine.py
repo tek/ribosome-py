@@ -433,6 +433,9 @@ class Machine(Logging):
             .unsafe_perform_sync()
         )
 
+    def bubble(self, msg):
+        self.parent.cata(_.bubble, lambda: self.send)(msg)
+
 
 class Transitions(object):
     State = Map
