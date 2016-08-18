@@ -49,4 +49,14 @@ class Logging(tryp.logging.Logging):
     def _log(self):
         return trypnv_logger(self.__class__.__name__)
 
-__all__ = ('trypnv_logger', 'nvim_logging', 'Logging')
+
+def pr(a):
+    log.verbose(a)
+    return a
+
+
+def pv(a):
+    log.verbose(str(a))
+    return a
+
+__all__ = ('trypnv_logger', 'nvim_logging', 'Logging', 'pr')
