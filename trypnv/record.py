@@ -17,8 +17,17 @@ def field(tpe, **kw):
     return any_field(type=tpe, **kw)
 
 
-def list_field(**kw):
-    return field(List, initial=List(), factory=List.wrap, **kw)
+def _monad_type_field_inv(eff, tpe):
+    err = 'must be {}[{}]'.format(eff, tpe)
+    def inv(a):
+        good = tpe is None or not a.exists(lambda b: not isinstance(b, tpe))
+        return good, err
+    return inv
+
+
+def list_field(tpe=None, **kw):
+    return field(List, initial=List(), factory=List.wrap,
+                 invariant=_monad_type_field_inv('List', tpe), **kw)
 
 
 def lazy_list_field(**kw):
@@ -29,10 +38,9 @@ def dfield(default, **kw):
     return field(type(default), initial=default, **kw)
 
 
-def maybe_field(tpe, initial=Empty(), **kw):
-    err = 'must be Maybe[{}]'.format(tpe)
-    inv = lambda a: (not a.exists(lambda b: not isinstance(b, tpe)), err)
-    return field(Maybe, initial=initial, invariant=inv, **kw)
+def maybe_field(tpe=None, initial=Empty(), **kw):
+    return field(Maybe, initial=initial,
+                 invariant=_monad_type_field_inv('Maybe', tpe), **kw)
 
 
 def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw):
