@@ -22,7 +22,8 @@ from trypnv.data import Data
 from trypnv.record import Record, any_field, list_field, field, dfield
 from trypnv.nvim import NvimIO
 
-from tryp import Maybe, List, Map, may, Empty, curried, Just, __, F, Either
+from tryp import (Maybe, List, Map, may, Empty, curried, Just, __, F, Either,
+                  Try)
 from tryp.lazy import lazy
 from tryp.util.string import camelcaseify
 from tryp.tc.optional import Optional
@@ -580,6 +581,12 @@ class StateMachine(AsyncIOThread, ModularMachine):
         asyncio.run_coroutine_threadsafe(self.join(), self._loop)\
             .result(2)
         return self.data
+
+    def eval_expr(self, expr: str, pre: Callable=lambda a, b: (a, b)):
+        sub = self.sub
+        sub_map = Map(sub / (lambda a: (a.name, a)))
+        data, plugins = pre(self.data, sub_map)
+        return Try(eval, expr, None, dict(data=data, plugins=plugins))
 
     def _send(self, data, msg: Message):
         return (
