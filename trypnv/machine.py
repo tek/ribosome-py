@@ -137,6 +137,11 @@ def message(name, *fields, **kw):
                                fields=fields, **kw)
 
 
+def json_message(name, *fields, **kw):
+    f = fields + ('options',)
+    return message(name, *f, **kw)
+
+
 class Publish(Message, fields=('message',)):
 
     def __str__(self):
