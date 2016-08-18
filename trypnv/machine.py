@@ -293,6 +293,15 @@ def either_msg(e: Either):
     return e.right_or_map(F(Error) >> _.pub)
 
 
+def either_handle(msg: type):
+    def decorator(f):
+        @functools.wraps(f)
+        def either_wrap(*args, **kwargs):
+            return Just(either_msg(f(*args, **kwargs)))
+        return handle(msg)(either_wrap)
+    return decorator
+
+
 class Machine(Logging):
     _data_type = Data
 
