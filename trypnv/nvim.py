@@ -421,8 +421,8 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
         super().__init__(vim, vim, prefix)
 
-    def runtime(self, path: str):
-        return self.cmd('runtime! {}.vim'.format(path))
+    def runtime(self, path: str, verbose=True):
+        return self.cmd('runtime! {}.vim'.format(path), verbose=verbose)
 
     def echo(self, text: str):
         self.vcmd(echo(text, 'echo', prefix=Empty()))
