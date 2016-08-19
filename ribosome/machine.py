@@ -307,13 +307,16 @@ def either_handle(msg: type):
 class Machine(Logging):
     _data_type = Data
 
-    def __init__(self, parent: 'Machine'=None) -> None:
+    def __init__(self, parent: 'Machine'=None, title=None) -> None:
         self.parent = Maybe(parent)
+        self._title = Maybe(title)
         self._setup_handlers()
 
     @property
     def title(self):
-        return 'machine'
+        return self._title.or_else(
+            List.wrap(type(self).__module__.rsplit('.')).reversed.lift(1)
+        ) | 'machine'
 
     def _setup_handlers(self):
         handlers = inspect.getmembers(self,
@@ -451,7 +454,7 @@ class Transitions(object):
 
     @property
     def name(self):
-        return self.machine.name
+        return self.machine.title
 
     @property
     def log(self):
@@ -549,13 +552,13 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
 
 class StateMachine(AsyncIOThread, ModularMachine):
 
-    def __init__(self, sub: List[Machine]=List(), parent=None
+    def __init__(self, sub: List[Machine]=List(), parent=None, title=None
                  ) -> None:
         AsyncIOThread.__init__(self)
         self.data = None
         self._messages = None
         self.sub = sub
-        ModularMachine.__init__(self, parent)
+        ModularMachine.__init__(self, parent, title=None)
 
     @property
     def init(self) -> Data:
@@ -591,7 +594,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
 
     def eval_expr(self, expr: str, pre: Callable=lambda a, b: (a, b)):
         sub = self.sub
-        sub_map = Map(sub / (lambda a: (a.name, a)))
+        sub_map = Map(sub / (lambda a: (a.title, a)))
         data, plugins = pre(self.data, sub_map)
         return Try(eval, expr, None, dict(data=data, plugins=plugins))
 
@@ -675,11 +678,10 @@ class PluginStateMachine(StateMachine):
             self.log.error(msg.format(self.title, path, e))
         else:
             if hasattr(mod, 'Plugin'):
-                name = path.split('.')[-1]
-                return getattr(mod, 'Plugin')(name, self.vim, self)
+                return getattr(mod, 'Plugin')(self.vim, self)
 
-    def plugin(self, name):
-        return self.sub.find(_.name == name)
+    def plugin(self, title):
+        return self.sub.find(_.title == title)
 
     def plug_command(self, plug_name: str, cmd_name: str, args: list=[],
                      sync=False):
@@ -694,7 +696,7 @@ class PluginStateMachine(StateMachine):
     @may_handle(PlugCommand)
     def _plug_command(self, data, msg):
         self.log.debug(
-            'sending command {} to plugin {}'.format(msg.msg, msg.plug.name))
+            'sending command {} to plugin {}'.format(msg.msg, msg.plug.title))
         return msg.plug.process(data, msg.msg)
 
 
