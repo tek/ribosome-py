@@ -4,9 +4,9 @@ from typing import Union
 
 import neovim
 
-from trypnv.nvim import NvimFacade
-from trypnv.machine import StateMachine
-from trypnv.logging import nvim_logging
+from ribosome.nvim import NvimFacade
+from ribosome.machine import StateMachine
+from ribosome.logging import nvim_logging
 
 
 class NvimPlugin(object):
@@ -36,7 +36,7 @@ class NvimPlugin(object):
 
     @property
     def name(self):
-        return 'trypnv'
+        return 'ribosome'
 
 
 class NvimStatePlugin(NvimPlugin):

@@ -1,7 +1,7 @@
 import neovim
 
-from trypnv import NvimPlugin, command
-from trypnv.logging import Logging
+from ribosome import NvimPlugin, command
+from ribosome.logging import Logging
 
 
 class TestPlugin(NvimPlugin, Logging):

@@ -1,19 +1,19 @@
 from setuptools import setup, find_packages
 
-version_parts = (7, 4, 1)
+version_parts = (1, 0, 0)
 version = '.'.join(map(str, version_parts))
 
 setup(
-    name='tryp-nvim',
-    description='neovim helpers',
+    name='ribosome',
+    description='neovim plugin framework',
     version=version,
     author='Torsten Schmits',
     author_email='torstenschmits@gmail.com',
     license='MIT',
-    url='https://github.com/tek/tryp-nvim',
+    url='https://github.com/tek/ribosome',
     packages=find_packages(exclude=['unit', 'unit.*']),
     install_requires=[
-        'tryp>=7.3.0',
+        'amino>=1.0.0',
         'neovim',
         'pyrsistent',
     ]

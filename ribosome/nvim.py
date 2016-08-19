@@ -12,21 +12,19 @@ import traceback
 import neovim
 from neovim.api import NvimError
 
-from fn import _, F
-
 from pyrsistent import PRecord
 
-from tryp.util.string import camelcaseify
+from amino.util.string import camelcaseify
 
-import tryp
-from tryp import Maybe, may, List, Map, Boolean, Empty, Just, __
-from tryp.either import Either, Right, Left
-from tryp.util.string import decode
-from tryp.anon import format_funcall
+import amino
+from amino import Maybe, may, List, Map, Boolean, Empty, Just, __, _, F
+from amino.either import Either, Right, Left
+from amino.util.string import decode
+from amino.anon import format_funcall
 
-import trypnv
-from trypnv.record import dfield
-from trypnv.logging import Logging
+import ribosome
+from ribosome.record import dfield
+from ribosome.logging import Logging
 
 
 def squote(text):
@@ -55,7 +53,7 @@ def echohl(text, hl, prefix=Empty()):
 class NvimComponent(Logging):
 
     def __init__(self, vim, target, prefix: str) -> None:
-        if trypnv.in_vim and isinstance(target, (AsyncVimProxy,
+        if ribosome.in_vim and isinstance(target, (AsyncVimProxy,
                                                  NvimComponent)):
             msg = '{} created with non-native target {}'
             raise Exception(msg.format(self, target))
@@ -443,7 +441,7 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         ''' as a workaround for possible bug in embedded nvim,
         only write in bulk when in production
         '''
-        if tryp.integration_test:
+        if amino.integration_test:
             text.foreach(self.log.info)
         else:
             self.log.info('\n'.join(text))

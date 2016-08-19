@@ -7,15 +7,15 @@ from pathlib import Path
 
 import neovim
 
-from tryp.test import fixture_path, temp_dir, later, temp_file
+from amino.test import fixture_path, temp_dir, later, temp_file
 
-from tryp import List, Maybe, Either, Left, __, Map
-from tryp.test import IntegrationSpec as IntegrationSpecBase
+from amino import List, Maybe, Either, Left, __, Map
+from amino.test import IntegrationSpec as IntegrationSpecBase
 
-from trypnv.logging import Logging
-from trypnv import NvimFacade
-from trypnv.nvim import AsyncVimProxy
-from trypnv.test.fixtures import rplugin_template
+from ribosome.logging import Logging
+from ribosome import NvimFacade
+from ribosome.nvim import AsyncVimProxy
+from ribosome.test.fixtures import rplugin_template
 
 
 class IntegrationSpec(IntegrationSpecBase):
@@ -32,7 +32,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         self._debug = False
         self.logfile = temp_dir('log') / self.__class__.__name__
         self.logfile.touch()
-        os.environ['TRYPNV_LOG_FILE'] = str(self.logfile)
+        os.environ['RIBOSOME_LOG_FILE'] = str(self.logfile)
         self.vimlog = temp_dir('log') / 'vim'
         self._pre_start_neovim()
         self._start_neovim()
@@ -135,7 +135,7 @@ class PluginIntegrationSpec(VimIntegrationSpec):
     @property
     def plugin_class(self) -> Either[str, type]:
         name = self.__class__.__name__
-        e = 'property {}.plugin_class must return tryp.Right(YourPluginClass)'
+        e = 'property {}.plugin_class must return amino.Right(YourPluginClass)'
         return Left(e.format(name))
 
     @property
@@ -158,7 +158,7 @@ class PluginIntegrationSpec(VimIntegrationSpec):
     def _auto_rplugin(self, cls):
         mod = cls.__module__
         name = cls.__name__
-        rp_path = temp_file('trypnv', 'spec', 'plugin.py')
+        rp_path = temp_file('ribosome', 'spec', 'plugin.py')
         rp_path.write_text(rplugin_template.format(plugin_module=mod,
                                                    plugin_class=name))
         return rp_path

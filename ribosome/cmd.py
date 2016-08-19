@@ -6,11 +6,11 @@ import neovim
 
 from fn import _
 
-from tryp import List, Maybe, may, Just, Map, Try
-from tryp.util.string import camelcaseify
+from amino import List, Maybe, may, Just, Map, Try
+from amino.util.string import camelcaseify
 
-from trypnv.logging import Logging
-import trypnv
+from ribosome.logging import Logging
+import ribosome
 
 
 def try_int(val):
@@ -160,7 +160,7 @@ class MessageCommand(Command):
         return self._message._field_count_max
 
     def _call_fun(self, obj, *args):
-        if isinstance(obj, trypnv.NvimStatePlugin):
+        if isinstance(obj, ribosome.NvimStatePlugin):
             obj.state().send(self._message(*args))
         else:
             msg = 'msg_command can only be used on NvimStatePlugin ({})'

@@ -15,19 +15,19 @@ from fn import _
 from pyrsistent import PRecord
 from pyrsistent._precord import _PRecordMeta
 
-import tryp
-from trypnv.logging import Logging
-from trypnv.cmd import StateCommand
-from trypnv.data import Data
-from trypnv.record import Record, any_field, list_field, field, dfield
-from trypnv.nvim import NvimIO
+import amino
+from ribosome.logging import Logging
+from ribosome.cmd import StateCommand
+from ribosome.data import Data
+from ribosome.record import Record, any_field, list_field, field, dfield
+from ribosome.nvim import NvimIO
 
-from tryp import (Maybe, List, Map, may, Empty, curried, Just, __, F, Either,
+from amino import (Maybe, List, Map, may, Empty, curried, Just, __, F, Either,
                   Try)
-from tryp.lazy import lazy
-from tryp.util.string import camelcaseify
-from tryp.tc.optional import Optional
-from tryp.task import Task
+from amino.lazy import lazy
+from amino.util.string import camelcaseify
+from amino.tc.optional import Optional
+from amino.task import Task
 
 
 def _field_namespace(fields, opt_fields, varargs):
@@ -357,7 +357,7 @@ class Machine(Logging):
     def _handle_transition_error(self, handler, msg, e):
         err = 'transition "{}" failed for {} in {}'
         self.log.exception(err.format(handler.name, msg, self.name))
-        if tryp.development:
+        if amino.development:
             raise TransitionFailed() from e
         return Empty()
 
@@ -378,7 +378,7 @@ class Machine(Logging):
         if rest:
             tpl = 'invalid transition result parts in {}: {}'
             msg = tpl.format(self.name, rest)
-            if tryp.development:
+            if amino.development:
                 raise MachineError(msg)
             else:
                 self.log.error(msg)

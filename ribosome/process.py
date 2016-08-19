@@ -7,14 +7,14 @@ from fn import F, _
 import asyncio
 from asyncio.subprocess import PIPE
 
-from tryp import Map, Future, __, Boolean
-from tryp.lazy import lazy
-from tryp.either import Right, Left
+from amino import Map, Future, __, Boolean
+from amino.lazy import lazy
+from amino.either import Right, Left
 
-import trypnv
-from trypnv.logging import Logging
-from trypnv.nvim import NvimFacade
-from trypnv.record import Record, any_field, field, list_field, maybe_field
+import ribosome
+from ribosome.logging import Logging
+from ribosome.nvim import NvimFacade
+from ribosome.record import Record, any_field, field, list_field, maybe_field
 
 
 class Result(object):
@@ -170,7 +170,7 @@ class ProcessExecutor(Logging):
         return self.current.is_empty
 
     def _main_event_loop(self):
-        return (self.vim.main_event_loop() if trypnv.in_vim else
+        return (self.vim.main_event_loop() if ribosome.in_vim else
                 self._dummy_ctx())
 
     @contextmanager

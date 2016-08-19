@@ -1,13 +1,13 @@
-import tryp
-import tryp.test
-from tryp.logging import tryp_stdout_logging
+import amino
+import amino.test
+from amino.logging import amino_stdout_logging
 
 
-class Spec(tryp.test.Spec):
+class Spec(amino.test.Spec):
 
     def setup(self, *a, **kw):
-        tryp.development = True
-        tryp_stdout_logging()
+        amino.development = True
+        amino_stdout_logging()
         super(Spec, self).setup(*a, **kw)
 
 

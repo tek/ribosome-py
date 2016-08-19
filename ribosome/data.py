@@ -1,8 +1,8 @@
-from tryp import Map
+from amino import Map
 
 from typing import Callable, Any
 
-from trypnv.record import Record, field
+from ribosome.record import Record, field
 
 
 class Data(Record):

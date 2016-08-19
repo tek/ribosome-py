@@ -6,14 +6,14 @@ from pathlib import Path
 
 from {plugin_module} import {plugin_class}
 
-import tryp
+import amino
 
-tryp.development = True
+amino.development = True
 
-import tryp.logging
+import amino.logging
 
-logfile = Path(os.environ['TRYPNV_LOG_FILE'])
-tryp.logging.tryp_file_logging(level=logging.DEBUG,
+logfile = Path(os.environ['RIBOSOME_LOG_FILE'])
+amino.logging.amino_file_logging(level=logging.DEBUG,
                                handler_level=logging.DEBUG,
                                logfile=logfile)
 

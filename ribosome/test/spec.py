@@ -3,12 +3,12 @@ from contextlib import contextmanager
 
 from flexmock import flexmock
 
-from tryp import may, Maybe, List
-from tryp.test import Spec
+from amino import may, Maybe, List
+from amino.test import Spec
 
-import trypnv
-from trypnv.nvim import Buffer, Tab, Window
-from trypnv import NvimFacade
+import ribosome
+from ribosome.nvim import Buffer, Tab, Window
+from ribosome import NvimFacade
 
 
 class MockNvim(object):
@@ -89,7 +89,7 @@ class MockNvimSpec(Spec):
 
     def setup(self):
         super().setup()
-        trypnv.in_vim = False
+        ribosome.in_vim = False
         self.vim = MockNvimFacade(self.prefix)
         self.vim_mock = flexmock(self.vim)
 

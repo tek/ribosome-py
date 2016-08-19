@@ -2,10 +2,10 @@ from concurrent.futures import Future
 
 import sure  # NOQA
 
-from trypnv.machine import may_handle, message, ModularMachine, Transitions
-from trypnv import Machine, StateMachine
+from ribosome.machine import may_handle, message, ModularMachine, Transitions
+from ribosome import Machine, StateMachine
 
-from tryp import List, Map
+from amino import List, Map
 
 from unit._support.spec import Spec
 

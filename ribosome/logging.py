@@ -1,9 +1,9 @@
 import logging
 
-import tryp
-from tryp.lazy import lazy
-import tryp.logging
-from tryp.logging import tryp_logger, init_loglevel
+import amino
+from amino.lazy import lazy
+import amino.logging
+from amino.logging import amino_logger, init_loglevel
 
 
 class NvimHandler(logging.Handler):
@@ -23,31 +23,31 @@ class NvimHandler(logging.Handler):
         dispatcher(record.getMessage())
 
 
-log = trypnv_root_logger = tryp_logger('nvim')
+log = ribosome_root_logger = amino_logger('nvim')
 _nvim_logging_initialized = False
 
 
-def trypnv_logger(name: str):
-    return trypnv_root_logger.getChild(name)
+def ribosome_logger(name: str):
+    return ribosome_root_logger.getChild(name)
 
 
 def nvim_logging(vim, level: int=None, handler_level: int=logging.INFO):
     global _nvim_logging_initialized
     if not _nvim_logging_initialized:
-        if level is None and not tryp.development:
+        if level is None and not amino.development:
             level = logging.INFO
         handler = NvimHandler(vim)
-        trypnv_root_logger.addHandler(handler)
+        ribosome_root_logger.addHandler(handler)
         handler.setLevel(handler_level)
-        init_loglevel(trypnv_root_logger, level)
+        init_loglevel(ribosome_root_logger, level)
         _nvim_logging_initialized = True
 
 
-class Logging(tryp.logging.Logging):
+class Logging(amino.logging.Logging):
 
     @lazy
     def _log(self):
-        return trypnv_logger(self.__class__.__name__)
+        return ribosome_logger(self.__class__.__name__)
 
 
 def pr(a):
@@ -59,4 +59,4 @@ def pv(a):
     log.verbose(str(a))
     return a
 
-__all__ = ('trypnv_logger', 'nvim_logging', 'Logging', 'pr')
+__all__ = ('ribosome_logger', 'nvim_logging', 'Logging', 'pr')

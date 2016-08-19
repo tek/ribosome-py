@@ -1,10 +1,10 @@
 import json
 
-from tryp import Just
-from tryp.test import Spec
+from amino import Just
+from amino.test import Spec
 
-from trypnv.cmd import Command, command, JsonMessageCommand, MessageCommand
-from trypnv.machine import message
+from ribosome.cmd import Command, command, JsonMessageCommand, MessageCommand
+from ribosome.machine import message
 
 
 BasicMessage = message(

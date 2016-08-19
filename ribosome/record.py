@@ -2,11 +2,11 @@ import uuid
 
 import pyrsistent
 
-from tryp import List, Empty, Maybe, Boolean, _, Map, Left, L, __, Either
-from tryp.lazy import LazyMeta, Lazy, lazy
-from tryp.lazy_list import LazyList
+from amino import List, Empty, Maybe, Boolean, _, Map, Left, L, __, Either
+from amino.lazy import LazyMeta, Lazy, lazy
+from amino.lazy_list import LazyList
 
-from trypnv.logging import Logging
+from ribosome.logging import Logging
 
 
 def any_field(**kw):
