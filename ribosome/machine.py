@@ -20,10 +20,11 @@ from ribosome.logging import Logging
 from ribosome.cmd import StateCommand
 from ribosome.data import Data
 from ribosome.record import Record, any_field, list_field, field, dfield
-from ribosome.nvim import NvimIO
+from ribosome.nvim import NvimIO, HasNvim
+from ribosome import NvimFacade
 
 from amino import (Maybe, List, Map, may, Empty, curried, Just, __, F, Either,
-                  Try)
+                   Try)
 from amino.lazy import lazy
 from amino.util.string import camelcaseify
 from amino.tc.optional import Optional
@@ -306,10 +307,13 @@ def either_handle(msg: type):
 class Machine(Logging):
     _data_type = Data
 
-    def __init__(self, name: str, parent: 'Machine'=None) -> None:
-        self.name = name
+    def __init__(self, parent: 'Machine'=None) -> None:
         self.parent = Maybe(parent)
         self._setup_handlers()
+
+    @property
+    def title(self):
+        return 'machine'
 
     def _setup_handlers(self):
         handlers = inspect.getmembers(self,
@@ -356,7 +360,7 @@ class Machine(Logging):
 
     def _handle_transition_error(self, handler, msg, e):
         err = 'transition "{}" failed for {} in {}'
-        self.log.exception(err.format(handler.name, msg, self.name))
+        self.log.exception(err.format(handler.name, msg, self.title))
         if amino.development:
             raise TransitionFailed() from e
         return Empty()
@@ -377,7 +381,7 @@ class Machine(Logging):
         msgs = strict + coro.map(Coroutine).map(_.pub)
         if rest:
             tpl = 'invalid transition result parts in {}: {}'
-            msg = tpl.format(self.name, rest)
+            msg = tpl.format(self.title, rest)
             if amino.development:
                 raise MachineError(msg)
             else:
@@ -407,7 +411,7 @@ class Machine(Logging):
 
     def _invalid_command(self, name):
         self.log.error(
-            'plugin "{}" has no command "{}"'.format(self.name, name))
+            'plugin "{}" has no command "{}"'.format(self.title, name))
         return Empty()
 
     @may_handle(NvimIOTask)
@@ -545,13 +549,13 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
 
 class StateMachine(AsyncIOThread, ModularMachine):
 
-    def __init__(self, name: str, sub: List[Machine]=List(), parent=None
+    def __init__(self, sub: List[Machine]=List(), parent=None
                  ) -> None:
         AsyncIOThread.__init__(self)
         self.data = None
         self._messages = None
         self.sub = sub
-        ModularMachine.__init__(self, name, parent)
+        ModularMachine.__init__(self, parent)
 
     @property
     def init(self) -> Data:
@@ -658,8 +662,8 @@ class StateMachine(AsyncIOThread, ModularMachine):
 
 class PluginStateMachine(StateMachine):
 
-    def __init__(self, name, plugins: List[str]) -> None:
-        StateMachine.__init__(self, name)
+    def __init__(self, plugins: List[str]) -> None:
+        StateMachine.__init__(self)
         self.sub = plugins.flat_map(self.start_plugin)
 
     @may
@@ -668,7 +672,7 @@ class PluginStateMachine(StateMachine):
             mod = importlib.import_module(path)
         except ImportError as e:
             msg = 'invalid {} plugin module "{}": {}'
-            self.log.error(msg.format(self.name, path, e))
+            self.log.error(msg.format(self.title, path, e))
         else:
             if hasattr(mod, 'Plugin'):
                 name = path.split('.')[-1]
@@ -692,6 +696,17 @@ class PluginStateMachine(StateMachine):
         self.log.debug(
             'sending command {} to plugin {}'.format(msg.msg, msg.plug.name))
         return msg.plug.process(data, msg.msg)
+
+
+class RootMachine(PluginStateMachine, HasNvim, Logging):
+
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List()) -> None:
+        HasNvim.__init__(self, vim)
+        PluginStateMachine.__init__(self, plugins)
+
+    @property
+    def title(self):
+        return 'ribosome'
 
 __all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Error',
            'Info', 'ModularMachine', 'Transitions')
