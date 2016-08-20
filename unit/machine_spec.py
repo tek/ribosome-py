@@ -60,7 +60,7 @@ class PublishSpec(Spec):
         Machine._data_type = Map
 
     def publish(self):
-        with _Z('z', List(_A('a'), _B('b'))).transient() as z:
+        with _Z(List(_A('a'), _B('b'))).transient() as z:
             res = z.send_sync(M1())
             z.goal.result().should.be.ok
         res.should.have.key('a').being.ok
@@ -70,9 +70,9 @@ class PublishSpec(Spec):
 
 class _C(ModularMachine):
 
-    def __init__(self, name, res):
+    def __init__(self, title, res):
         self.res = res
-        super().__init__(name)
+        super().__init__(title=title)
 
     class Transitions(Transitions):
 
@@ -91,7 +91,7 @@ class ModularSpec(Spec):
     def publish(self):
         data = 'data'
         name = 'c'
-        with _Z('z', List(_C(name, data))).transient() as z:
+        with _Z(List(_C(name, data))).transient() as z:
             res = z.send_sync(M1())
             z.goal.result().should.equal(data)
             res.sub_states[name][data].should.equal(data)

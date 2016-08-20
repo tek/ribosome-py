@@ -1,7 +1,7 @@
 from ribosome.nvim import NvimFacade
 from ribosome.cmd import command, msg_command, json_msg_command
-from ribosome.machine import Machine, StateMachine, handle, may_handle
-from ribosome.machine import PluginStateMachine, RootMachine
+from ribosome.machine import (Machine, StateMachine, handle, may_handle,
+                              PluginStateMachine, RootMachine)
 from ribosome.process import ProcessExecutor, Job
 from ribosome.plugin import NvimStatePlugin, NvimPlugin
 
