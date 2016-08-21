@@ -1,3 +1,5 @@
+[![Join the chat at https://gitter.im/tek/ribosome](https://badges.gitter.im/tek/ribosome.svg)](https://gitter.im/tek/ribosome?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 # Intro
 A framework for building and testing neovim-python plugins consisting of:
 * convenient decorators for commands with json argument parsing
@@ -25,7 +27,7 @@ The last command runs the dummy test to verify it works.
 [pyrsistent].
 
 As a comprehensive example for how to use this framework, take a look at the
-[proteome.nvim] plugin.
+[proteome] plugin ([doc][proteome.nvim]).
 
 # Basic
 The class `ribosome.NvimPlugin` serves as an optional base class that handles
