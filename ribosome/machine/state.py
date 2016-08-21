@@ -182,8 +182,8 @@ class StateMachine(AsyncIOThread, ModularMachine):
 
 class PluginStateMachine(StateMachine):
 
-    def __init__(self, plugins: List[str]) -> None:
-        StateMachine.__init__(self)
+    def __init__(self, plugins: List[str], title=None) -> None:
+        StateMachine.__init__(self, title=title)
         self.sub = plugins.flat_map(self.start_plugin)
 
     @may
@@ -219,9 +219,10 @@ class PluginStateMachine(StateMachine):
 
 class RootMachine(PluginStateMachine, HasNvim, Logging):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List()) -> None:
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None
+                 ) -> None:
         HasNvim.__init__(self, vim)
-        PluginStateMachine.__init__(self, plugins)
+        PluginStateMachine.__init__(self, plugins, title=None)
 
     @property
     def title(self):
