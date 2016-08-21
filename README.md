@@ -1,7 +1,7 @@
 [![Join the chat at https://gitter.im/tek/ribosome](https://badges.gitter.im/tek/ribosome.svg)](https://gitter.im/tek/ribosome?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 # Intro
-A framework for building and testing neovim-python plugins consisting of:
+A framework for building and testing [neovim-python] plugins consisting of:
 * convenient decorators for commands with json argument parsing
 * message-passing machines for command dispatching
 * neovim API abstractions
@@ -244,6 +244,7 @@ For in-depth examples, consider the specs in [proteome].
 The [giter8] template creates a directory named `runtime` in the project root,
 you can link or copy it to your bundle dir and execute `:UpdateRemotePlugins`.
 
+[neovim-python]: https://github.com/neovim/python-client
 [amino]: https://github.com/tek/amino
 [proteome.nvim]: https://github.com/tek/proteome.nvim
 [proteome]: https://github.com/tek/proteome
