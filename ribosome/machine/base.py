@@ -25,6 +25,7 @@ A = TypeVar('A')
 NvimIOTask = message('NvimIOTask', 'io')
 RunTask = message('RunTask', 'task')
 DataTask = message('DataTask', 'cons')
+DataEitherTask = message('DataEitherTask', 'cons')
 
 
 def is_seq(a):
@@ -172,6 +173,14 @@ class Machine(Logging):
     def message_data_task(self, data: Data, msg):
         return either_msg(
             msg.cons(Task.now(data))
+            .unsafe_perform_sync()
+        )
+
+    @may_handle(DataEitherTask)
+    def message_data_either_task(self, data: Data, msg):
+        return either_msg(
+            msg.cons(Task.now(data))
+            .map(either_msg)
             .unsafe_perform_sync()
         )
 
