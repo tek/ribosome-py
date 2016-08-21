@@ -10,6 +10,17 @@ A framework for building and testing neovim-python plugins consisting of:
 
 The pypi name is *ribosome*.
 
+To get started with a fully functional skeleton project, use [giter8]:
+
+```
+g8 tek/ribosome
+cd <projectdir>
+pip install -r requirements.txt
+spec integration
+```
+
+The last command runs the dummy test to verify it works.
+
 *ribosome* heavily uses functional data structures from [amino] and
 [pyrsistent].
 
@@ -227,8 +238,13 @@ the test run.
 
 For in-depth examples, consider the specs in [proteome].
 
+# Neovim Runtime
+The [giter8] template creates a directory named `runtime` in the project root,
+you can link or copy it to your bundle dir and execute `:UpdateRemotePlugins`.
+
 [amino]: https://github.com/tek/amino
 [proteome.nvim]: https://github.com/tek/proteome.nvim
 [proteome]: https://github.com/tek/proteome
 [pyrsistent]: https://github.com/tobgu/pyrsistent
 [spec]: https://github.com/bitprophet/spec
+[giter8]: https://github.com/foundweekends/giter8
