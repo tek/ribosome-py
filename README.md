@@ -210,6 +210,30 @@ return Increment(2).pub
 
 ## Modular Transitions
 
+To avoid having to pass the state and message arguments along with helper
+functions, a more comfortable variant of transition definition is possible by
+extending `ribosome.ModularMachine`.
+With this class, each message is handled by a fresh instance of the nested
+class `Transitions`, which is initialized with the current state and message as
+instances attributes:
+
+```python
+Reset = message('Reset', 'value')
+
+class XSubTransitions(ribosome.Transitions):
+
+    @ribosome.may_handle(Increment)
+    def increment(self):
+        new_data = self.data.set(counter=self.msg.value)
+        return new_data, Print().pub
+
+class Plugin(ribosome.ModularMachine):
+  Transitions = XSubTransitions
+```
+
+Here, the `.pub` transformation must be used in order to reach the parent
+machine where the `Print` message is handled.
+
 # API Facade
 
 # Testing
