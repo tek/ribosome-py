@@ -330,8 +330,10 @@ Here `self.state` is the `XPlugin` instance and `self.root` is the `X`
 instance.
 
 # Neovim Runtime
-The [giter8] template creates a directory named `runtime` in the project root,
-you can link or copy it to your bundle dir and execute `:UpdateRemotePlugins`.
+If you want to publish your plugin as a python egg with a minimal adapter
+*neovim* plugin, the [giter8] template creates a directory named `runtime` in
+the project root, you can link or copy it to your bundle dir and execute
+`:UpdateRemotePlugins` for testing or publish it as a plugin.
 
 [neovim-python]: https://github.com/neovim/python-client
 [amino]: https://github.com/tek/amino
