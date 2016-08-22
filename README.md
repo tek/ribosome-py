@@ -176,6 +176,7 @@ To easily connect a *neovim* command to a machine transition, use the
 class XPlugin(ribosome.NvimPlugin):
     ...
 
+    @property
     def state(self):
         return self.x
 
@@ -213,6 +214,8 @@ return Increment(2).pub
 
 # Testing
 
+### Complete Integration
+
 *ribosome* provides a convenient way of integration testing your plugin within
 a running *neovim* instance using the [spec] plugin for *nose*.
 
@@ -239,6 +242,30 @@ Set `self._debug = True` to print all logged messages to stdout at the end of
 the test run.
 
 For in-depth examples, consider the specs in [proteome].
+
+### Semi-Integration
+
+There is also a *light* variant of integration test which also uses a *neovim*
+child process but starts the plugin in the main process, making it simpler to
+interact with it.
+
+The equivalent version of the above spec is:
+
+```python
+class IncrementSpec(ribosome.test.ExternalIntegrationSpec):
+
+    @property
+    def plugin_class(self):
+        return amino.Right(x.XPlugin)
+
+    def inc(self):
+        self.state.x_start()
+        self.root.send(Increment(8))
+        ...
+```
+
+Here `self.state` is the `XPlugin` instance and `self.root` is the `X`
+instance.
 
 # Neovim Runtime
 The [giter8] template creates a directory named `runtime` in the project root,
