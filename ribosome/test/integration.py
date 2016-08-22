@@ -1,18 +1,20 @@
 import os
-from threading import Thread
-import asyncio
-from functools import wraps
 import json
+import asyncio
 from pathlib import Path
+from functools import wraps
+from threading import Thread
+from contextlib import contextmanager
 
 import neovim
 
 from amino.test import fixture_path, temp_dir, later, temp_file
 
-from amino import List, Maybe, Either, Left, __, Map
+from amino import List, Maybe, Either, Left, __, Map, Try, L, _
 from amino.test import IntegrationSpec as IntegrationSpecBase
 
-from ribosome.logging import Logging
+import ribosome
+from ribosome.logging import Logging, log
 from ribosome import NvimFacade
 from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
@@ -98,17 +100,58 @@ def main_looped(fun):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         done = asyncio.Future(loop=loop)
-
         def runner():
             local_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(local_loop)
-            fun(self)
+            Try(fun, self).leffect(L(log.caught_exception)('spec', _))
             loop.call_soon_threadsafe(lambda: done.set_result(True))
             local_loop.close()
         Thread(target=runner).start()
         loop.run_until_complete(done)
         loop.close()
     return wrapper
+
+
+@contextmanager
+def _nop_main_loop(self):
+    yield
+
+
+def _mock_async(self, f):
+    ret = f(self)
+    return ret
+
+
+def _mock_proxy(self):
+    return self
+
+
+class ExternalIntegrationSpec(VimIntegrationSpec):
+
+    def _pre_start_neovim(self):
+        super()._pre_start_neovim()
+        ribosome.in_vim = False
+        NvimFacade.async = _mock_async
+        NvimFacade.main_event_loop = _nop_main_loop
+        NvimFacade.proxy = property(_mock_proxy)
+        NvimFacade.clean = lambda self: True
+        AsyncVimProxy.allow_async_relay = False
+
+    def _post_start_neovim(self):
+        cls = self.plugin_class.get_or_raise
+        self.plugin = cls(self.neovim)
+
+    def _await(self):
+        if self.root is not None:
+            self.root.await_state()
+
+    @property
+    def root(self):
+        return self.plugin.state
+
+    def teardown(self):
+        if self.root is not None:
+            self.root.stop()
 
 
 class PluginIntegrationSpec(VimIntegrationSpec):
