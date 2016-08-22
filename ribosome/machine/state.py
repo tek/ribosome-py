@@ -46,11 +46,15 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
     def stop(self):
         if self.done is not None:
             self._stop()
-            self.done.result(10)
             try:
-                self._loop.close()
+                self.done.result(5)
             except Exception as e:
                 self.log.error(e)
+            finally:
+                try:
+                    self._loop.close()
+                except Exception as e:
+                    self.log.error(e)
 
     def _stop(self):
         self._done()
@@ -105,8 +109,8 @@ class StateMachine(AsyncIOThread, ModularMachine):
         return self.await_state()
 
     def await_state(self):
-        asyncio.run_coroutine_threadsafe(self.join(), self._loop)\
-            .result(2)
+        asyncio.run_coroutine_threadsafe(self.join_messages(),
+                                         self._loop).result(2)
         return self.data
 
     def eval_expr(self, expr: str, pre: Callable=lambda a, b: (a, b)):
@@ -176,7 +180,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
         self._messages.task_done()
         return result.data
 
-    async def join(self):
+    async def join_messages(self):
         await self._messages.join()
 
 
