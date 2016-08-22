@@ -161,7 +161,7 @@ class MessageCommand(Command):
 
     def _call_fun(self, obj, *args):
         if isinstance(obj, ribosome.NvimStatePlugin):
-            obj.state().send(self._message(*args))
+            obj.state.send(self._message(*args))
         else:
             msg = 'msg_command can only be used on NvimStatePlugin ({})'
             self.log.error(msg.format(obj))
