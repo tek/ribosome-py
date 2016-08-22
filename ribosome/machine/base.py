@@ -3,7 +3,7 @@ from typing import Sequence, Callable, TypeVar
 from asyncio import iscoroutine
 
 import amino
-from amino import Maybe, may, F, _, List, Map, Empty, curried
+from amino import Maybe, may, F, _, List, Map, Empty, curried, L
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
@@ -16,8 +16,9 @@ from ribosome.machine.transition import (Handler, TransitionResult,
                                          CoroTransitionResult,
                                          StrictTransitionResult, may_handle,
                                          either_msg, TransitionFailed,
-                                         Coroutine, MachineError, Error)
-from ribosome.machine.message_base import _message_attr, _machine_attr
+                                         Coroutine, MachineError, Error,
+                                         WrappedHandler)
+from ribosome.machine.message_base import _machine_attr
 from ribosome.cmd import StateCommand
 
 A = TypeVar('A')
@@ -46,7 +47,7 @@ class Machine(Logging):
     def __init__(self, parent: 'Machine'=None, title=None) -> None:
         self.parent = Maybe(parent)
         self._title = Maybe(title)
-        self._setup_handlers()
+        self._message_handlers = self._collect_handlers()
 
     @property
     def title(self):
@@ -54,17 +55,19 @@ class Machine(Logging):
             List.wrap(type(self).__module__.rsplit('.')).reversed.lift(1)
         ) | 'machine'
 
-    def _setup_handlers(self):
-        handlers = inspect.getmembers(self,
+    def _collect_handlers(self):
+        handlers = inspect.getmembers(type(self),
                                       lambda a: hasattr(a, _machine_attr))
-        handler_map = List.wrap(handlers)\
-            .smap(Handler.create)\
+        handler_map = (
+            List.wrap(handlers)
+            .map2(L(Handler.create)(self, _, _))
             .map(lambda a: (a.message, a))
-        self._message_handlers = Map(handler_map)
+        )
+        return Map(handler_map)
 
     @property
     def _default_handler(self):
-        return Handler('unhandled', None, self.unhandled)
+        return Handler(self, 'unhandled', None, type(self).unhandled)
 
     def process(self, data: Data, msg) -> TransitionResult:
         self.prepare(msg)
@@ -219,36 +222,18 @@ class Transitions(object):
         return self.data.with_sub_state(self.name, new_data)
 
 
-class WrappedHandler(object):
-
-    def __init__(self, machine, name, message, tpe, fun):
-        self.machine = machine
-        self.name = name
-        self.message = message
-        self.tpe = tpe
-        self.fun = fun
-
-    @staticmethod
-    def create(machine, name, tpe, fun):
-        return WrappedHandler(machine, name,
-                              getattr(fun, _message_attr), tpe, fun)
-
-    def run(self, data, msg):
-        return self.fun(self.tpe(self.machine, data, msg))
-
-
 class ModularMachine(Machine):
     Transitions = Transitions
 
-    def _setup_handlers(self):
-        super()._setup_handlers()
+    def _collect_handlers(self):
         handlers = inspect.getmembers(self.Transitions,
                                       lambda a: hasattr(a, _machine_attr))
-        handler_map = List.wrap(handlers)\
-            .smap(lambda n, f: WrappedHandler.create(self, n, self.Transitions,
-                                                     f))\
+        handler_map = (
+            List.wrap(handlers)
+            .map2(L(WrappedHandler.create)(self, _, self.Transitions, _))
             .map(lambda a: (a.message, a))
-        self._message_handlers = self._message_handlers ** handler_map
+        )
+        return super()._collect_handlers() ** handler_map
 
 
-__all__ = ()
+__all__ = ('ModularMachine', 'Transitions', 'Machine')

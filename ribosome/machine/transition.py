@@ -28,24 +28,43 @@ def _recover_error(handler, result):
     )
 
 
-class Handler(object):
+class Handler:
 
-    def __init__(self, name, message, fun):
+    def __init__(self, machine, name, message, fun):
+        self.machine = machine
         self.name = name
         self.message = message
         self.fun = fun
 
     @staticmethod
-    def create(name, fun):
+    def create(machine, name, fun):
         tpe = CoroHandler if iscoroutinefunction(fun) else Handler
-        return tpe(name, getattr(fun, _message_attr), fun)
+        return tpe(machine, name, getattr(fun, _message_attr), fun)
 
     def run(self, data, msg):
-        return _recover_error(self, self.fun(data, msg))
+        return _recover_error(self, self.fun(self.machine, data, msg))
 
     def __str__(self):
         return '{}({}, {}, {})'.format(self.__class__.__name__, self.name,
                                        self.message, self.fun)
+
+
+class WrappedHandler:
+
+    def __init__(self, machine, name, message, tpe, fun):
+        self.machine = machine
+        self.name = name
+        self.message = message
+        self.tpe = tpe
+        self.fun = fun
+
+    @staticmethod
+    def create(machine, name, tpe, fun):
+        return WrappedHandler(machine, name,
+                              getattr(fun, _message_attr), tpe, fun)
+
+    def run(self, data, msg):
+        return self.fun(self.tpe(self.machine, data, msg))
 
 
 class CoroHandler(Handler):
