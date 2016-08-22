@@ -41,7 +41,7 @@ class NvimPlugin(object):
 
 class NvimStatePlugin(NvimPlugin):
 
-    @abc.abstractmethod
+    @abc.abstractproperty
     def state(self) -> StateMachine:
         ...
 
