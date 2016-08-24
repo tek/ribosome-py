@@ -1,4 +1,4 @@
-from typing import TypeVar, Callable, Any, Generic
+from typing import TypeVar, Callable, Any
 from pathlib import Path
 import threading
 from concurrent import futures
@@ -12,18 +12,14 @@ import traceback
 import neovim
 from neovim.api import NvimError
 
-from pyrsistent import PRecord
-
 from amino.util.string import camelcaseify
 
 import amino
-from amino import Maybe, may, List, Map, Boolean, Empty, Just, __, _, F
-from amino.either import Either, Right, Left
+from amino import Maybe, may, List, Map, Boolean, Empty, Just, __, _
 from amino.util.string import decode
 from amino.anon import format_funcall
 
 import ribosome
-from ribosome.record import dfield
 from ribosome.logging import Logging
 
 
@@ -54,7 +50,7 @@ class NvimComponent(Logging):
 
     def __init__(self, vim, target, prefix: str) -> None:
         if ribosome.in_vim and isinstance(target, (AsyncVimProxy,
-                                                 NvimComponent)):
+                                                   NvimComponent)):
             msg = '{} created with non-native target {}'
             raise Exception(msg.format(self, target))
         self.vim = vim
@@ -498,40 +494,6 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def feedkeys(self, keyseq, *a, **kw):
         self.vim.feedkeys(keyseq, *a, **kw)
 
-B = TypeVar('B')
-
-
-class NvimIO(Generic[A]):
-
-    def __init__(self, apply: Callable[[NvimComponent], A]) -> None:
-        self._apply = apply
-
-    def unsafe_perform_io(self, vim) -> Either[Exception, A]:
-        try:
-            return Right(self._apply(vim))
-        except Exception as e:
-            return Left(e)
-
-    def flat_map(self, f: Callable[[A], 'NvimIO[B]']):
-        g = lambda v: f(self._apply(v))._apply(v)
-        return NvimIO(g)
-
-    __floordiv__ = flat_map
-
-    def map(self, f: Callable[[A], B]):
-        return NvimIO(F(self._apply) >> f)
-
-    __truediv__ = map
-
-    def effect(self, f: Callable[[A], Any]):
-        def wrap(v):
-            ret = self._apply(v)
-            f(ret)
-            return ret
-        return NvimIO(wrap)
-
-    __mod__ = effect
-
 
 class AsyncVimCallProxy(object):
 
@@ -581,64 +543,6 @@ class AsyncVimProxy(object):
 
     def __str__(self):
         return '{}({})'.format(self.__class__.__name__, str(self._target))
-
-
-class ScratchBuilder(PRecord):
-    params = dfield(Map())
-
-    @property
-    def tab(self):
-        return self.copy(tab=True)
-
-    def copy(self, **kw):
-        return ScratchBuilder(self.params ** kw)
-
-    @property
-    def build(self):
-        return (
-            NvimIO(self._setup_tab) /
-            self._setup_buffer /
-            self._create
-        )
-
-    def _setup_tab(self, vim):
-        tab = vim.tabnew()
-        tab.window.set_optionb('wrap', False)
-        return tab
-
-    def _setup_buffer(self, tab):
-        buffer = tab.bufnew()
-        buffer.set_options('buftype', 'nofile')
-        buffer.set_options('bufhidden', 'wipe')
-        buffer.set_optionb('buflisted', False)
-        buffer.set_optionb('swapfile', False)
-        buffer.set_modifiable(False)
-        return (tab, buffer)
-
-    def _create(self, args):
-        tab, buffer = args
-        return ScratchBuffer(tab.vim, tab, buffer)
-
-
-class ScratchBuffer(HasTab):
-
-    def __init__(self, vim, tab, buffer):
-        super().__init__(vim, buffer.target, buffer.prefix)
-        self._tab = tab
-        self._buffer = buffer
-
-    @property
-    def _internal_tab(self):
-        return self._tab.target
-
-    @property
-    def _internal_buffer(self):
-        return self._buffer.target
-
-    def set_content(self, text):
-        self._buffer.set_modifiable(True)
-        self._buffer.set_content(text)
-        self._buffer.set_modifiable(False)
 
 
 class Flags(object):

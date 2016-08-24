@@ -4,9 +4,7 @@ import json
 
 import neovim
 
-from fn import _
-
-from amino import List, Maybe, may, Just, Map, Try
+from amino import List, Maybe, may, Just, Map, Try, _
 from amino.util.string import camelcaseify
 
 from ribosome.logging import Logging
