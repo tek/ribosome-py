@@ -1,8 +1,9 @@
 import uuid
+import re
 
 import pyrsistent
 
-from amino import List, Empty, Maybe, Boolean, _, Map, Left, L, __, Either
+from amino import List, Empty, Maybe, Boolean, _, Map, Left, L, __, Either, Try
 from amino.lazy import LazyMeta, Lazy, lazy
 from amino.lazy_list import LazyList
 
@@ -60,6 +61,14 @@ def map_field(**kw):
 
 def uuid_field():
     return field(uuid.UUID, initial=lambda: uuid.uuid4())
+
+
+def _re_fact(ex: str):
+    return Try(re.compile, ex) | re.compile('')
+
+
+def re_field(**kw):
+    return field(re._pattern_type, factory=_re_fact, **kw)
 
 
 class FieldMutator(object):

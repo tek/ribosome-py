@@ -2,12 +2,10 @@ from pathlib import Path
 import shutil
 from contextlib import contextmanager
 
-from fn import F, _
-
 import asyncio
 from asyncio.subprocess import PIPE
 
-from amino import Map, Future, __, Boolean
+from amino import Map, Future, __, Boolean, F, _
 from amino.lazy import lazy
 from amino.either import Right, Left
 
