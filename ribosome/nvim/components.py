@@ -277,10 +277,6 @@ class HasBuffers(HasBuffer):
     def _internal_buffers(self):
         return self.vim.buffers
 
-    def bufnew(self):
-        self.cmd('bufnew')
-        return self.buffer
-
 
 class HasWindow(HasBuffer):
 
@@ -295,6 +291,14 @@ class HasWindow(HasBuffer):
     @property
     def _internal_buffer(self):
         return self.window._internal_buffer
+
+    def vsplit(self):
+        self.cmd('vsplit')
+        return self.window
+
+    def vnew(self):
+        self.cmd_sync('vnew')
+        return self.window
 
 
 class HasWindows(HasBuffers, HasWindow):
@@ -372,7 +376,7 @@ class Buffer(HasWindow):
         self.set_optionb('modifiable', value)
 
 
-class Window(HasTab):
+class Window(HasTab, HasBuffers):
 
     @property
     def _internal_buffer(self):
