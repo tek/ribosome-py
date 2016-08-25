@@ -118,9 +118,8 @@ class Machine(Logging):
         elif is_message(result) or not is_seq(result):
             result = List(result)
         datas, rest = List.wrap(result).split_type(self._data_type)
-        strict, rest = rest.split_type(Message)
-        coro, rest = rest.split(iscoroutine)
-        msgs = strict + coro.map(Coroutine).map(_.pub)
+        trans = rest / self._transform_result
+        msgs, rest = trans.split_type(Message)
         if rest:
             tpl = 'invalid transition result parts in {}: {}'
             msg = tpl.format(self.title, rest)
@@ -130,6 +129,14 @@ class Machine(Logging):
                 self.log.error(msg)
         new_data = datas.head | old_data
         return self._create_result(new_data, msgs)
+
+    def _transform_result(self, result):
+        if iscoroutine(result):
+            return Coroutine(result).pub
+        elif isinstance(result, Task):
+            return RunTask(result)
+        else:
+            return result
 
     def _create_result(self, data, msgs):
         pub, resend = msgs.split_type(Publish)
