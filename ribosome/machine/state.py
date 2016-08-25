@@ -8,20 +8,23 @@ from contextlib import contextmanager
 
 from ribosome.logging import Logging
 from ribosome.data import Data
-from ribosome.nvim import HasNvim
+from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
 from ribosome.machine.message_base import (message, Message, Nop, Done, Quit,
                                            PlugCommand, Stop)
-from ribosome.machine.base import ModularMachine, Machine, may_handle
+from ribosome.machine.base import ModularMachine, Machine
 from ribosome.machine.transition import (TransitionResult, Coroutine,
-                                         TransitionFailed)
+                                         TransitionFailed, may_handle, handle)
 
-from amino import Maybe, List, Map, may, Try, _
+from amino import Maybe, List, Map, may, Try, _, L
 from amino.tc.optional import Optional  # NOQA
 
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
 Info = message('Info', 'message')
+RunMachine = message('RunMachine', 'machine')
+KillMachine = message('KillMachine', 'machine')
+ScratchMachine = message('ScratchMachine', 'machine', 'tab')
 
 
 class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
@@ -146,6 +149,14 @@ class StateMachine(AsyncIOThread, ModularMachine):
     def _couroutine(self, data: Data, msg):
         return msg
 
+    @may_handle(RunMachine)
+    def _run_machine(self, data, msg):
+        self.sub = self.sub.cat(msg.machine)
+
+    @may_handle(KillMachine)
+    def _kill_machine(self, data, msg):
+        self.sub = self.sub.filter(_.title == msg.machine)
+
     def unhandled(self, data, msg):
         return self._fold_sub(data, msg)
 
@@ -231,5 +242,15 @@ class RootMachine(PluginStateMachine, HasNvim, Logging):
     @property
     def title(self):
         return 'ribosome'
+
+    @handle(ScratchMachine)
+    def _scratch_machine(self, data, msg):
+        return (
+            ScratchBuilder(use_tab=msg.tab)
+            .build
+            .unsafe_perform_io(self.vim) /
+            L(msg.machine)(_, self) /
+            RunMachine
+        )
 
 __all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Info')
