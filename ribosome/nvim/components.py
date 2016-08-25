@@ -403,6 +403,9 @@ class Window(HasTab, HasBuffers):
     def cursor(self):
         return List.wrap(self.target.cursor)
 
+    def close(self):
+        self.cmd('close')
+
 
 class Tab(HasWindows):
 
