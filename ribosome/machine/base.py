@@ -3,7 +3,7 @@ from typing import Sequence, Callable, TypeVar
 from asyncio import iscoroutine
 
 import amino
-from amino import Maybe, may, F, _, List, Map, Empty, curried, L
+from amino import Maybe, may, F, _, List, Map, Empty, curried, L, __
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
@@ -155,7 +155,7 @@ class Machine(Logging):
     def command(self, name: str, args: list):
         return self._command_by_message_name(name)\
             .map(lambda a: StateCommand(a[0]))\
-            .map(_.call('dispatch', self, args))\
+            .map(__.dispatch(self, args))\
             .or_else(F(self._invalid_command, name))
 
     def _invalid_command(self, name):
