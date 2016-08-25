@@ -16,7 +16,7 @@ from ribosome.machine.transition import (Handler, TransitionResult,
                                          CoroTransitionResult,
                                          StrictTransitionResult, may_handle,
                                          either_msg, TransitionFailed,
-                                         Coroutine, MachineError, Error,
+                                         Coroutine, MachineError,
                                          WrappedHandler)
 from ribosome.machine.message_base import _machine_attr
 from ribosome.cmd import StateCommand
@@ -169,14 +169,9 @@ class Machine(Logging):
 
     @may_handle(RunTask)
     def message_run_task(self, data: Data, msg):
-        success = lambda r: r if isinstance(r, Message) else None
-        return (
+        return either_msg(
             msg.task
             .unsafe_perform_sync()
-            .cata(
-                F(Error) >> _.pub,
-                success
-            )
         )
 
     @may_handle(DataTask)
