@@ -1,7 +1,8 @@
 from myo.record import Record
 
 from ribosome.record import map_field, bool_field
-from ribosome.nvim.components import HasTab
+from ribosome.nvim.components import HasWindow
+from ribosome.nvim import NvimIO
 
 
 class ScratchBuilder(Record):
@@ -15,41 +16,40 @@ class ScratchBuilder(Record):
     @property
     def build(self):
         return (
-            (NvimIO(self._setup_tab) / self._setup_buffer)
+            (NvimIO(self._setup_window) / self._setup_buffer)
             .map2(self._create)
         )
 
-    def _setup_tab(self, vim):
+    def _setup_window(self, vim):
         if self.use_tab:
             tab = vim.tabnew()
-            tab.window.set_optionb('wrap', False)
-            return tab
+            return tab.window
         else:
-            return self.vim.tab
+            return vim.vnew()
 
-    def _setup_buffer(self, tab):
-        buffer = tab.bufnew()
+    def _setup_buffer(self, win):
+        win.set_optionb('wrap', False)
+        buffer = win.buffer
         buffer.set_options('buftype', 'nofile')
         buffer.set_options('bufhidden', 'wipe')
         buffer.set_optionb('buflisted', False)
         buffer.set_optionb('swapfile', False)
-        buffer.set_modifiable(False)
-        return (tab, buffer)
+        return (win, buffer)
 
-    def _create(self, tab, buffer):
-        return ScratchBuffer(tab.vim, tab, buffer)
+    def _create(self, win, buffer):
+        return ScratchBuffer(win.vim, win, buffer)
 
 
-class ScratchBuffer(HasTab):
+class ScratchBuffer(HasWindow):
 
-    def __init__(self, vim, tab, buffer):
+    def __init__(self, vim, win, buffer):
         super().__init__(vim, buffer.target, buffer.prefix)
-        self._tab = tab
+        self._win = win
         self._buffer = buffer
 
     @property
-    def _internal_tab(self):
-        return self._tab.target
+    def _internal_window(self):
+        return self._win.target
 
     @property
     def _internal_buffer(self):
