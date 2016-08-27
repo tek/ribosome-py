@@ -11,4 +11,4 @@ class Spec(amino.test.Spec):
         super(Spec, self).setup(*a, **kw)
 
 
-__all__ = ['Spec']
+__all__ = ('Spec',)

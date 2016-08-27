@@ -51,12 +51,14 @@ class Logging(amino.logging.Logging):
 
 
 def pr(a):
-    log.verbose(a)
+    v = log.verbose
+    v(a)
     return a
 
 
 def pv(a):
-    log.verbose(str(a))
+    v = log.verbose
+    v(str(a))
     return a
 
 __all__ = ('ribosome_logger', 'nvim_logging', 'Logging', 'pr')

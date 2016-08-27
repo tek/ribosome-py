@@ -96,4 +96,4 @@ class ModularSpec(Spec):
             z.goal.result().should.equal(data)
             res.sub_states[name][data].should.equal(data)
 
-__all__ = ['PublishSpec', 'ModularSpec']
+__all__ = ('PublishSpec', 'ModularSpec')
