@@ -339,6 +339,9 @@ class HasWindows(HasBuffers, HasWindow):
     def _internal_windows(self):
         return self.vim.windows
 
+    def focus(self, number: int):
+        return NvimCmd(self, 'wincmd', 'w', range=number)
+
 
 class HasTab(HasWindow):
 
