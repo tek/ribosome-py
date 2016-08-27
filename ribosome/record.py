@@ -19,10 +19,14 @@ def field(tpe, **kw):
 
 
 def _monad_type_field_inv(eff, tpe):
-    err = 'must be {}[{}]'.format(eff, tpe)
     def inv(a):
-        good = tpe is None or not a.exists(lambda b: not isinstance(b, tpe))
-        return good, err
+        if tpe is None:
+            return True, ''
+        else:
+            bad = a.find(lambda b: not isinstance(b, tpe))
+            bad_tpe = bad | ''
+            err = 'must be {}[{}], found {}'.format(eff, tpe.__name__, bad_tpe)
+            return not bad.present, err
     return inv
 
 
