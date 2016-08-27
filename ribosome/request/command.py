@@ -1,9 +1,4 @@
-from typing import Callable, Any, Tuple
-import json
-
 import neovim
-
-from amino import may, Map, Try
 
 from ribosome.request.base import (RequestHandler, MessageRequestHandler,
                                    JsonMessageRequestHandler)
@@ -27,47 +22,8 @@ class MessageCommand(Command, MessageRequestHandler):
     pass
 
 
-class JsonMessageCommand(MessageCommand):
-
-    def __init__(self, fun: Callable[[], Any], msg: type, **kw) -> None:
-        super(JsonMessageCommand, self).__init__(fun, msg, **kw)
-
-    @property
-    def nargs(self):
-        return '+'
-
-    @property
-    def min(self) -> int:
-        return super().min - 1
-
-    @property  # type: ignore
-    @may
-    def max(self):
-        pass
-
-    def _extract_args(self, args: Tuple[str]):
-        def parse(d):
-            def fail(err):
-                raise ParseError('neither valid json nor python: {}'.format(d))
-            return (
-                Try(json.loads, d)
-                .or_else(Try(eval, d))
-                .or_else(Try(json.loads, d.replace('\\"', '"')))
-                .right_or_map(fail)
-            )
-        pos_args, data_args = (tuple(args[:self.min]),  # type: ignore
-                               tuple(args[self.min:]))  # type: ignore
-        data = ' '.join(data_args)
-        params = parse(data) if data else {}
-        return pos_args + (Map(params),)
-
-    def _call_fun(self, obj, *args):
-        try:
-            real_args = self._extract_args(args)
-        except ParseError as e:
-            self.log.error(e)
-        else:
-            super(JsonMessageCommand, self)._call_fun(obj, *real_args)
+class JsonMessageCommand(Command, JsonMessageRequestHandler):
+    pass
 
 
 class StateCommand(MessageCommand):
