@@ -553,6 +553,14 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def feedkeys(self, keyseq, *a, **kw):
         self.vim.feedkeys(keyseq, *a, **kw)
 
+    def edit(self, path):
+        if self.buffer.modifiable:
+            self.write()
+        return NvimCmd(self, 'edit!', str(path))
+
+    def write(self):
+        return NvimCmd(self, 'write!')
+
 
 class AsyncVimCallProxy():
 
