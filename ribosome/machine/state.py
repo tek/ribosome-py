@@ -1,4 +1,5 @@
 from typing import Callable
+from typing import Optional  # NOQA
 import abc
 import threading
 import asyncio
@@ -17,7 +18,6 @@ from ribosome.machine.transition import (TransitionResult, Coroutine,
                                          TransitionFailed, may_handle, handle)
 
 from amino import Maybe, List, Map, may, Try, _, L
-from amino.tc.optional import Optional  # NOQA
 
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')

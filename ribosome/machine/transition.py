@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Any
 from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
-from amino import F, Maybe, __, _, may, Either, Just
+from amino import F, Maybe, _, may, Either, Just
 
 from ribosome.machine.message_base import message, _message_attr, _machine_attr
 
@@ -19,13 +19,11 @@ Coroutine = message('Coroutine', 'coro')
 def _recover_error(handler, result):
     if not Optional.exists(type(result)):
         err = 'in {}: result has no Optional: {}'
-        raise MachineError(err.format(handler, result))
-    to_error = F(Maybe) / Error / _.pub >> __.to_either(None)
-    return (
-        result
-        .to_either(None)
-        .recover_with(to_error)
-    )
+        return Just(Error(err.format(handler, result)))
+    elif isinstance(result, Either):
+        return Just(result.right_or_map(Error))
+    else:
+        return result
 
 
 class Handler:
@@ -64,7 +62,8 @@ class WrappedHandler:
                               getattr(fun, _message_attr), tpe, fun)
 
     def run(self, data, msg):
-        return self.fun(self.tpe(self.machine, data, msg))
+        return _recover_error(self,
+                              self.fun(self.tpe(self.machine, data, msg)))
 
 
 class CoroHandler(Handler):

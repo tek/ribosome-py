@@ -17,7 +17,7 @@ from ribosome.machine.transition import (Handler, TransitionResult,
                                          StrictTransitionResult, may_handle,
                                          either_msg, TransitionFailed,
                                          Coroutine, MachineError,
-                                         WrappedHandler)
+                                         WrappedHandler, Error)
 from ribosome.machine.message_base import _machine_attr
 from ribosome.request.command import StateCommand
 
@@ -188,6 +188,10 @@ class Machine(Logging):
             .map(either_msg)
             .unsafe_perform_sync()
         )
+
+    @may_handle(Error)
+    def message_error(self, data, msg):
+        self.log.error(msg.message)
 
     def bubble(self, msg):
         self.parent.cata(_.bubble, lambda: self.send)(msg)
