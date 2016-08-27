@@ -1,6 +1,4 @@
-from myo.record import Record
-
-from ribosome.record import map_field, bool_field
+from ribosome.record import map_field, bool_field, Record
 
 from amino import Empty, Just, Maybe, __
 from ribosome.nvim.components import HasWindow

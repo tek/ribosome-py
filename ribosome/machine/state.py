@@ -24,7 +24,7 @@ IO = message('IO', 'perform')
 Info = message('Info', 'message')
 RunMachine = message('RunMachine', 'machine')
 KillMachine = message('KillMachine', 'machine')
-ScratchMachine = message('ScratchMachine', 'machine', 'tab')
+RunScratchMachine = message('RunScratchMachine', 'machine', 'tab')
 
 
 class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
@@ -243,7 +243,7 @@ class RootMachine(PluginStateMachine, HasNvim, Logging):
     def title(self):
         return 'ribosome'
 
-    @handle(ScratchMachine)
+    @handle(RunScratchMachine)
     def _scratch_machine(self, data, msg):
         return (
             ScratchBuilder(use_tab=msg.tab)
