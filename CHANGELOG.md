@@ -1,5 +1,7 @@
 # Changelog
 
 ### 8.5
-* Add function decorator `ribosome.function`
-* Add transient `ScratchMachine` that handles mappings in a scratch buffer
+* Function decorator `ribosome.function`
+* Transient `ScratchMachine` that handles mappings in a scratch buffer
+* `NvimCmd` helper class allowing for delayed execution with unrestricted
+  synchronicity type

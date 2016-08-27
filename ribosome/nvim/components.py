@@ -252,6 +252,32 @@ class NvimComponent(Logging):
         return Syntax(self)
 
 
+class NvimCmd:
+
+    def __init__(self, vim: NvimComponent, name: str, args: str='',
+                 range=Empty(), silent=True) -> None:
+        self.vim = vim
+        self.name = name
+        self.args = args
+        self.range = range
+        self.silent = silent
+
+    @property
+    def _cmdline(self):
+        s = 'silent! ' if self.silent else ''
+        r = self.range | ''
+        return '{}{}{} {}'.format(s, r, self.name, self.args)
+
+    def run_sync(self):
+        return self.vim.cmd_sync(self._cmdline)
+
+    def run_async(self):
+        return self.vim.cmd(self._cmdline)
+
+    def run_output(self):
+        return self.vim.cmd_output(self._cmdline)
+
+
 class HasBuffer(NvimComponent, metaclass=abc.ABCMeta):
 
     @property
