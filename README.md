@@ -2,7 +2,7 @@
 
 # Intro
 A framework for building and testing [neovim-python] plugins consisting of:
-* convenient decorators for commands with json argument parsing
+* convenient decorators for commands and functions with json argument parsing
 * message-passing machines for command dispatching
 * neovim API abstractions
 * integraton test framework
@@ -81,6 +81,11 @@ type to the [state machine](#machines), carrying the supplied arguments.
 The `ribosome.json_msg_command` decorator assumes the non-positional
 arguments to be literal json or python, which is parsed and passed to the
 message constructor.
+
+# Functions
+
+The `ribosome.function` decorator works identically to the command decorator,
+but defaulting to `sync=True`.
 
 # Machines
 

@@ -19,7 +19,7 @@ from ribosome.machine.transition import (Handler, TransitionResult,
                                          Coroutine, MachineError,
                                          WrappedHandler)
 from ribosome.machine.message_base import _machine_attr
-from ribosome.cmd import StateCommand
+from ribosome.request.command import StateCommand
 
 A = TypeVar('A')
 

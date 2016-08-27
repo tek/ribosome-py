@@ -1,14 +1,20 @@
-from typing import Callable, Any, Tuple
-import inspect
+import abc
 import json
+import inspect
+from typing import Callable, Any, Tuple
 
-import neovim
-
-from amino import List, Maybe, may, Just, Map, Try, _
+from amino import List, Maybe, Right, Left, may, _, Just, Map, Try
 from amino.util.string import camelcaseify
 
-from ribosome.logging import Logging
 import ribosome
+from ribosome.logging import Logging
+
+
+def parse_int(i):
+    return Right(i) if isinstance(i, int) else (
+        Right(int(i)) if isinstance(i, str) and i.isdigit() else
+        Left('could not parse int {}'.format(i))
+    )
 
 
 def try_int(val):
@@ -19,7 +25,11 @@ def numeric(val):
     return isinstance(val, int)
 
 
-class Command(Logging):
+class ParseError(Exception):
+    pass
+
+
+class RequestHandler(Logging, metaclass=abc.ABCMeta):
 
     def __init__(
             self,
@@ -41,6 +51,18 @@ class Command(Logging):
         self._min = Maybe(min)
         self._max = Maybe(max)
         self._kw = kw
+
+    @abc.abstractproperty
+    def desc(self):
+        ...
+
+    @property
+    def kw(self):
+        return self.default_kw ** self._kw
+
+    @property
+    def default_kw(self):
+        return Map()
 
     @property
     def nargs(self):
@@ -108,15 +130,15 @@ class Command(Logging):
         return self.exact_count\
             .map(lambda a: 'exactly {}'.format(a) if a else 'none')\
             .get_or_else(
-                Just(self.min)
-                .zip(self.max)
-                .smap('between {} and {}'.format)
-                .get_or_else('at least {}'.format(self.min))
+                (Just(self.min) & self.max)
+                .map2('between {} and {}'.format) |
+                'at least {}'.format(self.min)
             )
 
     def error(self, args):
-        msg = 'argument count for command "{}" is {}, must be {} ({})'
-        err = msg.format(self.name, len(args), self.count_spec, args)
+        msg = 'argument count for {} "{}" is {}, must be {} ({})'
+        err = msg.format(self.desc, self.name, len(args), self.count_spec,
+                         args)
         self.log.error(err)
         return err
 
@@ -130,15 +152,8 @@ class Command(Logging):
         else:
             return self.error(args)
 
-    @property
-    def neovim_cmd(self):
-        @neovim.command(self.name, nargs=self.nargs, **self._kw)
-        def neovim_cmd_wrapper(obj, *rpc_args):
-            return self.dispatch(obj, rpc_args)
-        return neovim_cmd_wrapper
 
-
-class MessageCommand(Command):
+class MessageRequestHandler(RequestHandler):
 
     def __init__(self, fun: Callable[[], Any], msg: type, **kw) -> None:
         self._message = msg
@@ -161,8 +176,8 @@ class MessageCommand(Command):
         if isinstance(obj, ribosome.NvimStatePlugin):
             obj.state.send(self._message(*args))
         else:
-            msg = 'msg_command can only be used on NvimStatePlugin ({})'
-            self.log.error(msg.format(obj))
+            msg = 'msg_{} can only be used on NvimStatePlugin ({})'
+            self.log.error(msg.format(self.desc, obj))
 
     @property
     def msg_dispatch(self):
@@ -171,14 +186,10 @@ class MessageCommand(Command):
         return msg_dispatch_wrapper
 
 
-class ParseError(Exception):
-    pass
-
-
-class JsonMessageCommand(MessageCommand):
+class JsonMessageRequestHandler(MessageRequestHandler):
 
     def __init__(self, fun: Callable[[], Any], msg: type, **kw) -> None:
-        super(JsonMessageCommand, self).__init__(fun, msg, **kw)
+        super(JsonMessageRequestHandler, self).__init__(fun, msg, **kw)
 
     @property
     def nargs(self):
@@ -215,43 +226,6 @@ class JsonMessageCommand(MessageCommand):
         except ParseError as e:
             self.log.error(e)
         else:
-            super(JsonMessageCommand, self)._call_fun(obj, *real_args)
+            super(JsonMessageRequestHandler, self)._call_fun(obj, *real_args)
 
-
-class StateCommand(MessageCommand):
-
-    def __init__(self, msg: type, **kw) -> None:
-        def fun():
-            pass
-        super(StateCommand, self).__init__(fun, msg, **kw)
-
-    def _call_fun(self, obj, *args):
-        return self._message(*args)
-
-    @property
-    def _infer_name(self):
-        return self._message.__name__
-
-
-def command(**kw):
-    def neovim_cmd_decorator(fun):
-        handler = Command(fun, **kw)
-        return handler.neovim_cmd
-    return neovim_cmd_decorator
-
-
-def msg_command(msg: type, **kw):
-    def neovim_msg_cmd_decorator(fun):
-        handler = MessageCommand(fun, msg, **kw)
-        return handler.neovim_cmd
-    return neovim_msg_cmd_decorator
-
-
-def json_msg_command(msg: type, **kw):
-    def neovim_json_msg_cmd_decorator(fun):
-        handler = JsonMessageCommand(fun, msg, **kw)
-        return handler.neovim_cmd
-    return neovim_json_msg_cmd_decorator
-
-
-__all__ = ['command', 'msg_command', 'json_msg_command']
+__all__ = ('RequestHandler', 'MessageRequestHandler')
