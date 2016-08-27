@@ -15,9 +15,10 @@ from neovim.api import NvimError
 from amino.util.string import camelcaseify
 
 import amino
-from amino import Maybe, may, List, Map, Boolean, Empty, Just, __, _
+from amino import Maybe, may, List, Map, Boolean, Empty, Just, __, _, Try
 from amino.util.string import decode
 from amino.anon import format_funcall
+from amino.task import task
 
 import ribosome
 from ribosome.logging import Logging
@@ -375,8 +376,22 @@ class Buffer(HasWindow):
     def set_modifiable(self, value):
         self.set_optionb('modifiable', value)
 
+    @property
+    def modifiable(self):
+        return self.optionb('modifiable')
+
+    @property
+    def desc(self):
+        n = self.name
+        name = ' {}'.format(n) if n else ''
+        return 'buf #{}{}'.format(self._internal_buffer.number, name)
+
 
 class Window(HasTab, HasBuffers):
+
+    def __repr__(self):
+        n = Try(lambda: self.buffer.desc) | ''
+        return '{}({})'.format(self.__class__.__name__, n)
 
     @property
     def _internal_buffer(self):
@@ -403,8 +418,16 @@ class Window(HasTab, HasBuffers):
     def cursor(self):
         return List.wrap(self.target.cursor)
 
+    @property
+    def line(self):
+        return self.cursor.head
+
     def close(self):
         self.cmd('close')
+
+    @task
+    def set_cursor(self, line, col=0):
+        self.target.cursor = (line, col)
 
 
 class Tab(HasWindows):
@@ -502,7 +525,7 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         self.vim.feedkeys(keyseq, *a, **kw)
 
 
-class AsyncVimCallProxy(object):
+class AsyncVimCallProxy():
 
     def __init__(self, target, name):
         self._target = target
@@ -512,7 +535,7 @@ class AsyncVimCallProxy(object):
         return self._target.async(lambda v: getattr(v, self.name)(*a, **kw))
 
 
-class AsyncVimProxy(object):
+class AsyncVimProxy():
     allow_async_relay = True
 
     def __init__(self, target):
@@ -548,11 +571,11 @@ class AsyncVimProxy(object):
     def __eq__(self, other):
         return self.__getattr__('__eq__')(other)
 
-    def __str__(self):
-        return '{}({})'.format(self.__class__.__name__, str(self._target))
+    def __repr__(self):
+        return '{}({!r})'.format(self.__class__.__name__, self._target)
 
 
-class Flags(object):
+class Flags:
 
     def __init__(self, vim: NvimFacade, prefix: bool) -> None:
         self.vim = vim
@@ -567,7 +590,7 @@ class Flags(object):
         return self.get(name)
 
 
-class HasNvim(object):
+class HasNvim:
 
     def __init__(self, vim: NvimFacade) -> None:
         self.vim = vim
