@@ -193,7 +193,7 @@ class JsonMessageRequestHandler(MessageRequestHandler):
 
     @property
     def nargs(self):
-        return '+'
+        return '+' if self.min > 0 else '*'
 
     @property  # type: ignore
     @may
