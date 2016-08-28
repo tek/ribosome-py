@@ -8,6 +8,7 @@ from ribosome.nvim import NvimIO, Tab
 class ScratchBuilder(Record):
     params = map_field()
     use_tab = bool_field()
+    vertical = bool_field()
 
     @property
     def tab(self):
@@ -21,12 +22,15 @@ class ScratchBuilder(Record):
             .map3(self._create)
         )
 
+    def _create_window(self, vim):
+        return vim.vnew() if self.vertical else vim.new()
+
     def _setup_window(self, vim):
         if self.use_tab:
             tab = vim.tabnew()
             return Just(tab), tab.window
         else:
-            return Empty(), vim.vnew()
+            return Empty(), self._create_window(vim)
 
     def _setup_buffer(self, tab, win):
         win.set_optionb('wrap', False)

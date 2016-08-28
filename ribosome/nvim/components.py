@@ -326,6 +326,10 @@ class HasWindow(HasBuffer):
         self.cmd('vsplit')
         return self.window
 
+    def new(self):
+        self.cmd_sync('new')
+        return self.window
+
     def vnew(self):
         self.cmd_sync('vnew')
         return self.window
