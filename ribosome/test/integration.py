@@ -19,6 +19,8 @@ from ribosome import NvimFacade
 from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
 
+from amino import env
+
 
 class IntegrationSpec(IntegrationSpecBase):
 
@@ -31,7 +33,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
 
     def setup(self):
         super().setup()
-        self._debug = False
+        self._debug = 'RIBOSOME_DEVELOPMENT' in env
         self.logfile = temp_dir('log') / self.__class__.__name__
         self.logfile.touch()
         os.environ['RIBOSOME_LOG_FILE'] = str(self.logfile)
