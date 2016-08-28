@@ -18,7 +18,6 @@ import amino
 from amino import Maybe, may, List, Map, Boolean, Empty, Just, __, _, Try
 from amino.util.string import decode
 from amino.anon import format_funcall
-from amino.task import task
 
 import ribosome
 from ribosome.logging import Logging
@@ -45,6 +44,10 @@ def echo(text, cmd='echom', prefix=Empty()):
 
 def echohl(text, hl, prefix=Empty()):
     return 'echohl {} | {} | echohl None'.format(hl, echo(text))
+
+
+def on_main_thread():
+    return threading.current_thread() != threading.main_thread()
 
 
 class NvimComponent(Logging):
@@ -332,12 +335,14 @@ class HasWindows(HasBuffers, HasWindow):
 
     @property
     def windows(self):
-        return List(*self._internal_windows)\
-            .map(lambda a: Window(self.vim, a, self.prefix).proxy)
+        return (
+            self._internal_windows /
+            (lambda a: Window(self.vim, a, self.prefix).proxy)
+        )
 
     @property
     def _internal_windows(self):
-        return self.vim.windows
+        return List.wrap(self.vim.windows)
 
     def focus(self, number: int):
         return NvimCmd(self, 'wincmd', 'w', range=number)
@@ -419,7 +424,10 @@ class Buffer(HasWindow):
 class Window(HasTab, HasBuffers):
 
     def __repr__(self):
-        n = Try(lambda: self.buffer.desc) | ''
+        if on_main_thread():
+            n = ''
+        else:
+            n = Try(lambda: self.buffer.desc) | ''
         return '{}({})'.format(self.__class__.__name__, n)
 
     @property
@@ -454,7 +462,6 @@ class Window(HasTab, HasBuffers):
     def close(self):
         self.cmd('close')
 
-    @task
     def set_cursor(self, line, col=0):
         self.target.cursor = (line, col)
 
@@ -581,8 +588,7 @@ class AsyncVimProxy():
 
     @property
     def _need_relay(self):
-        return (self.allow_async_relay and
-                threading.current_thread() != threading.main_thread())
+        return self.allow_async_relay and on_main_thread()
 
     def __getattr__(self, name):
         if self._need_relay:
