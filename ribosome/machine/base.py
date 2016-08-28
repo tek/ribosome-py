@@ -18,13 +18,14 @@ from ribosome.machine.transition import (Handler, TransitionResult,
                                          either_msg, TransitionFailed,
                                          Coroutine, MachineError,
                                          WrappedHandler, Error)
-from ribosome.machine.message_base import _machine_attr
+from ribosome.machine.message_base import _machine_attr, Nop
 from ribosome.request.command import StateCommand
 
 A = TypeVar('A')
 
 NvimIOTask = message('NvimIOTask', 'io')
 RunTask = message('RunTask', 'task')
+UnitTask = message('UnitTask', 'task')
 DataTask = message('DataTask', 'cons')
 DataEitherTask = message('DataEitherTask', 'cons')
 
@@ -172,6 +173,14 @@ class Machine(Logging):
         return either_msg(
             msg.task
             .unsafe_perform_sync()
+        )
+
+    @may_handle(UnitTask)
+    def message_run_unit_task(self, data: Data, msg):
+        return either_msg(
+            msg.task
+            .unsafe_perform_sync()
+            .replace(Nop())
         )
 
     @may_handle(DataTask)
