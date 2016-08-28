@@ -170,10 +170,15 @@ class PluginIntegrationSpec(VimIntegrationSpec):
             rp_handlers,
         )
 
-    def json_cmd(self, cmd, **data):
+    def _json_cmd(self, cmd, data):
         j = json.dumps(data).replace('"', '\\"')
-        cmd = '{} {}'.format(cmd, j)
-        self.vim.cmd(cmd)
+        return '{} {}'.format(cmd, j)
+
+    def json_cmd(self, cmd, **data):
+        self.vim.cmd(self._json_cmd(cmd, data))
+
+    def json_cmd_sync(self, cmd, **data):
+        self.vim.cmd_sync(self._json_cmd(cmd, data))
 
     @property
     def plugin_class(self) -> Either[str, type]:

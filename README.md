@@ -143,6 +143,8 @@ class X(ribosome.RootMachine):
 ```
 
 The `message` helper creates a subclass of `Message` with low boilerplate.
+For json commands, the `json_message` function must be used, which adds an
+additional dict field called `options`.
 
 The decorators take as argument the class of the message which they can handle.
 In the example, the counter is incremented by the amount specified in the

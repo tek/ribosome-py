@@ -195,10 +195,6 @@ class JsonMessageRequestHandler(MessageRequestHandler):
     def nargs(self):
         return '+'
 
-    @property
-    def min(self) -> int:
-        return super().min - 1
-
     @property  # type: ignore
     @may
     def max(self):
@@ -228,4 +224,5 @@ class JsonMessageRequestHandler(MessageRequestHandler):
         else:
             super(JsonMessageRequestHandler, self)._call_fun(obj, *real_args)
 
-__all__ = ('RequestHandler', 'MessageRequestHandler')
+__all__ = ('RequestHandler', 'MessageRequestHandler',
+           'JsonMessageRequestHandler')

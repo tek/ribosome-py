@@ -121,8 +121,8 @@ def message(name, *fields, **kw):
 
 
 def json_message(name, *fields, **kw):
-    f = fields + ('options',)
-    return message(name, *f, **kw)
+    opt = (('options', Map()),)
+    return message(name, *fields, opt_fields=opt, **kw)
 
 
 class Publish(Message, fields=('message',)):
@@ -137,4 +137,5 @@ Quit = message('Quit')
 Done = message('Done')
 PlugCommand = message('PlugCommand', 'plug', 'msg')
 
-__all__ = ()
+__all__ = ('message', 'Message', 'json_message', 'Publish', 'Nop', 'Stop',
+           'Quit', 'Done', 'PlugCommand')
