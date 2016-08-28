@@ -43,7 +43,7 @@ class ScratchMachine(ModularMachine, HasNvim, metaclass=abc.ABCMeta):
     @handle(Mapping)
     def input(self, data, msg):
         return (
-            Boolean(msg.uuid == str(self.uuid))
+            Boolean(str(msg.uuid) == str(self.uuid))
             .flat_maybe(self.mappings.get(msg.keyseq)) /
             __()
         )
