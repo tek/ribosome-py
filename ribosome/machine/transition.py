@@ -5,7 +5,8 @@ from asyncio import iscoroutinefunction
 from amino.tc.optional import Optional
 from amino import F, Maybe, _, may, Either, Just
 
-from ribosome.machine.message_base import message, _message_attr, _machine_attr
+from ribosome.machine.message_base import (message, _message_attr,
+                                           _machine_attr, Message)
 
 from ribosome.record import Record, any_field, list_field, field
 from ribosome.logging import Logging
@@ -16,12 +17,16 @@ Error = message('Error', 'message')
 Coroutine = message('Coroutine', 'coro')
 
 
+def _to_error(data):
+    return data if isinstance(data, Message) else Error(data)
+
+
 def _recover_error(handler, result):
     if not Optional.exists(type(result)):
         err = 'in {}: result has no Optional: {}'
         return Just(Error(err.format(handler, result)))
     elif isinstance(result, Either):
-        return Just(result.right_or_map(Error))
+        return Just(result.right_or_map(_to_error))
     else:
         return result
 
