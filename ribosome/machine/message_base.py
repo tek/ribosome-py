@@ -17,7 +17,7 @@ def _field_namespace(fields, opt_fields, varargs):
     for fname in fields:
         namespace[fname] = any_field()
     for fname, val in opt_fields:
-        namespace[fname] = dfield(val)
+        namespace[fname] = any_field(initial=val)
     if varargs:
         namespace[varargs] = list_field()
     return namespace
