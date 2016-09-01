@@ -17,14 +17,15 @@ from ribosome.machine.base import ModularMachine, Machine
 from ribosome.machine.transition import (TransitionResult, Coroutine,
                                          TransitionFailed, may_handle, handle)
 
-from amino import Maybe, List, Map, may, Try, _, L
+from amino import Maybe, List, Map, may, Try, _, L, Empty
 
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
 Info = message('Info', 'message')
 RunMachine = message('RunMachine', 'machine')
 KillMachine = message('KillMachine', 'machine')
-RunScratchMachine = message('RunScratchMachine', 'machine', 'tab')
+RunScratchMachine = message('RunScratchMachine', 'machine', 'tab',
+                            opt_fields=(('size', Empty()),))
 
 
 class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
@@ -246,7 +247,7 @@ class RootMachine(PluginStateMachine, HasNvim, Logging):
     @handle(RunScratchMachine)
     def _scratch_machine(self, data, msg):
         return (
-            ScratchBuilder(use_tab=msg.tab)
+            ScratchBuilder(use_tab=msg.tab, size=msg.size)
             .build
             .unsafe_perform_io(self.vim) /
             L(msg.machine)(_, self) /

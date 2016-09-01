@@ -1,4 +1,4 @@
-from ribosome.record import map_field, bool_field, Record
+from ribosome.record import map_field, bool_field, Record, maybe_field
 
 from amino import Empty, Just, Maybe, __
 from ribosome.nvim.components import HasWindow
@@ -9,6 +9,7 @@ class ScratchBuilder(Record):
     params = map_field()
     use_tab = bool_field()
     vertical = bool_field()
+    size = maybe_field(int)
 
     @property
     def tab(self):
@@ -39,6 +40,7 @@ class ScratchBuilder(Record):
         buffer.set_options('bufhidden', 'wipe')
         buffer.set_optionb('buflisted', False)
         buffer.set_optionb('swapfile', False)
+        self.size / 'resize {}'.format % win.cmd_sync
         return (tab, win, buffer)
 
     def _create(self, tab, win, buffer):
