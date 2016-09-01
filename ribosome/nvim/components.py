@@ -239,7 +239,7 @@ class NvimComponent(Logging):
         output requires user input to proceed (e.g. multiline output)
         '''
         l = line if verbose else 'silent {}'.format(line)
-        return self.vim.command(l, async=not sync)
+        return Try(self.vim.command, l, async=not sync)
 
     def cmd_sync(self, line: str, verbose=False):
         return self.cmd(line, verbose=verbose, sync=True)
