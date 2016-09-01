@@ -13,12 +13,34 @@ from ribosome.logging import Logging
 
 A = TypeVar('A')
 
+
+class Failure:
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class Fatal(Failure):
+    pass
+
+
+class NothingToDo(Failure):
+    pass
+
+
 Error = message('Error', 'message')
+Warning = message('Warning', 'message')
+Debug = message('Debug', 'message')
 Coroutine = message('Coroutine', 'coro')
 
 
 def _to_error(data):
-    return data if isinstance(data, Message) else Error(data)
+    return (
+        data if isinstance(data, Message)
+        else Error(data.message) if isinstance(data, Fatal)
+        else Debug(data.message) if isinstance(data, NothingToDo)
+        else Debug(str(data))
+    )
 
 
 def _recover_error(handler, result):
