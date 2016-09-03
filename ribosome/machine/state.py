@@ -23,7 +23,7 @@ Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
 Info = message('Info', 'message')
 RunMachine = message('RunMachine', 'machine')
-KillMachine = message('KillMachine', 'machine')
+KillMachine = message('KillMachine', 'uuid')
 RunScratchMachine = message('RunScratchMachine', 'machine', 'tab',
                             opt_fields=(('size', Empty()),))
 
@@ -156,7 +156,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
 
     @may_handle(KillMachine)
     def _kill_machine(self, data, msg):
-        self.sub = self.sub.filter(_.title == msg.machine)
+        self.sub = self.sub.filter_not(_.uuid == msg.uuid)
 
     def unhandled(self, data, msg):
         return self._fold_sub(data, msg)

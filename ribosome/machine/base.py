@@ -1,3 +1,4 @@
+import uuid
 import inspect
 from typing import Sequence, Callable, TypeVar
 from asyncio import iscoroutine
@@ -48,6 +49,7 @@ class Machine(Logging):
     def __init__(self, parent: 'Machine'=None, title=None) -> None:
         self.parent = Maybe(parent)
         self._title = Maybe(title)
+        self.uuid = uuid.uuid4()
         self._message_handlers = self._collect_handlers()
 
     @property
