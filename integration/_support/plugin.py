@@ -8,6 +8,7 @@ from ribosome.logging import Logging
 from ribosome.request import function, msg_function, msg_command
 from ribosome.machine import message, may_handle, handle
 from ribosome.machine.state import RootMachine
+from ribosome.machine.transition import Fatal
 
 
 Msg = message('Msg', 'text')
@@ -22,7 +23,7 @@ class Mach(RootMachine):
 
     @handle(Err)
     def err(self, data, msg):
-        return Left(TestPlugin.test_error)
+        return Left(Fatal(TestPlugin.test_error))
 
 
 class TestPlugin(NvimStatePlugin, Logging):

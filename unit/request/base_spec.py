@@ -12,7 +12,7 @@ BasicMessage = message(
     'BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
 
 
-JsonMessage = message('JsonMessage', 'a', 'b', 'json')
+JsonMessage = message('JsonMessage', 'a', 'b')
 
 
 class RH(RequestHandler):
