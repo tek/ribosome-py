@@ -349,7 +349,7 @@ class HasWindows(HasBuffers, HasWindow):
         return List.wrap(self.vim.windows)
 
     def focus(self, number: int):
-        return NvimCmd(self, 'wincmd', 'w', range=number)
+        return NvimCmd(self, 'wincmd', 'w', range=Just(number))
 
 
 class HasTab(HasWindow):
