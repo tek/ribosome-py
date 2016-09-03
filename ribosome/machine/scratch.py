@@ -2,13 +2,16 @@ import re
 import abc
 from typing import Callable
 
-from ribosome.machine import message, ModularMachine, handle
+from ribosome.machine import message, ModularMachine, handle, may_handle
 from ribosome.nvim import HasNvim, NvimFacade, ScratchBuffer
+from ribosome.machine.state import KillMachine
+from ribosome.machine.base import UnitTask
 
 from amino import Map, Boolean, __, Empty
-
+from amino.task import Task
 
 Mapping = message('Mapping', 'uuid', 'keyseq')
+Quit = message('Quit')
 
 
 class ScratchMachine(ModularMachine, HasNvim, metaclass=abc.ABCMeta):
@@ -45,5 +48,10 @@ class ScratchMachine(ModularMachine, HasNvim, metaclass=abc.ABCMeta):
             .flat_maybe(self.mappings.get(msg.keyseq)) /
             __()
         )
+
+    @may_handle(Quit)
+    def quit(self, data, msg):
+        close = Task(self.scratch.close)
+        return UnitTask(close), KillMachine(self.uuid).pub
 
 __all__ = ('ScratchMachine',)
