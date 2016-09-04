@@ -50,16 +50,16 @@ class ScratchMachine(ModularMachine, HasNvim, metaclass=abc.ABCMeta):
         m = re.match('%(.*)%', keyseq)
         ks = '<{}>'.format(m.group(1)) if m else keyseq
         toseq = to | keyseq
-        cmd = self._mapping_cmd(toseq)
-        self.scratch.buffer.nmap(ks, cmd)
+        cmd = self._mapping_call(toseq)
+        self.scratch.buffer.nmap(ks, ':{}<cr>'.format(cmd))
 
-    def _mapping_cmd(self, seq):
-        return ':call {}Mapping(\'{}\', \'{}\')<cr>'.format(self.prefix,
-                                                            self.uuid, seq)
+    def _mapping_call(self, seq):
+        return 'call {}Mapping(\'{}\', \'{}\')'.format(self.prefix, self.uuid,
+                                                       seq)
 
     def _create_autocmds(self):
         cmd = self.scratch.buffer.autocmd('BufWipeout',
-                                          self._mapping_cmd(self._quit_seq))
+                                          self._mapping_call(self._quit_seq))
         cmd.run_async()
 
     @handle(Mapping)
