@@ -35,7 +35,7 @@ class ScratchMachine(ModularMachine, HasNvim, metaclass=abc.ABCMeta):
 
     @lazy
     def _quit_seq(self):
-        return '<quit>'
+        return '%%quit%%'
 
     @lazy
     def _internal_mappings(self):
