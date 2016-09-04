@@ -9,6 +9,7 @@ from ribosome.machine.base import UnitTask
 
 from amino import Map, Boolean, __, Empty
 from amino.task import Task
+from amino.lazy import lazy
 
 Mapping = message('Mapping', 'uuid', 'keyseq')
 Quit = message('Quit')
@@ -22,6 +23,7 @@ class ScratchMachine(ModularMachine, HasNvim, metaclass=abc.ABCMeta):
         ModularMachine.__init__(self, parent, title=title)
         HasNvim.__init__(self, vim)
         self._create_mappings()
+        self._create_autocmds()
 
     @abc.abstractproperty
     def prefix(self) -> str:
@@ -31,6 +33,16 @@ class ScratchMachine(ModularMachine, HasNvim, metaclass=abc.ABCMeta):
     def mappings(self) -> Map[str, Callable]:
         ...
 
+    @lazy
+    def _quit_seq(self):
+        return '<quit>'
+
+    @lazy
+    def _internal_mappings(self):
+        return Map({
+            self._quit_seq: Quit,
+        })
+
     def _create_mappings(self):
         self.mappings.k / self._create_mapping
 
@@ -38,14 +50,24 @@ class ScratchMachine(ModularMachine, HasNvim, metaclass=abc.ABCMeta):
         m = re.match('%(.*)%', keyseq)
         ks = '<{}>'.format(m.group(1)) if m else keyseq
         toseq = to | keyseq
-        cmd = ':call {}Mapping(\'{}\', \'{}\')<cr>'
-        self.scratch.buffer.nmap(ks, cmd.format(self.prefix, self.uuid, toseq))
+        cmd = self._mapping_cmd(toseq)
+        self.scratch.buffer.nmap(ks, cmd)
+
+    def _mapping_cmd(self, seq):
+        return ':call {}Mapping(\'{}\', \'{}\')<cr>'.format(self.prefix,
+                                                            self.uuid, seq)
+
+    def _create_autocmds(self):
+        cmd = self.scratch.buffer.autocmd('BufWipeout',
+                                          self._mapping_cmd(self._quit_seq))
+        cmd.run_async()
 
     @handle(Mapping)
     def input(self, data, msg):
         return (
             Boolean(str(msg.uuid) == str(self.uuid))
-            .flat_maybe(self.mappings.get(msg.keyseq)) /
+            .flat_maybe(self.mappings.get(msg.keyseq))
+            .or_else(self._internal_mappings.get(msg.keyseq)) /
             __()
         )
 

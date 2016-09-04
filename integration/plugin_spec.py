@@ -13,7 +13,7 @@ class PluginSpec(PluginIntegrationSpec):
         return Right(TestPlugin)
 
     def _last_output(self, content):
-        later(lambda: self._log_out.last.should.contain(content))
+        later(lambda: self._log_out.last.should.contain(content), timeout=1)
 
     def startup(self):
         i = 99932
@@ -28,5 +28,18 @@ class PluginSpec(PluginIntegrationSpec):
         self._last_output(fun_text)
         self.vim.cmd_sync('Err')
         self._last_output(TestPlugin.test_error)
+
+    def scratch(self):
+        self.vim.cmd_sync('Go')
+        self.vim.cmd_sync('Scratch')
+        later(lambda: self.vim.windows.length.should.equal(2))
+        self.vim.cmd_sync('CheckScratch')
+        self._last_output('1')
+        self.vim.cmd_sync('ScratchTest')
+        self._last_output(TestPlugin.test_scratch)
+        self.vim.window.close()
+        later(lambda: self.vim.windows.length.should.equal(1))
+        self.vim.cmd_sync('CheckScratch')
+        self._last_output('0')
 
 __all__ = ('PluginSpec',)

@@ -424,6 +424,9 @@ class Buffer(HasWindow):
         name = ' {}'.format(n) if n else ''
         return 'buf #{}{}'.format(self._internal_buffer.number, name)
 
+    def autocmd(self, name, cmd):
+        return NvimCmd(self, 'autocmd', '{} <buffer> {}'.format(name, cmd))
+
 
 class Window(HasTab, HasBuffers):
 
