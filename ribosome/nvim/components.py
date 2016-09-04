@@ -52,6 +52,17 @@ def on_main_thread():
 
 class NvimComponent(Logging):
 
+    def __repr__(self):
+        if on_main_thread():
+            n = ''
+        else:
+            n = self._details
+        return '{}({})'.format(self.__class__.__name__, n)
+
+    @property
+    def _details(self):
+        return ''
+
     def __init__(self, vim, target, prefix: str) -> None:
         if ribosome.in_vim and isinstance(target, (AsyncVimProxy,
                                                    NvimComponent)):
@@ -386,6 +397,10 @@ class HasTabs(HasTab):
 class Buffer(HasWindow):
 
     @property
+    def _details(self):
+        return Try(lambda: self.desc) | ''
+
+    @property
     def _internal_buffer(self):
         return self.target
 
@@ -430,12 +445,9 @@ class Buffer(HasWindow):
 
 class Window(HasTab, HasBuffers):
 
-    def __repr__(self):
-        if on_main_thread():
-            n = ''
-        else:
-            n = Try(lambda: self.buffer.desc) | ''
-        return '{}({})'.format(self.__class__.__name__, n)
+    @property
+    def _details(self):
+        return Try(lambda: self.buffer.desc) | ''
 
     @property
     def _internal_buffer(self):
@@ -584,6 +596,10 @@ class AsyncVimCallProxy():
 
     def __call__(self, *a, **kw):
         return self._target.async(lambda v: getattr(v, self.name)(*a, **kw))
+
+    def __repr__(self):
+        return '{}({}, {})'.format(self.__class__.__name__, self.name,
+                                   self._target)
 
 
 class AsyncVimProxy():
