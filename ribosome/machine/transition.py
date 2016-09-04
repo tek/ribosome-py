@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Any
 from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
-from amino import F, Maybe, _, may, Either, Just
+from amino import F, Maybe, _, may, Either, Just, Left, I
 
 from ribosome.machine.message_base import (message, _message_attr,
                                            _machine_attr, Message)
@@ -18,6 +18,9 @@ class Failure:
 
     def __init__(self, message: str) -> None:
         self.message = message
+
+    def __repr__(self):
+        return '{}({})'.format(self.__class__.__name__, self.message)
 
 
 class Fatal(Failure):
@@ -51,6 +54,10 @@ def _recover_error(handler, result):
         return Just(result.right_or_map(_to_error))
     else:
         return result
+
+
+def _task_result(result):
+    return result.cata(Left, I)
 
 
 class Handler:
@@ -161,7 +168,7 @@ def may_handle(msg: type):
 
 
 def either_msg(e: Either):
-    return e.right_or_map(F(Error) >> _.pub)
+    return e.right_or_map(Error)
 
 
 def either_handle(msg: type):

@@ -4,7 +4,7 @@ from typing import Sequence, Callable, TypeVar
 from asyncio import iscoroutine
 
 import amino
-from amino import Maybe, may, F, _, List, Map, Empty, curried, L, __
+from amino import Maybe, may, F, _, List, Map, Empty, curried, L, __, Just
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
@@ -16,9 +16,9 @@ from ribosome.nvim import NvimIO
 from ribosome.machine.transition import (Handler, TransitionResult,
                                          CoroTransitionResult,
                                          StrictTransitionResult, may_handle,
-                                         either_msg, TransitionFailed,
-                                         Coroutine, MachineError,
-                                         WrappedHandler, Error, Debug)
+                                         TransitionFailed, Coroutine,
+                                         MachineError, WrappedHandler, Error,
+                                         Debug, handle, _task_result)
 from ribosome.machine.message_base import _machine_attr, Nop
 from ribosome.request.command import StateCommand
 
@@ -170,35 +170,20 @@ class Machine(Logging):
     def message_nvim_io(self, data: Data, msg):
         msg.io.unsafe_perform_io(self.vim)
 
-    @may_handle(RunTask)
+    def _run_task(self, task):
+        return _task_result(task.attempt())
+
+    @handle(RunTask)
     def message_run_task(self, data: Data, msg):
-        return either_msg(
-            msg.task
-            .unsafe_perform_sync()
-        )
+        return self._run_task(msg.task)
 
-    @may_handle(UnitTask)
+    @handle(UnitTask)
     def message_run_unit_task(self, data: Data, msg):
-        return either_msg(
-            msg.task
-            .unsafe_perform_sync()
-            .replace(Nop())
-        )
+        return self._run_task(msg.task.replace(Just(Nop())))
 
-    @may_handle(DataTask)
+    @handle(DataTask)
     def message_data_task(self, data: Data, msg):
-        return either_msg(
-            msg.cons(Task.now(data))
-            .unsafe_perform_sync()
-        )
-
-    @may_handle(DataEitherTask)
-    def message_data_either_task(self, data: Data, msg):
-        return either_msg(
-            msg.cons(Task.now(data))
-            .map(either_msg)
-            .unsafe_perform_sync()
-        )
+        return self._run_task(msg.cons(Task.now(data)))
 
     @may_handle(Error)
     def message_error(self, data, msg):
