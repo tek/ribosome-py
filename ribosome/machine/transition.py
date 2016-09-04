@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Any
 from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
-from amino import F, Maybe, _, may, Either, Just, Left, I
+from amino import Maybe, may, Either, Just, Left, I
 
 from ribosome.machine.message_base import (message, _message_attr,
                                            _machine_attr, Message)
@@ -42,6 +42,7 @@ def _to_error(data):
         data if isinstance(data, Message)
         else Error(data.message) if isinstance(data, Fatal)
         else Debug(data.message) if isinstance(data, NothingToDo)
+        else Error(data) if isinstance(data, Exception)
         else Debug(str(data))
     )
 
