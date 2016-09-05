@@ -180,7 +180,7 @@ class PluginIntegrationSpec(VimIntegrationSpec):
         self.vim.cmd(self._json_cmd(cmd, data))
 
     def json_cmd_sync(self, cmd, **data):
-        self.vim.cmd_sync(self._json_cmd(cmd, data))
+        return self.vim.cmd_sync(self._json_cmd(cmd, data))
 
     @property
     def plugin_class(self) -> Either[str, type]:
