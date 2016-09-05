@@ -125,21 +125,26 @@ class NvimComponent(Logging):
     def prefixed(self, name: str):
         return '{}_{}'.format(self.prefix, name)
 
+    def namespaced(self, name: str):
+        return name
+
     @may
     def var(self, name) -> Maybe[str]:
-        v = self.target.vars.get(name)
+        vname = self.namespaced(name)
+        v = self.target.vars.get(vname)
         if v is None:
-            self.log.debug('variable not found: {}'.format(name))
+            self.log.debug('variable not found: {}'.format(vname))
         return decode(v)
 
     def set_var(self, name, value):
+        vname = self.namespaced(name)
         try:
-            self.target.vars[name] = value
+            self.target.vars[vname] = value
         except:
             msg = 'setting vim variable {} to {}'
-            self.log.exception(msg.format(name, value))
+            self.log.exception(msg.format(vname, value))
         else:
-            self._vars.add(name)
+            self._vars.add(vname)
 
     def pvar(self, name) -> Maybe[str]:
         return self.var(self.prefixed(name))
@@ -441,6 +446,9 @@ class Buffer(HasWindow):
 
     def autocmd(self, name, cmd):
         return NvimCmd(self, 'autocmd', '{} <buffer> {}'.format(name, cmd))
+
+    def namespaced(self, name: str):
+        return 'b:{}'.format(name)
 
 
 class Window(HasTab, HasBuffers):
