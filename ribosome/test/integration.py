@@ -41,7 +41,8 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         self._tmux_pane = None
         self._keep_tmux_pane = False
         self.vimlog = temp_dir('log') / 'vim'
-        self._cmdline = ('nvim', '-V{}'.format(self.vimlog), '-u', 'NONE')
+        self._cmdline = ('nvim', '-V{}'.format(self.vimlog), '-n', '-u',
+                         'NONE')
 
     def setup(self):
         super().setup()
