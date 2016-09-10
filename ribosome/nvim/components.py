@@ -260,7 +260,6 @@ class NvimComponent(Logging):
         return result
 
     def cmd_sync(self, line: str, verbose=False):
-        self.log.verbose('cmd: {}, verbose: {}'.format(line, verbose))
         return self.cmd(line, verbose=verbose, sync=True)
 
     def cmd_output(self, line: str) -> List[str]:
