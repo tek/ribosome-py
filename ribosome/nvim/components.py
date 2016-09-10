@@ -255,13 +255,22 @@ class NvimComponent(Logging):
         output requires user input to proceed (e.g. multiline output)
         '''
         l = line if verbose else 'silent {}'.format(line)
-        return Try(self.vim.command, l, async=not sync)
+        result = Try(self.vim.command, l, async=not sync)
+        self._cmd_result(line, result, sync)
+        return result
 
     def cmd_sync(self, line: str, verbose=False):
+        self.log.verbose('cmd: {}, verbose: {}'.format(line, verbose))
         return self.cmd(line, verbose=verbose, sync=True)
 
     def cmd_output(self, line: str) -> List[str]:
         return List.wrap(self.vim.command_output(line).split('\n'))
+
+    def _cmd_result(self, line, result, sync: bool):
+        if sync:
+            self.log.debug('result of cmd \'{}\': {}'.format(line, result))
+        else:
+            self.log.debug('async cmd \'{}\''.format(line))
 
     def vcmd(self, line: str, sync=False):
         return self.cmd(line, verbose=True, sync=sync)
@@ -281,20 +290,20 @@ class NvimCmd:
         self.range = range
         self.silent = silent
 
-    @property
-    def _cmdline(self):
-        s = 'silent! ' if self.silent else ''
+    def _cmdline(self, silent=None):
+        sil = self.silent if silent is None else silent
+        s = 'silent! ' if sil else ''
         r = self.range | ''
         return '{}{}{} {}'.format(s, r, self.name, self.args)
 
-    def run_sync(self):
-        return self.vim.cmd_sync(self._cmdline)
+    def run_sync(self, silent=None):
+        return self.vim.cmd_sync(self._cmdline(silent))
 
-    def run_async(self):
-        return self.vim.cmd(self._cmdline)
+    def run_async(self, silent=None):
+        return self.vim.cmd(self._cmdline(silent))
 
-    def run_output(self):
-        return self.vim.cmd_output(self._cmdline)
+    def run_output(self, silent=None):
+        return self.vim.cmd_output(self._cmdline(silent))
 
 
 class HasBuffer(NvimComponent, metaclass=abc.ABCMeta):
