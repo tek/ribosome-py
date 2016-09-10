@@ -18,6 +18,7 @@ import amino
 from amino import Maybe, may, List, Map, Boolean, Empty, Just, __, _, Try
 from amino.util.string import decode
 from amino.anon import format_funcall
+from amino.lazy import lazy
 
 import ribosome
 from ribosome.logging import Logging
@@ -52,6 +53,16 @@ def on_main_thread():
 
 class NvimComponent(Logging):
 
+    def __init__(self, vim, target, prefix: str) -> None:
+        if ribosome.in_vim and isinstance(target, (AsyncVimProxy,
+                                                   NvimComponent)):
+            msg = '{} created with non-native target {}'
+            raise Exception(msg.format(self, target))
+        self.vim = vim
+        self.target = target
+        self.prefix = prefix
+        self._vars = set()  # type: set
+
     def __repr__(self):
         if on_main_thread():
             n = ''
@@ -62,16 +73,6 @@ class NvimComponent(Logging):
     @property
     def _details(self):
         return ''
-
-    def __init__(self, vim, target, prefix: str) -> None:
-        if ribosome.in_vim and isinstance(target, (AsyncVimProxy,
-                                                   NvimComponent)):
-            msg = '{} created with non-native target {}'
-            raise Exception(msg.format(self, target))
-        self.vim = vim
-        self.target = target
-        self.prefix = prefix
-        self._vars = set()  # type: set
 
     @property
     def loop(self):
@@ -278,6 +279,10 @@ class NvimComponent(Logging):
     def syntax(self):
         return Syntax(self)
 
+    @lazy
+    def root(self):
+        return NvimFacade(self.vim, self.prefix)
+
 
 class NvimCmd:
 
@@ -457,6 +462,9 @@ class Buffer(HasWindow):
 
     def namespaced(self, name: str):
         return 'b:{}'.format(name)
+
+    def pvar_or_global(self, name):
+        return self.pvar(name).or_else(lambda: self.root.pvar(name))
 
 
 class Window(HasTab, HasBuffers):
