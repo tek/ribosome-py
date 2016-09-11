@@ -561,6 +561,9 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def pautocmd(self, name):
         self.uautocmd('{}{}'.format(camelcaseify(self.prefix), name))
 
+    def autocmd(self, name, pattern, cmd):
+        return NvimCmd(self, 'autocmd', '{} {} {}'.format(name, pattern, cmd))
+
     def call(self, name, *a, **kw):
         return (
             Maybe.from_call(self.vim.call, name, *a, exc=NvimError, **kw)
