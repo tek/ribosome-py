@@ -200,7 +200,7 @@ class Machine(Logging):
         self.parent.cata(_.bubble, lambda: self.send)(msg)
 
 
-class Transitions(object):
+class Transitions:
     State = Map
 
     def __init__(self, machine: Machine, data: Data, msg: Message) -> None:

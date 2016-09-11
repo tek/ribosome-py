@@ -13,11 +13,11 @@ from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
 from ribosome.machine.message_base import (message, Message, Nop, Done, Quit,
                                            PlugCommand, Stop)
-from ribosome.machine.base import ModularMachine, Machine
+from ribosome.machine.base import ModularMachine, Machine, Transitions
 from ribosome.machine.transition import (TransitionResult, Coroutine,
                                          TransitionFailed, may_handle, handle)
 
-from amino import Maybe, List, Map, may, Try, _, L, Empty
+from amino import Maybe, List, Map, may, Try, _, L, Empty, __
 
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
@@ -253,5 +253,27 @@ class RootMachine(PluginStateMachine, HasNvim, Logging):
             L(msg.machine)(_, self) /
             RunMachine
         )
+
+
+class SubMachine(ModularMachine):
+
+    def new_state(self):
+        pass
+
+
+class SubTransitions(Transitions):
+
+    def _state(self, data):
+        return data.sub_state(self.name, self.machine.new_state)
+
+    @property
+    def state(self):
+        return self._state(self.data)
+
+    def _with_sub(self, data, state):
+        return data.with_sub_state(self.name, state)
+
+    def with_sub(self, state):
+        return self._with_sub(self.data, state)
 
 __all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Info')
