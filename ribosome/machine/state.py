@@ -22,10 +22,12 @@ from amino import Maybe, List, Map, may, Try, _, L, Empty, __
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
 Info = message('Info', 'message')
+Envelope = message('Envelope', 'message', 'to')
 RunMachine = message('RunMachine', 'machine')
 KillMachine = message('KillMachine', 'uuid')
 RunScratchMachine = message('RunScratchMachine', 'machine', 'tab',
                             opt_fields=(('size', Empty()),))
+Init = message('Init')
 
 
 class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
@@ -153,10 +155,16 @@ class StateMachine(AsyncIOThread, ModularMachine):
     @may_handle(RunMachine)
     def _run_machine(self, data, msg):
         self.sub = self.sub.cat(msg.machine)
+        return Envelope(Init(), msg.machine.uuid)
 
     @may_handle(KillMachine)
     def _kill_machine(self, data, msg):
         self.sub = self.sub.filter_not(_.uuid == msg.uuid)
+
+    @handle(Envelope)
+    def message_envelop(self, data, msg):
+        return self.sub.find(_.uuid == msg.to) / __.loop_process(data,
+                                                                 msg.message)
 
     def unhandled(self, data, msg):
         return self._fold_sub(data, msg)
