@@ -1,3 +1,4 @@
+import re
 from typing import TypeVar, Callable, Any
 from pathlib import Path
 import threading
@@ -22,6 +23,7 @@ from amino.lazy import lazy
 
 import ribosome
 from ribosome.logging import Logging
+from ribosome.request.base import parse_int
 
 
 def squote(text):
@@ -566,16 +568,28 @@ class AsyncVimProxy():
         return self.__getattr__('__call__')(*a, **kw)
 
 
+# FIXME recording variable name for eventual cleanup only works with a global
+# NvimFacade instance
 class Vars(Logging):
 
     def __init__(self, vim) -> None:
         self.vim = vim
         self._vars = set()  # type: set
 
+    def __repr__(self):
+        return '{}({!r})'.format(self.__class__.__name__, self.vim)
+
+    @property
+    def internal(self):
+        return self.vim.target.vars
+
+    def _get(self, name):
+        return self.internal.get(name)
+
     @may
     def __call__(self, name) -> Maybe[str]:
         vname = self.vim.namespaced(name)
-        v = self.vim.target.vars.get(vname)
+        v = self._get(vname)
         if v is None:
             self.log.debug('variable not found: {}'.format(vname))
         return decode(v)
@@ -584,7 +598,7 @@ class Vars(Logging):
         return self.vim.prefixed(name)
 
     def _set(self, name, value):
-        self.vim.target.vars[name] = value
+        self.internal[name] = value
 
     def set(self, name, value):
         vname = self.vim.namespaced(name)
@@ -625,7 +639,7 @@ class Vars(Logging):
 
     def clean(self):
         for name in self._vars:
-            del self.target.vars[name]
+            del self.internal[name]
         self._vars = set()
 
     def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
@@ -656,6 +670,22 @@ class Vars(Logging):
 
     def pd(self, name):
         return self.typed(dict, self.p(name))
+
+    @property
+    def all(self):
+        rex = re.compile('^#(?P<num>\d+)$')
+        def parse(k, v):
+            v2 = (Maybe(rex.match(v)) / __.groupdict() / Map //
+                  __.get('num') // parse_int)
+            return k, (v2 | v)
+        lines = (
+            (self.vim.cmd_output('silent let') / __.split(maxsplit=1) /
+                List.wrap)
+            .filter(_.length == 2)
+            .filter_not(lambda a: a[0].startswith('v:'))
+            .map2(parse)
+        )
+        return Map(lines)
 
 
 class Options(Logging):
