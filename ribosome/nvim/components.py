@@ -135,7 +135,7 @@ class NvimComponent(Logging):
         return AsyncVimProxy(self, self)
 
     def prefixed(self, name: str):
-        return '{}_{}'.format(self.prefix, name)
+        return '{}_{}'.format(self.prefix, name) if self.prefix else name
 
     def clean(self):
         self.vars.clean()
@@ -155,7 +155,7 @@ class NvimComponent(Logging):
         return self.cmd(line, verbose=verbose, sync=True)
 
     def cmd_output(self, line: str) -> List[str]:
-        return List.wrap(self.vim.command_output(line).split('\n'))
+        return List.wrap(self.vim.command_output(line).splitlines())
 
     def _cmd_result(self, line, result, sync: bool):
         if sync:

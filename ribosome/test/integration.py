@@ -39,7 +39,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         super().__init__()
         self.tmux_nvim = False
         self._tmux_pane = None
-        self._keep_tmux_pane = False
+        self.keep_tmux_pane = False
         self.vimlog = temp_dir('log') / 'vim'
         self._cmdline = ('nvim', '-V{}'.format(self.vimlog), '-n', '-u',
                          'NONE')
@@ -107,7 +107,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         self.neovim.command('python3 sys.path.insert(0, \'{}\')'.format(path))
 
     def _cleanup_tmux(self):
-        if self._tmux_pane is not None and not self._keep_tmux_pane:
+        if self._tmux_pane is not None and not self.keep_tmux_pane:
             self._tmux_pane.cmd('kill-pane')
 
     def _nvim_facade(self, vim):
