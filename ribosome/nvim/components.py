@@ -554,7 +554,7 @@ class AsyncVimProxy():
             return getattr(self._target, name)
 
     def _async_attr(self, name):
-        return self._vim.async(lambda v: getattr(v, name))
+        return self._vim.async(lambda v: getattr(self._target, name))
 
     def __eq__(self, other):
         return self.__getattr__('__eq__')(other)
