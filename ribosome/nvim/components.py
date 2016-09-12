@@ -61,7 +61,8 @@ class NvimComponent(Logging):
         self.vim = vim
         self.target = target
         self.prefix = prefix
-        self._vars = set()  # type: set
+        self._vars = Vars(self)
+        self._options = Options(self)
 
     def __repr__(self):
         if on_main_thread():
@@ -69,6 +70,14 @@ class NvimComponent(Logging):
         else:
             n = self._details
         return '{}({})'.format(self.__class__.__name__, n)
+
+    @property
+    def vars(self):
+        return AsyncVimProxy(self._vars, self)
+
+    @property
+    def options(self):
+        return AsyncVimProxy(self._options, self)
 
     @property
     def _details(self):
@@ -121,7 +130,7 @@ class NvimComponent(Logging):
 
     @property
     def proxy(self):
-        return AsyncVimProxy(self)
+        return AsyncVimProxy(self, self)
 
     def prefixed(self, name: str):
         return '{}_{}'.format(self.prefix, name)
@@ -129,125 +138,8 @@ class NvimComponent(Logging):
     def namespaced(self, name: str):
         return name
 
-    @may
-    def var(self, name) -> Maybe[str]:
-        vname = self.namespaced(name)
-        v = self.target.vars.get(vname)
-        if v is None:
-            self.log.debug('variable not found: {}'.format(vname))
-        return decode(v)
-
-    def set_var(self, name, value):
-        vname = self.namespaced(name)
-        try:
-            self.target.vars[vname] = value
-        except:
-            msg = 'setting vim variable {} to {}'
-            self.log.exception(msg.format(vname, value))
-        else:
-            self._vars.add(vname)
-
-    def pvar(self, name) -> Maybe[str]:
-        return self.var(self.prefixed(name))
-
-    def set_pvar(self, name, value):
-        self.set_var(self.prefixed(name), value)
-
-    def path(self, name: str) -> Maybe[Path]:
-        return self.var(name)\
-            .map(lambda a: Path(a).expanduser())  # type: ignore
-
-    def ppath(self, name: str) -> Maybe[Path]:
-        return self.path(self.prefixed(name))
-
-    def ppathl(self, name: str) -> Maybe[Path]:
-        return self.pl(name)\
-            .map(lambda l: l.map(Path).map(__.expanduser()))
-
-    def dir(self, name: str) -> Maybe[Path]:
-        var = self.path(name)
-        val = var.filter(__.is_dir())
-        if not val.is_just:
-            msg = 'g:{} is not a directory ({})'
-            self.log.error(msg.format(name, var))
-        return val
-
-    def pdir(self, name: str) -> Maybe[Path]:
-        return self.dir(self.prefixed(name))
-
     def clean(self):
-        for name in self._vars:
-            del self.target.vars[name]
-        self._vars = set()
-
-    def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
-        @may
-        def check(v: A):
-            if isinstance(v, tpe):
-                return v
-            else:
-                msg = 'invalid type {} for variable {} (wanted {})'.format(
-                    type(v), v, tpe)
-                self.log.error(msg)
-        return value.flat_map(check)
-
-    def s(self, name):
-        return self.typed(str, self.var(name))
-
-    def ps(self, name):
-        return self.typed(str, self.pvar(name))
-
-    def l(self, name):
-        return self.typed(list, self.var(name))
-
-    def pl(self, name):
-        return self.typed(list, self.pvar(name))
-
-    def d(self, name):
-        return self.typed(dict, self.var(name))
-
-    def pd(self, name):
-        return self.typed(dict, self.pvar(name))
-
-    @may
-    def option(self, name: str) -> Maybe[str]:
-        v = self.target.options.get(name)
-        if v is None:
-            self.log.debug('variable not found: {}'.format(name))
-        return decode(v)
-
-    def set_option(self, name: str, value):
-        try:
-            self.target.options[name] = value
-        except NvimError as e:
-            self.log.error(e)
-
-    def options(self, name: str):
-        return self.typed(str, self.option(name))
-
-    def set_options(self, name: str, value):
-        return self.set_option(name, str(value))
-
-    def optionl(self, name: str) -> List[str]:
-        return self.options(name)\
-            .map(lambda a: a.split(','))\
-            .map(List.wrap)\
-            .get_or_else(List())
-
-    def amend_optionl(self, name: str, value):
-        if not isinstance(value, list):
-            value = List(value)
-        new_value = (self.optionl(name) + list(map(str, value))).distinct
-        self.set_optionl(name, new_value)
-
-    def set_optionl(self, name: str, value: List[str]):
-        self.target.options[name] = ','.join(value)
-
-    def optionb(self, name: str):
-        return self.typed(bool, self.option(name))
-
-    def set_optionb(self, name: str, value):
-        return self.set_option(name, bool(value))
+        self.vars.clean()
 
     def cmd(self, line: str, verbose=False, sync=False):
         ''' Wrap **Nvim.command**, default to async.
@@ -428,7 +320,7 @@ class Buffer(HasWindow):
 
     @property
     def modified(self):
-        return self.option('modified').contains(True)
+        return self.options('modified').contains(True)
 
     @property
     def name(self):
@@ -445,11 +337,11 @@ class Buffer(HasWindow):
         return self.cmd('nmap <buffer><silent> {} {}'.format(keyseq, dispatch))
 
     def set_modifiable(self, value):
-        self.set_optionb('modifiable', value)
+        self.options.set_b('modifiable', value)
 
     @property
     def modifiable(self):
-        return self.optionb('modifiable')
+        return self.options.b('modifiable')
 
     @property
     def desc(self):
@@ -464,7 +356,7 @@ class Buffer(HasWindow):
         return 'b:{}'.format(name)
 
     def pvar_or_global(self, name):
-        return self.pvar(name).or_else(lambda: self.root.pvar(name))
+        return self.vars.p(name).or_else(lambda: self.root.vars.p(name))
 
 
 class Window(HasTab, HasBuffers):
@@ -617,12 +509,14 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
 class AsyncVimCallProxy():
 
-    def __init__(self, target, name):
+    def __init__(self, target, vim, name):
         self._target = target
+        self._vim = vim
         self.name = name
 
     def __call__(self, *a, **kw):
-        return self._target.async(lambda v: getattr(v, self.name)(*a, **kw))
+        return self._vim.async(
+            lambda v: getattr(self._target, self.name)(*a, **kw))
 
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.name,
@@ -632,7 +526,8 @@ class AsyncVimCallProxy():
 class AsyncVimProxy():
     allow_async_relay = True
 
-    def __init__(self, target):
+    def __init__(self, target, vim):
+        self._vim = vim
         self._target = target
         self._target_tpe = type(target)
 
@@ -650,7 +545,7 @@ class AsyncVimProxy():
         if (hasattr(self._target_tpe, name)):
             attr = getattr(self._target_tpe, name)
             if isinstance(attr, FunctionType):
-                return AsyncVimCallProxy(self._target, name)
+                return AsyncVimCallProxy(self._target, self._vim, name)
             else:
                 return self._async_attr(name)
         elif hasattr(self._target, name):
@@ -659,7 +554,7 @@ class AsyncVimProxy():
             return getattr(self._target, name)
 
     def _async_attr(self, name):
-        return self._target.async(lambda v: getattr(v, name))
+        return self._vim.async(lambda v: getattr(v, name))
 
     def __eq__(self, other):
         return self.__getattr__('__eq__')(other)
@@ -667,15 +562,167 @@ class AsyncVimProxy():
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self._target)
 
+    def __call__(self, *a, **kw):
+        return self.__getattr__('__call__')(*a, **kw)
+
+
+class Vars(Logging):
+
+    def __init__(self, vim) -> None:
+        self.vim = vim
+        self._vars = set()  # type: set
+
+    @may
+    def __call__(self, name) -> Maybe[str]:
+        vname = self.vim.namespaced(name)
+        v = self.vim.target.vars.get(vname)
+        if v is None:
+            self.log.debug('variable not found: {}'.format(vname))
+        return decode(v)
+
+    def prefixed(self, name):
+        return self.vim.prefixed(name)
+
+    def _set(self, name, value):
+        self.vim.target.vars[name] = value
+
+    def set(self, name, value):
+        vname = self.vim.namespaced(name)
+        try:
+            self._set(vname, value)
+        except:
+            msg = 'setting vim variable {} to {}'
+            self.log.exception(msg.format(vname, value))
+        else:
+            self._vars.add(vname)
+
+    def p(self, name) -> Maybe[str]:
+        return self(self.prefixed(name))
+
+    def set_p(self, name, value):
+        self.set(self.prefixed(name), value)
+
+    def path(self, name: str) -> Maybe[Path]:
+        return self(name).map(lambda a: Path(a).expanduser())  # type: ignore
+
+    def ppath(self, name: str) -> Maybe[Path]:
+        return self.path(self.prefixed(name))
+
+    def ppathl(self, name: str) -> Maybe[Path]:
+        return self.pl(name)\
+            .map(lambda l: l.map(Path).map(__.expanduser()))
+
+    def dir(self, name: str) -> Maybe[Path]:
+        var = self.path(name)
+        val = var.filter(__.is_dir())
+        if not val.is_just:
+            msg = 'g:{} is not a directory ({})'
+            self.log.error(msg.format(name, var))
+        return val
+
+    def pdir(self, name: str) -> Maybe[Path]:
+        return self.dir(self.prefixed(name))
+
+    def clean(self):
+        for name in self._vars:
+            del self.target.vars[name]
+        self._vars = set()
+
+    def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
+        @may
+        def check(v: A):
+            if isinstance(v, tpe):
+                return v
+            else:
+                msg = 'invalid type {} for variable {} (wanted {})'.format(
+                    type(v), v, tpe)
+                self.log.error(msg)
+        return value.flat_map(check)
+
+    def s(self, name):
+        return self.typed(str, self.var(name))
+
+    def ps(self, name):
+        return self.typed(str, self.vars.p(name))
+
+    def l(self, name):
+        return self.typed(list, self.var(name))
+
+    def pl(self, name):
+        return self.typed(list, self.p(name))
+
+    def d(self, name):
+        return self.typed(dict, self(name))
+
+    def pd(self, name):
+        return self.typed(dict, self.p(name))
+
+
+class Options(Logging):
+
+    def __init__(self, vim) -> None:
+        self.vim = vim
+
+    @may
+    def __call__(self, name: str) -> Maybe[str]:
+        v = self.vim.target.options.get(name)
+        if v is None:
+            self.log.debug('variable not found: {}'.format(name))
+        return decode(v)
+
+    def set(self, name: str, value):
+        try:
+            self.vim.target.options[name] = value
+        except NvimError as e:
+            self.log.error(e)
+
+    def s(self, name: str):
+        return self.typed(str, self(name))
+
+    def set_s(self, name: str, value):
+        return self.set(name, str(value))
+
+    def l(self, name: str) -> List[str]:
+        return self.s(name)\
+            .map(lambda a: a.split(','))\
+            .map(List.wrap)\
+            .get_or_else(List())
+
+    def amend_l(self, name: str, value):
+        if not isinstance(value, list):
+            value = List(value)
+        new_value = (self.l(name) + list(map(str, value))).distinct
+        self.set_l(name, new_value)
+
+    def set_l(self, name: str, value: List[str]):
+        self.vim.target.options[name] = ','.join(value)
+
+    def b(self, name: str):
+        return self.typed(bool, self(name))
+
+    def set_b(self, name: str, value):
+        return self.set(name, bool(value))
+
+    def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
+        @may
+        def check(v: A):
+            if isinstance(v, tpe):
+                return v
+            else:
+                msg = 'invalid type {} for option {} (wanted {})'.format(
+                    type(v), v, tpe)
+                self.log.error(msg)
+        return value.flat_map(check)
+
 
 class Flags:
 
-    def __init__(self, vim: NvimFacade, prefix: bool) -> None:
-        self.vim = vim
+    def __init__(self, vars, prefix: bool) -> None:
+        self.vars = vars
         self.prefix = prefix
 
     def get(self, name, default=False):
-        v = (self.vim.pvar(name) if self.prefix else self.vim.var(name))\
+        v = (self.vars.p(name) if self.prefix else self.vars(name))\
             .get_or_else(default)
         return Boolean(v)
 
@@ -687,8 +734,8 @@ class HasNvim:
 
     def __init__(self, vim: NvimFacade) -> None:
         self.vim = vim
-        self.flags = Flags(vim, False)
-        self.pflags = Flags(vim, True)
+        self.flags = Flags(vim.vars, False)
+        self.pflags = Flags(vim.vars, True)
 
 
 class Syntax(Logging):

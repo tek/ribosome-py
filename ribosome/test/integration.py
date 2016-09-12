@@ -131,17 +131,17 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
 
     def _post_start_neovim(self):
         rtp = fixture_path('config', 'rtp')
-        self.vim.amend_optionl('runtimepath', rtp)
+        self.vim.options.amend_l('runtimepath', rtp)
 
     def _pre_start(self):
         pass
 
     def _pvar_becomes(self, name, value):
-        return self._wait_for(lambda: self.vim.pvar(name).contains(value))
+        return self._wait_for(lambda: self.vim.vars.p(name).contains(value))
 
     def _pvar_becomes_map(self, name, value, f):
         return self._wait_for(
-            lambda: self.vim.pvar(name).map(f).contains(value))
+            lambda: self.vim.vars.p(name).map(f).contains(value))
 
     @property
     def _log_out(self):

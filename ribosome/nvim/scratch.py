@@ -34,12 +34,12 @@ class ScratchBuilder(Record):
             return Empty(), self._create_window(vim)
 
     def _setup_buffer(self, tab, win):
-        win.set_optionb('wrap', False)
+        win.options.set_b('wrap', False)
         buffer = win.buffer
-        buffer.set_options('buftype', 'nofile')
-        buffer.set_options('bufhidden', 'wipe')
-        buffer.set_optionb('buflisted', False)
-        buffer.set_optionb('swapfile', False)
+        buffer.options.set_s('buftype', 'nofile')
+        buffer.options.set_s('bufhidden', 'wipe')
+        buffer.options.set_b('buflisted', False)
+        buffer.options.set_b('swapfile', False)
         self.size / 'resize {}'.format % win.cmd_sync
         return (tab, win, buffer)
 

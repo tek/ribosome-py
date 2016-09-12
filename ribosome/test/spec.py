@@ -9,9 +9,44 @@ from amino.test import Spec
 import ribosome
 from ribosome.nvim import Buffer, Tab, Window
 from ribosome import NvimFacade
+from ribosome.nvim.components import Options, Vars
+
+
+class MockOptions(Options):
+
+    def set(self, *a, **kw):
+        pass
+
+
+class MockVars(Vars):
+
+    def __init__(self, vim) -> None:
+        super().__init__(vim)
+        self.vars = dict()
+        self.prefix = vim.prefix
+
+    @may
+    def __call__(self, name: str) -> Maybe[str]:  # type: ignore
+        v = self.vars.get(name)
+        if v is None:
+            ignore_names = ['_machine', '_message',
+                            '{}__message'.format(self.prefix),
+                            '{}__machine'.format(self.prefix),
+                            ]
+            if name not in ignore_names:
+                self.log.error('variable not found: {}'.format(name))
+        return v
+
+    def set(self, name, value):
+        self.vars[name] = value
 
 
 class MockNvim(object):
+
+    def __init__(self, prefix) -> None:
+        self.prefix = prefix
+        self._vars = MockVars(self)
+        self._options = MockOptions(self)
 
     @property
     def window(self):
@@ -24,9 +59,6 @@ class MockNvim(object):
     @property
     def tab(self):
         return MockTab(self.vim, None, self.prefix)
-
-    def set_option(self, *a, **kw):
-        pass
 
     def cmd(self, *a, **kw):
         pass
@@ -47,21 +79,8 @@ class MockBuffer(MockNvim, Buffer):
 class MockNvimFacade(MockNvim, NvimFacade):
 
     def __init__(self, prefix):
-        self.vars = {}
-        super().__init__(None, prefix)
+        MockNvim.__init__(self, prefix)
         self.target = self
-
-    @may
-    def var(self, name: str) -> Maybe[str]:  # type: ignore
-        v = self.vars.get(name)
-        if v is None:
-            ignore_names = ['_machine', '_message',
-                            '{}__message'.format(self.prefix),
-                            '{}__machine'.format(self.prefix),
-                            ]
-            if name not in ignore_names:
-                self.log.error('variable not found: {}'.format(name))
-        return v
 
     @property
     def windows(self):
