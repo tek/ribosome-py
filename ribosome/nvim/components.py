@@ -562,9 +562,70 @@ class AsyncVimProxy():
         return self.__getattr__('__call__')(*a, **kw)
 
 
+class OptVar(Logging, metaclass=abc.ABCMeta):
+
+    @abc.abstractmethod
+    def _get(self, name) -> Maybe[str]:
+        ...
+
+    @property
+    def _desc(self):
+        ...
+
+    @may
+    def __call__(self, name) -> Maybe[str]:
+        v = self._get(name)
+        if v is None:
+            self.log.debug('{} not found: {}'.format(self._desc, name))
+        return decode(v)
+
+    def set(self, name, value):
+        self.log.debug('setting {} {} to \'{}\''.format(self._desc, name,
+                                                        value))
+        try:
+            self._set(name, value)
+        except:
+            msg = 'setting vim {} {} to {}'
+            self.log.exception(msg.format(self._desc, name, value))
+
+    def path(self, name: str) -> Maybe[Path]:
+        return self(name).map(lambda a: Path(a).expanduser())  # type: ignore
+
+    def dir(self, name: str) -> Maybe[Path]:
+        var = self.path(name)
+        val = var.filter(__.is_dir())
+        if not val.is_just:
+            msg = 'g:{} is not a directory ({})'
+            self.log.error(msg.format(name, var))
+        return val
+
+    def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
+        @may
+        def check(v: A):
+            if isinstance(v, tpe):
+                return v
+            else:
+                msg = 'invalid type {} for {} {} (wanted {})'.format(
+                    type(v), self._desc, v, tpe)
+                self.log.error(msg)
+        return value.flat_map(check)
+
+    def s(self, name):
+        return self.typed(str, self(name))
+
+    def l(self, name):
+        return self.typed(list, self(name))
+
+    def d(self, name):
+        return self.typed(dict, self(name))
+
+    def b(self, name: str):
+        return self.typed(bool, self(name))
+
+
 # FIXME recording variable name for eventual cleanup only works with a global
 # NvimFacade instance
-class Vars(Logging):
+class Vars(OptVar):
 
     def __init__(self, vim) -> None:
         self.vim = vim
@@ -580,37 +641,27 @@ class Vars(Logging):
     def _get(self, name):
         return self.internal.get(name)
 
-    @may
-    def __call__(self, name) -> Maybe[str]:
-        v = self._get(name)
-        if v is None:
-            self.log.debug('variable not found: {}'.format(name))
-        return decode(v)
+    @property
+    def _desc(self):
+        return 'variable'
 
     def prefixed(self, name):
         return self.vim.prefixed(name)
 
     def _set(self, name, value):
         self.internal[name] = value
+        self._vars.add(name)
 
-    def set(self, name, value):
-        self.log.debug('setting {} to \'{}\''.format(name, value))
-        try:
-            self._set(name, value)
-        except:
-            msg = 'setting vim variable {} to {}'
-            self.log.exception(msg.format(name, value))
-        else:
-            self._vars.add(name)
+    def clean(self):
+        for name in self._vars:
+            del self.internal[name]
+        self._vars = set()
 
     def p(self, name) -> Maybe[str]:
         return self(self.prefixed(name))
 
     def set_p(self, name, value):
         self.set(self.prefixed(name), value)
-
-    def path(self, name: str) -> Maybe[Path]:
-        return self(name).map(lambda a: Path(a).expanduser())  # type: ignore
 
     def ppath(self, name: str) -> Maybe[Path]:
         return self.path(self.prefixed(name))
@@ -619,50 +670,20 @@ class Vars(Logging):
         return self.pl(name)\
             .map(lambda l: l.map(Path).map(__.expanduser()))
 
-    def dir(self, name: str) -> Maybe[Path]:
-        var = self.path(name)
-        val = var.filter(__.is_dir())
-        if not val.is_just:
-            msg = 'g:{} is not a directory ({})'
-            self.log.error(msg.format(name, var))
-        return val
-
     def pdir(self, name: str) -> Maybe[Path]:
         return self.dir(self.prefixed(name))
-
-    def clean(self):
-        for name in self._vars:
-            del self.internal[name]
-        self._vars = set()
-
-    def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
-        @may
-        def check(v: A):
-            if isinstance(v, tpe):
-                return v
-            else:
-                msg = 'invalid type {} for variable {} (wanted {})'.format(
-                    type(v), v, tpe)
-                self.log.error(msg)
-        return value.flat_map(check)
-
-    def s(self, name):
-        return self.typed(str, self.var(name))
 
     def ps(self, name):
         return self.typed(str, self.vars.p(name))
 
-    def l(self, name):
-        return self.typed(list, self.var(name))
-
     def pl(self, name):
         return self.typed(list, self.p(name))
 
-    def d(self, name):
-        return self.typed(dict, self(name))
-
     def pd(self, name):
         return self.typed(dict, self.p(name))
+
+    def pb(self, name: str):
+        return self.typed(bool, self.p(name))
 
     @property
     def all(self):
@@ -681,23 +702,20 @@ class Vars(Logging):
         return Map(lines)
 
 
-class Options(Logging):
+class Options(OptVar):
 
     def __init__(self, vim) -> None:
         self.vim = vim
 
-    @may
-    def __call__(self, name: str) -> Maybe[str]:
-        v = self.vim.target.options.get(name)
-        if v is None:
-            self.log.debug('variable not found: {}'.format(name))
-        return decode(v)
+    def _get(self, name):
+        return self.vim.target.options.get(name)
 
-    def set(self, name: str, value):
-        try:
-            self.vim.target.options[name] = value
-        except NvimError as e:
-            self.log.error(e)
+    @property
+    def _desc(self):
+        return 'option'
+
+    def _set(self, name: str, value):
+        self.vim.target.options[name] = value
 
     def s(self, name: str):
         return self.typed(str, self(name))
