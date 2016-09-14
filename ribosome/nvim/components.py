@@ -53,6 +53,9 @@ def on_main_thread():
     return threading.current_thread() != threading.main_thread()
 
 
+shutdown = False
+
+
 class NvimComponent(Logging):
 
     def __init__(self, vim, target, prefix: str) -> None:
@@ -98,10 +101,11 @@ class NvimComponent(Logging):
         ''' run a callback function on the main thread and return its
         value (blocking). the callback receives 'self' as an argument.
         '''
-        result = futures.Future()  # type: futures.Future
-        cb = lambda: result.set_result(f(self))
-        self._run_on_main_thread(cb)
-        return result.result()
+        if not shutdown:
+            result = futures.Future()  # type: futures.Future
+            cb = lambda: result.set_result(f(self))
+            self._run_on_main_thread(cb)
+            return result.result()
 
     def _run_on_main_thread(self, f: Callable[..., Any]):
         ''' run a callback function on the host's main thread

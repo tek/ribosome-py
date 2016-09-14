@@ -1,3 +1,4 @@
+import time
 import uuid
 import inspect
 from typing import Sequence, Callable, TypeVar
@@ -98,10 +99,15 @@ class Machine(Logging):
             .get_or_else(lambda: self._default_handler)
 
     def _execute_transition(self, handler, data, msg):
+        start_time = time.time()
         try:
             return handler.run(data, msg)
         except Exception as e:
             return self._handle_transition_error(handler, msg, e)
+        finally:
+            dur = time.time() - start_time
+            self.log.debug('{} took {:.4f}s for {} to process'.format(
+                msg, dur, self.title))
 
     def _handle_transition_error(self, handler, msg, e):
         err = 'transition "{}" failed for {} in {}'

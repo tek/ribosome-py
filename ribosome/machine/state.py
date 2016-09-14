@@ -3,7 +3,6 @@ from typing import Optional  # NOQA
 import abc
 import threading
 import asyncio
-from concurrent import futures
 import importlib
 from contextlib import contextmanager
 
@@ -34,39 +33,42 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
 
     def __init__(self) -> None:
         threading.Thread.__init__(self)
-        self.done = None  # type: Optional[futures.Future]
-        self.running = futures.Future()  # type: futures.Future
+        self.done = threading.Event()
+        self.running = threading.Event()
 
     def run(self):
         self._loop = asyncio.new_event_loop()  # type: ignore
         self._messages = asyncio.PriorityQueue(loop=self._loop)
         asyncio.set_event_loop(self._loop)
-        self.done = futures.Future()
-        self.running.set_result(True)
+        self.done.clear()
+        self.running.set()
         try:
             self._loop.run_until_complete(self._main(self.init))
+            self.log.debug('event loop finished in {}'.format(self.title))
         except Exception:
             self.log.exception('while running state machine')
-        self.running = futures.Future()
+        self.running.clear()
 
     def stop(self):
-        if self.done is not None:
+        if not self.done.is_set():
+            self.log.debug('stopping machine {}'.format(self.title))
             self._stop()
+            self.send(Nop().pub.at(1))
             try:
-                self.done.result(5)
+                self.done.wait(5)
             except Exception as e:
-                self.log.error(e)
+                self.log.error('{}: {}'.format(self.title, e))
             finally:
                 try:
                     self._loop.close()
                 except Exception as e:
-                    self.log.error(e)
+                    self.log.error('{}: {}'.format(self.title, e))
 
     def _stop(self):
         self._done()
 
     def _done(self):
-        self.done.set_result(True)
+        self.done.set()
 
     @abc.abstractmethod
     async def _main(self, initial):
@@ -92,7 +94,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
         return self._data_type()
 
     def wait_for_running(self):
-        self.running.result(3)
+        self.running.wait(3)
 
     def start_wait(self):
         self.start()
@@ -105,18 +107,18 @@ class StateMachine(AsyncIOThread, ModularMachine):
         return self._messages.put(msg)
 
     def send(self, msg: Message, prio=0.5):
-        self.log.debug('send {}'.format(msg))
+        self.log.debug('send {} in {}'.format(msg, self.title))
         if self._messages is not None:
             return asyncio.run_coroutine_threadsafe(  # type: ignore
                 self._messages.put(msg), self._loop)
 
-    def send_sync(self, msg: Message):
+    def send_sync(self, msg: Message, wait=2):
         self.send(msg)
-        return self.await_state()
+        return self.await_state(wait)
 
-    def await_state(self):
+    def await_state(self, wait=2):
         asyncio.run_coroutine_threadsafe(self.join_messages(),
-                                         self._loop).result(2)
+                                         self._loop).result(wait)
         return self.data
 
     def eval_expr(self, expr: str, pre: Callable=lambda a, b: (a, b)):
@@ -138,7 +140,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
 
     @may_handle(Stop)
     def _stop_msg(self, data: Data, msg):
-        return Quit(), Done().at(1)
+        return Quit(), Done().pub.at(1)
 
     @may_handle(Done)
     def _done_msg(self, data: Data, msg):
@@ -188,7 +190,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
 
     async def _main(self, data):
         self.data = data
-        while not self.done.done():
+        while not self.done.is_set():
             self.data = await self._process_one_message(self.data)
 
     async def _process_one_message(self, data):
