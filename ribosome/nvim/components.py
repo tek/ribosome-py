@@ -106,6 +106,8 @@ class NvimComponent(Logging):
             cb = lambda: result.set_result(f(self))
             self._run_on_main_thread(cb)
             return result.result()
+        else:
+            return f(self)
 
     def _run_on_main_thread(self, f: Callable[..., Any]):
         ''' run a callback function on the host's main thread
@@ -658,7 +660,8 @@ class Vars(OptVar):
 
     def clean(self):
         for name in self._vars:
-            del self.internal[name]
+            if not re.match('^[A-Z].*', name):
+                del self.internal[name]
         self._vars = set()
 
     def p(self, name) -> Maybe[str]:
