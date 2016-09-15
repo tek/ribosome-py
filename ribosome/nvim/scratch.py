@@ -10,6 +10,7 @@ class ScratchBuilder(Record):
     use_tab = bool_field()
     vertical = bool_field()
     size = maybe_field(int)
+    wrap = bool_field()
 
     @property
     def tab(self):
@@ -34,7 +35,7 @@ class ScratchBuilder(Record):
             return Empty(), self._create_window(vim)
 
     def _setup_buffer(self, tab, win):
-        win.options.set_b('wrap', False)
+        win.options.set_b('wrap', self.wrap)
         buffer = win.buffer
         buffer.options.set_s('buftype', 'nofile')
         buffer.options.set_s('bufhidden', 'wipe')
