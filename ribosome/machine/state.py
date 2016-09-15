@@ -15,8 +15,9 @@ from ribosome.machine.message_base import (message, Message, Nop, Done, Quit,
 from ribosome.machine.base import ModularMachine, Machine, Transitions
 from ribosome.machine.transition import (TransitionResult, Coroutine,
                                          TransitionFailed, may_handle, handle)
+from ribosome.machine.message_base import json_message
 
-from amino import Maybe, List, Map, may, Try, _, L, Empty, __
+from amino import Maybe, List, Map, may, Try, _, L, __
 
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
@@ -24,8 +25,7 @@ Info = message('Info', 'message')
 Envelope = message('Envelope', 'message', 'to')
 RunMachine = message('RunMachine', 'machine')
 KillMachine = message('KillMachine', 'uuid')
-RunScratchMachine = message('RunScratchMachine', 'machine', 'tab',
-                            opt_fields=(('size', Empty()),))
+RunScratchMachine = json_message('RunScratchMachine', 'machine')
 Init = message('Init')
 
 
@@ -257,7 +257,7 @@ class RootMachine(PluginStateMachine, HasNvim, Logging):
     @handle(RunScratchMachine)
     def _scratch_machine(self, data, msg):
         return (
-            ScratchBuilder(use_tab=msg.tab, size=msg.size)
+            ScratchBuilder(**msg.options)
             .build
             .unsafe_perform_io(self.vim) /
             L(msg.machine)(_, self) /
