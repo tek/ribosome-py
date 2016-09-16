@@ -88,7 +88,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         else:
             server = libtmux.Server()
             session = next(s for s in server.sessions
-                           if s['session_attached'] == '1')
+                           if int(s['session_attached']) >= 1)
             return session.attached_window
 
     def _start_neovim_tmux(self):
