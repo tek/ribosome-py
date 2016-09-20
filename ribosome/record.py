@@ -126,6 +126,21 @@ class RecordMeta(LazyMeta, pyrsistent.PClassMeta):
 
 class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
 
+    @property
+    def _name(self):
+        return self.__class__.__name__
+
+    @property
+    def _str_name(self):
+        return self._name
+
+    @property
+    def _str_extra(self):
+        return List()
+
+    def __str__(self):
+        return '{}({})'.format(self._str_name, self._str_extra.mk_string(', '))
+
     @lazy
     def setter(self):
         return FieldProxy(self, FieldSetter)
