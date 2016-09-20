@@ -164,7 +164,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
         self.sub = self.sub.filter_not(_.uuid == msg.uuid)
 
     @handle(Envelope)
-    def message_envelop(self, data, msg):
+    def message_envelope(self, data, msg):
         return self.sub.find(_.uuid == msg.to) / __.loop_process(data,
                                                                  msg.message)
 
