@@ -88,6 +88,13 @@ class FieldSetter(FieldMutator):
         return self.target.set(**{self.name: value})
 
 
+class FieldModifier(FieldMutator):
+
+    def __call__(self, f):
+        return self.target.set(
+            **{self.name: f(getattr(self.target, self.name))})
+
+
 class FieldAppender(FieldMutator):
 
     def __call__(self, value):
@@ -133,6 +140,10 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
     @lazy
     def append1(self):
         return FieldProxy(self, FieldAppender1)
+
+    @lazy
+    def modder(self):
+        return FieldProxy(self, FieldModifier)
 
     def mod(self, name: str, modder):
         par = {name: modder(getattr(self, name))}
