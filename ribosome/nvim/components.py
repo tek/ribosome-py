@@ -161,7 +161,8 @@ class NvimComponent(Logging):
         return self.cmd(line, verbose=verbose, sync=True)
 
     def cmd_output(self, line: str) -> List[str]:
-        return List.wrap(self.vim.command_output(line).splitlines())
+        return List.wrap(
+            self.vim.command_output('silent {}'.format(line)).splitlines())
 
     def _cmd_result(self, line, result, sync: bool):
         if sync:
