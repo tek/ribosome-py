@@ -629,6 +629,9 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
     def b(self, name: str):
         return self.typed(bool, self(name))
 
+    def i(self, name: str):
+        return self.typed(int, self(name))
+
 
 # FIXME recording variable name for eventual cleanup only works with a global
 # NvimFacade instance
@@ -692,6 +695,9 @@ class Vars(OptVar):
 
     def pb(self, name: str):
         return self.typed(bool, self.p(name))
+
+    def pi(self, name: str):
+        return self.typed(int, self.p(name))
 
     @property
     def all(self):
