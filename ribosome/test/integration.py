@@ -37,7 +37,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
 
     def __init__(self) -> None:
         super().__init__()
-        self.tmux_nvim = False
+        self.tmux_nvim = 'RIBOSOME_TMUX_SPEC' in env
         self._tmux_pane = None
         self.keep_tmux_pane = False
         self.vimlog = temp_dir('log') / 'vim'
