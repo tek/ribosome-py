@@ -798,16 +798,24 @@ class Syntax(Logging):
     def __init__(self, target):
         self.target = target
 
+    def _opts(self, *a, **kw):
+        o = List.wrap(a) + Map(kw).to_list.map2('{}={}'.format)
+        return ' '.join(o)
+
     def match(self, group, pat, *a, **kw):
         return self.cmd('match', group, pat, *a, **kw)
 
     def cmd(self, cmdname, group, pat, *a, **kw):
-        opts = List.wrap(a) + Map(kw).to_list.smap('{}={}'.format)
-        c = 'syntax {} {} /{}/ {}'.format(cmdname, group, pat, ' '.join(opts))
+        c = 'syntax {} {} /{}/ {}'.format(cmdname, group, pat,
+                                          self._opts(*a, **kw))
         self.target.cmd(c)
 
     def link(self, group, to):
         c = 'highlight link {} {}'.format(group, to)
+        self.target.cmd(c)
+
+    def highlight(self, group, *a, **kw):
+        c = 'highlight {} {}'.format(group, self._opts(*a, **kw))
         self.target.cmd(c)
 
 __all__ = ('NvimFacade', 'HasNvim')
