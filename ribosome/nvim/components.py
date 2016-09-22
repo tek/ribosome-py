@@ -627,7 +627,7 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
         return self.typed(dict, self(name))
 
     def b(self, name: str):
-        return self.typed(bool, self(name))
+        return self.typed(bool, self(name)) / Boolean
 
     def i(self, name: str):
         return self.typed(int, self(name))
@@ -694,7 +694,7 @@ class Vars(OptVar):
         return self.typed(dict, self.p(name))
 
     def pb(self, name: str):
-        return self.typed(bool, self.p(name))
+        return self.typed(bool, self.p(name)) / Boolean
 
     def pi(self, name: str):
         return self.typed(int, self.p(name))
