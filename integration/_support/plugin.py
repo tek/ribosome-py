@@ -33,7 +33,7 @@ class Mach(RootMachine):
     @may_handle(Scratch)
     def run_scratch(self, data, msg):
         ctor = L(ScratchM)(self.vim, _, _)
-        return RunScratchMachine(ctor, False)
+        return RunScratchMachine(ctor)
 
     @may_handle(ScratchCheck)
     def check_scratch(self, data, msg):
@@ -42,6 +42,10 @@ class Mach(RootMachine):
 
 class ScratchM(ScratchMachine):
 
+    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer,
+                 parent: Machine) -> None:
+        super().__init__(vim, scratch, parent=parent, title='scratch')
+
     @property
     def prefix(self):
         return 'Test'
@@ -49,10 +53,6 @@ class ScratchM(ScratchMachine):
     @property
     def mappings(self):
         return Map()
-
-    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer,
-                 parent: Machine) -> None:
-        super().__init__(vim, scratch, parent=parent, title='scratch')
 
     @may_handle(ScratchTest)
     def test(self, data, msg):
