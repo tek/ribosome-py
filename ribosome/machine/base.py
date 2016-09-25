@@ -5,7 +5,7 @@ from typing import Sequence, Callable, TypeVar
 from asyncio import iscoroutine
 
 import amino
-from amino import Maybe, may, F, _, List, Map, Empty, curried, L, __, Just
+from amino import Maybe, F, _, List, Map, Empty, curried, L, __, Just
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
@@ -152,9 +152,8 @@ class Machine(Logging):
         pub_msgs = pub.map(_.message)
         return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)
 
-    @may
     def unhandled(self, data: Data, msg: Message):
-        pass
+        return Just(TransitionResult.unhandled(data))
 
     def _command_by_message_name(self, name: str):
         msg_name = camelcaseify(name)

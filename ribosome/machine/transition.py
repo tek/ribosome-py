@@ -8,7 +8,7 @@ from amino import Maybe, may, Either, Just, Left, I
 from ribosome.machine.message_base import (message, _message_attr,
                                            _machine_attr, Message)
 
-from ribosome.record import Record, any_field, list_field, field
+from ribosome.record import Record, any_field, list_field, field, bool_field
 from ribosome.logging import Logging
 
 A = TypeVar('A')
@@ -110,10 +110,15 @@ class CoroHandler(Handler):
 class TransitionResult(Record):
     data = any_field()
     resend = list_field()
+    handled = bool_field(True)
 
     @staticmethod
     def empty(data):
         return StrictTransitionResult(data=data)
+
+    @staticmethod
+    def unhandled(data):
+        return StrictTransitionResult(data=data, handled=False)
 
     def fold(self, f):
         return self
@@ -123,11 +128,14 @@ class TransitionResult(Record):
 
     def accum(self, other: 'TransitionResult'):
         if isinstance(other, CoroTransitionResult):
-            return self.accum(StrictTransitionResult(data=other.data,
-                                                     pub=other.pub))
+            return self.accum(StrictTransitionResult(
+                data=other.data, pub=other.pub,
+                handled=other.handled or self.handled
+            ))
         else:
             return other.set(
                 pub=self.pub + other.pub,
+                handled=other.handled or self.handled
             )
 
 

@@ -23,10 +23,11 @@ Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
 Info = message('Info', 'message')
 Envelope = message('Envelope', 'message', 'to')
-RunMachine = message('RunMachine', 'machine')
+RunMachine = json_message('RunMachine', 'machine')
 KillMachine = message('KillMachine', 'uuid')
 RunScratchMachine = json_message('RunScratchMachine', 'machine')
 Init = message('Init')
+IfUnhandled = message('IfUnhandled', 'msg', 'unhandled')
 
 
 class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
@@ -157,7 +158,8 @@ class StateMachine(AsyncIOThread, ModularMachine):
     @may_handle(RunMachine)
     def _run_machine(self, data, msg):
         self.sub = self.sub.cat(msg.machine)
-        return Envelope(Init(), msg.machine.uuid)
+        init = msg.options.get('init') | Init()
+        return Envelope(init, msg.machine.uuid)
 
     @may_handle(KillMachine)
     def _kill_machine(self, data, msg):
@@ -168,6 +170,10 @@ class StateMachine(AsyncIOThread, ModularMachine):
         return self.sub.find(_.uuid == msg.to) / __.loop_process(data,
                                                                  msg.message)
 
+    @may_handle(IfUnhandled)
+    def if_unhandled(self, data, msg):
+        result = self._send(data, msg.msg)
+        return result if result.handled else self._send(data, msg.unhandled)
     def unhandled(self, data, msg):
         return self._fold_sub(data, msg)
 
@@ -178,7 +184,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
         messages.
         '''
         send = lambda z, s: z.accum(s.loop_process(z.data, msg))
-        return self.sub.fold_left(TransitionResult.empty(data))(send)
+        return self.sub.fold_left(TransitionResult.unhandled(data))(send)
 
     @contextmanager
     def transient(self):
@@ -257,11 +263,11 @@ class RootMachine(PluginStateMachine, HasNvim, Logging):
     @handle(RunScratchMachine)
     def _scratch_machine(self, data, msg):
         return (
-            ScratchBuilder(**msg.options)
+            ScratchBuilder(**(msg.options - 'init'))
             .build
             .unsafe_perform_io(self.vim) /
             L(msg.machine)(_, self) /
-            RunMachine
+            L(RunMachine)(_, msg.options)
         )
 
 
