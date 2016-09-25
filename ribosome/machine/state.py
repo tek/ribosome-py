@@ -6,6 +6,8 @@ import asyncio
 import importlib
 from contextlib import contextmanager
 
+from lenses import Lens
+
 from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.nvim import HasNvim, ScratchBuilder
@@ -18,7 +20,7 @@ from ribosome.machine.transition import (TransitionResult, Coroutine,
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
 
-from amino import Maybe, List, Map, may, Try, _, L, __
+from amino import Maybe, List, Map, may, Try, _, L, __, Empty
 
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
@@ -29,6 +31,7 @@ KillMachine = message('KillMachine', 'uuid')
 RunScratchMachine = json_message('RunScratchMachine', 'machine')
 Init = message('Init')
 IfUnhandled = message('IfUnhandled', 'msg', 'unhandled')
+UpdateRecord = json_message('UpdateRecord', 'tpe', 'name')
 
 
 class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
@@ -300,5 +303,16 @@ class SubTransitions(Transitions, TransitionHelpers):
     @property
     def options(self):
         return getattr(self.msg, 'options', Map())
+
+    @handle(UpdateRecord)
+    def message_update_record(self):
+        return (
+            self.record_lens(self.msg.tpe, self.msg.name) /
+            __.modify(__.update_from_opt(self.msg.options)) /
+            self.with_sub
+        )
+
+    def record_lens(self, tpe, name) -> Maybe[Lens]:
+        return Empty()
 
 __all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Info')
