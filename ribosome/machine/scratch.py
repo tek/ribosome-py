@@ -2,9 +2,9 @@ import re
 import abc
 from typing import Callable
 
-from ribosome.machine import message, ModularMachine, handle, may_handle
+from ribosome.machine import message, handle, may_handle
 from ribosome.nvim import HasNvim, NvimFacade, ScratchBuffer
-from ribosome.machine.state import KillMachine
+from ribosome.machine.state import KillMachine, SubMachine
 from ribosome.machine.base import UnitTask
 
 from amino import Map, Boolean, __, Empty
@@ -15,12 +15,12 @@ Mapping = message('Mapping', 'uuid', 'keyseq')
 Quit = message('Quit')
 
 
-class ScratchMachine(ModularMachine, HasNvim, metaclass=abc.ABCMeta):
+class ScratchMachine(SubMachine, HasNvim, metaclass=abc.ABCMeta):
 
     def __init__(self, vim: NvimFacade, scratch: ScratchBuffer, parent=None,
                  title=None) -> None:
         self.scratch = scratch
-        ModularMachine.__init__(self, parent, title=title)
+        SubMachine.__init__(self, parent, title=title)
         HasNvim.__init__(self, vim)
         self._create_mappings()
         self._create_autocmds()

@@ -16,6 +16,7 @@ from ribosome.machine.base import ModularMachine, Machine, Transitions
 from ribosome.machine.transition import (TransitionResult, Coroutine,
                                          TransitionFailed, may_handle, handle)
 from ribosome.machine.message_base import json_message
+from ribosome.machine.helpers import TransitionHelpers
 
 from amino import Maybe, List, Map, may, Try, _, L, __
 
@@ -271,16 +272,16 @@ class RootMachine(PluginStateMachine, HasNvim, Logging):
         )
 
 
-class SubMachine(ModularMachine):
+class SubMachine(ModularMachine, TransitionHelpers):
 
     def new_state(self):
         pass
 
 
-class SubTransitions(Transitions):
+class SubTransitions(Transitions, TransitionHelpers):
 
     def _state(self, data):
-        return data.sub_state(self.name, self.machine.new_state)
+        return data.sub_state(self.name, self.new_state)
 
     @property
     def state(self):
@@ -291,5 +292,13 @@ class SubTransitions(Transitions):
 
     def with_sub(self, state):
         return self._with_sub(self.data, state)
+
+    @property
+    def new_state(self):
+        return self.machine.new_state
+
+    @property
+    def options(self):
+        return getattr(self.msg, 'options', Map())
 
 __all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Info')
