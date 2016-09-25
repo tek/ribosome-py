@@ -31,8 +31,8 @@ def _monad_type_field_inv(eff, tpe):
     return inv
 
 
-def list_field(tpe=None, **kw):
-    return field(List, initial=List(), factory=List.wrap,
+def list_field(tpe=None, initial=List(), **kw):
+    return field(List, initial=initial, factory=List.wrap,
                  invariant=_monad_type_field_inv('List', tpe), **kw)
 
 
