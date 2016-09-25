@@ -26,12 +26,16 @@ class RecordSpec(Spec):
         b = 'b'
         c = 'c'
         o = 10
+        o2 = 19
         rb = RecB.from_opt(Map(mand1=a, mand2=b, bad=1, opt=o, lst=[c]))
         rb.mand1.should.equal(a)
         rb.mand2.should.equal(b)
         rb.opt.should.contain(o)
         rb.lst.should.equal(List(c))
         rb.lst.should.be.a(List)
+        rb2 = rb.update_from_opt(Map(mand1=b, opt=o2))
+        rb2.mand1.should.equal(b)
+        rb2.opt.should.contain(o2)
         (RecB.from_opt
          .when.called_with(Map(mand1=a))
          .should.throw(InvariantException))

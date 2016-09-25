@@ -136,7 +136,7 @@ class RecordMeta(LazyMeta, pyrsistent.PClassMeta):
 class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
 
     @classmethod
-    def from_opt(cls, opt: Map) -> Maybe:
+    def args_from_opt(cls, opt: Map):
         def may_arg(name, value):
             return name, Just(value)
         def list_arg(name, value):
@@ -147,8 +147,14 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
             cb = (may_arg if Maybe in types else list_arg if List in types else
                   regular_arg)
             return opt.get(name) / L(cb)(name, _)
-        args = Map(cls._field_data.map2(arg).join)
-        return cls(**args)
+        return Map(cls._field_data.map2(arg).join)
+
+    @classmethod
+    def from_opt(cls, opt: Map) -> Maybe:
+        return cls(**cls.args_from_opt(opt))
+
+    def update_from_opt(self, opt: Map):
+        return self.set(**self.args_from_opt(opt))
 
     @property
     def _name(self):
