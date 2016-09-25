@@ -3,7 +3,8 @@ import re
 
 import pyrsistent
 
-from amino import List, Empty, Maybe, Boolean, _, Map, Left, L, __, Either, Try
+from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try,
+                   Maybe, Just)
 from amino.lazy import LazyMeta, Lazy, lazy
 from amino.lazy_list import LazyList
 
@@ -121,10 +122,33 @@ class FieldProxy(FieldMutator):
 
 
 class RecordMeta(LazyMeta, pyrsistent.PClassMeta):
-    pass
+
+    @property
+    def mandatory_fields(self):
+        mand = lambda f: f.mandatory and f.initial.__class__ is object
+        return Map(self._pclass_fields).valfilter(mand)
+
+    @property
+    def _field_data(self):
+        return Map(self._pclass_fields).valmap(_.type)
 
 
 class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
+
+    @classmethod
+    def from_opt(cls, opt: Map) -> Maybe:
+        def may_arg(name, value):
+            return name, Just(value)
+        def list_arg(name, value):
+            return name, value
+        def regular_arg(name, value):
+            return name, value
+        def arg(name, types):
+            cb = (may_arg if Maybe in types else list_arg if List in types else
+                  regular_arg)
+            return opt.get(name) / L(cb)(name, _)
+        args = Map(cls._field_data.map2(arg).join)
+        return cls(**args)
 
     @property
     def _name(self):
