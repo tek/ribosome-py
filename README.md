@@ -254,16 +254,16 @@ requests from concurrent and asyncio contexts by executing all methods on the
 
 ### typed and functional data
 
-Numerous convenient helpers for retrieving and setting options and variables
+Numerous convenient adapters for retrieving and setting options and variables
 provide safer interaction with *neovim*.
 
 All getters return a monadic `amino.Maybe` which is `Just(value)` if the
 data was found and is of valid type, and `Empty()` otherwise.
 
 ```python
-self.vim.option('filetype') # => Just('python')
-self.vim.var('garbage') # => Empty()
-self.vim.optionl('rtp') # => Just(List('~/.config/nvim/bundle/proteome.nvim'))
+self.vim.options('filetype') # => Just('python')
+self.vim.vars('garbage') # => Empty()
+self.vim.options.l('rtp') # => Just(List('~/.config/nvim/bundle/proteome.nvim'))
 ```
 
 For shorter variable names, `NvimFacade` is initialized with a prefix (the
@@ -272,7 +272,7 @@ All getters have an alternative variant starting with `p` that uses the prefix
 for the variable name:
 
 ```python
-self.vim.plist('projects') # => Just(List('proteome', 'ribosome', 'amino'))
+self.vim.vars.pl('projects') # => Just(List('proteome', 'ribosome', 'amino'))
 ```
 This queries the variable `g:proteome_projects`, converts it to
 `amino.List` and wraps it in `amino.Maybe`.
