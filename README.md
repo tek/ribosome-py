@@ -5,7 +5,7 @@ A framework for building and testing [neovim-python] plugins consisting of:
 * convenient decorators for commands and functions with json argument parsing
 * message-passing machines for command dispatching
 * neovim API abstractions
-* integraton test framework
+* integration test framework
 * pure and functional principles
 
 # Use
