@@ -1,12 +1,14 @@
 import functools
-from typing import Callable, TypeVar, Any
+from typing import Callable, TypeVar
 from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
 from amino import Maybe, may, Either, Just, Left, I
 
 from ribosome.machine.message_base import (message, _message_attr,
-                                           _machine_attr, Message)
+                                           _machine_attr, Message,
+                                           default_prio, _prio_attr,
+                                           fallback_prio)
 
 from ribosome.record import Record, any_field, list_field, field, bool_field
 from ribosome.logging import Logging
@@ -63,16 +65,19 @@ def _task_result(result):
 
 class Handler:
 
-    def __init__(self, machine, name, message, fun):
+    def __init__(self, machine, name, message, fun, prio):
         self.machine = machine
         self.name = name
         self.message = message
         self.fun = fun
+        self.prio = prio
 
     @staticmethod
     def create(machine, name, fun):
         tpe = CoroHandler if iscoroutinefunction(fun) else Handler
-        return tpe(machine, name, getattr(fun, _message_attr), fun)
+        msg = getattr(fun, _message_attr)
+        prio = getattr(fun, _prio_attr, default_prio)
+        return tpe(machine, name, msg, fun, prio)
 
     def run(self, data, msg):
         return _recover_error(self, self.fun(self.machine, data, msg))
@@ -84,17 +89,19 @@ class Handler:
 
 class WrappedHandler:
 
-    def __init__(self, machine, name, message, tpe, fun):
+    def __init__(self, machine, name, message, tpe, fun, prio):
         self.machine = machine
         self.name = name
         self.message = message
         self.tpe = tpe
         self.fun = fun
+        self.prio = prio
 
     @staticmethod
     def create(machine, name, tpe, fun):
-        return WrappedHandler(machine, name,
-                              getattr(fun, _message_attr), tpe, fun)
+        msg = getattr(fun, _message_attr)
+        prio = getattr(fun, _prio_attr, default_prio)
+        return WrappedHandler(machine, name, msg, tpe, fun, prio)
 
     def run(self, data, msg):
         return _recover_error(self,
@@ -162,18 +169,27 @@ class CoroTransitionResult(TransitionResult, Logging):
         return [self.coro]
 
 
-def handle(msg: type):
-    def add_handler(func: Callable[[A, Any], Maybe[A]]):
+def handle(msg: type, prio=default_prio):
+    def add_handler(func: Callable[..., Maybe[A]]):
         setattr(func, _machine_attr, True)
         setattr(func, _message_attr, msg)
+        setattr(func, _prio_attr, prio)
         return func
     return add_handler
 
 
-def may_handle(msg: type):
-    def may_wrap(func: Callable[[A, Any], Maybe[A]]):
-        return handle(msg)(may(func))
+def may_handle(msg: type, prio=default_prio):
+    def may_wrap(func: Callable[..., Maybe[A]]):
+        return handle(msg, prio=prio)(may(func))
     return may_wrap
+
+
+def fallback(msg: type, prio=fallback_prio):
+    return handle(msg, prio=prio)
+
+
+def may_fallback(msg: type, prio=fallback_prio):
+    return may_handle(msg, prio=prio)
 
 
 def either_msg(e: Either):

@@ -8,7 +8,7 @@ from ribosome.logging import Logging
 from ribosome.request import function, msg_function, msg_command
 from ribosome.machine import message, may_handle, handle, Machine
 from ribosome.machine.state import RootMachine, RunScratchMachine
-from ribosome.machine.transition import Fatal
+from ribosome.machine.transition import Fatal, may_fallback
 from ribosome.machine.scratch import ScratchMachine, Mapping
 from ribosome.nvim import NvimFacade, ScratchBuffer
 
@@ -54,7 +54,7 @@ class ScratchM(ScratchMachine):
     def mappings(self):
         return Map()
 
-    @may_handle(ScratchTest)
+    @may_fallback(ScratchTest)
     def test(self, data, msg):
         self.log.info(TestPlugin.test_scratch)
 

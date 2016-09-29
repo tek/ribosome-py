@@ -20,7 +20,7 @@ from ribosome.machine.transition import (TransitionResult, Coroutine,
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
 
-from amino import Maybe, List, Map, may, Try, _, L, __, Empty
+from amino import Maybe, List, Map, may, Try, _, L, __, Empty, Just
 
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
@@ -178,16 +178,18 @@ class StateMachine(AsyncIOThread, ModularMachine):
     def if_unhandled(self, data, msg):
         result = self._send(data, msg.msg)
         return result if result.handled else self._send(data, msg.unhandled)
-    def unhandled(self, data, msg):
-        return self._fold_sub(data, msg)
 
-    @may
-    def _fold_sub(self, data, msg):
+    def unhandled(self, data, msg):
+        prios = (self.sub // _.prios).distinct.sort(reverse=True)
+        step = lambda z, a: z if z.handled else self._fold_sub(z.data, msg, a)
+        return Just(prios.fold_left(TransitionResult.unhandled(data))(step))
+
+    def _fold_sub(self, data, msg, prio=None):
         ''' send **msg** to all sub-machines, passing the transformed
         data from each machine to the next and accumulating published
         messages.
         '''
-        send = lambda z, s: z.accum(s.loop_process(z.data, msg))
+        send = lambda z, s: z.accum(s.loop_process(z.data, msg, prio))
         return self.sub.fold_left(TransitionResult.unhandled(data))(send)
 
     @contextmanager

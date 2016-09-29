@@ -4,11 +4,14 @@ import inspect
 from typing import Sequence, Callable, TypeVar
 from asyncio import iscoroutine
 
+import toolz
+
 import amino
 from amino import Maybe, F, _, List, Map, Empty, curried, L, __, Just
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
+from amino.func import flip
 
 from ribosome.machine.message_base import Message, Publish, message
 from ribosome.logging import Logging
@@ -44,6 +47,16 @@ def io(f: Callable):
     return NvimIOTask(NvimIO(f))
 
 
+class Handlers(Logging):
+
+    def __init__(self, prio: int, handlers: Map[type, Handler]) -> None:
+        self.prio = prio
+        self.handlers = handlers
+
+    def handler(self, msg):
+        return self.handlers.get(type(msg))
+
+
 class Machine(Logging):
     _data_type = Data
 
@@ -51,7 +64,7 @@ class Machine(Logging):
         self.parent = Maybe(parent)
         self._title = Maybe(title)
         self.uuid = uuid.uuid4()
-        self._message_handlers = self._collect_handlers()
+        self._message_handlers = self._handler_map()
 
     @property
     def title(self):
@@ -59,23 +72,29 @@ class Machine(Logging):
             List.wrap(type(self).__module__.rsplit('.')).reversed.lift(1)
         ) | 'machine'
 
-    def _collect_handlers(self):
-        handlers = inspect.getmembers(type(self),
-                                      lambda a: hasattr(a, _machine_attr))
-        handler_map = (
-            List.wrap(handlers)
-            .map2(L(Handler.create)(self, _, _))
-            .map(lambda a: (a.message, a))
-        )
-        return Map(handler_map)
+    def _handler_map(self):
+        def create(prio, h):
+            h = List.wrap(h).apzip(_.message).map2(flip)
+            return prio, Handlers(prio, Map(h))
+        return Map(toolz.groupby(_.prio, self._handlers)).map(create)
+
+    @property
+    def _handlers(self):
+        methods = inspect.getmembers(type(self),
+                                     lambda a: hasattr(a, _machine_attr))
+        return List.wrap(methods).map2(L(Handler.create)(self, _, _))
 
     @property
     def _default_handler(self):
-        return Handler(self, 'unhandled', None, type(self).unhandled)
+        return Handler(self, 'unhandled', None, type(self).unhandled, 0)
 
-    def process(self, data: Data, msg) -> TransitionResult:
+    @property
+    def prios(self):
+        return self._message_handlers.k
+
+    def process(self, data: Data, msg, prio=None) -> TransitionResult:
         self.prepare(msg)
-        handler = self._resolve_handler(msg)
+        handler = self._resolve_handler(msg, prio)
         result = self._execute_transition(handler, data, msg)
         return self._dispatch_transition_result(data, result)
 
@@ -89,14 +108,17 @@ class Machine(Logging):
             TransitionResult.empty(data)
         )
 
-    def loop_process(self, data, msg):
+    def loop_process(self, data, msg, prio=None):
         sender = lambda z, m: z.accum(self.loop_process(z.data, m))
-        return self.process(data, msg).fold(sender)
+        return self.process(data, msg, prio).fold(sender)
 
-    def _resolve_handler(self, msg):
-        return self._message_handlers\
-            .get(type(msg))\
-            .get_or_else(lambda: self._default_handler)
+    def _resolve_handler(self, msg, prio):
+        f = __.handler(msg)
+        return (
+            self._message_handlers.v.find_map(f)
+            if prio is None else
+            (self._message_handlers.get(prio) // f)
+        ) | (lambda: self._default_handler)
 
     def _execute_transition(self, handler, data, msg):
         start_time = time.time()
@@ -239,15 +261,14 @@ class Transitions:
 class ModularMachine(Machine):
     Transitions = Transitions
 
-    def _collect_handlers(self):
-        handlers = inspect.getmembers(self.Transitions,
-                                      lambda a: hasattr(a, _machine_attr))
-        handler_map = (
-            List.wrap(handlers)
+    @property
+    def _handlers(self):
+        methods = inspect.getmembers(self.Transitions,
+                                     lambda a: hasattr(a, _machine_attr))
+        handlers = (
+            List.wrap(methods)
             .map2(L(WrappedHandler.create)(self, _, self.Transitions, _))
-            .map(lambda a: (a.message, a))
         )
-        return super()._collect_handlers() ** handler_map
-
+        return handlers + super()._handlers
 
 __all__ = ('ModularMachine', 'Transitions', 'Machine')

@@ -10,6 +10,9 @@ from pyrsistent import PRecord
 
 _machine_attr = '_machine'
 _message_attr = '_message'
+_prio_attr = '_prio'
+default_prio = 0.5
+fallback_prio = 0.3
 
 
 def _field_namespace(fields, opt_fields, varargs):
