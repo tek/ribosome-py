@@ -132,6 +132,14 @@ class RecordMeta(LazyMeta, pyrsistent.PClassMeta):
     def _field_data(self):
         return Map(self._pclass_fields).valmap(_.type)
 
+    @property
+    def _field_names(self):
+        return List.wrap(self._pclass_fields.keys())
+
+    @property
+    def _field_names_no_uuid(self):
+        return self._field_names - 'uuid'
+
 
 class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
 
@@ -193,6 +201,20 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
     def mod(self, name: str, modder):
         par = {name: modder(getattr(self, name))}
         return self.set(**par)
+
+    @property
+    def _fields_no_uuid(self):
+        return type(self)._field_names_no_uuid / (lambda a: getattr(self, a))
+
+    def __eq__(self, other):
+        return (
+            type(self) == type(other) and
+            type(self)._field_names_no_uuid
+            .forall(lambda a: getattr(self, a) == getattr(other, a))
+        )
+
+    def __hash__(self):
+        return sum(self._fields_no_uuid / hash)
 
 __all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field',
            'bool_field', 'any_field')
