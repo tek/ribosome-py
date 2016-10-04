@@ -33,6 +33,10 @@ Init = message('Init')
 IfUnhandled = message('IfUnhandled', 'msg', 'unhandled')
 UpdateRecord = json_message('UpdateRecord', 'tpe', 'name')
 
+short_timeout = 3
+medium_timeout = 3
+long_timeout = 5
+
 
 class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
 
@@ -55,12 +59,12 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
         self.running.clear()
 
     def stop(self):
-        if not self.done.is_set():
+        if self.is_alive() and not self.done.is_set():
             self.log.debug('stopping machine {}'.format(self.title))
             self._stop()
             self.send(Nop().pub.at(1))
             try:
-                self.done.wait(5)
+                self.done.wait(long_timeout)
             except Exception as e:
                 self.log.error('{}: {}'.format(self.title, e))
             finally:
@@ -99,7 +103,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
         return self._data_type()
 
     def wait_for_running(self):
-        self.running.wait(3)
+        self.running.wait(medium_timeout)
 
     def start_wait(self):
         self.start()
@@ -117,13 +121,13 @@ class StateMachine(AsyncIOThread, ModularMachine):
             return asyncio.run_coroutine_threadsafe(  # type: ignore
                 self._messages.put(msg), self._loop)
 
-    def send_sync(self, msg: Message, wait=2):
+    def send_sync(self, msg: Message, wait=None):
         self.send(msg)
         return self.await_state(wait)
 
-    def await_state(self, wait=2):
-        asyncio.run_coroutine_threadsafe(self.join_messages(),
-                                         self._loop).result(wait)
+    def await_state(self, wait=None):
+        (asyncio.run_coroutine_threadsafe(self.join_messages(), self._loop)
+         .result(Maybe(wait) | short_timeout))
         return self.data
 
     def eval_expr(self, expr: str, pre: Callable=lambda a, b: (a, b)):
