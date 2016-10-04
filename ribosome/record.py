@@ -1,7 +1,10 @@
 import uuid
 import re
+from typing import Callable
 
 import pyrsistent
+
+from lenses import Lens, lens
 
 from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try,
                    Maybe, Just)
@@ -215,6 +218,13 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
 
     def __hash__(self):
         return sum(self._fields_no_uuid / hash)
+
+    def attr_lens(self, attr: Callable[..., List], sub: Callable[..., Lens]):
+        return attr(self).find_lens(sub) / attr(lens()).add_lens
+
+    def attr_lens_pred(self, attr: Callable[..., List],
+                       pred: Callable[..., bool]):
+        return attr(self).find_lens_pred(pred) / attr(lens()).add_lens
 
 __all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field',
            'bool_field', 'any_field')
