@@ -213,7 +213,7 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
     def teardown(self):
         super().teardown()
         if self.root is not None:
-            self.root.stop()
+            self.root.stop(shutdown=False)
 
 
 class PluginIntegrationSpec(VimIntegrationSpec):

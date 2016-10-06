@@ -20,6 +20,7 @@ from ribosome.machine.transition import (TransitionResult, Coroutine,
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
 
+import amino
 from amino import Maybe, List, Map, may, Try, _, L, __, Empty, Just
 
 Callback = message('Callback', 'func')
@@ -43,12 +44,14 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
     def __init__(self) -> None:
         threading.Thread.__init__(self)
         self.done = threading.Event()
+        self.quit_now = threading.Event()
         self.running = threading.Event()
 
     def run(self):
         self._loop = asyncio.new_event_loop()  # type: ignore
         self._messages = asyncio.PriorityQueue(loop=self._loop)
         asyncio.set_event_loop(self._loop)
+        self.quit_now.clear()
         self.done.clear()
         self.running.set()
         try:
@@ -57,27 +60,29 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
         except Exception:
             self.log.exception('while running state machine')
         self.running.clear()
+        self.done.set()
 
-    def stop(self):
-        if self.is_alive() and not self.done.is_set():
+    def stop(self, shutdown=True):
+        if self.is_alive() and self.running.is_set():
             self.log.debug('stopping machine {}'.format(self.title))
-            self._stop()
-            self.send(Nop().pub.at(1))
-            try:
-                self.done.wait(long_timeout)
-            except Exception as e:
-                self.log.error('{}: {}'.format(self.title, e))
-            finally:
+            if shutdown:
+                self._stop()
+            else:
+                self._done()
+            self.send(Nop())
+            if self.done.wait(long_timeout):
                 try:
                     self._loop.close()
                 except Exception as e:
-                    self.log.error('{}: {}'.format(self.title, e))
+                    if amino.development:
+                        self.log.caught_exception(
+                            'stopping {}'.format(self.title))
 
     def _stop(self):
         self._done()
 
     def _done(self):
-        self.done.set()
+        self.quit_now.set()
 
     @abc.abstractmethod
     async def _main(self, initial):
@@ -206,7 +211,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
 
     async def _main(self, data):
         self.data = data
-        while not self.done.is_set():
+        while not self.quit_now.is_set():
             self.data = await self._process_one_message(self.data)
 
     async def _process_one_message(self, data):
