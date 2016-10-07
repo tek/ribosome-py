@@ -7,7 +7,7 @@ from asyncio import iscoroutine
 import toolz
 
 import amino
-from amino import Maybe, F, _, List, Map, Empty, curried, L, __, Just
+from amino import Maybe, F, _, List, Map, Empty, L, __, Just
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
@@ -29,10 +29,9 @@ from ribosome.request.command import StateCommand
 A = TypeVar('A')
 
 NvimIOTask = message('NvimIOTask', 'io')
-RunTask = message('RunTask', 'task')
-UnitTask = message('UnitTask', 'task')
-DataTask = message('DataTask', 'cons')
-DataEitherTask = message('DataEitherTask', 'cons')
+RunTask = message('RunTask', 'task', opt_fields=(('msg', Empty()),))
+UnitTask = message('UnitTask', 'task', opt_fields=(('msg', Empty()),))
+DataTask = message('DataTask', 'cons', opt_fields=(('msg', Empty()),))
 
 
 def is_seq(a):
@@ -57,6 +56,84 @@ class Handlers(Logging):
         return self.handlers.get(type(msg))
 
 
+class HandlerJob(Logging):
+
+    def __init__(self, machine, data, msg, handler, data_type) -> None:
+        self.machine = machine
+        self.data = data
+        self.msg = msg
+        self.handler = handler
+        self.data_type = data_type
+        self.start_time = time.time()
+
+    @property
+    def run(self):
+        result = self._execute_transition(self.handler, self.data, self.msg)
+        return self.dispatch_transition_result(result)
+
+    def dispatch_transition_result(self, result):
+        return (
+            result /
+            self.process_result |
+            TransitionResult.empty(self.data)
+        )
+
+    def _execute_transition(self, handler, data, msg):
+        try:
+            return handler.run(data, msg)
+        except Exception as e:
+            return self._handle_transition_error(e)
+
+    def _handle_transition_error(self, e):
+        err = 'transition "{}" failed for {} in {}'
+        self.log.exception(err.format(self.handler.name, self.msg,
+                                      self.machine.title))
+        if amino.development:
+            raise TransitionFailed() from e
+        return Empty()
+
+    def process_result(self, result) -> TransitionResult:
+        if isinstance(result, Coroutine):
+            return CoroTransitionResult(data=self.data, coro=result)
+        elif isinstance(result, TransitionResult):
+            return result
+        elif isinstance(result, self.data_type):
+            return TransitionResult.empty(result)
+        elif is_message(result) or not is_seq(result):
+            result = List(result)
+        datas, rest = List.wrap(result).split_type(self.data_type)
+        trans = rest / self._transform_result
+        msgs, rest = trans.split_type(Message)
+        if rest:
+            tpl = 'invalid transition result parts in {}: {}'
+            msg = tpl.format(self.machine.title, rest)
+            if amino.development:
+                raise MachineError(msg)
+            else:
+                self.log.error(msg)
+        new_data = datas.head | self.data
+        return self._create_result(new_data, msgs)
+
+    def _transform_result(self, result):
+        if iscoroutine(result):
+            return Coroutine(result).pub
+        elif isinstance(result, Task):
+            return RunTask(result, Just(self.msg))
+        elif isinstance(result, RunTask):
+            return RunTask(result.task, Just(self.msg))
+        elif isinstance(result, UnitTask):
+            return UnitTask(result.task, Just(self.msg))
+        elif isinstance(result, DataTask):
+            return DataTask(result.cons, Just(self.msg))
+        else:
+            return result
+
+    def _create_result(self, data, msgs):
+        pub, resend = msgs.split_type(Publish)
+        pub_msgs = pub.map(_.message)
+        return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)
+
+
 class Machine(Logging):
     _data_type = Data
 
@@ -65,6 +142,8 @@ class Machine(Logging):
         self._title = Maybe(title)
         self.uuid = uuid.uuid4()
         self._message_handlers = self._handler_map()
+        self._reports = List()
+        self._min_report_time = 0.1
 
     @property
     def title(self):
@@ -95,18 +174,13 @@ class Machine(Logging):
     def process(self, data: Data, msg, prio=None) -> TransitionResult:
         self.prepare(msg)
         handler = self._resolve_handler(msg, prio)
-        result = self._execute_transition(handler, data, msg)
-        return self._dispatch_transition_result(data, result)
+        job = HandlerJob(self, data, msg, handler, self._data_type)
+        result = job.run
+        self._check_time(job.start_time, msg)
+        return result
 
     def prepare(self, msg):
         pass
-
-    def _dispatch_transition_result(self, data, result):
-        return (
-            result /
-            self._process_result(data) |
-            TransitionResult.empty(data)
-        )
 
     def loop_process(self, data, msg, prio=None):
         sender = lambda z, m: z.accum(self.loop_process(z.data, m))
@@ -119,60 +193,6 @@ class Machine(Logging):
             if prio is None else
             (self._message_handlers.get(prio) // f)
         ) | (lambda: self._default_handler)
-
-    def _execute_transition(self, handler, data, msg):
-        start_time = time.time()
-        try:
-            return handler.run(data, msg)
-        except Exception as e:
-            return self._handle_transition_error(handler, msg, e)
-        finally:
-            dur = time.time() - start_time
-            self.log.debug('{} took {:.4f}s for {} to process'.format(
-                msg, dur, self.title))
-
-    def _handle_transition_error(self, handler, msg, e):
-        err = 'transition "{}" failed for {} in {}'
-        self.log.exception(err.format(handler.name, msg, self.title))
-        if amino.development:
-            raise TransitionFailed() from e
-        return Empty()
-
-    @curried
-    def _process_result(self, old_data: Data, result) -> TransitionResult:
-        if isinstance(result, Coroutine):
-            return CoroTransitionResult(data=old_data, coro=result)
-        elif isinstance(result, TransitionResult):
-            return result
-        elif isinstance(result, self._data_type):
-            return TransitionResult.empty(result)
-        elif is_message(result) or not is_seq(result):
-            result = List(result)
-        datas, rest = List.wrap(result).split_type(self._data_type)
-        trans = rest / self._transform_result
-        msgs, rest = trans.split_type(Message)
-        if rest:
-            tpl = 'invalid transition result parts in {}: {}'
-            msg = tpl.format(self.title, rest)
-            if amino.development:
-                raise MachineError(msg)
-            else:
-                self.log.error(msg)
-        new_data = datas.head | old_data
-        return self._create_result(new_data, msgs)
-
-    def _transform_result(self, result):
-        if iscoroutine(result):
-            return Coroutine(result).pub
-        elif isinstance(result, Task):
-            return RunTask(result)
-        else:
-            return result
-
-    def _create_result(self, data, msgs):
-        pub, resend = msgs.split_type(Publish)
-        pub_msgs = pub.map(_.message)
-        return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)
 
     def unhandled(self, data: Data, msg: Message):
         return Just(TransitionResult.unhandled(data))
@@ -225,6 +245,20 @@ class Machine(Logging):
 
     def bubble(self, msg):
         self.parent.cata(_.bubble, lambda: self.send)(msg)
+
+    def _check_time(self, start_time, msg):
+        dur = time.time() - start_time
+        self.log.debug(self._format_report(msg, dur))
+        if dur > self._min_report_time:
+            self._reports = self._reports.cat((msg, dur))
+
+    def report(self):
+        if self._reports:
+            self.log.info('time-consuming messages in {}:'.format(self.title))
+            self._reports.map2(self._format_report) % self.log.info
+
+    def _format_report(self, msg, dur):
+        return '{} took {:.4f}s for {} to process'.format(msg, dur, self.title)
 
 
 class Transitions:

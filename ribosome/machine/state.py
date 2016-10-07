@@ -14,7 +14,8 @@ from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
 from ribosome.machine.message_base import (message, Message, Nop, Done, Quit,
                                            PlugCommand, Stop)
-from ribosome.machine.base import ModularMachine, Machine, Transitions
+from ribosome.machine.base import (ModularMachine, Machine, Transitions,
+                                   HandlerJob)
 from ribosome.machine.transition import (TransitionResult, Coroutine,
                                          TransitionFailed, may_handle, handle)
 from ribosome.machine.message_base import json_message
@@ -217,7 +218,8 @@ class StateMachine(AsyncIOThread, ModularMachine):
     async def _process_one_message(self, data):
         msg = await self._messages.get()
         sent = self._send(data, msg)
-        result = await sent.await_coro(self._dispatch_transition_result)
+        job = HandlerJob(self, data, msg, None, self._data_type)
+        result = await sent.await_coro(job.dispatch_transition_result)
         for pub in result.pub:
             await self._publish(pub)
         self._messages.task_done()

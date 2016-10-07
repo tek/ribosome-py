@@ -158,7 +158,7 @@ class CoroTransitionResult(TransitionResult, Logging):
 
     async def await_coro(self, callback):
         value = await self.coro.coro
-        result = callback(self.data, _recover_error(self, value))
+        result = callback(_recover_error(self, value))
         if result.resend:
             msg = 'Cannot resend {} from coro {}, use .pub on messages'
             self.log.warn(msg.format(result.resend, self.coro))
