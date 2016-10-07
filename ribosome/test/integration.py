@@ -154,6 +154,19 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
             return checker(self._log_out[index]).should.be.ok
         later(check)
 
+    def _log_contains(self, line):
+        later(lambda: self._log_out.should.contain(line))
+
+    def _json_cmd(self, cmd, data):
+        j = json.dumps(data).replace('"', '\\"')
+        return '{} {}'.format(cmd, j)
+
+    def json_cmd(self, cmd, **data):
+        self.vim.cmd(self._json_cmd(cmd, data))
+
+    def json_cmd_sync(self, cmd, **data):
+        return self.vim.cmd_sync(self._json_cmd(cmd, data))
+
 
 def main_looped(fun):
     @wraps(fun)
@@ -231,16 +244,6 @@ class PluginIntegrationSpec(VimIntegrationSpec):
             str(rp_path),
             rp_handlers,
         )
-
-    def _json_cmd(self, cmd, data):
-        j = json.dumps(data).replace('"', '\\"')
-        return '{} {}'.format(cmd, j)
-
-    def json_cmd(self, cmd, **data):
-        self.vim.cmd(self._json_cmd(cmd, data))
-
-    def json_cmd_sync(self, cmd, **data):
-        return self.vim.cmd_sync(self._json_cmd(cmd, data))
 
     @property
     def plugin_class(self) -> Either[str, type]:
