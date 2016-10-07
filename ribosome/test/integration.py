@@ -227,6 +227,11 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
         super().teardown()
         if self.root is not None:
             self.root.stop(shutdown=False)
+            if self._debug:
+                self._report()
+
+    def _report(self):
+        self.root.sub.cat(self.root) % __.report()
 
 
 class PluginIntegrationSpec(VimIntegrationSpec):
