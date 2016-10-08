@@ -8,7 +8,7 @@ from amino import Maybe, may, Either, Just, Left, I
 from ribosome.machine.message_base import (message, _message_attr,
                                            _machine_attr, Message,
                                            default_prio, _prio_attr,
-                                           fallback_prio)
+                                           fallback_prio, override_prio)
 
 from ribosome.record import Record, any_field, list_field, field, bool_field
 from ribosome.logging import Logging
@@ -189,6 +189,14 @@ def fallback(msg: type, prio=fallback_prio):
 
 
 def may_fallback(msg: type, prio=fallback_prio):
+    return may_handle(msg, prio=prio)
+
+
+def override(msg: type, prio=override_prio):
+    return handle(msg, prio=prio)
+
+
+def may_override(msg: type, prio=override_prio):
     return may_handle(msg, prio=prio)
 
 

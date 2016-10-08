@@ -163,6 +163,17 @@ whether something happened or not; with `may_handle`, the returned value can
 either be the plain version of the transition result or `None` (i.e. no return
 statement at all).
 
+Message handlers can have a priority value that can be used to select one
+handler over another, even across different machines.
+If one or more handlers of a higher priority are available, only they are used.
+The priority can be specified via keyword argument, as in
+`@handle(Print, prio=0.9)`.
+The default priority is `0.5`, and there are two extra decorators available:
+* `@override(Print) with prio=0.8`
+* `@fallback(Print) with prio=0.3`
+That way, it is possible for custom plugins to block transitions in standard
+plugins.
+
 `self.log` is part of the `ribosome.Logging` class which sets up logging to
 file and *neovim*, using the latter's `echo` (for `log.info`) and `echohl` (for
 `log.warn` and `log.error`) commands.

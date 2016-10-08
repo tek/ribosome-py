@@ -13,6 +13,7 @@ _message_attr = '_message'
 _prio_attr = '_prio'
 default_prio = 0.5
 fallback_prio = 0.3
+override_prio = 0.8
 
 
 def _field_namespace(fields, opt_fields, varargs):
