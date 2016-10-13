@@ -400,6 +400,10 @@ class Window(HasTab, HasBuffers):
     def close(self):
         self.cmd('close')
 
+    def close_unless_last(self):
+        if self.tab.windows.length > 1:
+            self.close()
+
     def set_cursor(self, line, col=0):
         self.target.cursor = (line, col)
 
