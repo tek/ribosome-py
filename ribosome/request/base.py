@@ -206,8 +206,8 @@ class JsonMessageRequestHandler(MessageRequestHandler):
                 raise ParseError('neither valid json nor python: {}'.format(d))
             return (
                 Try(json.loads, d)
-                .or_else(Try(eval, d))
-                .or_else(Try(json.loads, d.replace('\\"', '"')))
+                .o(lambda: Try(eval, d))
+                .o(lambda: Try(json.loads, d.replace('\\"', '"')))
                 .right_or_map(fail)
             )
         pos_args, data_args = (tuple(args[:self.min]),  # type: ignore

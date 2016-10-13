@@ -73,7 +73,7 @@ class ScratchMachine(SubMachine, HasNvim, metaclass=abc.ABCMeta):
 
     @may_handle(Quit)
     def quit(self, data, msg):
-        close = Task(self.scratch.close)
+        close = Task.delay(self.scratch.close)
         return UnitTask(close), KillMachine(self.uuid).pub
 
 __all__ = ('ScratchMachine',)
