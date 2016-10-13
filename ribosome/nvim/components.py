@@ -403,6 +403,18 @@ class Window(HasTab, HasBuffers):
     def set_cursor(self, line, col=0):
         self.target.cursor = (line, col)
 
+    @property
+    def width(self):
+        return parse_int(self.target.width)
+
+    @property
+    def height(self):
+        return parse_int(self.target.height)
+
+    @property
+    def size(self):
+        return self.width & self.height
+
 
 class Tab(HasWindows):
 
