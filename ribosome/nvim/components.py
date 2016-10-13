@@ -521,6 +521,10 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def write(self):
         return NvimCmd(self, 'write!')
 
+    @property
+    def messages(self):
+        return self.cmd_output('messages')
+
 
 class AsyncVimCallProxy():
 
