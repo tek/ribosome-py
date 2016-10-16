@@ -405,7 +405,8 @@ class Window(HasTab, HasBuffers):
             self.close()
 
     def set_cursor(self, line, col=0):
-        self.target.cursor = (line, col)
+        buf_max = self.buffer.content.length
+        self.target.cursor = (min(line, buf_max), col)
 
     @property
     def width(self):
