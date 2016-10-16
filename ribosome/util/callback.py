@@ -2,7 +2,7 @@ import re
 import abc
 from typing import Callable
 
-from amino import Maybe, Either, __, Right, L, List, _, Map
+from amino import Maybe, Either, __, Right, L, List, _, Map, Try
 
 from ribosome.logging import Logging
 from ribosome.nvim import NvimFacade
@@ -44,15 +44,32 @@ class CallbackSpec(Logging, metaclass=abc.ABCMeta):
         return '{}({})'.format(self.__class__.__name__, self.spec)
 
 
-class PythonCallbackSpec(CallbackSpec):
+class PythonCallbackSpecBase(CallbackSpec):
+
+    def _inst(self, vim, name):
+        return (Try(name, vim)
+                if isinstance(name, type) and issubclass(name, VimCallback)
+                else Right(name))
+
+    @abc.abstractmethod
+    def _func(self):
+        ...
 
     def func(self, vim):
+        return self._func // L(self._inst)(vim, _)
+
+
+class PythonCallbackSpec(PythonCallbackSpecBase):
+
+    @property
+    def _func(self):
         return Either.import_path(self.spec)
 
 
-class StrictPythonCallbackSpec(CallbackSpec):
+class StrictPythonCallbackSpec(PythonCallbackSpecBase):
 
-    def func(self, vim):
+    @property
+    def _func(self):
         return Right(self.spec)
 
 
@@ -66,12 +83,6 @@ class VarCallbackSpec(CallbackSpec):
 
     def func(self, vim):
         return Right(L(vim.vars)(self.spec))
-
-
-class SpecialCallbackSpec(CallbackSpec):
-
-    def func(self, vim):
-        return Right(SpecialCallback(self.spec))
 
 _py_callback_re = re.compile('^py:(.+)')
 _vim_callback_re = re.compile('^vim:(.+)')
@@ -109,6 +120,6 @@ def parse_special_callback(data, special: Map) -> Maybe[CallbackSpec]:
 def parse_callback_spec(data: str, special=Map()) -> Maybe[CallbackSpec]:
     spec = special.empty.no.flat_m(L(parse_special_callback)(data, special))
     other = lambda: _callback_res.flat_map2(L(parse_callback)(data, _, _)).head
-    return spec.o(other)
+    return spec.o(other).to_either(_cb_err(data))
 
 __all__ = ('VimCallback', 'parse_callback_spec')
