@@ -1,9 +1,11 @@
-import abc
 import re
+import abc
+from typing import Callable
 
-from amino import Maybe, Either, __, Left, F, Right
+from amino import Maybe, Either, __, Right, L, List, _, Map
 
 from ribosome.logging import Logging
+from ribosome.nvim import NvimFacade
 
 
 class VimCallback(Logging, metaclass=abc.ABCMeta):
@@ -25,44 +27,88 @@ class SpecialCallback:
     def __str__(self):
         return self.name
 
+
+class CallbackSpec(Logging, metaclass=abc.ABCMeta):
+
+    def __init__(self, spec) -> None:
+        self.spec = spec
+
+    @abc.abstractmethod
+    def func(self, vim: NvimFacade) -> Either[str, Callable]:
+        ...
+
+    def __call__(self, vim: NvimFacade, *a):
+        return self.func(vim) // __(*a)
+
+    def __str__(self):
+        return '{}({})'.format(self.__class__.__name__, self.spec)
+
+
+class PythonCallbackSpec(CallbackSpec):
+
+    def func(self, vim):
+        return Either.import_path(self.spec)
+
+
+class StrictPythonCallbackSpec(CallbackSpec):
+
+    def func(self, vim):
+        return Right(self.spec)
+
+
+class VimFuncCallbackSpec(CallbackSpec):
+
+    def func(self, vim):
+        return Right(L(vim.call)(self.spec))
+
+
+class VarCallbackSpec(CallbackSpec):
+
+    def func(self, vim):
+        return Right(L(vim.vars)(self.spec))
+
+
+class SpecialCallbackSpec(CallbackSpec):
+
+    def func(self, vim):
+        return Right(SpecialCallback(self.spec))
+
 _py_callback_re = re.compile('^py:(.+)')
 _vim_callback_re = re.compile('^vim:(.+)')
+_var_callback_re = re.compile('^var:(.+)')
 _special_callback_re = re.compile('^s:(.+)')
+
+_callback_res = List(
+    (_py_callback_re, PythonCallbackSpec),
+    (_vim_callback_re, VimFuncCallbackSpec),
+    (_var_callback_re, VarCallbackSpec),
+)
 
 
 def _cb_err(data):
     return 'invalid callback string: {}'.format(data)
 
 
-def parse_python_callback(data: str):
+def parse_callback(data: str, rex, tpe: type):
     return (
-        Maybe(_py_callback_re.match(data)) /
+        Maybe(rex.match(data)) /
         __.group(1) /
-        Either.import_path
-    ).to_either(_cb_err(data))
+        tpe
+    )
 
 
-def parse_vim_callback(data: str):
-    return Left(_cb_err(data))
-
-
-def parse_special_callback(data: str):
+def parse_special_callback(data, special: Map) -> Maybe[CallbackSpec]:
     return (
         Maybe(_special_callback_re.match(data)) /
-        __.group(1) /
-        SpecialCallback /
-        Right
-    ).to_either(_cb_err(data))
+        __.group(1) //
+        special.get /
+        StrictPythonCallbackSpec
+    )
 
 
-def parse_callback_spec(data: str):
-    if not isinstance(data, str):
-        return Left('callback spec must be str, got {}'.format(type(data)))
-    else:
-        return (
-            parse_python_callback(data)
-            .or_else(F(parse_vim_callback, data))
-            .or_else(F(parse_special_callback, data))
-        )
+def parse_callback_spec(data: str, special=Map()) -> Maybe[CallbackSpec]:
+    spec = special.empty.no.flat_m(L(parse_special_callback)(data, special))
+    other = lambda: _callback_res.flat_map2(L(parse_callback)(data, _, _)).head
+    return spec.o(other)
 
 __all__ = ('VimCallback', 'parse_callback_spec')

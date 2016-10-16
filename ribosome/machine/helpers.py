@@ -1,4 +1,4 @@
-from amino import Map, L, _, List, Left, Right
+from amino import Map, L, _, List, Left, Right, __
 
 from ribosome.util.callback import VimCallback, parse_callback_spec
 
@@ -16,24 +16,27 @@ class TransitionHelpers:
 
     def _inst_callback(self, name, target):
         t = target or self.vim
-        return name(t) if issubclass(name, VimCallback) else name
+        return (name(t)
+                if isinstance(name, type) and issubclass(name, VimCallback)
+                else name)
 
-    def _inst_callbacks(self, spec, target):
-        cb = spec / parse_callback_spec / _.join
+    def _inst_callbacks(self, spec, target, special):
+        cb = (
+            spec /
+            L(parse_callback_spec)(_, special) /
+            __.flat_map(__.func(self.vim))
+        )
         self._callback_errors(spec, cb)
         return cb.filter(_.is_right).join / L(self._inst_callback)(_, target)
 
-    def _callback(self, name, target=None):
+    def _callback(self, name, target=None, special=Map()):
         spec = self.options.get(name).o(self.vim.vars.p(name))
-        return self._inst_callbacks(spec, target)
+        return self._inst_callbacks(spec, target, special)
 
-    def _callbacks(self, name, target=None):
-        t = target or self.vim
-        def inst(name):
-            return name(t) if issubclass(name, VimCallback) else name
+    def _callbacks(self, name, target=None, special=Map()):
         var = self.vim.vars.pl(name) | List()
         opt = self.options.get(name) | List()
-        return self._inst_callbacks(var + opt, target)
+        return self._inst_callbacks(var + opt, target, special)
 
     def _from_opt(self, tpe, **strict):
         o = self.options ** Map(strict)
