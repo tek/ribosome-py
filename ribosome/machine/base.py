@@ -199,8 +199,12 @@ class Machine(Logging):
 
     def _command_by_message_name(self, name: str):
         msg_name = camelcaseify(name)
-        return self._message_handlers\
-            .find_key(lambda a: a.__name__ in [name, msg_name])
+        return (
+            self._message_handlers.to_list
+            .sort_by(_[0])
+            .map2(lambda a, b: b.handlers)
+            .find_map(__.find_key(lambda a: a.__name__ in [name, msg_name]))
+        )
 
     def command(self, name: str, args: list):
         return self._command_by_message_name(name)\
