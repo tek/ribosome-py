@@ -3,7 +3,6 @@ from typing import Optional  # NOQA
 import abc
 import threading
 import asyncio
-import importlib
 from contextlib import contextmanager
 
 from lenses import Lens
@@ -22,7 +21,7 @@ from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
 
 import amino
-from amino import Maybe, List, Map, may, Try, _, L, __, Empty, Just
+from amino import Maybe, Map, Try, _, L, __, Empty, Just, Either, List, Left
 
 Callback = message('Callback', 'func')
 IO = message('IO', 'perform')
@@ -241,16 +240,26 @@ class PluginStateMachine(StateMachine):
         StateMachine.__init__(self, title=title)
         self.sub = plugins.flat_map(self.start_plugin)
 
-    @may
-    def start_plugin(self, path: str):
-        try:
-            mod = importlib.import_module(path)
-        except ImportError as e:
+    def start_plugin(self, name: str):
+        def report(errs):
             msg = 'invalid {} plugin module "{}": {}'
-            self.log.error(msg.format(self.title, path, e))
-        else:
-            if hasattr(mod, 'Plugin'):
-                return getattr(mod, 'Plugin')(self.vim, self)
+            self.log.error(msg.format(self.title, name, errs))
+        return (self._find_plugin(name) // self._inst_plugin).leffect(report)
+
+    def _find_plugin(self, name: str):
+        mods = List(
+            Either.import_module(name),
+            Either.import_module('{}.plugins.{}'.format(self.title, name))
+        )
+        errors = mods.filter(_.is_left) / _.value
+        return mods.find(_.is_right) | Left(errors)
+
+    def _inst_plugin(self, mod):
+        return (
+            Try(getattr(mod, 'Plugin'), self.vim, self)
+            if hasattr(mod, 'Plugin')
+            else Left('module does not define class `Plugin`')
+        )
 
     def plugin(self, title):
         return self.sub.find(_.title == title)
