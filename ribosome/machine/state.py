@@ -38,6 +38,7 @@ UpdateRecord = json_message('UpdateRecord', 'tpe', 'name')
 short_timeout = 3
 medium_timeout = 3
 long_timeout = 5
+warn_no_handler = True
 
 
 class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
@@ -146,7 +147,7 @@ class StateMachine(AsyncIOThread, ModularMachine):
         return (
             Maybe.from_call(
                 self.loop_process, data, msg, exc=TransitionFailed) |
-            TransitionResult.empty(data)
+            TransitionResult.unhandled(data)
         )
 
     @may_handle(Nop)
@@ -218,10 +219,15 @@ class StateMachine(AsyncIOThread, ModularMachine):
     async def _process_one_message(self, data):
         msg = await self._messages.get()
         sent = self._send(data, msg)
-        job = HandlerJob(self, data, msg, None, self._data_type)
-        result = await sent.await_coro(job.dispatch_transition_result)
-        for pub in result.pub:
-            await self._publish(pub)
+        if sent.handled:
+            job = HandlerJob(self, data, msg, None, self._data_type)
+            result = await sent.await_coro(job.dispatch_transition_result)
+            for pub in result.pub:
+                await self._publish(pub)
+        else:
+            result = sent
+            log = self.log.warning if warn_no_handler else self.log.debug
+            log('{}: no handler for {}'.format(self.title, msg))
         self._messages.task_done()
         return result.data
 
