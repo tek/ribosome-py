@@ -11,7 +11,7 @@ def unite(f):
             self.vim.cmd('source {}/plugin/*.vim'.format(unite))
             self.vim.cmd('source {}/plugin/unite/*.vim'.format(unite))
             self.vim.cmd('source {}/syntax/*.vim'.format(unite))
-            return f(self, unite)
+            return f(self)
         env['UNITE_DIR'] % go
     return wrapper
 
