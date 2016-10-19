@@ -89,10 +89,11 @@ class Message(PRecord, metaclass=MessageMeta, skip_fields=True):
     prio = dfield(0.5)
 
     def __new__(cls, *args, **kw):
-        field_map = (
-            Map({cls._field_varargs: args}) if cls._field_varargs
-            else Map(zip(cls._field_order, args))
-        )
+        count = len(cls._field_order)
+        sargs, vargs = args[:count], args[count:]
+        vmap = (Map({cls._field_varargs: vargs}) if cls._field_varargs else
+                Map())
+        field_map = vmap ** Map(zip(cls._field_order, sargs))
         ext_kw = field_map ** kw + ('time', time.time())
         return super().__new__(cls, **ext_kw)
 

@@ -174,7 +174,13 @@ class MessageRequestHandler(RequestHandler):
 
     def _call_fun(self, obj, *args):
         if isinstance(obj, ribosome.NvimStatePlugin):
-            obj.state.send(self._message(*args))
+            try:
+                msg = self._message(*args)
+            except Exception as e:
+                name = self._message.__name__
+                self.log.error('bad args to {}: {}'.format(name, e))
+            else:
+                obj.state.send(msg)
         else:
             msg = 'msg_{} can only be used on NvimStatePlugin ({})'
             self.log.error(msg.format(self.desc, obj))
