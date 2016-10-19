@@ -222,7 +222,7 @@ class Machine(Logging):
         msg.io.unsafe_perform_io(self.vim)
 
     def _run_task(self, task):
-        result = task.attempt()
+        result = task.attempt
         if result.value is None:
             self.log.error('Task returned None: {}'.format(task))
         return _task_result(result)
