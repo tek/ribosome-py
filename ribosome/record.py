@@ -1,13 +1,16 @@
-import uuid
 import re
+import uuid
+import json
 from typing import Callable
 
 import pyrsistent
 
 from lenses import Lens, lens
 
+from toolz import merge
+
 from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try,
-                   Maybe, Just)
+                   Maybe, Just, Path)
 from amino.lazy import LazyMeta, Lazy, lazy
 from amino.lazy_list import LazyList
 
@@ -176,11 +179,17 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
         return self._name
 
     @property
-    def _str_extra(self):
+    def _str_extra(self) -> List:
         return List()
 
+    @property
+    def _str_extra_named(self) -> Map:
+        return Map()
+
     def __str__(self):
-        return '{}({})'.format(self._str_name, self._str_extra.mk_string(', '))
+        extra_named = self._str_extra_named.map2('{}={}'.format)
+        return '{}({})'.format(self._str_name,
+                               (self._str_extra + extra_named).join_comma)
 
     @lazy
     def setter(self):
@@ -226,5 +235,60 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
                        pred: Callable[..., bool]):
         return attr(self).find_lens_pred(pred) / attr(lens()).add_lens
 
+    @property
+    def __path__(self):
+        cls = self.__class__
+        return '{}.{}'.format(cls.__module__, cls.__name__)
+
+    def to_map(self):
+        return Map(type(self)._field_names_no_uuid.apzip(L(getattr)(self, _)))
+
+    @property
+    def json(self):
+        return merge(self.to_map(), dict(__type__=self.__path__))
+
+
+def _decode_json_obj(obj):
+    m = Map(obj)
+    def decode_record(path):
+        return Either.import_path(path).get_or_raise.from_opt(m)
+    return m.get('__type__').cata(decode_record, L(json.loads)(obj))
+
+
+class EncodeJson(json.JSONEncoder):
+
+    def default(self, obj):
+        return (
+            obj.json
+            if hasattr(obj, 'json') else
+            str(obj)
+            if isinstance(obj, (uuid.UUID, Path)) else
+            super().default(obj)
+        )
+
+
+def json_err(task, data, err):
+    return 'error {}coding json: {}\ndata: {}'.format(task, err, data)
+
+
+def _encode_json(data):
+    return EncodeJson().encode(data)
+
+
+def _decode_json(data):
+    return json.loads(data, object_hook=_decode_json_obj)
+
+
+def _code_json(data, handler, prefix):
+    return Try(handler, data).lmap(L(json_err)(prefix, data, _))
+
+
+def encode_json(data):
+    return _code_json(data, _encode_json, 'en')
+
+
+def decode_json(data):
+    return _code_json(data, _decode_json, 'de')
+
 __all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field',
-           'bool_field', 'any_field')
+           'bool_field', 'any_field', 'encode_json', 'decode_json')
