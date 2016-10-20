@@ -1,12 +1,10 @@
 from unit._support.spec import Spec
 
-from ribosome.record import maybe_field, field, list_field
+from ribosome.record import maybe_field, field, list_field, Record
 
 from pyrsistent._checked_types import InvariantException
 
 from amino import Map, List
-
-from myo.record import Record
 
 
 class RecA(Record):
