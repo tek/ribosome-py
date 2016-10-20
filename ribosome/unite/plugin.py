@@ -1,6 +1,10 @@
 import neovim
 
 from amino import List, Map, L, __, _
+from amino.util.string import snake_case
+
+from ribosome.logging import log
+from ribosome.unite.data import UniteSyntax
 
 
 def _convert_candidate(c):
@@ -40,4 +44,27 @@ def mk_unite_action(Unite):
         return uc_wrap
     return decorator
 
-__all__ = ('mk_unite_candidates', 'mk_unite_action')
+
+def _unite_function(name, msg, param_cb):
+    @neovim.function(name, sync=True)
+    def _unite_dispatcher(self, args):
+        params = param_cb(List.wrap(args))
+        params / UniteSyntax % self.state.send
+    return _unite_dispatcher
+
+
+def unite_plugin(name, names):
+    sname = snake_case(name)
+    syntax_name = '_{}_unite_syntax'.format(sname)
+    def decorator(cls):
+        def set_fun(name, msg, cb):
+            try:
+                setattr(cls, name, _unite_function(name, msg, cb))
+            except Exception as e:
+                log.error(e)
+        syntax_cb = lambda args: args.tail // _.head / _['source'] / _['name']
+        set_fun(syntax_name, UniteSyntax, syntax_cb)
+        return cls
+    return decorator
+
+__all__ = ('mk_unite_candidates', 'mk_unite_action', 'unite_plugin')
