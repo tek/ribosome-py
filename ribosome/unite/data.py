@@ -3,8 +3,9 @@ import abc
 from ribosome.machine import Message
 from ribosome import NvimFacade
 from ribosome.logging import Logging
+from ribosome.nvim.components import Syntax
 
-from amino import List, Map, _, L
+from amino import List, Map, _, L, Maybe, Task
 
 
 class UniteMessage(Message, varargs='unite_args'):
@@ -56,13 +57,23 @@ class UniteSource(UniteEntity):
         'name': '{}',
         'gather_candidates': function('{}'),
         'default_kind': '{}',
+        {}
     }}
     '''.replace('\n', '')
 
-    def __init__(self, name: str, source: str, kind: str) -> None:
+    _syntax_templ = '''
+        'syntax': 'uniteSource_{}',
+        'hooks': {{
+            'on_init': function('{}'),
+        }},
+    '''.replace('\n', '')
+
+    def __init__(self, name: str, source: str, kind: str, syntax: Maybe[str]
+                 ) -> None:
         super().__init__(name)
         self.source = source
         self.kind = kind
+        self.syntax = syntax
 
     @property
     def tpe(self):
@@ -70,11 +81,15 @@ class UniteSource(UniteEntity):
 
     @property
     def _func_defs_sync(self):
-        return List(self.source)
+        return List(self.source) + self.syntax.to_list
 
     @property
     def data(self):
-        return self._templ.format(self.name, self.source, self.kind)
+        extra = self.syntax / L(self._syntax_templ.format)(self.name, _) | ''
+        return self._templ.format(self.name, self.source, self.kind, extra)
+
+    def syntax_task(self, syntax: Syntax) -> Task:
+        return Task.zero
 
 
 class UniteKind(UniteEntity):

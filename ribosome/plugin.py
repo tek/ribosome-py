@@ -45,5 +45,4 @@ class NvimStatePlugin(NvimPlugin):
     def state(self) -> StateMachine:
         ...
 
-
 __all__ = ('NvimPlugin', 'NvimStatePlugin')
