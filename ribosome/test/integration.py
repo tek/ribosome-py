@@ -170,6 +170,9 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
     def _buffer_content(self, data):
         later(lambda: self.vim.buffer.content.should.equal(data))
 
+    def _buffer_length(self, length):
+        later(lambda: self.vim.buffer.content.should.have.length_of(length))
+
 
 def main_looped(fun):
     @wraps(fun)
