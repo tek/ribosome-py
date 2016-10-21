@@ -53,7 +53,7 @@ def _unite_function(name, msg, param_cb):
     return _unite_dispatcher
 
 
-def unite_plugin(name, names):
+def unite_plugin(name):
     sname = snake_case(name)
     syntax_name = '_{}_unite_syntax'.format(sname)
     def decorator(cls):
