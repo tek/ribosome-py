@@ -647,6 +647,9 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
     def d(self, name):
         return self.typed(dict, self(name))
 
+    def m(self, name):
+        return self.d(name) / Map
+
     def b(self, name: str):
         return self.typed(bool, self(name)) / Boolean
 
@@ -713,6 +716,9 @@ class Vars(OptVar):
 
     def pd(self, name):
         return self.typed(dict, self.p(name))
+
+    def pm(self, name):
+        return self.pd(name) / Map
 
     def pb(self, name: str):
         return self.typed(bool, self.p(name)) / Boolean
