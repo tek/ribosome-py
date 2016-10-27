@@ -208,6 +208,10 @@ def _mock_proxy(self):
 
 class ExternalIntegrationSpec(VimIntegrationSpec):
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._report_expensive = False
+
     def _pre_start_neovim(self):
         super()._pre_start_neovim()
         ribosome.in_vim = False
@@ -233,7 +237,7 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
         super().teardown()
         if self.root is not None:
             self.root.stop(shutdown=False)
-            if self._debug:
+            if self._debug and self._report_expensive:
                 self._report()
 
     def _report(self):
