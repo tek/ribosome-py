@@ -10,7 +10,7 @@ from lenses import Lens, lens
 from toolz import merge
 
 from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try,
-                   Maybe, Just, Path)
+                   Maybe, Just, Path, I)
 from amino.lazy import LazyMeta, Lazy, lazy
 from amino.lazy_list import LazyList
 
@@ -50,9 +50,17 @@ def dfield(default, **kw):
     return field(type(default), initial=default, **kw)
 
 
-def maybe_field(tpe=None, initial=Empty(), **kw):
+def maybe_factory(fact, tpe):
+    def f(val):
+        return val / (lambda v: v if isinstance(v, tpe) else fact(v))
+    return f
+
+
+def maybe_field(tpe=None, factory=None, initial=Empty(), **kw):
+    fact = I if factory is None or tpe is None else maybe_factory(factory, tpe)
     return field(Maybe, initial=initial,
-                 invariant=_monad_type_field_inv('Maybe', tpe), **kw)
+                 invariant=_monad_type_field_inv('Maybe', tpe), factory=fact,
+                 **kw)
 
 
 def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw):
@@ -135,8 +143,12 @@ class RecordMeta(LazyMeta, pyrsistent.PClassMeta):
         return Map(self._pclass_fields).valfilter(mand)
 
     @property
+    def _field_map(self):
+        return Map(self._pclass_fields)
+
+    @property
     def _field_data(self):
-        return Map(self._pclass_fields).valmap(_.type)
+        return self._field_map.valmap(_.type)
 
     @property
     def _field_names(self):
@@ -151,17 +163,21 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
 
     @classmethod
     def args_from_opt(cls, opt: Map):
-        def may_arg(name, value):
-            return name, Just(value)
-        def list_arg(name, value):
+        def may_arg(name, field, value):
+            ctor = field.factory
+            return name, ctor(Just(value))
+        def list_arg(name, field, value):
             return name, value
-        def regular_arg(name, value):
+        def regular_arg(name, field, value):
             return name, value
-        def arg(name, types):
-            cb = (may_arg if Maybe in types else list_arg if List in types else
-                  regular_arg)
-            return opt.get(name) / L(cb)(name, _)
-        return Map(cls._field_data.map2(arg).join)
+        def arg(name, field):
+            cb = (
+                may_arg if Maybe in field.type else
+                list_arg if List in field.type else
+                regular_arg
+            )
+            return opt.get(name) / L(cb)(name, field, _)
+        return Map(cls._field_map.map2(arg).join)
 
     @classmethod
     def from_opt(cls, opt: Map) -> Maybe:
