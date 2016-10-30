@@ -38,6 +38,9 @@ class NvimPlugin(object):
     def name(self):
         return 'ribosome'
 
+    def start_plugin(self):
+        pass
+
 
 class NvimStatePlugin(NvimPlugin):
 

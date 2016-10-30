@@ -54,6 +54,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         self._start_neovim()
         self._post_start_neovim()
         self._pre_start()
+        self._start_plugin()
 
     def _start_neovim(self):
         if self.tmux_nvim:
@@ -117,10 +118,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
     def _prefix(self):
         return ''
 
-    # FIXME quitting neovim blocks sometimes
-    # without quitting, specs with subprocesses block in the end
     def teardown(self):
-        # self.neovim.quit()
         if self._debug:
             self._log_out.foreach(self.log.info)
         if self.tmux_nvim:
@@ -134,6 +132,9 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         self.vim.options.amend_l('runtimepath', rtp)
 
     def _pre_start(self):
+        pass
+
+    def _start_plugin(self):
         pass
 
     def _pvar_becomes(self, name, value):
