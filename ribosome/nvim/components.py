@@ -361,6 +361,10 @@ class Buffer(HasWindow):
     def pvar_or_global(self, name):
         return self.vars.p(name).or_else(lambda: self.root.vars.p(name))
 
+    @property
+    def id(self):
+        return self._internal_buffer.number
+
 
 class Window(HasTab, HasBuffers):
 
