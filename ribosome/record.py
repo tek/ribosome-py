@@ -180,12 +180,15 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
         return Map(cls._field_map.map2(arg).join)
 
     @classmethod
-    def from_opt(cls, opt: Map) -> Maybe:
+    def from_opt(cls, opt: Map):
         return cls(**cls.args_from_opt(opt))
 
     @classmethod
     def from_attr(cls, arg):
         return lambda a: cls(**{arg: a})
+
+    def set_from_opt(self, opt: Map):
+        return self.set(**self.args_from_opt(opt))
 
     def update_from_opt(self, opt: Map):
         return self.set(**self.args_from_opt(opt))
