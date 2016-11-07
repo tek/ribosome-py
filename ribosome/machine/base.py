@@ -105,8 +105,8 @@ class HandlerJob(Logging):
         trans = rest / self._transform_result
         msgs, rest = trans.split_type(Message)
         if rest:
-            tpl = 'invalid transition result parts in {}: {}'
-            msg = tpl.format(self.machine.title, rest)
+            tpl = 'invalid transition result parts for {} in {}: {}'
+            msg = tpl.format(self.msg, self.machine.title, rest)
             if amino.development:
                 raise MachineError(msg)
             else:
