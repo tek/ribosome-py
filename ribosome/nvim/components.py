@@ -405,6 +405,10 @@ class Window(HasTab, HasBuffers):
     def line(self):
         return self.cursor.head
 
+    @property
+    def line0(self):
+        return self.line / (_ - 1)
+
     def close(self):
         self.cmd('close')
 
