@@ -10,7 +10,7 @@ import neovim
 
 from amino.test import fixture_path, temp_dir, later, temp_file
 
-from amino import List, Maybe, Either, Left, __, Map, Try, L, _
+from amino import List, Maybe, Either, Left, __, Map, Try, L, _, env
 from amino.test import IntegrationSpec as IntegrationSpecBase
 
 import ribosome
@@ -93,14 +93,15 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
             return session.attached_window
 
     def _start_neovim_tmux(self):
-        path = self.project_path
-        env = (
+        global_path = env['PYTHONPATH'] | ''
+        path = '{}:{}'.format(self.project_path, global_path)
+        tmux_env = (
             'env',
             'NVIM_LISTEN_ADDRESS={}'.format(self.nvim_socket),
             'PYTHONPATH={}'.format(path),
             'RIBOSOME_LOG_FILE={}'.format(self.logfile),
         )
-        cmd = tuple(env + self._cmdline)
+        cmd = tuple(tmux_env + self._cmdline)
         out = self._tmux_window.cmd(
             'split-window', '-d', '-P', '-F#{pane_id}', *cmd).stdout
         self._tmux_pane = Pane(self._tmux_window, pane_id=out[0])
