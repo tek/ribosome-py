@@ -193,7 +193,7 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
 
     @classmethod
     def from_attr(cls, arg):
-        return lambda a: cls(**{arg: a})
+        return lambda a, **kw: cls(**{arg: a}, **kw)
 
     def set_from_opt(self, opt: Map):
         return self.set(**self.args_from_opt(opt))
