@@ -365,6 +365,10 @@ class Buffer(HasWindow):
     def id(self):
         return self._internal_buffer.number
 
+    @property
+    def line_count(self):
+        return self.content.length
+
 
 class Window(HasTab, HasBuffers):
 
