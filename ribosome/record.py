@@ -82,6 +82,14 @@ def uuid_field():
     return field(uuid.UUID, initial=lambda: uuid.uuid4())
 
 
+def int_field(**kw):
+    return field(int, **kw)
+
+
+def str_field(**kw):
+    return field(str, **kw)
+
+
 def _re_fact(ex: str):
     return Try(re.compile, ex) | re.compile('')
 
@@ -316,4 +324,5 @@ def decode_json(data):
     return _code_json(data, _decode_json, 'de')
 
 __all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field',
-           'bool_field', 'any_field', 'encode_json', 'decode_json')
+           'bool_field', 'any_field', 'encode_json', 'decode_json',
+           'int_field', 'uuid_field', 'map_field', 'either_field', 'str_field')
