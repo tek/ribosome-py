@@ -45,5 +45,4 @@ class TransitionHelpers:
         return (Left(msg.format(tpe, missing)) if missing else
                 Right(tpe.from_opt(o)))
 
-
 __all__ = ('TransitionHelpers',)

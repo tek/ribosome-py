@@ -1,11 +1,9 @@
 from typing import TypeVar, Callable, Any, Generic
 
-from tryp import F
-
 from amino.tc.base import ImplicitInstances, Implicits
 from amino.lazy import lazy
 from amino.tc.monad import Monad
-from amino import Either, Right, Left
+from amino import Either, Right, Left, L
 
 from ribosome.nvim.components import NvimComponent
 
@@ -54,6 +52,6 @@ class NvimIOMonad(Monad):
         return NvimIO(g)
 
     def map(self, fa: NvimIO[A], f: Callable[[A], B]) -> NvimIO[B]:
-        return NvimIO(F(fa.run) >> f)
+        return NvimIO(L(fa.run)() >> f)
 
 __all__ = ('NvimIO',)
