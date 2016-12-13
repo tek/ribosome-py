@@ -170,6 +170,9 @@ class NvimComponent(Logging):
     def vcmd(self, line: str, sync=False):
         return self.cmd(line, verbose=True, sync=sync)
 
+    def normal(self, keys):
+        return self.cmd_sync('normal! {}'.format(keys))
+
     @property
     def syntax(self):
         return Syntax(self)
