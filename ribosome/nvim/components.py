@@ -70,11 +70,8 @@ class NvimComponent(Logging):
         self._options = Options(self)
 
     def __repr__(self):
-        if on_main_thread():
-            n = ''
-        else:
-            n = self._details
-        return '{}({})'.format(self.__class__.__name__, n)
+        n = '' if on_main_thread() else self._details
+        return '{}({}, {})'.format(self.__class__.__name__, self.prefix, n)
 
     @property
     def vars(self):
