@@ -495,7 +495,8 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
     def call(self, name, *a, **kw):
         return (
-            Maybe.from_call(self.vim.call, name, *a, exc=NvimError, **kw)
+            Maybe.from_call(self.vim.call, name, *a, exc=(NvimError, OSError),
+                            **kw)
             .to_either(lambda: 'vim call failed: {}'.format(
                 format_funcall(name, a, kw)))
         )
