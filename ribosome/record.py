@@ -273,9 +273,11 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
 
 def _decode_json_obj(obj):
     m = Map(obj)
-    def decode_record(path):
-        return Either.import_path(path).get_or_raise.from_opt(m)
-    return m.get('__type__').cata(decode_record, L(json.loads)(obj))
+    return (
+        m.get('__type__') /
+        L(Either.import_path)(_).get_or_raise.from_opt(m) |
+        m
+    )
 
 
 class EncodeJson(json.JSONEncoder):
