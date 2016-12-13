@@ -432,6 +432,11 @@ class Window(HasTab, HasBuffers):
     def size(self):
         return self.width & self.height
 
+    def visual_line(self, start, end):
+        self.set_cursor(start)
+        self.normal('V')
+        self.set_cursor(end)
+
 
 class Tab(HasWindows):
 
