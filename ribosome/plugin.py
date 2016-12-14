@@ -48,4 +48,8 @@ class NvimStatePlugin(NvimPlugin):
     def state(self) -> StateMachine:
         ...
 
+    @property
+    def default_sync(self):
+        return False
+
 __all__ = ('NvimPlugin', 'NvimStatePlugin')

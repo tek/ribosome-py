@@ -155,9 +155,11 @@ class RequestHandler(Logging, metaclass=abc.ABCMeta):
 
 class MessageRequestHandler(RequestHandler):
 
-    def __init__(self, fun: Callable[[], Any], msg: type, **kw) -> None:
+    def __init__(self, fun: Callable[[], Any], msg: type, sync=None,
+                 **kw) -> None:
         self._message = msg
         self._fun_name = fun.__name__
+        self._sync = Maybe.check(sync)
         super().__init__(self._message.__init__, **kw)  # type: ignore
 
     @property
@@ -180,7 +182,9 @@ class MessageRequestHandler(RequestHandler):
                 name = self._message.__name__
                 self.log.error('bad args to {}: {}'.format(name, e))
             else:
-                obj.state.send(msg)
+                sync = self._sync | obj.default_sync
+                sender = obj.state.send_sync if sync else obj.state.send
+                sender(msg)
         else:
             msg = 'msg_{} can only be used on NvimStatePlugin ({})'
             self.log.error(msg.format(self.desc, obj))

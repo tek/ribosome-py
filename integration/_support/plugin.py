@@ -91,7 +91,7 @@ class TestPlugin(NvimStatePlugin, Logging):
     def fun(self, value):
         return self.test_fun.format(value)
 
-    @msg_function(Msg)
+    @msg_function(Msg, sync=True)
     def msg_fun(self):
         pass
 
