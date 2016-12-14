@@ -7,7 +7,8 @@ from amino import Left, L, _, Map
 from ribosome.logging import Logging
 from ribosome.request import function, msg_function, msg_command
 from ribosome.machine import message, may_handle, handle, Machine
-from ribosome.machine.state import RootMachine, RunScratchMachine
+from ribosome.machine.state import (UnloopedRootMachine, RunScratchMachine,
+                                    RootMachine)
 from ribosome.machine.transition import Fatal, may_fallback
 from ribosome.machine.scratch import ScratchMachine, Mapping
 from ribosome.nvim import NvimFacade, ScratchBuffer
@@ -20,7 +21,7 @@ ScratchTest = message('ScratchTest')
 ScratchCheck = message('ScratchCheck')
 
 
-class Mach(RootMachine):
+class Mach:
 
     @may_handle(Msg)
     def mess(self, data, msg):
@@ -38,6 +39,14 @@ class Mach(RootMachine):
     @may_handle(ScratchCheck)
     def check_scratch(self, data, msg):
         self.log.info(self.sub.length)
+
+
+class MachLooped(Mach, RootMachine):
+    pass
+
+
+class MachUnlooped(Mach, UnloopedRootMachine):
+    pass
 
 
 class ScratchM(ScratchMachine):
@@ -68,10 +77,6 @@ class TestPlugin(NvimStatePlugin, Logging):
 
     def start(self):
         self.state.start()
-
-    @lazy
-    def state(self):
-        return Mach(self.vim.proxy, title='spec')
 
     @neovim.function('Value', sync=True)
     def value(self, args):
@@ -109,5 +114,19 @@ class TestPlugin(NvimStatePlugin, Logging):
     @msg_command(ScratchCheck)
     def check_scratch(self):
         pass
+
+
+class TestPluginLooped(TestPlugin):
+
+    @lazy
+    def state(self):
+        return MachLooped(self.vim.proxy, title='spec')
+
+
+class TestPluginUnlooped(TestPlugin):
+
+    @lazy
+    def state(self):
+        return MachUnlooped(self.vim.proxy, title='spec')
 
 __all__ = ('TestPlugin',)

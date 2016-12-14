@@ -1,7 +1,5 @@
 from concurrent.futures import Future
 
-import sure  # NOQA
-
 from ribosome.machine import may_handle, message, ModularMachine, Transitions
 from ribosome import Machine, StateMachine
 
@@ -68,18 +66,20 @@ class PublishSpec(Spec):
         res.should.have.key('c').being.ok
 
 
+class _CTransitions(Transitions):
+
+    @may_handle(M1)
+    def m1(self):
+        local = self.local + (self.machine.res, self.machine.res)
+        return self.with_local(local), M2()
+
+
 class _C(ModularMachine):
+    Transitions = _CTransitions
 
     def __init__(self, title, res):
         self.res = res
         super().__init__(title=title)
-
-    class Transitions(Transitions):
-
-        @may_handle(M1)
-        def m1(self):
-            local = self.local + (self.machine.res, self.machine.res)
-            return self.with_local(local), M2()
 
     @may_handle(M2)
     def m2(self, data, msg):

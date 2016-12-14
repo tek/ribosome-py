@@ -40,7 +40,14 @@ long_timeout = 5
 warn_no_handler = True
 
 
-class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
+class AsyncIOBase(Logging, abc.ABC):
+
+    def _init_asyncio(self):
+        self._loop = asyncio.new_event_loop()  # type: ignore
+        self._messages = asyncio.PriorityQueue(loop=self._loop)
+
+
+class AsyncIOThread(threading.Thread, AsyncIOBase):
 
     def __init__(self) -> None:
         threading.Thread.__init__(self)
@@ -49,8 +56,7 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
         self.running = threading.Event()
 
     def run(self):
-        self._loop = asyncio.new_event_loop()  # type: ignore
-        self._messages = asyncio.PriorityQueue(loop=self._loop)
+        self._init_asyncio()
         asyncio.set_event_loop(self._loop)
         self.quit_now.clear()
         self.done.clear()
@@ -94,11 +100,10 @@ class AsyncIOThread(threading.Thread, Logging, metaclass=abc.ABCMeta):
         pass
 
 
-class StateMachine(AsyncIOThread, ModularMachine):
+class StateMachineBase(ModularMachine):
 
     def __init__(self, sub: List[Machine]=List(), parent=None, title=None
                  ) -> None:
-        AsyncIOThread.__init__(self)
         self.data = None
         self._messages = None
         self.sub = sub
@@ -107,9 +112,6 @@ class StateMachine(AsyncIOThread, ModularMachine):
     @property
     def init(self) -> Data:
         return self._data_type()
-
-    def wait_for_running(self):
-        self.running.wait(medium_timeout)
 
     def start_wait(self):
         self.start()
@@ -210,10 +212,8 @@ class StateMachine(AsyncIOThread, ModularMachine):
         yield self
         self.stop()
 
-    async def _main(self, data):
-        self.data = data
-        while not self.quit_now.is_set():
-            self.data = await self._process_one_message(self.data)
+    async def _step(self):
+        self.data = await self._process_one_message(self.data)
 
     async def _process_one_message(self, data):
         msg = await self._messages.get()
@@ -234,10 +234,50 @@ class StateMachine(AsyncIOThread, ModularMachine):
         await self._messages.join()
 
 
-class PluginStateMachine(StateMachine):
+class StateMachine(StateMachineBase, AsyncIOThread):
 
-    def __init__(self, plugins: List[str], title=None) -> None:
-        StateMachine.__init__(self, title=title)
+    def __init__(self, *a, **kw) -> None:
+        AsyncIOThread.__init__(self)
+        StateMachineBase.__init__(self, *a, **kw)
+
+    def wait_for_running(self):
+        self.running.wait(medium_timeout)
+
+    async def _main(self, data):
+        self.data = data
+        while not self.quit_now.is_set():
+            await self._step()
+
+
+class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
+
+    def start(self):
+        self.data = self.init
+        self._init_asyncio()
+
+    def wait_for_running(self):
+        pass
+
+    def process_messages(self):
+        return self._loop.run_until_complete(self._process_messages())
+
+    async def _process_messages(self):
+        while not self._messages.empty():
+            await self._step()
+
+    def send_sync(self, msg):
+        self.log.debug('send {} in {}'.format(msg, self.title))
+        if self._messages is not None:
+            self._loop.run_until_complete(self._messages.put(msg))
+        return self.process_messages()
+
+    def send(self, msg):
+        threading.Thread(target=self.send_sync, args=(msg,)).start()
+
+
+class PluginStateMachine:
+
+    def __init__(self, plugins: List[str]) -> None:
         self.sub = plugins.flat_map(self.start_plugin)
 
     def start_plugin(self, name: str):
@@ -281,12 +321,13 @@ class PluginStateMachine(StateMachine):
         return msg.plug.process(data, msg.msg)
 
 
-class RootMachine(PluginStateMachine, HasNvim, Logging):
+# FIXME why is the title param ignored?
+class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
     def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None
                  ) -> None:
         HasNvim.__init__(self, vim)
-        PluginStateMachine.__init__(self, plugins, title=None)
+        PluginStateMachine.__init__(self, plugins)
 
     @property
     def title(self):
@@ -301,6 +342,22 @@ class RootMachine(PluginStateMachine, HasNvim, Logging):
             L(msg.machine)(_, self) /
             L(RunMachine)(_, msg.options)
         )
+
+
+class RootMachine(StateMachine, RootMachineBase):
+
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None
+                 ) -> None:
+        StateMachine.__init__(self, title=title)
+        RootMachineBase.__init__(self, vim, plugins)
+
+
+class UnloopedRootMachine(UnloopedStateMachine, RootMachineBase):
+
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None
+                 ) -> None:
+        UnloopedStateMachine.__init__(self, title=title)
+        RootMachineBase.__init__(self, vim, plugins)
 
 
 class SubMachine(ModularMachine, TransitionHelpers):

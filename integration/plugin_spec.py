@@ -3,19 +3,16 @@ from amino.test import later
 
 from ribosome.test import PluginIntegrationSpec
 
-from integration._support.plugin import TestPlugin
+from integration._support.plugin import (TestPluginLooped, TestPlugin,
+                                         TestPluginUnlooped)
 
 
-class PluginSpec(PluginIntegrationSpec):
-
-    @property
-    def plugin_class(self):
-        return Right(TestPlugin)
+class _PluginSpecBase(PluginIntegrationSpec):
 
     def _last_output(self, content):
         later(lambda: self._log_out.last.should.contain(content), timeout=1)
 
-    def startup(self):
+    def _startup(self):
         i = 99932
         fun_text = 'message function test'
         self.vim.cmd_sync('Go')
@@ -29,7 +26,7 @@ class PluginSpec(PluginIntegrationSpec):
         self.vim.cmd_sync('Err')
         self._last_output(TestPlugin.test_error)
 
-    def scratch(self):
+    def _scratch(self):
         self.vim.cmd_sync('Go')
         self.vim.cmd_sync('Scratch')
         later(lambda: self.vim.windows.length.should.equal(2))
@@ -42,4 +39,30 @@ class PluginSpec(PluginIntegrationSpec):
         self.vim.cmd_sync('CheckScratch')
         self._last_output('0')
 
-__all__ = ('PluginSpec',)
+
+class LoopedPluginSpec(_PluginSpecBase):
+
+    @property
+    def plugin_class(self):
+        return Right(TestPluginLooped)
+
+    def startup(self):
+        self._startup()
+
+    def scratch(self):
+        self._scratch()
+
+
+class _UnloopedPluginSpec(_PluginSpecBase):
+
+    @property
+    def plugin_class(self):
+        return Right(TestPluginUnlooped)
+
+    def startup(self):
+        self._startup()
+
+    def scratch(self):
+        self._scratch()
+
+__all__ = ('LoopedPluginSpec',)
