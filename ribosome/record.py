@@ -13,6 +13,8 @@ from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try,
                    Maybe, Just, Path, I)
 from amino.lazy import LazyMeta, Lazy, lazy
 from amino.lazy_list import LazyList
+from amino.tc.optional import Optional
+from amino.tc.foldable import Foldable
 
 from ribosome.logging import Logging
 
@@ -25,10 +27,13 @@ def field(tpe, **kw):
     return any_field(type=tpe, **kw)
 
 
-def _monad_type_field_inv(eff, tpe):
+def _foldable_type_field_inv(eff, tpe):
     def inv(a):
+        atpe = type(a)
         if tpe is None:
             return True, ''
+        elif not Foldable.exists_instance(atpe):
+            return False, '{} does not have a Foldable'.format(atpe)
         else:
             bad = a.find(lambda b: not isinstance(b, tpe))
             bad_tpe = bad | ''
@@ -39,7 +44,7 @@ def _monad_type_field_inv(eff, tpe):
 
 def list_field(tpe=None, initial=List(), **kw):
     return field(List, initial=initial, factory=List.wrap,
-                 invariant=_monad_type_field_inv('List', tpe), **kw)
+                 invariant=_foldable_type_field_inv('List', tpe), **kw)
 
 
 def lazy_list_field(**kw):
@@ -59,8 +64,8 @@ def maybe_factory(fact, tpe):
 def maybe_field(tpe=None, factory=None, initial=Empty(), **kw):
     fact = I if factory is None or tpe is None else maybe_factory(factory, tpe)
     return field(Maybe, initial=initial,
-                 invariant=_monad_type_field_inv('Maybe', tpe), factory=fact,
-                 **kw)
+                 invariant=_foldable_type_field_inv('Maybe', tpe),
+                 factory=fact, **kw)
 
 
 def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw):
@@ -68,6 +73,21 @@ def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw):
     check = lambda t, a: (isinstance(a, t), err)
     inv = __.cata(L(check)(ltpe, _), L(check)(rtpe, _))
     return field(Either, initial=initial, invariant=inv, **kw)
+
+
+def _optional_inv(tpe):
+    def inv(a):
+        atpe = type(a)
+        return (
+            _foldable_type_field_inv('Optional', tpe)(a)
+            if Optional.exists_instance(atpe) else
+            (False, '{} has no Optional'.format(atpe))
+        )
+    return inv
+
+
+def optional_field(tpe=None, initial=Empty(), **kw):
+    return any_field(initial=initial, invariant=_optional_inv(tpe), **kw)
 
 
 def bool_field(initial=False, **kw):
