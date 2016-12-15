@@ -14,9 +14,9 @@ from ribosome import NvimFacade
 from ribosome.machine.message_base import (message, Message, Nop, Done, Quit,
                                            PlugCommand, Stop)
 from ribosome.machine.base import (ModularMachine, Machine, Transitions,
-                                   HandlerJob)
+                                   HandlerJob, MachineBase)
 from ribosome.machine.transition import (TransitionResult, Coroutine,
-                                         TransitionFailed, may_handle, handle)
+                                         may_handle, handle)
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
 
@@ -146,9 +146,8 @@ class StateMachineBase(ModularMachine):
 
     def _send(self, data, msg: Message):
         return (
-            Maybe.from_call(
-                self.loop_process, data, msg, exc=TransitionFailed) |
-            TransitionResult.unhandled(data)
+            Try(self.loop_process, data, msg)
+            .right_or_map(L(TransitionResult.failed)(data, _))
         )
 
     @may_handle(Nop)
@@ -218,17 +217,33 @@ class StateMachineBase(ModularMachine):
     async def _process_one_message(self, data):
         msg = await self._messages.get()
         sent = self._send(data, msg)
-        if sent.handled:
-            job = HandlerJob(self, data, msg, None, self._data_type)
-            result = await sent.await_coro(job.dispatch_transition_result)
-            for pub in result.pub:
-                await self._publish(pub)
-        else:
-            result = sent
-            log = self.log.warning if warn_no_handler else self.log.debug
-            log('{}: no handler for {}'.format(self.title, msg))
+        result = (
+            await self._successful_transition(data, msg, sent)
+            if sent.handled else
+            self._failed_transition(msg, sent)
+            if sent.failure else
+            self._unhandled_message(msg, sent)
+        )
         self._messages.task_done()
         return result.data
+
+    async def _successful_transition(self, data, msg, sent):
+        job = HandlerJob(self, data, msg, None, self._data_type)
+        result = await sent.await_coro(job.dispatch_transition_result)
+        for pub in result.pub:
+            await self._publish(pub)
+        return result
+
+    def _failed_transition(self, msg, sent):
+        errmsg = sent.error_message
+        msg_name = type(msg).__name__
+        self.log.error('error handling {}: {}'.format(msg_name, errmsg))
+        return sent
+
+    def _unhandled_message(self, msg, sent):
+        log = self.log.warning if warn_no_handler else self.log.debug
+        log('{}: no handler for {}'.format(self.title, msg))
+        return sent
 
     async def join_messages(self):
         await self._messages.join()

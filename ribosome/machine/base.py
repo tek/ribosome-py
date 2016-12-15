@@ -86,12 +86,12 @@ class HandlerJob(Logging):
             return self._handle_transition_error(e)
 
     def _handle_transition_error(self, e):
-        err = 'transition "{}" failed for {} in {}'
-        self.log.exception(err.format(self.handler.name, self.msg,
-                                      self.machine.title))
         if amino.development:
-            raise TransitionFailed() from e
-        return Empty()
+            err = 'transition "{}" failed for {} in {}'
+            self.log.exception(err.format(self.handler.name, self.msg,
+                                          self.machine.title))
+            raise TransitionFailed(str(e)) from e
+        return Just(StrictTransitionResult.failed(self.data, e))
 
     def process_result(self, result) -> TransitionResult:
         if isinstance(result, Coroutine):

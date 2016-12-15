@@ -3,14 +3,16 @@ from typing import Callable, TypeVar
 from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
-from amino import Maybe, may, Either, Just, Left, I
+from amino import Maybe, may, Either, Just, Left, I, List
+from amino.task import TaskException
 
 from ribosome.machine.message_base import (message, _message_attr,
                                            _machine_attr, Message,
                                            default_prio, _prio_attr,
                                            fallback_prio, override_prio)
 
-from ribosome.record import Record, any_field, list_field, field, bool_field
+from ribosome.record import (Record, any_field, list_field, field, bool_field,
+                             optional_field)
 from ribosome.logging import Logging
 
 A = TypeVar('A')
@@ -118,14 +120,25 @@ class TransitionResult(Record):
     data = any_field()
     resend = list_field()
     handled = bool_field(True)
+    failure = bool_field(False)
+    error = optional_field()
 
     @staticmethod
-    def empty(data):
-        return StrictTransitionResult(data=data)
+    def empty(data, **kw):
+        return StrictTransitionResult(data=data, **kw)
 
     @staticmethod
-    def unhandled(data):
-        return StrictTransitionResult(data=data, handled=False)
+    def failed(data, error, **kw):
+        return TransitionResult.unhandled(data, failure=True,
+                                          error=Just(error), **kw)
+
+    @staticmethod
+    def unhandled(data, **kw):
+        return StrictTransitionResult(data=data, handled=False, **kw)
+
+    @property
+    def _str_extra(self):
+        return List(self.handled) + self.error.to_list + self.resend
 
     def fold(self, f):
         return self
@@ -144,6 +157,12 @@ class TransitionResult(Record):
                 pub=self.pub + other.pub,
                 handled=other.handled or self.handled
             )
+
+    @property
+    def error_message(self):
+        def format(err):
+            return str(err.cause if isinstance(err, TaskException) else err)
+        return self.error / format | 'unknown error'
 
 
 class StrictTransitionResult(TransitionResult):
