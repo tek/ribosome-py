@@ -1,6 +1,7 @@
 from unit._support.spec import Spec
 
-from ribosome.record import maybe_field, field, list_field, Record
+from ribosome.record import (maybe_field, field, list_field, Record,
+                             optional_field)
 
 from pyrsistent._checked_types import InvariantException
 
@@ -10,6 +11,7 @@ from amino import Map, List
 class RecA(Record):
     mand1 = field(str)
     opt = maybe_field(int)
+    opt2 = optional_field(int)
 
 
 class RecB(RecA):
@@ -25,10 +27,13 @@ class RecordSpec(Spec):
         c = 'c'
         o = 10
         o2 = 19
-        rb = RecB.from_opt(Map(mand1=a, mand2=b, bad=1, opt=o, lst=[c]))
+        o3 = 23
+        rb = RecB.from_opt(Map(mand1=a, mand2=b, bad=1, opt=o, opt2=o3,
+                               lst=[c]))
         rb.mand1.should.equal(a)
         rb.mand2.should.equal(b)
         rb.opt.should.contain(o)
+        rb.opt2.should.contain(o3)
         rb.lst.should.equal(List(c))
         rb.lst.should.be.a(List)
         rb2 = rb.update_from_opt(Map(mand1=b, opt=o2))

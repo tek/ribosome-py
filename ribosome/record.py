@@ -75,19 +75,37 @@ def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw):
     return field(Either, initial=initial, invariant=inv, **kw)
 
 
-def _optional_inv(tpe):
-    def inv(a):
+class OptionalInvariant:
+
+    def __init__(self, tpe) -> None:
+        self.tpe = tpe
+
+    def __call__(self, a):
         atpe = type(a)
         return (
-            _foldable_type_field_inv('Optional', tpe)(a)
+            _foldable_type_field_inv('Optional', self.tpe)(a)
             if Optional.exists_instance(atpe) else
             (False, '{} has no Optional'.format(atpe))
         )
-    return inv
 
 
-def optional_field(tpe=None, initial=Empty(), **kw):
-    return any_field(initial=initial, invariant=_optional_inv(tpe), **kw)
+class OptionalFactory:
+
+    def __init__(self, factory, tpe) -> None:
+        self.factory = factory
+        self.tpe = tpe
+
+    @property
+    def fact(self):
+        return maybe_factory(self.factory, self.tpe)
+
+    def __call__(self, a):
+        return a if self.factory is None or self.tpe is None else self.fact(a)
+
+
+def optional_field(tpe=None, factory=None, initial=Empty(), **kw):
+    return any_field(initial=initial, factory=OptionalFactory(factory, tpe),
+                     invariant=OptionalInvariant(tpe), **kw)
 
 
 def bool_field(initial=False, **kw):
@@ -202,6 +220,7 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
             cb = (
                 may_arg if Maybe in field.type else
                 list_arg if List in field.type else
+                may_arg if isinstance(field.factory, OptionalFactory) else
                 regular_arg
             )
             return opt.get(name) / L(cb)(name, field, _)
