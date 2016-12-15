@@ -321,7 +321,7 @@ request handlers.
 Set `self._debug = True` to print all logged messages to stdout at the end of
 the test run.
 
-Set `self.tmux_nvim = True` or the env var `$RIBOSOME_TMUX_SPEX` to run the
+Set `self.tmux_nvim = True` or the env var `$RIBOSOME_TMUX_SPEC` to run the
 instance in a split pane instead of a child process.
 
 For in-depth examples, consider the specs in [proteome].
