@@ -16,7 +16,8 @@ from neovim.api import NvimError
 from amino.util.string import camelcaseify
 
 import amino
-from amino import Maybe, may, List, Map, Boolean, Empty, Just, __, _, Try
+from amino import (Maybe, List, Map, Boolean, Empty, Just, __, _, Try, Either,
+                   Left, Right)
 from amino.util.string import decode
 from amino.anon import format_funcall
 from amino.lazy import lazy
@@ -454,7 +455,7 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         super().__init__(vim, vim, prefix)
 
     def runtime(self, path: str, verbose=True):
-        return self.cmd('runtime! {}.vim'.format(path), verbose=verbose)
+        return self.cmd_sync('runtime! {}.vim'.format(path), verbose=verbose)
 
     def echo(self, text: str):
         self.vcmd(echo(text, 'echo', prefix=Empty()))
@@ -611,19 +612,20 @@ class AsyncVimProxy():
 class OptVar(Logging, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    def _get(self, name) -> Maybe[str]:
+    def _get(self, name):
         ...
 
     @property
     def _desc(self):
         ...
 
-    @may
-    def __call__(self, name) -> Maybe[str]:
+    def __call__(self, name) -> Either[str, str]:
         v = self._get(name)
         if v is None:
-            self.log.debug('{} not found: {}'.format(self._desc, name))
-        return decode(v)
+            msg = '{} not found: {}'.format(self._desc, name)
+            self.log.debug(msg)
+            return Left(msg)
+        return Right(decode(v))
 
     def set(self, name, value):
         self.log.debug('setting {} {} to \'{}\''.format(self._desc, name,
@@ -634,26 +636,26 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
             msg = 'setting vim {} {} to {}'
             self.log.exception(msg.format(self._desc, name, value))
 
-    def path(self, name: str) -> Maybe[Path]:
+    def path(self, name: str) -> Either[str, Path]:
         return self(name).map(lambda a: Path(a).expanduser())  # type: ignore
 
-    def dir(self, name: str) -> Maybe[Path]:
+    def dir(self, name: str) -> Either[str, Path]:
         var = self.path(name)
         val = var.filter(__.is_dir())
-        if not val.is_just:
+        if not val.present:
             msg = 'g:{} is not a directory ({})'
             self.log.error(msg.format(name, var))
         return val
 
-    def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
-        @may
+    def typed(self, tpe: type, value: Either[str, A]) -> Either[str, A]:
         def check(v: A):
             if isinstance(v, tpe):
-                return v
+                return Right(v)
             else:
                 msg = 'invalid type {} for {} {} (wanted {})'.format(
                     type(v), self._desc, v, tpe)
                 self.log.error(msg)
+                return Left(msg)
         return value.flat_map(check)
 
     def s(self, name):
@@ -710,20 +712,20 @@ class Vars(OptVar):
                 del self.internal[name]
         self._vars = set()
 
-    def p(self, name) -> Maybe[str]:
+    def p(self, name) -> Either[str, str]:
         return self(self.prefixed(name))
 
     def set_p(self, name, value):
         self.set(self.prefixed(name), value)
 
-    def ppath(self, name: str) -> Maybe[Path]:
+    def ppath(self, name: str) -> Either[str, Path]:
         return self.path(self.prefixed(name))
 
-    def ppathl(self, name: str) -> Maybe[Path]:
+    def ppathl(self, name: str) -> Either[str, Path]:
         return self.pl(name)\
             .map(lambda l: l.map(Path).map(__.expanduser()))
 
-    def pdir(self, name: str) -> Maybe[Path]:
+    def pdir(self, name: str) -> Either[str, Path]:
         return self.dir(self.prefixed(name))
 
     def ps(self, name):
@@ -802,17 +804,6 @@ class Options(OptVar):
 
     def set_b(self, name: str, value):
         return self.set(name, bool(value))
-
-    def typed(self, tpe: type, value: Maybe[A]) -> Maybe[A]:
-        @may
-        def check(v: A):
-            if isinstance(v, tpe):
-                return v
-            else:
-                msg = 'invalid type {} for option {} (wanted {})'.format(
-                    type(v), v, tpe)
-                self.log.error(msg)
-        return value.flat_map(check)
 
 
 class Flags:
