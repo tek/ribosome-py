@@ -275,7 +275,7 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         threading.Thread(target=self.send_sync, args=(msg,)).start()
 
 
-class PluginStateMachine:
+class PluginStateMachine(MachineBase):
 
     def __init__(self, plugins: List[str]) -> None:
         self.sub = plugins.flat_map(self.start_plugin)

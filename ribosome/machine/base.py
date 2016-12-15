@@ -1,3 +1,4 @@
+import abc
 import time
 import uuid
 import inspect
@@ -134,7 +135,14 @@ class HandlerJob(Logging):
         return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)
 
 
-class Machine(Logging):
+class MachineBase(Logging, abc.ABC):
+
+    @abc.abstractproperty
+    def title(self) -> str:
+        ...
+
+
+class Machine(MachineBase):
     _data_type = Data
 
     def __init__(self, parent: 'Machine'=None, title=None) -> None:
