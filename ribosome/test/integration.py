@@ -57,6 +57,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         self._start_plugin()
 
     def _start_neovim(self):
+        asyncio.get_child_watcher().attach_loop(asyncio.get_event_loop())
         if self.tmux_nvim:
             self._start_neovim_tmux()
         else:

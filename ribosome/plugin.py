@@ -16,19 +16,9 @@ class NvimPlugin(object):
             nvim = NvimFacade(nvim, self.name)
         self.vim = nvim
         self.setup_logging()
-        self.setup_asyncio()
 
     def setup_logging(self):
         nvim_logging(self.vim)
-
-    def setup_asyncio(self):
-        ''' this ensures that the child process watcher is running on
-        the main thread, which is necessary for subprocess to be waited
-        for, as python can only catch SIG_CHLD on the main thread.
-        additionally, an event loop must be executed on the main thread
-        during waiting.
-        '''
-        asyncio.get_child_watcher()
 
     @property
     def loop(self):

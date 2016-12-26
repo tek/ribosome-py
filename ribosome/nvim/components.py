@@ -17,7 +17,7 @@ from amino.util.string import camelcaseify
 
 import amino
 from amino import (Maybe, List, Map, Boolean, Empty, Just, __, _, Try, Either,
-                   Left, Right)
+                   Left, Right, L)
 from amino.util.string import decode
 from amino.anon import format_funcall
 from amino.lazy import lazy
@@ -129,10 +129,21 @@ class NvimComponent(Logging):
         finally, gracefully stop the main loop.
         '''
         main = self.async(lambda v: asyncio.get_event_loop())
-        fut = asyncio.Future(loop=main)
-        self._run_on_main_thread(lambda: main.run_until_complete(fut))
-        yield main
-        main.call_soon_threadsafe(lambda: fut.set_result(True))
+        fut = main.create_future()
+        if not main.is_running():
+            self._run_on_main_thread(L(main.run_until_complete)(fut))
+        try:
+            yield main
+        except:
+            self.log.exception('error while running callback in main loop:')
+        main.call_soon_threadsafe(L(fut.set_result)(True))
+
+    @contextmanager
+    def threadsafe_subprocess(self):
+        with self.main_event_loop() as main:
+            set_watcher = lambda: asyncio.get_child_watcher().attach_loop(main)
+            self._run_on_main_thread(set_watcher)
+            yield main
 
     @property
     def proxy(self):

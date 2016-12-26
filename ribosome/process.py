@@ -168,7 +168,7 @@ class ProcessExecutor(Logging):
         return self.current.is_empty
 
     def _main_event_loop(self):
-        return (self.vim.main_event_loop() if ribosome.in_vim else
+        return (self.vim.threadsafe_subprocess() if ribosome.in_vim else
                 self._dummy_ctx())
 
     @contextmanager
