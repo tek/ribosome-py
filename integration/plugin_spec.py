@@ -1,13 +1,12 @@
 from amino import Right
 from amino.test import later
 
-from ribosome.test import PluginIntegrationSpec
-
 from integration._support.plugin import (TestPluginLooped, TestPlugin,
                                          TestPluginUnlooped)
+from integration._support.base import IntegrationSpecBase
 
 
-class _PluginSpecBase(PluginIntegrationSpec):
+class _PluginSpecBase(IntegrationSpecBase):
 
     def _last_output(self, content):
         later(lambda: self._log_out.last.should.contain(content), timeout=1)

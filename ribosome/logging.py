@@ -1,9 +1,14 @@
+import os
 import logging
+
+from toolz import merge
 
 import amino
 from amino.lazy import lazy
 import amino.logging
-from amino.logging import amino_logger, init_loglevel
+from amino.logging import (amino_logger, init_loglevel, amino_file_logging,
+                           DDEBUG)
+from amino import Path, env
 
 
 class NvimHandler(logging.Handler):
@@ -31,15 +36,30 @@ def ribosome_logger(name: str):
     return ribosome_root_logger.getChild(name)
 
 
-def nvim_logging(vim, level: int=None, handler_level: int=logging.INFO):
+def nvim_logging(vim, level: int=logging.INFO, file_kw=dict()):
     global _nvim_logging_initialized
     if not _nvim_logging_initialized:
         if level is None and not amino.development:
             level = logging.INFO
         handler = NvimHandler(vim)
         ribosome_root_logger.addHandler(handler)
-        handler.setLevel(handler_level)
-        init_loglevel(ribosome_root_logger, level)
+        init_loglevel(handler, level)
+        def file_log(prefix):
+            level = (
+                DDEBUG
+                if 'RIBOSOME_DEVELOPMENT' in env and
+                'RIBOSOME_SPEC' in env else
+                None
+            )
+            logfile = Path('{}_ribo_{}'.format(prefix, os.getpid()))
+            fmt_kw = lambda fmt: dict(fmt=fmt)
+            kw = merge(
+                file_kw,
+                dict(level=level, logfile=logfile),
+                env['RIBOSOME_FILE_LOG_FMT'] / fmt_kw | dict()
+            )
+            amino_file_logging(ribosome_root_logger, **kw)
+        amino.env['NVIM_PYTHON_LOG_FILE'] % file_log
         _nvim_logging_initialized = True
 
 

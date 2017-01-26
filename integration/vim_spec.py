@@ -1,12 +1,11 @@
 from amino import Right, List, __, Map
 from amino.test import later
 
-from ribosome.test import PluginIntegrationSpec
-
 from integration._support.facade import FacadeTestPlugin
+from integration._support.base import IntegrationSpecBase
 
 
-class VimSpec(PluginIntegrationSpec):
+class VimSpec(IntegrationSpecBase):
 
     @property
     def _prefix(self):

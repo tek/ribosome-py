@@ -46,6 +46,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
 
     def setup(self):
         super().setup()
+        env['RIBOSOME_SPEC'] = 1
         self._debug = 'RIBOSOME_DEVELOPMENT' in env
         self.logfile = temp_dir('log') / self.__class__.__name__
         self.logfile.touch()
