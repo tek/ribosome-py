@@ -4,6 +4,7 @@ import abc
 import threading
 import asyncio
 from contextlib import contextmanager
+import concurrent.futures
 
 from lenses import Lens
 
@@ -43,7 +44,11 @@ warn_no_handler = True
 class AsyncIOBase(Logging, abc.ABC):
 
     def _init_asyncio(self):
-        self._loop = asyncio.new_event_loop()  # type: ignore
+        self._loop = (
+            asyncio.new_event_loop()
+            if asyncio._get_running_loop() is None  # type: ignore
+            else asyncio.get_event_loop()
+        )
         self._messages = asyncio.PriorityQueue(loop=self._loop)
 
 
@@ -126,8 +131,8 @@ class StateMachineBase(ModularMachine):
     def send(self, msg: Message, prio=0.5):
         self.log.debug('send {} in {}'.format(msg, self.title))
         if self._messages is not None:
-            return asyncio.run_coroutine_threadsafe(  # type: ignore
-                self._messages.put(msg), self._loop)
+            return asyncio.run_coroutine_threadsafe(self._messages.put(msg),
+                                                    self._loop)
 
     def send_sync(self, msg: Message, wait=None):
         self.send(msg)
@@ -280,11 +285,19 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         while not self._messages.empty():
             await self._step()
 
-    def send_sync(self, msg):
+    def send_sync(self, msg, timeout=medium_timeout):
         self.log.debug('send {} in {}'.format(msg, self.title))
-        if self._messages is not None:
-            self._loop.run_until_complete(self._messages.put(msg))
-        return self.process_messages()
+        done = concurrent.futures.Future()  # type: concurrent.futures.Future
+        async def go():
+            if self._messages is not None:
+                await self._messages.put(msg)
+            result = await self._process_messages()
+            done.set_result(result)
+        if self._loop.is_running():
+            self._loop.call_soon_threadsafe(go())
+        else:
+            self._loop.run_until_complete(go())
+        return done.result(timeout)
 
     def send(self, msg):
         threading.Thread(target=self.send_sync, args=(msg,)).start()
