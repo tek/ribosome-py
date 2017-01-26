@@ -362,8 +362,8 @@ class Buffer(HasWindow):
     def content(self):
         return List.wrap(self.target[:]).map(decode)
 
-    def set_content(self, text):
-        self.target[:] = text
+    def set_content(self, text, rng=slice(None)):
+        self.target[rng] = text
 
     def nmap(self, keyseq, dispatch):
         return self.cmd('nmap <buffer><silent> {} {}'.format(keyseq, dispatch))
