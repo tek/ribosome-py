@@ -124,6 +124,10 @@ def int_field(**kw):
     return field(int, **kw)
 
 
+def float_field(**kw):
+    return field(float, **kw)
+
+
 def str_field(**kw):
     return field(str, **kw)
 
@@ -364,4 +368,5 @@ def decode_json(data):
 
 __all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field',
            'bool_field', 'any_field', 'encode_json', 'decode_json',
-           'int_field', 'uuid_field', 'map_field', 'either_field', 'str_field')
+           'int_field', 'uuid_field', 'map_field', 'either_field', 'str_field',
+           'float_field')
