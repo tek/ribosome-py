@@ -21,6 +21,7 @@ from amino import (Maybe, List, Map, Boolean, Empty, Just, __, _, Try, Either,
 from amino.util.string import decode
 from amino.anon import format_funcall
 from amino.lazy import lazy
+from amino.task import TaskException
 
 import ribosome
 from ribosome.logging import Logging
@@ -162,9 +163,13 @@ class NvimComponent(Logging):
         output requires user input to proceed (e.g. multiline output)
         '''
         l = line if verbose else 'silent {}'.format(line)
-        result = Try(self.vim.command, l, async=not sync)
-        self._cmd_result(line, result, sync)
-        return result
+        return (
+            Try(self.vim.command, l, async=not sync)
+            .bieffect(
+                L(self._cmd_error)(_, line, sync),
+                L(self._cmd_success)(_, line, sync)
+            )
+        )
 
     def cmd_sync(self, line: str, verbose=False):
         return self.cmd(line, verbose=verbose, sync=True)
@@ -173,11 +178,20 @@ class NvimComponent(Logging):
         return List.wrap(
             self.vim.command_output('silent {}'.format(line)).splitlines())
 
-    def _cmd_result(self, line, result, sync: bool):
+    def _cmd_success(self, line: str, result, sync: bool):
         if sync:
             self.log.debug('result of cmd \'{}\': {}'.format(line, result))
         else:
             self.log.debug('async cmd \'{}\''.format(line))
+
+    def _cmd_error(self, exc, line, sync):
+        err = exc.cause if isinstance(exc, TaskException) else exc
+        if amino.development:
+            a = '' if sync else 'a'
+            msg = 'running nvim {}sync cmd `{}`'
+            self.log.caught_exception(msg.format(a, line), err)
+        else:
+            self.log.error(decode(err))
 
     def vcmd(self, line: str, sync=False):
         return self.cmd(line, verbose=True, sync=sync)
