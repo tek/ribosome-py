@@ -171,11 +171,15 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
     def json_cmd_sync(self, cmd, **data):
         return self.vim.cmd_sync(self._json_cmd(cmd, data))
 
+    @property
+    def content(self):
+        return self.vim.buffer.content
+
     def _buffer_content(self, data):
-        later(lambda: self.vim.buffer.content.should.equal(data))
+        later(lambda: self.content.should.equal(data))
 
     def _buffer_length(self, length):
-        later(lambda: self.vim.buffer.content.should.have.length_of(length))
+        later(lambda: self.content.should.have.length_of(length))
 
 
 def main_looped(fun):
