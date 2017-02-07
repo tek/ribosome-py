@@ -1,4 +1,5 @@
 import os
+import abc
 import json
 import asyncio
 from pathlib import Path
@@ -7,11 +8,14 @@ from threading import Thread
 from contextlib import contextmanager
 
 import neovim
+from neovim.api import Nvim
 
 from amino.test import fixture_path, temp_dir, later, temp_file
 
 from amino import List, Maybe, Either, Left, __, Map, Try, L, _, env
-from amino.test import IntegrationSpec as IntegrationSpecBase
+from amino.lazy import lazy
+from amino.test.path import base_dir
+from amino.test.spec import IntegrationSpecBase
 
 import ribosome
 from ribosome.logging import Logging, log
@@ -21,19 +25,22 @@ from ribosome.test.fixtures import rplugin_template
 
 from libtmux import Pane
 
-from amino import env
-from amino.lazy import lazy
-from amino.test.path import base_dir
-
 
 class IntegrationSpec(IntegrationSpecBase):
 
-    def setup(self):
+    def setup(self) -> None:
         super().setup()
         AsyncVimProxy.allow_async_relay = False
 
 
-class VimIntegrationSpec(IntegrationSpecBase, Logging):
+class VimIntegrationSpecI(abc.ABC):
+
+    @abc.abstractproperty
+    def _log_out(self) -> List[str]:
+        ...
+
+
+class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
 
     def __init__(self) -> None:
         super().__init__()
@@ -44,7 +51,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         self._cmdline = ('nvim', '-V{}'.format(self.vimlog), '-n', '-u',
                          'NONE')
 
-    def setup(self):
+    def setup(self) -> None:
         super().setup()
         env['RIBOSOME_SPEC'] = 1
         self._debug = 'RIBOSOME_DEVELOPMENT' in env
@@ -56,8 +63,9 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         self._post_start_neovim()
         self._pre_start()
         self._start_plugin()
+        self._post_start()
 
-    def _start_neovim(self):
+    def _start_neovim(self) -> None:
         asyncio.get_child_watcher().attach_loop(asyncio.get_event_loop())
         if self.tmux_nvim:
             self._start_neovim_tmux()
@@ -65,7 +73,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
             self._start_neovim_embedded()
         self.vim = self._nvim_facade(self.neovim)
 
-    def _start_neovim_embedded(self):
+    def _start_neovim_embedded(self) -> None:
         ''' start an embedded vim session that loads no init.vim.
         **self.vimlog** is set as log file. aside from being convenient,
         this is crucially necessary, as the first use of the session
@@ -94,7 +102,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
                            if int(s['session_attached']) >= 1)
             return session.attached_window
 
-    def _start_neovim_tmux(self):
+    def _start_neovim_tmux(self) -> None:
         global_path = env['PYTHONPATH'] | ''
         path = '{}:{}'.format(self.project_path, global_path)
         tmux_env = (
@@ -114,7 +122,7 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         if self._tmux_pane is not None and not self.keep_tmux_pane:
             self._tmux_pane.cmd('kill-pane')
 
-    def _nvim_facade(self, vim):
+    def _nvim_facade(self, vim: Nvim) -> NvimFacade:
         return NvimFacade(vim, self._prefix)
 
     @property
@@ -127,17 +135,20 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
         if self.tmux_nvim:
             self._cleanup_tmux()
 
-    def _pre_start_neovim(self):
+    def _pre_start_neovim(self) -> None:
         pass
 
-    def _post_start_neovim(self):
+    def _post_start_neovim(self) -> None:
         rtp = fixture_path('config', 'rtp')
         self.vim.options.amend_l('runtimepath', rtp)
 
-    def _pre_start(self):
+    def _pre_start(self) -> None:
         pass
 
-    def _start_plugin(self):
+    def _start_plugin(self) -> None:
+        pass
+
+    def _post_start(self) -> None:
         pass
 
     def _pvar_becomes(self, name, value):
@@ -150,16 +161,6 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
     @property
     def _log_out(self):
         return List.wrap(self.logfile.read_text().splitlines())
-
-    def _log_line(self, index, checker):
-        def check():
-            minlen = index if index >= 0 else abs(index + 1)
-            len(self._log_out).should.be.greater_than(minlen)
-            return checker(self._log_out[index]).should.be.ok
-        later(check)
-
-    def _log_contains(self, line):
-        later(lambda: self._log_out.should.contain(line))
 
     def _json_cmd(self, cmd, data):
         j = json.dumps(data).replace('"', '\\"')
@@ -175,10 +176,23 @@ class VimIntegrationSpec(IntegrationSpecBase, Logging):
     def content(self):
         return self.vim.buffer.content
 
-    def _buffer_content(self, data):
+
+class VimIntegrationSureHelpers:
+
+    def _log_line(self, index, checker) -> None:
+        def check() -> None:
+            minlen = index if index >= 0 else abs(index + 1)
+            len(self._log_out).should.be.greater_than(minlen)
+            return checker(self._log_out[index]).should.be.ok
+        later(check)
+
+    def _log_contains(self, line) -> None:
+        later(lambda: self._log_out.should.contain(line))
+
+    def _buffer_content(self, data) -> None:
         later(lambda: self.content.should.equal(data))
 
-    def _buffer_length(self, length):
+    def _buffer_length(self, length) -> None:
         later(lambda: self.content.should.have.length_of(length))
 
 
