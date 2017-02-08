@@ -56,8 +56,10 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         env['RIBOSOME_SPEC'] = 1
         self._debug = 'RIBOSOME_DEVELOPMENT' in env
         self.logfile = temp_dir('log') / self.__class__.__name__
+        self.log_format = '{levelname} {name}:{message}'
         self.logfile.touch()
         os.environ['RIBOSOME_LOG_FILE'] = str(self.logfile)
+        os.environ['RIBOSOME_FILE_LOG_FMT'] = self.log_format
         self._pre_start_neovim()
         self._start_neovim()
         self._post_start_neovim()
@@ -110,6 +112,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
             'NVIM_LISTEN_ADDRESS={}'.format(self.nvim_socket),
             'PYTHONPATH={}'.format(path),
             'RIBOSOME_LOG_FILE={}'.format(self.logfile),
+            'RIBOSOME_FILE_LOG_FMT=\'{}\''.format(self.log_format),
         )
         cmd = tuple(tmux_env + self._cmdline)
         out = self._tmux_window.cmd(

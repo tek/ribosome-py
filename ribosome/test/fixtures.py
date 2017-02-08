@@ -15,10 +15,9 @@ from ribosome.logging import ribosome_root_logger
 
 logfile = Path(os.environ['RIBOSOME_LOG_FILE'])
 fmt = os.environ.get('RIBOSOME_FILE_LOG_FMT')
-amino.logging.amino_file_logging(ribosome_root_logger,
-                                 level=amino.logging.VERBOSE,
-                                 logfile=logfile,
-                                 fmt=fmt)
+amino.logging.amino_root_file_logging(level=amino.logging.VERBOSE,
+                                      logfile=logfile,
+                                      fmt=fmt)
 
 
 @neovim.plugin
