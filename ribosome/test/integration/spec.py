@@ -50,13 +50,13 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         self.vimlog = temp_dir('log') / 'vim'
         self._cmdline = ('nvim', '-V{}'.format(self.vimlog), '-n', '-u',
                          'NONE')
+        self.log_format = '{levelname} {name}:{message}'
 
     def setup(self) -> None:
         super().setup()
         env['RIBOSOME_SPEC'] = 1
         self._debug = 'RIBOSOME_DEVELOPMENT' in env
         self.logfile = temp_dir('log') / self.__class__.__name__
-        self.log_format = '{levelname} {name}:{message}'
         self.logfile.touch()
         os.environ['RIBOSOME_LOG_FILE'] = str(self.logfile)
         os.environ['RIBOSOME_FILE_LOG_FMT'] = self.log_format

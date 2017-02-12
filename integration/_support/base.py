@@ -6,7 +6,7 @@ from ribosome.test.integration import PluginIntegrationSpec
 class IntegrationSpecBase(PluginIntegrationSpec):
 
     def setup(self):
-        env['RIBOSOME_FILE_LOG_FMT'] = '{message}'
+        self.log_format = '{message}'
         super().setup()
 
 __all__ = ('IntegrationSpecBase',)
