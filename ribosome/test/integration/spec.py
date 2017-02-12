@@ -204,16 +204,25 @@ def main_looped(fun):
     def wrapper(self):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        asyncio.get_child_watcher().attach_loop(loop)
         done = asyncio.Future(loop=loop)
+        exc = None
         def runner():
             local_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(local_loop)
-            Try(fun, self).leffect(L(log.caught_exception)('spec', _))
-            loop.call_soon_threadsafe(lambda: done.set_result(True))
-            local_loop.close()
+            try:
+                fun(self)
+            except Exception as e:
+                nonlocal exc
+                exc = e
+            finally:
+                loop.call_soon_threadsafe(lambda: done.set_result(True))
+                local_loop.close()
         Thread(target=runner).start()
         loop.run_until_complete(done)
         loop.close()
+        if exc is not None:
+            raise exc
     return wrapper
 
 

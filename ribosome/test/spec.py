@@ -107,7 +107,6 @@ class MockNvimSpec(Spec):
         self.prefix = prefix
 
     def setup(self):
-        super().setup()
         ribosome.in_vim = False
         self.vim = MockNvimFacade(self.prefix)
         self.vim_mock = flexmock(self.vim)
