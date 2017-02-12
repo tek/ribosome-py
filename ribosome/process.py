@@ -1,6 +1,7 @@
 from pathlib import Path
 import shutil
 from contextlib import contextmanager
+from typing import Tuple
 
 import asyncio
 from asyncio.subprocess import PIPE
@@ -129,34 +130,56 @@ class ProcessExecutor(Logging):
         )
 
     async def _execute(self, job: Job):
+        def error(msg: str) -> Tuple[int, str, str]:
+            return -111, '', msg
         try:
+            out, err = None, None
             with self._main_event_loop():
                 proc = await self.process(job)
-                (out, err) = await proc.communicate(job.stdin)
-            msg = '{} executed successfully ({}, {})'.format(job, out, err)
-            self.log.debug(msg)
-            return proc.returncode, out.decode(), err.decode()
+                out, err = await proc.communicate(job.stdin)
+            if out is None or err is None:
+                return err('executing {} failed'.format(job))
+            else:
+                msg = '{} executed successfully ({}, {})'.format(job, out, err)
+                self.log.debug(msg)
+                return proc.returncode, out.decode(), err.decode()
         except Exception as e:
             self.log.exception('{} failed with {}'.format(job, repr(e)))
-            return -111, '', 'exception: {}'.format(e)
+            return error('exception: {}'.format(e))
 
     def run(self, job: Job) -> Future[Result]:
         ''' return values of execute are set as result of the task
         returned by ensure_future(), obtainable via task.result()
         '''
-        if self._can_execute(job):
+        if not self.watcher_ready:
+            msg = 'child watcher unattached when executing {}'.format(job)
+            self.log.error(msg)
+            job.cancel('unattached watcher')
+        elif not self.can_execute(job):
+            self.log.error('invalid execution job: {}'.format(job))
+            job.cancel('invalid')
+        else:
             self.log.debug('executing {}'.format(job))
             task = asyncio.ensure_future(self._execute(job), loop=self.loop)
             task.add_done_callback(job.finish)
             task.add_done_callback(F(self.job_done, job))
             self.current[job.client] = job
-        else:
-            self.log.error('invalid execution job: {}'.format(job))
-            job.cancel('invalid')
         return job.status
 
-    def _can_execute(self, job: Job):
-        return job.client not in self.current and job.valid
+    @property
+    def watcher_ready(self) -> bool:
+        with self._main_event_loop() as main:
+            watcher = asyncio.get_child_watcher()
+        return (
+            watcher is not None and
+            watcher._loop is not None
+        )
+
+    def can_execute(self, job: Job):
+        return (
+            job.client not in self.current and
+            job.valid
+        )
 
     def job_done(self, job, status):
         self.log.debug('{} is done with status {}'.format(job, status))

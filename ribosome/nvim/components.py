@@ -9,6 +9,8 @@ import abc
 from types import FunctionType
 import inspect
 import traceback
+import time
+import functools
 
 import neovim
 from neovim.api import NvimError
@@ -96,27 +98,39 @@ class NvimComponent(Logging):
         cb = lambda: self.__run_on_main_thread(f)
         threading.Timer(1.0, cb).start()
 
-    def async(self, f: Callable[['NvimComponent'], Any]):
+    def async(self, f: Callable[['NvimComponent'], Any], *a, **kw):
         ''' run a callback function on the main thread and return its
         value (blocking). the callback receives 'self' as an argument.
         '''
         if not shutdown:
-            result = futures.Future()  # type: futures.Future
-            cb = lambda: result.set_result(f(self))
+            msg = 'running {} on main thread blocking'
+            self.log.ddebug(
+                lambda: msg.format(format_funcall(f.__name__, a, kw)))
+            result_fut = futures.Future()  # type: futures.Future
+            @functools.wraps(f)
+            def cb() -> None:
+                result_fut.set_result(f(self, *a, **kw))
             self._run_on_main_thread(cb)
-            return result.result()
+            result = result_fut.result()
+            self.log.ddebug('async returns {}'.format(result))
+            return result
         else:
-            return f(self)
+            return f(self, *a, **kw)
 
-    def _run_on_main_thread(self, f: Callable[..., Any]):
+    def _run_on_main_thread(self, f: Callable[..., Any], *a, **kw):
         ''' run a callback function on the host's main thread
         '''
         frame = inspect.currentframe()  # type: ignore
         def dispatch():
+            self.log.ddebug(
+                lambda: 'running on main thread: {}'.format(
+                    format_funcall(f.__name__, a, kw)))
             try:
-                f()
+                f(*a, **kw)
             except NvimError as e:
                 self._report_nvim_error(e, frame)
+            else:
+                self.log.ddebug('{} successful'.format(f.__name__))
         self.vim.session.threadsafe_call(dispatch)
 
     def _report_nvim_error(self, err, frame):
@@ -125,14 +139,20 @@ class NvimComponent(Logging):
 
     @contextmanager
     def main_event_loop(self):
-        ''' run the asyncio main loop on vim's pyuv main thread, then
-        yield the loop to the with statement in the current thread, and
-        finally, gracefully stop the main loop.
+        ''' run the asyncio main loop on vim's pyuv main thread and
+        yield the loop to the with statement in the current thread.
         '''
-        main = self.async(lambda v: asyncio.get_event_loop())
+        def get_event_loop(v) -> Any:
+            return asyncio.get_event_loop()
+        main = self.async(get_event_loop)
         fut = main.create_future()
         if not main.is_running():
-            self._run_on_main_thread(L(main.run_until_complete)(fut))
+            self._run_on_main_thread(main.run_until_complete, fut)
+            start = time.time()
+            while not main.is_running() and time.time() - start < 1:
+                time.sleep(0.01)
+            if not main.is_running():
+                self.log.debug('timed out waiting for main loop to start')
         try:
             yield main
         except:
@@ -141,9 +161,23 @@ class NvimComponent(Logging):
 
     @contextmanager
     def threadsafe_subprocess(self):
+        def set_watcher(vim: Any) -> None:
+            asyncio.get_child_watcher().attach_loop(asyncio.get_event_loop())
+        self.async(set_watcher)
         with self.main_event_loop() as main:
-            set_watcher = lambda: asyncio.get_child_watcher().attach_loop(main)
-            self._run_on_main_thread(set_watcher)
+            # fut = main.create_future()
+            # def check_watcher() -> None:
+            #     self.log.verbose(asyncio.get_child_watcher()._loop)
+            #     if asyncio.get_child_watcher()._loop is not None:
+            #         self.log.verbose('setting done')
+            #         main.call_soon_threadsafe(L(fut.set_result)(True))
+            #         self.log.verbose(fut.result())
+            # start = time.time()
+            # while not fut.done() and time.time() - start < 1:
+            #     self.async(lambda v: check_watcher)
+            #     time.sleep(0.01)
+            # if not fut.done():
+            #     self.log.debug('timed out waiting for child watcher')
             yield main
 
     @property
@@ -583,8 +617,9 @@ class AsyncVimCallProxy():
         self.name = name
 
     def __call__(self, *a, **kw):
-        return self._vim.async(
-            lambda v: getattr(self._target, self.name)(*a, **kw))
+        def proxy_call(vim, target, name, *a, **kw) -> None:
+            return getattr(target, name)(*a, **kw)
+        return self._vim.async(proxy_call, self._target, self.name, *a, **kw)
 
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.name,
@@ -622,7 +657,9 @@ class AsyncVimProxy():
             return getattr(self._target, name)
 
     def _async_attr(self, name):
-        return self._vim.async(lambda v: getattr(self._target, name))
+        def proxy_getattr(vim, target, name) -> None:
+            return getattr(target, name)
+        return self._vim.async(proxy_getattr, self._target, name)
 
     def __eq__(self, other):
         return self.__getattr__('__eq__')(other)
