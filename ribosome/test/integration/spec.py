@@ -53,7 +53,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def setup(self) -> None:
         super().setup()
         env['RIBOSOME_SPEC'] = 1
-        env['RIBOSOME_PKG_DIR'] = pkg_dir()
+        env['RIBOSOME_PKG_DIR'] = str(pkg_dir())
         self._debug = 'RIBOSOME_DEVELOPMENT' in env
         self.logfile = temp_dir('log') / self.__class__.__name__
         self.logfile.touch()
