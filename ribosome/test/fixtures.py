@@ -5,8 +5,6 @@ import sys
 import logging
 from pathlib import Path
 
-from {plugin_module} import {plugin_class}
-
 import amino
 
 amino.development = True
@@ -23,6 +21,8 @@ amino.logging.amino_root_file_logging(level=amino.logging.VERBOSE,
 pkg_dir = os.environ.get('RIBOSOME_PKG_DIR')
 if pkg_dir:
     sys.path.insert(0, pkg_dir)
+
+from {plugin_module} import {plugin_class}
 
 @neovim.plugin
 class Plugin({plugin_class}):
