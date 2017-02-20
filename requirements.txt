@@ -1,4 +1,4 @@
-amino
+amino>=9.5.1
 neovim
 pyrsistent
 libtmux
