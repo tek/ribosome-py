@@ -1,6 +1,7 @@
 amino
 neovim
 pyrsistent
+libtmux
 spec
 sure
 flexmock
