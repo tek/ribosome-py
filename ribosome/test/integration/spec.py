@@ -23,8 +23,6 @@ from ribosome import NvimFacade
 from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
 
-from libtmux import Pane
-
 
 class IntegrationSpec(IntegrationSpecBase):
 
@@ -105,6 +103,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
             return session.attached_window
 
     def _start_neovim_tmux(self) -> None:
+        from libtmux import Pane
         global_path = env['PYTHONPATH'] | ''
         path = '{}:{}'.format(self.project_path, global_path)
         tmux_env = (
