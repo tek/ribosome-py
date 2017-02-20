@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version_parts = (10, 0, 4)
+version_parts = (10, 0, 5)
 version = '.'.join(map(str, version_parts))
 
 setup(
@@ -13,7 +13,7 @@ setup(
     url='https://github.com/tek/ribosome',
     packages=find_packages(exclude=['unit', 'unit.*']),
     install_requires=[
-        'amino>=9.3.1',
+        'amino>=9.5.1',
         'neovim',
         'pyrsistent',
     ]
