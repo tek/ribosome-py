@@ -1,6 +1,7 @@
 rplugin_template = '''
 import neovim
 import os
+import sys
 import logging
 from pathlib import Path
 
@@ -19,6 +20,9 @@ amino.logging.amino_root_file_logging(level=amino.logging.VERBOSE,
                                       logfile=logfile,
                                       fmt=fmt)
 
+pkg_dir = os.environ.get('RIBOSOME_PKG_DIR')
+if pkg_dir:
+    sys.path.insert(0, pkg_dir)
 
 @neovim.plugin
 class Plugin({plugin_class}):

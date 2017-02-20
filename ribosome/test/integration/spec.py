@@ -12,13 +12,13 @@ from neovim.api import Nvim
 
 from amino.test import fixture_path, temp_dir, later, temp_file
 
-from amino import List, Maybe, Either, Left, __, Map, Try, L, _, env
+from amino import List, Maybe, Either, Left, __, Map, env
 from amino.lazy import lazy
-from amino.test.path import base_dir
+from amino.test.path import base_dir, pkg_dir
 from amino.test.spec import IntegrationSpecBase
 
 import ribosome
-from ribosome.logging import Logging, log
+from ribosome.logging import Logging
 from ribosome import NvimFacade
 from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
@@ -53,6 +53,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def setup(self) -> None:
         super().setup()
         env['RIBOSOME_SPEC'] = 1
+        env['RIBOSOME_PKG_DIR'] = pkg_dir()
         self._debug = 'RIBOSOME_DEVELOPMENT' in env
         self.logfile = temp_dir('log') / self.__class__.__name__
         self.logfile.touch()
