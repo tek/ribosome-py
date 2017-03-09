@@ -5,7 +5,7 @@ from typing import Callable, Any
 from amino.test.spec import default_timeout
 from amino import List
 
-from kallikrein import k
+from kallikrein import k, kf
 from kallikrein.matcher import Matcher
 from kallikrein.matchers.length import have_length
 from kallikrein.matchers.comparison import greater
@@ -15,14 +15,13 @@ from kallikrein.matchers import contain
 from ribosome.test.integration.spec import VimIntegrationSpecI
 
 
-def later(exp: Callable[..., Expectation], *a: Any, timeout: float=None,
-          intval: float=0.1, **kw: Any) -> None:
+def later(exp: Expectation, timeout: float=None, intval: float=0.1) -> None:
     to = default_timeout if timeout is None else timeout
     start = datetime.now()
-    while (not exp(*a, **kw).unsafe_eval and
+    while (not exp.unsafe_eval and
            (datetime.now() - start).total_seconds() < to):
         time.sleep(intval)
-    return exp()
+    return exp
 
 
 class VimIntegrationKlkHelpers(VimIntegrationSpecI):
@@ -44,5 +43,8 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
 
     def _buffer_length(self, length: int) -> None:
         return later(lambda: k(self.content).must(have_length(length)))
+
+    def _wait_for(self, pred: Callable[..., bool], *a: Any, **kw: Any) -> None:
+        return later(kf(pred, *a, **kw).true)
 
 __all__ = ('VimIntegrationKlkHelpers',)
