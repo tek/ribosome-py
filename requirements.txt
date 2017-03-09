@@ -5,3 +5,4 @@ libtmux
 spec
 sure
 flexmock
+kallikrein

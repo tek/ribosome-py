@@ -3,8 +3,8 @@ before_script:
 
 unit:
   script:
-    - spec unit
+    - klk unit
 
 integration:
   script:
-    - spec integration
+    - klk integration
