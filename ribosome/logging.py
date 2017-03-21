@@ -52,7 +52,7 @@ def nvim_logging(vim: Nvim, level: int=logging.INFO, file_kw: dict=dict()
                 DDEBUG
                 if 'RIBOSOME_DEVELOPMENT' in env and
                 'RIBOSOME_SPEC' in env else
-                None
+                env['RIBOSOME_FILE_LOG_LEVEL'] | logging.INFO
             )
             logfile = Path('{}_ribo_{}'.format(prefix, os.getpid()))
             fmt_kw = lambda fmt: dict(fmt=fmt)
