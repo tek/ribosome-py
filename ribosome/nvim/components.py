@@ -162,22 +162,13 @@ class NvimComponent(Logging):
     @contextmanager
     def threadsafe_subprocess(self):
         def set_watcher(vim: Any) -> None:
-            asyncio.get_child_watcher().attach_loop(asyncio.get_event_loop())
+            try:
+                asyncio.get_child_watcher().attach_loop(
+                    asyncio.get_event_loop())
+            except Exception:
+                pass
         self.async(set_watcher)
         with self.main_event_loop() as main:
-            # fut = main.create_future()
-            # def check_watcher() -> None:
-            #     self.log.verbose(asyncio.get_child_watcher()._loop)
-            #     if asyncio.get_child_watcher()._loop is not None:
-            #         self.log.verbose('setting done')
-            #         main.call_soon_threadsafe(L(fut.set_result)(True))
-            #         self.log.verbose(fut.result())
-            # start = time.time()
-            # while not fut.done() and time.time() - start < 1:
-            #     self.async(lambda v: check_watcher)
-            #     time.sleep(0.01)
-            # if not fut.done():
-            #     self.log.debug('timed out waiting for child watcher')
             yield main
 
     @property
