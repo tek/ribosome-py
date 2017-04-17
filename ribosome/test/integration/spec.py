@@ -176,7 +176,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return self.vim.cmd_sync(self._json_cmd(cmd, data))
 
     @property
-    def content(self):
+    def content(self) -> List[str]:
         return self.vim.buffer.content
 
 

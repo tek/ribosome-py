@@ -117,7 +117,7 @@ class UniteKind(UniteEntity):
     _defaults = Map(is_selectable=1)
 
     @property
-    def tpe(self):
+    def tpe(self) -> str:
         return 'kind'
 
     def __init__(self, name: str, actions: List[Map]) -> None:

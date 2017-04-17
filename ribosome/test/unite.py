@@ -12,7 +12,7 @@ def unite(f):
             self.vim.cmd('source {}/plugin/unite/*.vim'.format(unite))
             self.vim.cmd('source {}/syntax/*.vim'.format(unite))
             return f(self)
-        env['UNITE_DIR'] % go
+        return env['UNITE_DIR'] / go | None
     return wrapper
 
 __all__ = ('unite',)
