@@ -5,7 +5,8 @@ from typing import Callable, Any
 from amino.test.spec import default_timeout
 from amino import List
 
-from kallikrein import k, kf
+from kallikrein import kf
+from kallikrein.expectable import Expectable
 from kallikrein.matcher import Matcher
 from kallikrein.matchers.length import have_length
 from kallikrein.matchers.comparison import greater
@@ -26,23 +27,27 @@ def later(exp: Expectation, timeout: float=None, intval: float=0.1) -> None:
 
 class VimIntegrationKlkHelpers(VimIntegrationSpecI):
 
+    @property
+    def contentkf(self) -> Expectable:
+        return kf(lambda: self.vim.buffer.content)
+
     def _log_line(self, index: int, checker: Matcher) -> None:
         def check() -> None:
             minlen = index if index >= 0 else abs(index + 1)
             return (
-                k(self._log_out).must(have_length(greater(minlen))) &
-                k(self._log_out[index]).must(checker)
+                kf(lambda: self._log_out).must(have_length(greater(minlen))) &
+                kf(lambda: self._log_out[index]).must(checker)
             )
         return later(check)
 
     def _log_contains(self, line: str) -> None:
-        return later(lambda: k(self._log_out).must(contain(line)))
+        return later(kf(lambda: self._log_out).must(contain(line)))
 
     def _buffer_content(self, data: List[str]) -> None:
-        return later(lambda: k(self.content) == data)
+        return later(self.contentkf == data)
 
     def _buffer_length(self, length: int) -> None:
-        return later(lambda: k(self.content).must(have_length(length)))
+        return later(self.contentkf.must(have_length(length)))
 
     def _wait_for(self, pred: Callable[..., bool], *a: Any, **kw: Any) -> None:
         return later(kf(pred, *a, **kw).true)
