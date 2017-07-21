@@ -599,6 +599,9 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def messages(self):
         return self.cmd_output('messages')
 
+    def import_pvar_path(self, name: str) -> Maybe[A]:
+        return self.buffer.vars.p(name).o(lambda: self.vars.p(name)).flat_map(Either.import_path)
+
 
 class AsyncVimCallProxy():
 
