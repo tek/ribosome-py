@@ -45,6 +45,7 @@ class _PluginSpecBase(VimIntegrationKlkHelpers, IntegrationSpecBase):
         later(lambda: self.vim.windows.length.should.equal(1))
         self.vim.cmd_sync('CheckScratch')
         self._last_output('0')
+        return k(1) == 1
 
 
 class LoopedPluginSpec(_PluginSpecBase):

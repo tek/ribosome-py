@@ -8,12 +8,12 @@ from asyncio import iscoroutine
 import toolz
 
 import amino
-from amino import Maybe, F, _, List, Map, Empty, L, __, Just, Eval
+from amino import Maybe, F, _, List, Map, Empty, L, __, Just, Eval, Either
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
 from amino.func import flip
-from amino.state import State
+from amino.state import StateT, EvalState, MaybeState, EitherState
 from amino.tc.optional import Optional
 
 from ribosome.machine.message_base import Message, Publish, message
@@ -102,7 +102,7 @@ class HandlerJob(Logging):
             return res0
         elif isinstance(res0, self.data_type):
             return TransitionResult.empty(res0)
-        elif isinstance(res0, State):
+        elif isinstance(res0, StateT):
             result = self.transform_state(res0)
         elif is_message(res0) or not is_seq(res0):
             result = List(res0)
@@ -135,15 +135,17 @@ class HandlerJob(Logging):
         else:
             return result
 
-    def transform_state(self, res0: State):
-        r1 = res0.run(self.data)
-        if isinstance(r1, Eval):
-            (data, result) = r1._value()
-        elif Optional.exists(type(r1)):
-            (data, result) = r1.get_or_else((self.data, Nop()))
+    def transform_state(self, res0: StateT):
+        res1 = res0.run(self.data)
+        if res0.tpe == Eval:
+            (data, result) = res1._value()
+        elif res0.tpe == Maybe:
+            (data, result) = res1.get_or_else((self.data, Nop()))
+        elif res0.tpe == Either:
+            (data, result) = res1.value_or(lambda a: (self.data, Error(str(a))))
         else:
-            return List(Error(f'invalid effect type for transition result type State: {r1}'))
-        r2 = result.get_or_else(Nop()) if Optional.exists(type(result)) else r1
+            return List(Error(f'invalid effect for transition result `State`: {res0.tpe}#{res1}'))
+        r2 = result.get_or_else(Nop()) if Optional.exists(type(result)) else result
         return List(data, r2)
 
     def create_result(self, data, msgs):
