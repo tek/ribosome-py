@@ -30,7 +30,7 @@ class NvimHandler(logging.Handler):
         dispatcher(record.getMessage())
 
 
-log = ribosome_root_logger = amino_logger('nvim')
+ribo_log = log = ribosome_root_logger = amino_logger('nvim')
 _nvim_logging_initialized = False
 
 
@@ -84,4 +84,4 @@ def pv(a):
     v(str(a))
     return a
 
-__all__ = ('ribosome_logger', 'nvim_logging', 'Logging', 'pr')
+__all__ = ('ribosome_logger', 'nvim_logging', 'Logging', 'pr', 'ribo_log')
