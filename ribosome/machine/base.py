@@ -2,17 +2,19 @@ import abc
 import time
 import uuid
 import inspect
-from typing import Sequence, Callable, TypeVar
+from typing import Sequence, Callable, TypeVar, Any
 from asyncio import iscoroutine
 
 import toolz
 
 import amino
-from amino import Maybe, F, _, List, Map, Empty, L, __, Just
+from amino import Maybe, F, _, List, Map, Empty, L, __, Just, Eval
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
 from amino.func import flip
+from amino.state import State
+from amino.tc.optional import Optional
 
 from ribosome.machine.message_base import Message, Publish, message
 from ribosome.logging import Logging
@@ -83,9 +85,9 @@ class HandlerJob(Logging):
         try:
             return handler.run(data, msg)
         except Exception as e:
-            return self._handle_transition_error(e)
+            return self.handle_transition_error(e)
 
-    def _handle_transition_error(self, e):
+    def handle_transition_error(self, e):
         if amino.development:
             err = 'transition "{}" failed for {} in {}'
             self.log.exception(err.format(self.handler.name, self.msg,
@@ -93,17 +95,21 @@ class HandlerJob(Logging):
             raise TransitionFailed(str(e)) from e
         return Just(StrictTransitionResult.failed(self.data, e))
 
-    def process_result(self, result) -> TransitionResult:
-        if isinstance(result, Coroutine):
-            return CoroTransitionResult(data=self.data, coro=result)
-        elif isinstance(result, TransitionResult):
-            return result
-        elif isinstance(result, self.data_type):
-            return TransitionResult.empty(result)
-        elif is_message(result) or not is_seq(result):
-            result = List(result)
+    def process_result(self, res0: Any) -> TransitionResult:
+        if isinstance(res0, Coroutine):
+            return CoroTransitionResult(data=self.data, coro=res0)
+        elif isinstance(res0, TransitionResult):
+            return res0
+        elif isinstance(res0, self.data_type):
+            return TransitionResult.empty(res0)
+        elif isinstance(res0, State):
+            result = self.transform_state(res0)
+        elif is_message(res0) or not is_seq(res0):
+            result = List(res0)
+        else:
+            result = res0
         datas, rest = List.wrap(result).split_type(self.data_type)
-        trans = rest / self._transform_result
+        trans = rest / self.transform_result
         msgs, rest = trans.split_type(Message)
         if rest:
             tpl = 'invalid transition result parts for {} in {}: {}'
@@ -113,9 +119,9 @@ class HandlerJob(Logging):
             else:
                 self.log.error(msg)
         new_data = datas.head | self.data
-        return self._create_result(new_data, msgs)
+        return self.create_result(new_data, msgs)
 
-    def _transform_result(self, result):
+    def transform_result(self, result):
         if iscoroutine(result):
             return Coroutine(result).pub
         elif isinstance(result, Task):
@@ -129,7 +135,18 @@ class HandlerJob(Logging):
         else:
             return result
 
-    def _create_result(self, data, msgs):
+    def transform_state(self, res0: State):
+        r1 = res0.run(self.data)
+        if isinstance(r1, Eval):
+            (data, result) = r1._value()
+        elif Optional.exists(type(r1)):
+            (data, result) = r1.get_or_else((self.data, Nop()))
+        else:
+            return List(Error(f'invalid effect type for transition result type State: {r1}'))
+        r2 = result.get_or_else(Nop()) if Optional.exists(type(result)) else r1
+        return List(data, r2)
+
+    def create_result(self, data, msgs):
         pub, resend = msgs.split_type(Publish)
         pub_msgs = pub.map(_.message)
         return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)

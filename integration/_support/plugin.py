@@ -3,15 +3,18 @@ import neovim
 from ribosome import command, NvimStatePlugin
 
 from amino.lazy import lazy
-from amino import Left, L, _, Map
+from amino import Left, L, _, Map, List, Eval, Task, Just
+from amino.state import State
 from ribosome.logging import Logging
 from ribosome.request import function, msg_function, msg_command
-from ribosome.machine import message, may_handle, handle, Machine
+from ribosome.machine import message, may_handle, handle, Machine, Message, Nop
 from ribosome.machine.state import (UnloopedRootMachine, RunScratchMachine,
                                     RootMachine)
 from ribosome.machine.transition import Fatal, may_fallback
 from ribosome.machine.scratch import ScratchMachine, Mapping
 from ribosome.nvim import NvimFacade, ScratchBuffer
+from ribosome.data import Data
+from ribosome.record import int_field
 
 
 Msg = message('Msg', 'text')
@@ -19,13 +22,24 @@ Err = message('Err')
 Scratch = message('Scratch')
 ScratchTest = message('ScratchTest')
 ScratchCheck = message('ScratchCheck')
+St = message('St')
+Print = message('Print', 'msg')
 
 
-class Mach:
+class TData(Data):
+    v = int_field(initial=0)
+
+    @property
+    def _str_extra(self) -> List[str]:
+        return List(self.v)
+
+
+class Mach(Logging):
 
     @may_handle(Msg)
     def mess(self, data, msg):
         self.log.info(msg.text)
+        return data.set(v=3)
 
     @handle(Err)
     def err(self, data, msg):
@@ -40,9 +54,17 @@ class Mach:
     def check_scratch(self, data, msg):
         self.log.info(self.sub.length)
 
+    @may_handle(St)
+    def st(self, data, msg) -> State[TData, Message]:
+        return State.inspect(lambda a: Just(Print(a.v * 2)), Eval)
+
+    @may_handle(Print)
+    def print_(self, data: Data, msg: Print) -> Message:
+        self.log.info(msg.msg)
+
 
 class MachLooped(Mach, RootMachine):
-    pass
+    _data_type = TData
 
 
 class MachUnlooped(Mach, UnloopedRootMachine):
@@ -97,6 +119,10 @@ class TestPlugin(NvimStatePlugin, Logging):
 
     @msg_command(Err)
     def err(self):
+        pass
+
+    @msg_command(St)
+    def st(self):
         pass
 
     @msg_command(Scratch)

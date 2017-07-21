@@ -131,8 +131,7 @@ class StateMachineBase(ModularMachine):
     def send(self, msg: Message, prio=0.5):
         self.log.debug('send {} in {}'.format(msg, self.title))
         if self._messages is not None:
-            return asyncio.run_coroutine_threadsafe(self._messages.put(msg),
-                                                    self._loop)
+            return asyncio.run_coroutine_threadsafe(self._messages.put(msg), self._loop)
 
     def send_sync(self, msg: Message, wait=None):
         self.send(msg)

@@ -1,9 +1,9 @@
 import functools
-from typing import Callable, TypeVar
+from typing import Callable, TypeVar, Any
 from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
-from amino import Maybe, may, Either, Just, Left, I, List
+from amino import Maybe, may, Either, Just, Left, I, List, _
 from amino.task import TaskException
 
 from ribosome.machine.message_base import (message, _message_attr,
@@ -51,7 +51,8 @@ def _to_error(data):
     )
 
 
-def _recover_error(handler, result):
+def _recover_error(handler: 'Handler', result: Any) -> Maybe[Any]:
+    from ribosome.logging import log
     if not Optional.exists(type(result)):
         err = 'in {}: result has no Optional: {}'
         return Just(Error(err.format(handler, result)))
@@ -65,7 +66,7 @@ def _task_result(result):
     return result.cata(Left, I)
 
 
-class Handler:
+class Handler(Logging):
 
     def __init__(self, machine, name, message, fun, prio):
         self.machine = machine
@@ -81,8 +82,9 @@ class Handler:
         prio = getattr(fun, _prio_attr, default_prio)
         return tpe(machine, name, msg, fun, prio)
 
-    def run(self, data, msg):
-        return _recover_error(self, self.fun(self.machine, data, msg))
+    def run(self, data, msg) -> Maybe[Any]:
+        result = self.fun(self.machine, data, msg)
+        return _recover_error(self, result)
 
     def __str__(self):
         return '{}({}, {}, {})'.format(self.__class__.__name__, self.name,
@@ -106,8 +108,7 @@ class WrappedHandler:
         return WrappedHandler(machine, name, msg, tpe, fun, prio)
 
     def run(self, data, msg):
-        return _recover_error(self,
-                              self.fun(self.tpe(self.machine, data, msg)))
+        return _recover_error(self, self.fun(self.tpe(self.machine, data, msg)))
 
 
 class CoroHandler(Handler):

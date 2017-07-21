@@ -1,12 +1,16 @@
 from amino import Right
-from amino.test import later
+from amino.test.spec_spec import later
 
-from integration._support.plugin import (TestPluginLooped, TestPlugin,
-                                         TestPluginUnlooped)
+from kallikrein import k
+
+from ribosome.test.integration.klk import VimIntegrationKlkHelpers
+
+from integration._support.plugin import TestPluginLooped, TestPlugin, TestPluginUnlooped
 from integration._support.base import IntegrationSpecBase
 
 
-class _PluginSpecBase(IntegrationSpecBase):
+class _PluginSpecBase(VimIntegrationKlkHelpers, IntegrationSpecBase):
+    __unsafe__ = None
 
     def _last_output(self, content):
         later(lambda: self._log_out.last.should.contain(content), timeout=1)
@@ -24,6 +28,10 @@ class _PluginSpecBase(IntegrationSpecBase):
         self._last_output(fun_text)
         self.vim.cmd_sync('Err')
         self._last_output(TestPlugin.test_error)
+        self.vim.cmd_sync('St')
+        self._wait(1)
+        self._last_output('6')
+        return k(1) == 1
 
     def _scratch(self):
         self.vim.cmd_sync('Go')
