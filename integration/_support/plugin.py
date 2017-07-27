@@ -4,12 +4,11 @@ from ribosome import command, NvimStatePlugin
 
 from amino.lazy import lazy
 from amino import Left, L, _, Map, List, Eval, Task, Just
-from amino.state import State
+from amino.state import EvalState
 from ribosome.logging import Logging
 from ribosome.request import function, msg_function, msg_command
 from ribosome.machine import message, may_handle, handle, Machine, Message, Nop
-from ribosome.machine.state import (UnloopedRootMachine, RunScratchMachine,
-                                    RootMachine)
+from ribosome.machine.state import UnloopedRootMachine, RunScratchMachine, RootMachine
 from ribosome.machine.transition import Fatal, may_fallback
 from ribosome.machine.scratch import ScratchMachine, Mapping
 from ribosome.nvim import NvimFacade, ScratchBuffer
@@ -55,8 +54,8 @@ class Mach(Logging):
         self.log.info(self.sub.length)
 
     @may_handle(St)
-    def st(self, data, msg) -> State[TData, Message]:
-        return State.inspect(lambda a: Just(Print(a.v * 2)), Eval)
+    def st(self, data, msg) -> EvalState[TData, Message]:
+        return EvalState.inspect(lambda a: Just(Print(a.v * 2)))
 
     @may_handle(Print)
     def print_(self, data: Data, msg: Print) -> Message:

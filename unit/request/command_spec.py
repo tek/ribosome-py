@@ -1,6 +1,6 @@
-from amino.test import Spec
-
 from ribosome.request import command
+
+from unit._support.spec import Spec
 
 
 class CommandSpec(Spec):

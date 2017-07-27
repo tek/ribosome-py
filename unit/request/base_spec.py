@@ -1,11 +1,12 @@
 import json
 
 from amino import Just
-from amino.test import Spec
 
 from ribosome.request.base import (RequestHandler, MessageRequestHandler,
                                    JsonMessageRequestHandler)
 from ribosome.machine import message
+
+from unit._support.spec import Spec
 
 
 BasicMessage = message(

@@ -1,9 +1,10 @@
 import amino
 import amino.test
 from amino.logging import amino_stdout_logging
+from amino.test.spec_spec import Spec as SpecBase
 
 
-class Spec(amino.test.Spec):
+class Spec(SpecBase):
 
     def setup(self, *a, **kw):
         amino.development = True

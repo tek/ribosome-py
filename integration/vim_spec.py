@@ -1,11 +1,13 @@
-from amino import Right, List, __, Map
-from amino.test import later
+from amino import Right, List, __, Map, Left
+from amino.test.spec_spec import later
+
+from ribosome.test.integration.spec_spec import VimIntegrationSureHelpers
 
 from integration._support.facade import FacadeTestPlugin
 from integration._support.base import IntegrationSpecBase
 
 
-class VimSpec(IntegrationSpecBase):
+class VimSpec(IntegrationSpecBase, VimIntegrationSureHelpers):
 
     @property
     def _prefix(self):
@@ -24,9 +26,12 @@ class VimSpec(IntegrationSpecBase):
         self.vim.cmd_sync('Go')
         self.vim.buffer.vars.set_p(vname, content)
         later(lambda: self.vim.buffer.vars.pl(vname).should.contain(content))
-        var = (self.vim.call('AllVars') / Map //
-               __.get('b:{}_{}'.format(self._prefix, vname)))
+        var = (
+            self.vim.call('AllVars') /
+            Map //
+            __.get('b:{}_{}'.format(self._prefix, vname))
+        )
         var.should.contain(str(content))
-        self.vim.vars.p(vname).should.be.empty
+        self.vim.vars.p(vname).should.be.a(Left)
 
 __all__ = ('VimSpec',)

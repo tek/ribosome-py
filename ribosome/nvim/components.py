@@ -21,7 +21,7 @@ import amino
 from amino import (Maybe, List, Map, Boolean, Empty, Just, __, _, Try, Either,
                    Left, Right, L)
 from amino.util.string import decode
-from amino.anon import format_funcall
+from amino.util.fun import format_funcall
 from amino.lazy import lazy
 from amino.task import TaskException
 

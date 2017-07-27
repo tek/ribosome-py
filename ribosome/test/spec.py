@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from flexmock import flexmock
 
 from amino import may, Maybe, List
-from amino.test import Spec
+from amino.test.spec_spec import Spec
 
 import ribosome
 from ribosome.nvim import Buffer, Tab, Window

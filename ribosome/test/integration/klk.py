@@ -1,6 +1,6 @@
 import time
 from datetime import datetime
-from typing import Callable, Any
+from typing import Callable, Any, Union
 
 from amino.test.spec import default_timeout
 from amino import List
@@ -12,6 +12,7 @@ from kallikrein.matchers.length import have_length
 from kallikrein.matchers.comparison import greater
 from kallikrein.expectation import Expectation
 from kallikrein.matchers import contain
+from kallikrein.matchers.lines import have_lines
 
 from ribosome.test.integration.spec import VimIntegrationSpecI
 
@@ -43,8 +44,8 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
     def _log_contains(self, line: str) -> None:
         return later(kf(lambda: self._log_out).must(contain(line)))
 
-    def _buffer_content(self, data: List[str]) -> None:
-        return later(self.contentkf == data)
+    def _buffer_content(self, data: Union[str, List[str]]) -> None:
+        return later(self.contentkf.must(have_lines(data)))
 
     def _buffer_length(self, length: int) -> None:
         return later(self.contentkf.must(have_length(length)))
