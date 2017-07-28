@@ -1,5 +1,6 @@
 import os
 import logging
+from typing import TypeVar
 
 from toolz import merge
 
@@ -8,9 +9,10 @@ from neovim.api import Nvim
 import amino
 from amino.lazy import lazy
 import amino.logging
-from amino.logging import (amino_logger, init_loglevel,
-                           amino_root_file_logging, DDEBUG)
+from amino.logging import amino_logger, init_loglevel, amino_root_file_logging, DDEBUG, amino_file_logging
 from amino import Path, env
+
+A = TypeVar('A')
 
 
 class NvimHandler(logging.Handler):
@@ -25,26 +27,32 @@ class NvimHandler(logging.Handler):
         }
         super().__init__()
 
-    def emit(self, record: logging.LogRecord):
+    def emit(self, record: logging.LogRecord) -> None:
         dispatcher = self.dispatchers.get(record.levelno, self.vim.echom)
         dispatcher(record.getMessage())
 
 
+class NvimFilter(logging.Filter):
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.exc_info is None
+
+nvim_filter = NvimFilter()
 ribo_log = log = ribosome_root_logger = amino_logger('nvim')
 _nvim_logging_initialized = False
 
 
-def ribosome_logger(name: str):
+def ribosome_logger(name: str) -> logging.Logger:
     return ribosome_root_logger.getChild(name)
 
 
-def nvim_logging(vim: Nvim, level: int=logging.INFO, file_kw: dict=dict()
-                 ) -> None:
+def nvim_logging(vim: Nvim, level: int=logging.INFO, file_kw: dict=dict()) -> None:
     global _nvim_logging_initialized
     if not _nvim_logging_initialized:
         if level is None and not amino.development:
             level = logging.INFO
         handler = NvimHandler(vim)
+        handler.addFilter(nvim_filter)
         ribosome_root_logger.addHandler(handler)
         init_loglevel(handler, level)
         def file_log(prefix: str) -> None:
@@ -69,17 +77,17 @@ def nvim_logging(vim: Nvim, level: int=logging.INFO, file_kw: dict=dict()
 class Logging(amino.logging.Logging):
 
     @lazy
-    def _log(self):
+    def _log(self) -> logging.Logger:
         return ribosome_logger(self.__class__.__name__)
 
 
-def pr(a):
+def pr(a: A) -> A:
     v = log.verbose
     v(a)
     return a
 
 
-def pv(a):
+def pv(a: A) -> A:
     v = log.verbose
     v(str(a))
     return a
