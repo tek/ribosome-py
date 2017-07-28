@@ -181,15 +181,18 @@ class NvimComponent(Logging):
     def clean(self):
         self.vars.clean()
 
+    def _cmd(self, line: str, verbose=False, sync=False):
+        l = line if verbose else 'silent {}'.format(line)
+        return Try(self.vim.command, l, async=not sync)
+
     def cmd(self, line: str, verbose=False, sync=False):
         ''' Wrap **Nvim.command**, default to async.
         **verbose** prevents the use of **silent**, which is used by
         default because headless nvim will deadlock if a command's
         output requires user input to proceed (e.g. multiline output)
         '''
-        l = line if verbose else 'silent {}'.format(line)
         return (
-            Try(self.vim.command, l, async=not sync)
+            self._cmd(line, verbose, sync)
             .bieffect(
                 L(self._cmd_error)(_, line, sync),
                 L(self._cmd_success)(_, line, sync)
@@ -507,14 +510,17 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def runtime(self, path: str, verbose=True):
         return self.cmd_sync('runtime! {}.vim'.format(path), verbose=verbose)
 
+    def _echo(self, cmd: str) -> None:
+        return self._cmd(cmd)
+
     def echo(self, text: str):
-        self.vcmd(echo(text, 'echo', prefix=Empty()))
+        self._cmd(echo(text, 'echo', prefix=Empty()))
 
     def echom(self, text: str):
-        self.vcmd(echo(text, prefix=Just(self.prefix)))
+        self._cmd(echo(text, prefix=Just(self.prefix)))
 
     def echohl(self, hl: str, text: str):
-        self.vcmd(echohl(text, hl, prefix=Just(self.prefix)))
+        self._cmd(echohl(text, hl, prefix=Just(self.prefix)))
 
     def echowarn(self, text: str):
         self.echohl('WarningMsg', text)
