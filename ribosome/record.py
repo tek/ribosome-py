@@ -1,16 +1,15 @@
-import re
 import uuid
 import json
-from typing import Callable
+from typing import Callable, Union, Pattern, Tuple, TypeVar
 
 import pyrsistent
+from typing import Any
 
 from lenses import Lens, lens
 
 from toolz import merge
 
-from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try,
-                   Maybe, Just, Path, I)
+from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try, Maybe, Just, Path, I, Regex)
 from amino.lazy import LazyMeta, Lazy, lazy
 from amino.lazy_list import LazyList
 from amino.tc.optional import Optional
@@ -18,17 +17,19 @@ from amino.tc.foldable import Foldable
 
 from ribosome.logging import Logging
 
+A = TypeVar('A')
 
-def any_field(**kw):
+
+def any_field(**kw: Any) -> pyrsistent.field:
     return pyrsistent.field(mandatory=True, **kw)
 
 
-def field(tpe, **kw):
+def field(tpe: type, **kw: Any) -> pyrsistent.field:
     return any_field(type=tpe, **kw)
 
 
-def _foldable_type_field_inv(eff, tpe):
-    def inv(a):
+def _foldable_type_field_inv(eff: Any, tpe: type) -> Callable[[Any], Tuple[bool, str]]:
+    def inv(a: Any) -> Tuple[bool, str]:
         atpe = type(a)
         if tpe is None:
             return True, ''
@@ -42,33 +43,32 @@ def _foldable_type_field_inv(eff, tpe):
     return inv
 
 
-def list_field(tpe=None, initial=List(), **kw):
-    return field(List, initial=initial, factory=List.wrap,
-                 invariant=_foldable_type_field_inv('List', tpe), **kw)
+def list_field(tpe=None, initial=List(), **kw: Any) -> pyrsistent.field:
+    return field(List, initial=initial, factory=List.wrap, invariant=_foldable_type_field_inv('List', tpe), **kw)
 
 
-def lazy_list_field(**kw):
+def lazy_list_field(**kw: Any) -> pyrsistent.field:
     return field(LazyList, initial=LazyList([]), factory=LazyList, **kw)
 
 
-def dfield(default, **kw):
+def dfield(default: Any, **kw: Any) -> pyrsistent.field:
     return field(type(default), initial=default, **kw)
 
 
-def maybe_factory(fact, tpe):
-    def f(val):
+def maybe_factory(fact, tpe) -> Callable[[Maybe[A]], bool]:
+    def f(val: Maybe[A]) -> bool:
         return val / (lambda v: v if isinstance(v, tpe) else fact(v))
     return f
 
 
-def maybe_field(tpe=None, factory=None, initial=Empty(), **kw):
+def maybe_field(tpe=None, factory=None, initial=Empty(), **kw: Any) -> pyrsistent.field:
     fact = I if factory is None or tpe is None else maybe_factory(factory, tpe)
     return field(Maybe, initial=initial,
                  invariant=_foldable_type_field_inv('Maybe', tpe),
                  factory=fact, **kw)
 
 
-def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw):
+def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw: Any) -> pyrsistent.field:
     err = 'must be Either[{}, {}]'.format(ltpe, rtpe)
     check = lambda t, a: (isinstance(a, t), err)
     inv = __.cata(L(check)(ltpe, _), L(check)(rtpe, _))
@@ -103,41 +103,41 @@ class OptionalFactory:
         return a if self.factory is None or self.tpe is None else self.fact(a)
 
 
-def optional_field(tpe=None, factory=None, initial=Empty(), **kw):
+def optional_field(tpe=None, factory=None, initial=Empty(), **kw: Any) -> pyrsistent.field:
     return any_field(initial=initial, factory=OptionalFactory(factory, tpe),
                      invariant=OptionalInvariant(tpe), **kw)
 
 
-def bool_field(initial=False, **kw):
+def bool_field(initial=False, **kw: Any) -> pyrsistent.field:
     return field(Boolean, factory=Boolean.wrap, initial=Boolean(initial), **kw)
 
 
-def map_field(**kw):
+def map_field(**kw: Any) -> pyrsistent.field:
     return dfield(Map(), **kw)
 
 
-def uuid_field():
+def uuid_field() -> pyrsistent.field:
     return field(uuid.UUID, initial=lambda: uuid.uuid4())
 
 
-def int_field(**kw):
+def int_field(**kw: Any) -> pyrsistent.field:
     return field(int, **kw)
 
 
-def float_field(**kw):
+def float_field(**kw: Any) -> pyrsistent.field:
     return field(float, **kw)
 
 
-def str_field(**kw):
+def str_field(**kw: Any) -> pyrsistent.field:
     return field(str, **kw)
 
 
-def _re_fact(ex: str):
-    return Try(re.compile, ex) | re.compile('')
+def _re_fact(rex: Union[str, Regex, Pattern]) -> Regex:
+    return rex if isinstance(rex, Regex) else Regex.cons(rex)
 
 
-def re_field(**kw):
-    return field(re._pattern_type, factory=_re_fact, **kw)
+def re_field(**kw: Any) -> pyrsistent.field:
+    return field(Regex, factory=_re_fact, **kw)
 
 
 class FieldMutator(object):
