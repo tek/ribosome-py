@@ -52,7 +52,6 @@ def _to_error(data):
 
 
 def _recover_error(handler: 'Handler', result: Any) -> Maybe[Any]:
-    from ribosome.logging import log
     if not Optional.exists(type(result)):
         err = 'in {}: result has no Optional: {}'
         return Just(Error(err.format(handler, result)))
@@ -171,6 +170,10 @@ class StrictTransitionResult(TransitionResult):
 
     def fold(self, f):
         return self.resend.fold_left(self)(f)
+
+    @property
+    def _str_extra(self) -> List[Any]:
+        return super()._str_extra + self.pub
 
 
 class CoroTransitionResult(TransitionResult, Logging):

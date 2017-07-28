@@ -6,7 +6,7 @@ from typing import Tuple
 import asyncio
 from asyncio.subprocess import PIPE
 
-from amino import Map, Future, __, Boolean, F, _
+from amino import Map, Future, __, Boolean, _, L
 from amino.lazy import lazy
 from amino.either import Right, Left
 
@@ -162,13 +162,13 @@ class ProcessExecutor(Logging):
             self.log.debug('executing {}'.format(job))
             task = asyncio.ensure_future(self._execute(job), loop=self.loop)
             task.add_done_callback(job.finish)
-            task.add_done_callback(F(self.job_done, job))
+            task.add_done_callback(L(self.job_done)(job, _))
             self.current[job.client] = job
         return job.status
 
     @property
     def watcher_ready(self) -> bool:
-        with self._main_event_loop() as main:
+        with self._main_event_loop():
             watcher = asyncio.get_child_watcher()
         return (
             watcher is not None and

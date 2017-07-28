@@ -8,23 +8,20 @@ from asyncio import iscoroutine
 import toolz
 
 import amino
-from amino import Maybe, F, _, List, Map, Empty, L, __, Just, Eval, Either
+from amino import Maybe, _, List, Map, Empty, L, __, Just, Eval, Either
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
 from amino.func import flip
-from amino.state import StateT, EvalState, MaybeState, EitherState
+from amino.state import StateT
 from amino.tc.optional import Optional
 
 from ribosome.machine.message_base import Message, Publish, message
 from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.nvim import NvimIO
-from ribosome.machine.transition import (Handler, TransitionResult,
-                                         CoroTransitionResult,
-                                         StrictTransitionResult, may_handle,
-                                         TransitionFailed, Coroutine,
-                                         MachineError, WrappedHandler, Error,
+from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
+                                         may_handle, TransitionFailed, Coroutine, MachineError, WrappedHandler, Error,
                                          Debug, handle, _task_result)
 from ribosome.machine.message_base import _machine_attr, Nop
 from ribosome.request.command import StateCommand
@@ -90,8 +87,7 @@ class HandlerJob(Logging):
     def handle_transition_error(self, e):
         if amino.development:
             err = 'transition "{}" failed for {} in {}'
-            self.log.exception(err.format(self.handler.name, self.msg,
-                                          self.machine.title))
+            self.log.exception(err.format(self.handler.name, self.msg, self.machine.title))
             raise TransitionFailed(str(e)) from e
         return Just(StrictTransitionResult.failed(self.data, e))
 
@@ -234,10 +230,12 @@ class Machine(MachineBase):
         )
 
     def command(self, name: str, args: list):
-        return self._command_by_message_name(name)\
-            .map(lambda a: StateCommand(a[0]))\
-            .map(__.dispatch(self, args))\
-            .or_else(F(self._invalid_command, name))
+        return (
+            self._command_by_message_name(name)
+            .map(lambda a: StateCommand(a[0]))
+            .map(__.dispatch(self, args))
+            .or_else(L(self._invalid_command)(name, _))
+        )
 
     def _invalid_command(self, name):
         self.log.error(
