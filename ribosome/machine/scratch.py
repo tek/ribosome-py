@@ -17,8 +17,7 @@ Quit = message('Quit')
 
 class ScratchMachine(SubMachine, HasNvim, metaclass=abc.ABCMeta):
 
-    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer, parent=None,
-                 title=None) -> None:
+    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer, parent=None, title=None) -> None:
         self.scratch = scratch
         SubMachine.__init__(self, parent, title=title)
         HasNvim.__init__(self, vim)
@@ -54,12 +53,10 @@ class ScratchMachine(SubMachine, HasNvim, metaclass=abc.ABCMeta):
         self.scratch.buffer.nmap(ks, ':{}<cr>'.format(cmd))
 
     def _mapping_call(self, seq):
-        return 'call {}Mapping(\'{}\', \'{}\')'.format(self.prefix, self.uuid,
-                                                       seq)
+        return 'call {}Mapping(\'{}\', \'{}\')'.format(self.prefix, self.uuid, seq)
 
     def _create_autocmds(self):
-        cmd = self.scratch.buffer.autocmd('BufWipeout',
-                                          self._mapping_call(self._quit_seq))
+        cmd = self.scratch.buffer.autocmd('BufWipeout', self._mapping_call(self._quit_seq))
         cmd.run_async()
 
     @handle(Mapping)
