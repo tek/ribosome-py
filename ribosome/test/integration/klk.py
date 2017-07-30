@@ -16,7 +16,8 @@ from kallikrein.matchers.lines import have_lines
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.either import be_right
 
-from ribosome.test.integration.spec import VimIntegrationSpecI
+from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationSpec, ExternalIntegrationSpec,
+                                            PluginIntegrationSpec)
 from ribosome.nvim.components import Buffer
 
 
@@ -100,4 +101,17 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
         return later(kf(lambda: self.vim.messages).must(contain(line)))
 
 
-__all__ = ('VimIntegrationKlkHelpers',)
+class VimIntegrationKlkSpec(VimIntegrationSpec, VimIntegrationKlkHelpers):
+    pass
+
+
+class ExternalIntegrationKlkSpec(VimIntegrationSpec, ExternalIntegrationSpec):
+    pass
+
+
+class PluginIntegrationKlkSpec(VimIntegrationSpec, PluginIntegrationSpec):
+    pass
+
+
+__all__ = ('VimIntegrationKlkHelpers', 'VimIntegrationKlkSpec', 'ExternalIntegrationKlkSpec',
+           'PluginIntegrationKlkSpec')

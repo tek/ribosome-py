@@ -1,4 +1,6 @@
-from amino.test.spec_spec import later
+from amino.test.spec_spec import later, IntegrationSpec
+
+from ribosome.test.integration.spec import VimIntegrationSpec, ExternalIntegrationSpec, PluginIntegrationSpec
 
 
 class VimIntegrationSureHelpers:
@@ -18,3 +20,51 @@ class VimIntegrationSureHelpers:
 
     def _buffer_length(self, length) -> None:
         later(lambda: self.content.should.have.length_of(length))
+
+
+class VimIntegrationSpecSpec(VimIntegrationSpec, IntegrationSpec, VimIntegrationSureHelpers):
+
+    def __init__(self) -> None:
+        IntegrationSpec.__init__(self)
+        VimIntegrationSpec.__init__(self)
+
+    def setup(self) -> None:
+        IntegrationSpec.setup(self)
+        VimIntegrationSpec.setup(self)
+
+    def teardown(self) -> None:
+        IntegrationSpec.teardown(self)
+        VimIntegrationSpec.teardown(self)
+
+
+class ExternalIntegrationSpecSpec(ExternalIntegrationSpec, IntegrationSpec, VimIntegrationSureHelpers):
+
+    def __init__(self) -> None:
+        IntegrationSpec.__init__(self)
+        ExternalIntegrationSpec.__init__(self)
+
+    def setup(self) -> None:
+        IntegrationSpec.setup(self)
+        ExternalIntegrationSpec.setup(self)
+
+    def teardown(self) -> None:
+        IntegrationSpec.teardown(self)
+        VimIntegrationSpec.teardown(self)
+
+
+class PluginIntegrationSpecSpec(PluginIntegrationSpec, IntegrationSpec, VimIntegrationSureHelpers):
+
+    def __init__(self) -> None:
+        IntegrationSpec.__init__(self)
+        PluginIntegrationSpec.__init__(self)
+
+    def setup(self) -> None:
+        IntegrationSpec.setup(self)
+        PluginIntegrationSpec.setup(self)
+
+    def teardown(self) -> None:
+        IntegrationSpec.teardown(self)
+        VimIntegrationSpec.teardown(self)
+
+__all__ = ('VimIntegrationSureHelpers', 'VimIntegrationSpecSpec', 'ExternalIntegrationSpecSpec',
+           'PluginIntegrationSpecSpec')

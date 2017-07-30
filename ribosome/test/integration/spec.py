@@ -2,20 +2,19 @@ import os
 import abc
 import json
 import asyncio
-from pathlib import Path
 from functools import wraps
 from threading import Thread
 from contextlib import contextmanager
+from typing import Any
 
 import neovim
 from neovim.api import Nvim
 
 from amino.test import fixture_path, temp_dir, temp_file
 
-from amino import List, Maybe, Either, Left, __, Map, env
+from amino import List, Maybe, Either, Left, __, Map, env, Path
 from amino.lazy import lazy
 from amino.test.path import base_dir, pkg_dir
-from amino.test.spec import IntegrationSpecBase
 
 import ribosome
 from ribosome.logging import Logging
@@ -24,10 +23,9 @@ from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
 
 
-class IntegrationSpec(IntegrationSpecBase):
+class IntegrationSpecBase:
 
     def setup(self) -> None:
-        super().setup()
         AsyncVimProxy.allow_async_relay = False
 
 
@@ -41,17 +39,15 @@ class VimIntegrationSpecI(abc.ABC):
 class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
 
     def __init__(self) -> None:
-        super().__init__()
         self.tmux_nvim = 'RIBOSOME_TMUX_SPEC' in env
         self._tmux_pane = None
         self.keep_tmux_pane = False
         self.vimlog = temp_dir('log') / 'vim'
-        self._cmdline = ('nvim', '-V{}'.format(self.vimlog), '-n', '-u',
-                         'NONE')
+        self._cmdline = ('nvim', '-V{}'.format(self.vimlog), '-n', '-u', 'NONE')
         self.log_format = '{levelname} {name}:{message}'
 
     def setup(self) -> None:
-        super().setup()
+        IntegrationSpecBase.setup(self)
         env['RIBOSOME_SPEC'] = 1
         env['AMINO_DEVELOPMENT'] = 1
         env['RIBOSOME_PKG_DIR'] = str(pkg_dir())
@@ -85,15 +81,15 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         self.neovim = neovim.attach('child', argv=argv)
 
     @lazy
-    def nvim_socket(self):
+    def nvim_socket(self) -> str:
         return str(temp_dir('nvim_sockets') / List.random_string())
 
     @property
-    def project_path(self):
+    def project_path(self) -> str:
         return str(base_dir().parent)
 
     @lazy
-    def _tmux_window(self):
+    def _tmux_window(self) -> Any:
         try:
             import libtmux
         except ImportError:
@@ -122,7 +118,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         self.neovim = neovim.attach('socket', path=self.nvim_socket)
         self.neovim.command('python3 sys.path.insert(0, \'{}\')'.format(path))
 
-    def _cleanup_tmux(self):
+    def _cleanup_tmux(self) -> None:
         if self._tmux_pane is not None and not self.keep_tmux_pane:
             self._tmux_pane.cmd('kill-pane')
 
@@ -130,10 +126,10 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return NvimFacade(vim, self._prefix)
 
     @property
-    def _prefix(self):
+    def _prefix(self) -> str:
         return ''
 
-    def teardown(self):
+    def teardown(self) -> None:
         if self._debug:
             self._log_out.foreach(self.log.info)
         if self.tmux_nvim:
@@ -155,25 +151,25 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def _post_start(self) -> None:
         pass
 
-    def _pvar_becomes(self, name, value):
+    def _pvar_becomes(self, name, value) -> None:
         return self._wait_for(lambda: self.vim.vars.p(name).contains(value))
 
-    def _pvar_becomes_map(self, name, value, f):
+    def _pvar_becomes_map(self, name, value, f) -> None:
         return self._wait_for(
             lambda: self.vim.vars.p(name).map(f).contains(value))
 
     @property
-    def _log_out(self):
+    def _log_out(self) -> List[str]:
         return List.wrap(self.logfile.read_text().splitlines())
 
-    def _json_cmd(self, cmd, data):
+    def _json_cmd(self, cmd: str, data: dict) -> str:
         j = json.dumps(data).replace('"', '\\"')
         return '{} {}'.format(cmd, j)
 
-    def json_cmd(self, cmd, **data):
-        self.vim.cmd(self._json_cmd(cmd, data))
+    def json_cmd(self, cmd: str, **data: str) -> Either[Exception, str]:
+        return self.vim.cmd(self._json_cmd(cmd, data))
 
-    def json_cmd_sync(self, cmd, **data):
+    def json_cmd_sync(self, cmd: str, **data: str) -> Either[Exception, str]:
         return self.vim.cmd_sync(self._json_cmd(cmd, data))
 
     @property
@@ -228,7 +224,7 @@ def _mock_proxy(self):
 class ExternalIntegrationSpec(VimIntegrationSpec):
 
     def __init__(self) -> None:
-        super().__init__()
+        VimIntegrationSpec.__init__(self)
         self._report_expensive = False
 
     def _pre_start_neovim(self):
@@ -310,4 +306,4 @@ class PluginIntegrationSpec(VimIntegrationSpec):
                                                    plugin_class=name))
         return rp_path
 
-__all__ = ('IntegrationSpec', 'VimIntegrationSpec', 'PluginIntegrationSpec')
+__all__ = ('VimIntegrationSpec', 'PluginIntegrationSpec')
