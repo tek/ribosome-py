@@ -5,7 +5,7 @@ from ribosome import NvimFacade
 from ribosome.logging import Logging
 from ribosome.nvim.components import Syntax
 
-from amino import List, Map, _, L, Maybe, Task
+from amino import List, Map, _, L, Maybe, Task, __
 
 
 class UniteMessage(Message, varargs='unite_args'):
@@ -123,11 +123,11 @@ class UniteKind(UniteEntity):
     def __init__(self, name: str, actions: List[Map]) -> None:
         super().__init__(name)
         self.actions = actions / self._defaults.merge
-        self.default = actions.head / _['name'] | 'none'
+        self.default = actions.head / __['name'] | 'none'
 
     @property
     def _func_defs_async(self):
-        return self.actions / _['handler']
+        return self.actions / __['handler']
 
     def _action(self, params):
         return self._action_templ.format(**params)
@@ -135,8 +135,7 @@ class UniteKind(UniteEntity):
     @property
     def data(self):
         actions = self.actions.map(self._action).mk_string(', ')
-        return self._templ.format(name=self.name, actions=actions,
-                                  default=self.default)
+        return self._templ.format(name=self.name, actions=actions, default=self.default)
 
 __all__ = ('UniteMessage', 'UniteEntity', 'UniteSource', 'UniteKind',
            'UniteSyntax')
