@@ -1,7 +1,7 @@
 import functools
 import time
 
-from amino import Map, List, _, Empty, Just
+from amino import Map, List, Empty, Just, __
 
 from ribosome.record import any_field, dfield, list_field, field
 
@@ -41,7 +41,7 @@ def _init_field_metadata(inst):
 def _update_field_metadata(inst, fields, opt_fields, varargs):
     if varargs is not None:
         inst._field_varargs = varargs
-    inst._field_order += list(fields) + List(*opt_fields).map(_[0])
+    inst._field_order += list(fields) + List(*opt_fields).map(__[0])
     inst._field_count_min += len(fields)
     inst._field_count_max = (
         Empty() if inst._field_varargs

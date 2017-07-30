@@ -224,7 +224,7 @@ class Machine(MachineBase):
         msg_name = camelcaseify(name)
         return (
             self._message_handlers.to_list
-            .sort_by(_[0])
+            .sort_by(__[0])
             .map2(lambda a, b: b.handlers)
             .find_map(__.find_key(lambda a: a.__name__ in [name, msg_name]))
         )

@@ -62,7 +62,7 @@ def unite_plugin(name):
                 setattr(cls, name, _unite_function(name, msg, cb))
             except Exception as e:
                 log.error(e)
-        syntax_cb = lambda args: args.tail // _.head / _['source'] / _['name']
+        syntax_cb = lambda args: args.tail // _.head / __['source'] / __['name']
         set_fun(syntax_name, UniteSyntax, syntax_cb)
         return cls
     return decorator
