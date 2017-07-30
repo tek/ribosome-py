@@ -189,11 +189,13 @@ def main_looped(fun):
         asyncio.get_child_watcher().attach_loop(loop)
         done = asyncio.Future(loop=loop)
         exc = None
+        ret = None
         def runner():
+            nonlocal ret
             local_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(local_loop)
             try:
-                fun(self)
+                ret = fun(self)
             except Exception as e:
                 nonlocal exc
                 exc = e
@@ -205,6 +207,7 @@ def main_looped(fun):
         loop.close()
         if exc is not None:
             raise exc
+        return ret
     return wrapper
 
 
