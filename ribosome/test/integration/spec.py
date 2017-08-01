@@ -15,6 +15,7 @@ from amino.test import fixture_path, temp_dir, temp_file
 from amino import List, Maybe, Either, Left, __, Map, env, Path
 from amino.lazy import lazy
 from amino.test.path import base_dir, pkg_dir
+from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase
 
 import ribosome
 from ribosome.logging import Logging
@@ -23,7 +24,7 @@ from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
 
 
-class IntegrationSpecBase:
+class IntegrationSpecBase(AminoIntegrationSpecBase):
 
     def setup(self) -> None:
         AsyncVimProxy.allow_async_relay = False

@@ -105,11 +105,11 @@ class VimIntegrationKlkSpec(VimIntegrationSpec, VimIntegrationKlkHelpers):
     pass
 
 
-class ExternalIntegrationKlkSpec(VimIntegrationSpec, ExternalIntegrationSpec):
+class ExternalIntegrationKlkSpec(ExternalIntegrationSpec, VimIntegrationKlkHelpers):
     pass
 
 
-class PluginIntegrationKlkSpec(VimIntegrationSpec, PluginIntegrationSpec):
+class PluginIntegrationKlkSpec(PluginIntegrationSpec, VimIntegrationKlkHelpers):
     pass
 
 

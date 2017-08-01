@@ -9,7 +9,7 @@ from neovim.api import Nvim
 import amino
 from amino.lazy import lazy
 import amino.logging
-from amino.logging import amino_logger, init_loglevel, amino_root_file_logging, DDEBUG, amino_file_logging
+from amino.logging import amino_logger, init_loglevel, amino_root_file_logging, DDEBUG
 from amino import Path, env
 
 A = TypeVar('A')
@@ -58,16 +58,15 @@ def nvim_logging(vim: Nvim, level: int=logging.INFO, file_kw: dict=dict()) -> No
         def file_log(prefix: str) -> None:
             level = (
                 DDEBUG
-                if 'RIBOSOME_DEVELOPMENT' in env and
-                'RIBOSOME_SPEC' in env else
+                if 'RIBOSOME_DEVELOPMENT' in env and 'RIBOSOME_SPEC' in env else
                 env['RIBOSOME_FILE_LOG_LEVEL'] | logging.INFO
             )
             logfile = Path('{}_ribo_{}'.format(prefix, os.getpid()))
-            fmt_kw = lambda fmt: dict(fmt=fmt)
+            fmt = env['RIBOSOME_FILE_LOG_FMT'] / (lambda fmt: dict(fmt=fmt)) | dict()
             kw = merge(
                 file_kw,
                 dict(level=level, logfile=logfile),
-                env['RIBOSOME_FILE_LOG_FMT'] / fmt_kw | dict()
+                fmt
             )
             amino_root_file_logging(**kw)
         amino.env['NVIM_PYTHON_LOG_FILE'] % file_log
