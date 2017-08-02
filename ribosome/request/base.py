@@ -3,14 +3,14 @@ import json
 import inspect
 from typing import Callable, Any, Tuple
 
-from amino import List, Maybe, Right, Left, may, _, Just, Map, Try
+from amino import List, Maybe, Right, Left, may, _, Just, Map, Try, Either
 from amino.util.string import camelcaseify
 
 import ribosome
 from ribosome.logging import Logging
 
 
-def parse_int(i):
+def parse_int(i: Any) -> Either[str, int]:
     return Right(i) if isinstance(i, int) else (
         Right(int(i)) if isinstance(i, str) and i.isdigit() else
         Left('could not parse int {}'.format(i))

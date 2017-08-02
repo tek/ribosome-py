@@ -112,6 +112,5 @@ class ExternalIntegrationKlkSpec(ExternalIntegrationSpec, VimIntegrationKlkHelpe
 class PluginIntegrationKlkSpec(PluginIntegrationSpec, VimIntegrationKlkHelpers):
     pass
 
-
 __all__ = ('VimIntegrationKlkHelpers', 'VimIntegrationKlkSpec', 'ExternalIntegrationKlkSpec',
            'PluginIntegrationKlkSpec')

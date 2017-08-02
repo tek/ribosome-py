@@ -27,7 +27,11 @@ from ribosome.test.fixtures import rplugin_template
 class IntegrationSpecBase(AminoIntegrationSpecBase):
 
     def setup(self) -> None:
+        AminoIntegrationSpecBase.setup(self)
         AsyncVimProxy.allow_async_relay = False
+
+    def teardown(self) -> None:
+        AminoIntegrationSpecBase.teardown(self)
 
 
 class VimIntegrationSpecI(abc.ABC):
@@ -40,6 +44,7 @@ class VimIntegrationSpecI(abc.ABC):
 class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
 
     def __init__(self) -> None:
+        IntegrationSpecBase.__init__(self)
         self.tmux_nvim = 'RIBOSOME_TMUX_SPEC' in env
         self._tmux_pane = None
         self.keep_tmux_pane = False
@@ -131,6 +136,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return ''
 
     def teardown(self) -> None:
+        IntegrationSpecBase.teardown(self)
         if self._debug:
             self._log_out.foreach(self.log.info)
         if self.tmux_nvim:
@@ -250,7 +256,7 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
         return self.plugin.state
 
     def teardown(self):
-        super().teardown()
+        VimIntegrationSpec.teardown(self)
         if self.root is not None:
             self.root.stop(shutdown=False)
             if self._debug and self._report_expensive:
