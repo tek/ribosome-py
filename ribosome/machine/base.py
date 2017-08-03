@@ -15,10 +15,9 @@ from amino.lazy import lazy
 from amino.func import flip
 from amino.state import StateT
 from amino.tc.optional import Optional
-from amino.logging import print_log_info
 
 from ribosome.machine.message_base import Message, Publish, message
-from ribosome.logging import Logging
+from ribosome.logging import Logging, print_ribo_log_info
 from ribosome.data import Data
 from ribosome.nvim import NvimIO
 from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
@@ -276,7 +275,7 @@ class Machine(MachineBase):
 
     @may_handle(ShowLogInfo)
     def show_log_info(self, data: Data, msg: ShowLogInfo) -> Message:
-        print_log_info(self.log.info)
+        print_ribo_log_info(self.log.verbose)
 
     def bubble(self, msg):
         self.parent.cata(_.bubble, lambda: self.send)(msg)
