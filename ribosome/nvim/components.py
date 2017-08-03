@@ -1,5 +1,5 @@
 import re
-from typing import TypeVar, Callable, Any
+from typing import TypeVar, Callable, Any, Union
 from pathlib import Path
 import threading
 from concurrent import futures
@@ -18,8 +18,7 @@ from neovim.api import NvimError
 from amino.util.string import camelcaseify
 
 import amino
-from amino import (Maybe, List, Map, Boolean, Empty, Just, __, _, Try, Either,
-                   Left, Right, L)
+from amino import Maybe, List, Map, Boolean, Empty, Just, __, _, Try, Either, Left, Right, L, Lists
 from amino.util.string import decode
 from amino.util.fun import format_funcall
 from amino.lazy import lazy
@@ -44,13 +43,14 @@ def quote(text):
 A = TypeVar('A')
 
 
-def echo(text, cmd='echom', prefix=Empty()):
+def echo(text: Union[str, List[str]], cmd='echom', prefix: Maybe[str]=Empty()) -> List[str]:
+    lines = text if isinstance(text, List) else Lists.lines(text)
     pre = prefix.map(_ + ': ') | ''
-    return '{} "{}{}"'.format(cmd, pre, dquote(text))
+    return lines.map(lambda a: '{} "{}{}"'.format(cmd, pre, dquote(a)))
 
 
-def echohl(text, hl, prefix=Empty()):
-    return 'echohl {} | {} | echohl None'.format(hl, echo(text))
+def echohl(text: Union[str, List[str]], hl: str, prefix: Maybe[str]=Empty()):
+    return echo(text).cons(f'echohl {hl}').cat('echohl None')
 
 
 def on_main_thread():
@@ -510,22 +510,22 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def runtime(self, path: str, verbose=True):
         return self.cmd_sync('runtime! {}.vim'.format(path), verbose=verbose)
 
-    def _echo(self, cmd: str) -> None:
-        return self._cmd(cmd)
+    def _echo(self, lines: List[str]) -> None:
+        return lines.traverse(L(self._cmd)(_, True), Right)
 
-    def echo(self, text: str):
-        self._cmd(echo(text, 'echo', prefix=Empty()))
+    def echo(self, text: Union[str, List[str]]):
+        self._echo(echo(text, 'echo', prefix=Empty()))
 
-    def echom(self, text: str):
-        self._cmd(echo(text, prefix=Just(self.prefix)))
+    def echom(self, text: Union[str, List[str]]):
+        self._echo(echo(text, prefix=Just(self.prefix)))
 
-    def echohl(self, hl: str, text: str):
-        self._cmd(echohl(text, hl, prefix=Just(self.prefix)))
+    def echohl(self, hl: Union[str, List[str]], text: Union[str, List[str]]):
+        self._echo(echohl(text, hl, prefix=Just(self.prefix)))
 
-    def echowarn(self, text: str):
+    def echowarn(self, text: Union[str, List[str]]):
         self.echohl('WarningMsg', text)
 
-    def echoerr(self, text: str):
+    def echoerr(self, text: Union[str, List[str]]):
         self.echohl('ErrorMsg', text)
 
     def multi_line_info(self, text: List[str]):
