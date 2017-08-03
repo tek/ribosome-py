@@ -4,20 +4,20 @@ from typing import TypeVar
 
 from toolz import merge
 
-from neovim.api import Nvim
-
 import amino
 from amino.lazy import lazy
 import amino.logging
-from amino.logging import amino_logger, init_loglevel, amino_root_file_logging, DDEBUG
+from amino.logging import amino_logger, init_loglevel, amino_root_file_logging, DDEBUG, amino_root_logger
 from amino import Path, env
+
+import ribosome  # noqa
 
 A = TypeVar('A')
 
 
 class NvimHandler(logging.Handler):
 
-    def __init__(self, vim: Nvim) -> None:
+    def __init__(self, vim: 'ribosome.NvimFacade') -> None:
         self.vim = vim
         self.dispatchers = {
             logging.INFO: self.vim.echo,
@@ -46,7 +46,7 @@ def ribosome_logger(name: str) -> logging.Logger:
     return ribosome_root_logger.getChild(name)
 
 
-def nvim_logging(vim: Nvim, level: int=logging.INFO, file_kw: dict=dict()) -> None:
+def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: dict=dict()) -> None:
     global _nvim_logging_initialized
     if not _nvim_logging_initialized:
         if level is None and not amino.development:

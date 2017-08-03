@@ -15,6 +15,7 @@ from amino.lazy import lazy
 from amino.func import flip
 from amino.state import StateT
 from amino.tc.optional import Optional
+from amino.logging import print_log_info
 
 from ribosome.machine.message_base import Message, Publish, message
 from ribosome.logging import Logging
@@ -32,6 +33,7 @@ NvimIOTask = message('NvimIOTask', 'io')
 RunTask = message('RunTask', 'task', opt_fields=(('msg', Empty()),))
 UnitTask = message('UnitTask', 'task', opt_fields=(('msg', Empty()),))
 DataTask = message('DataTask', 'cons', opt_fields=(('msg', Empty()),))
+ShowLogInfo = message('ShowLogInfo')
 
 
 def is_seq(a):
@@ -271,6 +273,10 @@ class Machine(MachineBase):
     @may_handle(Debug)
     def message_debug(self, data, msg):
         self.log.debug(msg.message)
+
+    @may_handle(ShowLogInfo)
+    def show_log_info(self, data: Data, msg: ShowLogInfo) -> Message:
+        print_log_info(self.log.info)
 
     def bubble(self, msg):
         self.parent.cata(_.bubble, lambda: self.send)(msg)
