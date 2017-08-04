@@ -51,6 +51,10 @@ class AsyncIOBase(Logging, abc.ABC):
         )
         self._messages = asyncio.PriorityQueue(loop=self._loop)
 
+    @abc.abstractmethod
+    def stop(self, shutdown=True) -> None:
+        ...
+
 
 class AsyncIOThread(threading.Thread, AsyncIOBase):
 
@@ -87,8 +91,7 @@ class AsyncIOThread(threading.Thread, AsyncIOBase):
                     self._loop.close()
                 except Exception as e:
                     if amino.development:
-                        self.log.caught_exception(
-                            'stopping {}'.format(self.title))
+                        self.log.caught_exception('stopping {}'.format(self.title))
 
     def _stop(self):
         self._done()
@@ -273,6 +276,9 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
     def start(self):
         self.data = self.init
         self._init_asyncio()
+
+    def stop(self, shutdown=True) -> None:
+        pass
 
     def wait_for_running(self):
         pass
