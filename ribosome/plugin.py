@@ -17,7 +17,7 @@ class NvimPlugin(Logging):
         self.setup_logging()
 
     def setup_logging(self) -> None:
-        nvim_logging(self.vim)
+        self.file_log_handler = nvim_logging(self.vim)
 
     @property
     def loop(self) -> Any:

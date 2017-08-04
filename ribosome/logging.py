@@ -48,7 +48,7 @@ def ribosome_logger(name: str) -> logging.Logger:
     return ribosome_root_logger.getChild(name)
 
 
-def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: dict=dict()) -> None:
+def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: dict=dict()) -> logging.Handler:
     global _nvim_logging_initialized
     if not _nvim_logging_initialized:
         if level is None and not amino.development:
@@ -57,7 +57,7 @@ def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: d
         handler.addFilter(nvim_filter)
         ribosome_root_logger.addHandler(handler)
         init_loglevel(handler, VERBOSE)
-        def file_log(prefix: str) -> None:
+        def file_log(prefix: str) -> logging.Handler:
             level = (
                 DDEBUG
                 if options.development and options.spec else
@@ -70,9 +70,10 @@ def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: d
                 dict(level=level, logfile=logfile),
                 fmt
             )
-            amino_root_file_logging(**kw)
-        options.nvim_log_file.value % file_log
+            return amino_root_file_logging(**kw)
         _nvim_logging_initialized = True
+        logfile = options.nvim_log_file.value | (Path.home() / '.cache' / 'ribosome')
+        return file_log(logfile)
 
 
 class Logging(amino.logging.Logging):
