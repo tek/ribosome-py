@@ -1,7 +1,6 @@
 import neovim
 
-from ribosome.request.base import (RequestHandler, MessageRequestHandler,
-                                   JsonMessageRequestHandler)
+from ribosome.request.base import RequestHandler, MessageRequestHandler, JsonMessageRequestHandler
 
 
 class Command(RequestHandler):

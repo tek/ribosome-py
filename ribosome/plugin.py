@@ -54,19 +54,21 @@ class NvimStatePlugin(NvimPlugin):
 
 
 def setup_plugin(cls: type, name: str, prefix: str) -> None:
-    def name_handler(suf: str, handler: Callable[..., None]) -> None:
-        setattr(cls, f'{name}_{suf}', handler)
-    def handler(suf: str, handler: Callable[..., None]) -> None:
-        setattr(cls, f'{prefix}_{suf}', handler)
+    def name_handler(suf: str, handler: Callable[[str], Callable[..., None]]) -> None:
+        n = f'{name}_{suf}'
+        setattr(cls, n, handler(n))
+    def handler(suf: str, handler: Callable[[str], Callable[..., None]]) -> None:
+        n = f'{prefix}_{suf}'
+        setattr(cls, n, handler(n))
     def msg_cmd(suf: str, msg: type) -> None:
-        handler(suf, msg_command(msg)(lambda: None))
+        handler(suf, lambda n: msg_command(msg, name=n)(lambda: None))
     def msg_fun(suf: str, msg: type) -> None:
-        handler(suf, msg_function(msg)(lambda: None))
+        handler(suf, lambda n: msg_function(msg, name=n)(lambda: None))
     cls.name = name
     cls.prefix = prefix
     msg_cmd('show_log_info', ShowLogInfo)
-    handler('log_level', NvimPlugin.set_log_level)
+    handler('log_level', lambda n: command(name=n)(lambda self, *a, **kw: self.set_log_level(*a, **kw)))
     msg_fun('mapping', Mapping)
-    name_handler('start', command(sync=True)(NvimPlugin.start_plugin))
+    name_handler('start', lambda n: command(sync=True, name=n)(lambda self, *a, **kw: self.start_plugin(*a, **kw)))
 
 __all__ = ('NvimPlugin', 'NvimStatePlugin')

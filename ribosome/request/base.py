@@ -43,9 +43,7 @@ class RequestHandler(Logging, metaclass=abc.ABCMeta):
         self._fun = fun
         self._argspec = inspect.getfullargspec(fun)  # type: ignore
         self._params = List.wrap(self._argspec.args)
-        self._param_count = self._params.length - (
-            1 if self._params.head.contains('self') else 0
-        )
+        self._param_count = self._params.length - (1 if self._params.head.contains('self') else 0)
         self._name = Maybe(name)
         self._nargs = Maybe(try_int(nargs))
         self._min = Maybe(min)
@@ -106,11 +104,11 @@ class RequestHandler(Logging, metaclass=abc.ABCMeta):
 
     @property
     def name(self):
-        return self._name.get_or_else(self._infer_name)
+        return camelcaseify(self._name.get_or_else(self._infer_name))
 
     @property
     def _infer_name(self):
-        return camelcaseify(self._fun.__name__)
+        return self._fun.__name__
 
     @property  # type: ignore
     @may
@@ -164,7 +162,7 @@ class MessageRequestHandler(RequestHandler):
 
     @property
     def _infer_name(self):
-        return camelcaseify(self._fun_name)
+        return self._fun_name
 
     @property
     def min(self):
@@ -234,5 +232,4 @@ class JsonMessageRequestHandler(MessageRequestHandler):
         else:
             super(JsonMessageRequestHandler, self)._call_fun(obj, *real_args)
 
-__all__ = ('RequestHandler', 'MessageRequestHandler',
-           'JsonMessageRequestHandler')
+__all__ = ('RequestHandler', 'MessageRequestHandler', 'JsonMessageRequestHandler')
