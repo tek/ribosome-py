@@ -20,7 +20,11 @@ pkg_dir = os.environ.get('RIBOSOME_PKG_DIR')
 if pkg_dir:
     sys.path.insert(0, pkg_dir)
 
-from {plugin_module} import {plugin_class}
+try:
+    from {plugin_module} import {plugin_class}
+except Exception as e:
+    ribosome_root_logger.caught_exception('importing {plugin_module}.{plugin_class}', e)
+    raise
 
 @neovim.plugin
 class Plugin({plugin_class}):
