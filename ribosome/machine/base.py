@@ -142,7 +142,13 @@ class HandlerJob(Logging):
             (data, result) = res1.value_or(lambda a: (self.data, Error(str(a))))
         else:
             return List(Error(f'invalid effect for transition result `State`: {res0.tpe}#{res1}'))
-        r2 = result.get_or_else(Nop()) if Optional.exists(type(result)) else result
+        r2 = (
+            result.get_or_else(Nop())
+            if Optional.exists(type(result)) else
+            Nop()
+            if result is None else
+            result
+        )
         return List(data, r2)
 
     def create_result(self, data, msgs):
