@@ -194,8 +194,8 @@ class NvimComponent(Logging):
         return (
             self._cmd(line, verbose, sync)
             .bieffect(
-                L(self._cmd_error)(_, line, sync),
-                L(self._cmd_success)(_, line, sync)
+                L(self._cmd_error)(line, _, sync),
+                L(self._cmd_success)(line, _, sync)
             )
         )
 
@@ -212,12 +212,15 @@ class NvimComponent(Logging):
         else:
             self.log.debug('async cmd \'{}\''.format(line))
 
-    def _cmd_error(self, exc, line, sync):
+    def _cmd_error(self, line, exc, sync):
         err = exc.cause if isinstance(exc, TaskException) else exc
         if amino.development:
             a = '' if sync else 'a'
-            msg = 'running nvim {}sync cmd `{}`'
-            self.log.caught_exception(msg.format(a, line), err)
+            msg = f'running nvim {a}sync cmd `{line}`'
+            if isinstance(err, Exception):
+                self.log.caught_exception(msg, err)
+            else:
+                self.log.error(f'{msg}: {err}')
         else:
             self.log.error(decode(err))
 
@@ -688,8 +691,7 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
         return Right(decode(v))
 
     def set(self, name, value):
-        self.log.debug('setting {} {} to \'{}\''.format(self._desc, name,
-                                                        value))
+        self.log.debug('setting {} {} to \'{}\''.format(self._desc, name, value))
         try:
             self._set(name, value)
         except:
