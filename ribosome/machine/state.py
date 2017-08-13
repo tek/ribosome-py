@@ -25,7 +25,6 @@ import amino
 from amino import Maybe, Map, Try, _, L, __, Empty, Just, Either, List, Left
 
 Callback = message('Callback', 'func')
-IO = message('IO', 'perform')
 Info = message('Info', 'message')
 Envelope = message('Envelope', 'message', 'to')
 RunMachine = json_message('RunMachine', 'machine')

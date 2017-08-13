@@ -8,7 +8,7 @@ import asyncio
 import toolz
 
 import amino
-from amino import Maybe, _, List, Map, Empty, L, __, Just, Eval, Either, Lists
+from amino import Maybe, _, List, Map, Empty, L, __, Just, Eval, Either, Lists, Nothing
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
@@ -33,6 +33,7 @@ RunTask = message('RunTask', 'task', opt_fields=(('msg', Empty()),))
 UnitTask = message('UnitTask', 'task', opt_fields=(('msg', Empty()),))
 DataTask = message('DataTask', 'cons', opt_fields=(('msg', Empty()),))
 ShowLogInfo = message('ShowLogInfo')
+RunIOsParallel = message('RunIOsParallel', 'ios')
 RunCorosParallel = message('RunCorosParallel', 'coros')
 
 
@@ -278,6 +279,11 @@ class Machine(MachineBase):
             results = await asyncio.gather(*msg.coros)
             return Just(Lists.wrap(results))
         return wrap()
+
+    @may_handle(RunIOsParallel)
+    def run_ios_parallel(self, data: Data, msg: RunIOsParallel) -> Message:
+        coros = msg.ios / _.coro
+        return RunCorosParallel(coros)
 
     @may_handle(Error)
     def message_error(self, data, msg):

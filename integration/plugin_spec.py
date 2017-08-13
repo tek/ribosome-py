@@ -12,6 +12,7 @@ plugin with {}
 simple commands producing output $startup
 launch a scratch buffer $scratch
 execute coroutines in parallel $coros_parallel
+execute IOs in parallel $ios_parallel
 '''
 
 
@@ -57,6 +58,13 @@ class _PluginSpecBase(IntegrationSpecBase):
         self._log_contains('sleeping in 1')
         return self._log_contains('sleeping in 0')
 
+    def _ios_parallel(self) -> Expectation:
+        self.vim.cmd_sync('Go')
+        self.vim.cmd_sync('RunParallelIOs')
+        self._log_contains('sleeping in 2')
+        self._log_contains('sleeping in 1')
+        return self._log_contains('sleeping in 0')
+
 
 class LoopedPluginSpec(_PluginSpecBase):
     __doc__ = specs.format('permanent main loop thread')
@@ -74,6 +82,9 @@ class LoopedPluginSpec(_PluginSpecBase):
     def coros_parallel(self) -> Expectation:
         return self._coros_parallel()
 
+    def ios_parallel(self) -> Expectation:
+        return self._ios_parallel()
+
 
 class UnloopedPluginSpec(_PluginSpecBase):
     __doc__ = specs.format('on-demand main loop')
@@ -90,5 +101,8 @@ class UnloopedPluginSpec(_PluginSpecBase):
 
     def coros_parallel(self) -> Expectation:
         return self._coros_parallel()
+
+    def ios_parallel(self) -> Expectation:
+        return self._ios_parallel()
 
 __all__ = ('LoopedPluginSpec',)

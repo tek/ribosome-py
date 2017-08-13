@@ -1,11 +1,12 @@
 import asyncio
+from time import time
 
 import neovim
 
 from ribosome import command, NvimStatePlugin
 
 from amino.lazy import lazy
-from amino import Left, L, _, Map, List, Just, Lists
+from amino import Left, L, _, Map, List, Just, Lists, IO
 from amino.state import EvalState
 from ribosome.logging import Logging
 from ribosome.request import function, msg_function, msg_command
@@ -16,7 +17,7 @@ from ribosome.machine.scratch import ScratchMachine, Mapping
 from ribosome.nvim import NvimFacade, ScratchBuffer
 from ribosome.data import Data
 from ribosome.record import int_field
-from ribosome.machine.base import RunCorosParallel
+from ribosome.machine.base import RunCorosParallel, RunIOsParallel
 
 
 Msg = message('Msg', 'text')
@@ -27,6 +28,7 @@ ScratchCheck = message('ScratchCheck')
 St = message('St')
 Print = message('Print', 'msg')
 RunParallel = message('RunParallel')
+RunParallelIOs = message('RunParallelIOs')
 
 
 class TData(Data):
@@ -73,6 +75,15 @@ class Mach(Logging):
             return Nop().pub
         coros = Lists.range(3) / go
         return RunCorosParallel(coros)
+
+    @may_handle(RunParallelIOs)
+    def run_parallel_ios(self, data: Data, msg: RunParallelIOs) -> Message:
+        def go(n: int) -> None:
+            self.log.test(f'sleeping in {n}')
+            time.sleep(1)
+            return Nop().pub
+        ios = Lists.range(3) / L(IO.delay)(go, _)
+        return RunIOsParallel(ios)
 
 
 class MachLooped(Mach, RootMachine):
@@ -155,6 +166,10 @@ class TestPlugin(NvimStatePlugin, Logging):
 
     @msg_command(RunParallel)
     def run_parallel(self) -> None:
+        pass
+
+    @msg_command(RunParallelIOs)
+    def run_parallel_i_os(self) -> None:
         pass
 
 
