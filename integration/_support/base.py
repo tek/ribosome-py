@@ -1,9 +1,7 @@
-from amino import env
-
-from ribosome.test.integration import PluginIntegrationSpec
+from ribosome.test.integration.klk import PluginIntegrationKlkSpec
 
 
-class IntegrationSpecBase(PluginIntegrationSpec):
+class IntegrationSpecBase(PluginIntegrationKlkSpec):
 
     def setup(self):
         self.log_format = '{message}'

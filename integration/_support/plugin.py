@@ -3,11 +3,11 @@ import neovim
 from ribosome import command, NvimStatePlugin
 
 from amino.lazy import lazy
-from amino import Left, L, _, Map, List, Eval, Task, Just
+from amino import Left, L, _, Map, List, Just
 from amino.state import EvalState
 from ribosome.logging import Logging
 from ribosome.request import function, msg_function, msg_command
-from ribosome.machine import message, may_handle, handle, Machine, Message, Nop
+from ribosome.machine import message, may_handle, handle, Machine, Message
 from ribosome.machine.state import UnloopedRootMachine, RunScratchMachine, RootMachine
 from ribosome.machine.transition import Fatal, may_fallback
 from ribosome.machine.scratch import ScratchMachine, Mapping
@@ -67,7 +67,7 @@ class MachLooped(Mach, RootMachine):
 
 
 class MachUnlooped(Mach, UnloopedRootMachine):
-    pass
+    _data_type = TData
 
 
 class ScratchM(ScratchMachine):
@@ -96,7 +96,7 @@ class TestPlugin(NvimStatePlugin, Logging):
     test_error = 'test error'
     test_scratch = 'test scratch'
 
-    def start(self):
+    def start_plugin(self) -> None:
         self.state.start()
 
     @neovim.function('Value', sync=True)
@@ -105,7 +105,7 @@ class TestPlugin(NvimStatePlugin, Logging):
 
     @command(sync=True)
     def go(self):
-        self.start()
+        self.start_plugin()
         self.log.info(self.test_go)
 
     @function()
