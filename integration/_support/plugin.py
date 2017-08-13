@@ -1,19 +1,22 @@
+import asyncio
+
 import neovim
 
 from ribosome import command, NvimStatePlugin
 
 from amino.lazy import lazy
-from amino import Left, L, _, Map, List, Just
+from amino import Left, L, _, Map, List, Just, Lists
 from amino.state import EvalState
 from ribosome.logging import Logging
 from ribosome.request import function, msg_function, msg_command
-from ribosome.machine import message, may_handle, handle, Machine, Message
+from ribosome.machine import message, may_handle, handle, Machine, Message, Nop
 from ribosome.machine.state import UnloopedRootMachine, RunScratchMachine, RootMachine
 from ribosome.machine.transition import Fatal, may_fallback
 from ribosome.machine.scratch import ScratchMachine, Mapping
 from ribosome.nvim import NvimFacade, ScratchBuffer
 from ribosome.data import Data
 from ribosome.record import int_field
+from ribosome.machine.base import RunCorosParallel
 
 
 Msg = message('Msg', 'text')
@@ -23,6 +26,7 @@ ScratchTest = message('ScratchTest')
 ScratchCheck = message('ScratchCheck')
 St = message('St')
 Print = message('Print', 'msg')
+RunParallel = message('RunParallel')
 
 
 class TData(Data):
@@ -60,6 +64,15 @@ class Mach(Logging):
     @may_handle(Print)
     def print_(self, data: Data, msg: Print) -> Message:
         self.log.info(msg.msg)
+
+    @may_handle(RunParallel)
+    def run_parallel(self, data: Data, msg: RunParallel) -> Message:
+        async def go(n: int) -> None:
+            self.log.test(f'sleeping in {n}')
+            await asyncio.sleep(.1)
+            return Nop().pub
+        coros = Lists.range(3) / go
+        return RunCorosParallel(coros)
 
 
 class MachLooped(Mach, RootMachine):
@@ -140,18 +153,22 @@ class TestPlugin(NvimStatePlugin, Logging):
     def check_scratch(self):
         pass
 
+    @msg_command(RunParallel)
+    def run_parallel(self) -> None:
+        pass
+
 
 class TestPluginLooped(TestPlugin):
 
     @lazy
-    def state(self):
+    def state(self) -> MachLooped:
         return MachLooped(self.vim.proxy, title='spec')
 
 
 class TestPluginUnlooped(TestPlugin):
 
     @lazy
-    def state(self):
+    def state(self) -> MachUnlooped:
         return MachUnlooped(self.vim.proxy, title='spec')
 
 __all__ = ('TestPlugin',)

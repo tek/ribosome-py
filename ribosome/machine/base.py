@@ -3,12 +3,12 @@ import time
 import uuid
 import inspect
 from typing import Sequence, Callable, TypeVar, Any
-from asyncio import iscoroutine
+import asyncio
 
 import toolz
 
 import amino
-from amino import Maybe, _, List, Map, Empty, L, __, Just, Eval, Either
+from amino import Maybe, _, List, Map, Empty, L, __, Just, Eval, Either, Lists
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
@@ -33,6 +33,7 @@ RunTask = message('RunTask', 'task', opt_fields=(('msg', Empty()),))
 UnitTask = message('UnitTask', 'task', opt_fields=(('msg', Empty()),))
 DataTask = message('DataTask', 'cons', opt_fields=(('msg', Empty()),))
 ShowLogInfo = message('ShowLogInfo')
+RunCorosParallel = message('RunCorosParallel', 'coros')
 
 
 def is_seq(a):
@@ -119,7 +120,7 @@ class HandlerJob(Logging):
         return self.create_result(new_data, msgs)
 
     def transform_result(self, result):
-        if iscoroutine(result):
+        if asyncio.iscoroutine(result) or isinstance(result, asyncio.futures.Future):
             return Coroutine(result).pub
         elif isinstance(result, Task):
             return RunTask(result, Just(self.msg))
@@ -270,6 +271,13 @@ class Machine(MachineBase):
     @handle(DataTask)
     def message_data_task(self, data: Data, msg):
         return self._run_task(msg.cons(Task.now(data)))
+
+    @may_handle(RunCorosParallel)
+    def run_coros_parallel(self, data: Data, msg: RunCorosParallel) -> Message:
+        async def wrap() -> Maybe[List[Message]]:
+            results = await asyncio.gather(*msg.coros)
+            return Just(Lists.wrap(results))
+        return wrap()
 
     @may_handle(Error)
     def message_error(self, data, msg):
