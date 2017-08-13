@@ -1,5 +1,5 @@
 import asyncio
-from time import time
+import time
 
 import neovim
 
@@ -80,7 +80,7 @@ class Mach(Logging):
     def run_parallel_ios(self, data: Data, msg: RunParallelIOs) -> Message:
         def go(n: int) -> None:
             self.log.test(f'sleeping in {n}')
-            time.sleep(1)
+            time.sleep(.1)
             return Nop().pub
         ios = Lists.range(3) / L(IO.delay)(go, _)
         return RunIOsParallel(ios)

@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Any
 from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
-from amino import Maybe, may, Either, Just, Left, I, List, _
+from amino import Maybe, may, Either, Just, Left, I, List
 from amino.task import TaskException
 
 from ribosome.machine.message_base import (message, _message_attr,
@@ -34,11 +34,11 @@ class Fatal(Failure):
 class NothingToDo(Failure):
     pass
 
-
 Error = message('Error', 'message')
 Warning = message('Warning', 'message')
 Debug = message('Debug', 'message')
 Coroutine = message('Coroutine', 'coro')
+TransitionException = message('TransitionException', 'context', 'exc')
 
 
 def _to_error(data):
@@ -116,6 +116,10 @@ class CoroHandler(Handler):
         return Maybe(Coroutine(self.fun(data, msg)))
 
 
+class CoroExecutionHandler(Handler):
+    pass
+
+
 class TransitionResult(Record):
     data = any_field()
     resend = list_field()
@@ -141,9 +145,6 @@ class TransitionResult(Record):
         return List(self.handled) + self.error.to_list + self.resend
 
     def fold(self, f):
-        return self
-
-    async def await_coro(self, callback):
         return self
 
     def accum(self, other: 'TransitionResult'):
@@ -178,14 +179,6 @@ class StrictTransitionResult(TransitionResult):
 
 class CoroTransitionResult(TransitionResult, Logging):
     coro = field(Coroutine)
-
-    async def await_coro(self, callback):
-        value = await self.coro.coro
-        result = callback(_recover_error(self, value))
-        if result.resend:
-            msg = 'Cannot resend {} from coro {}, use .pub on messages'
-            self.log.warn(msg.format(result.resend, self.coro))
-        return result
 
     @property
     def pub(self):
@@ -243,7 +236,5 @@ class MachineError(RuntimeError):
 class TransitionFailed(MachineError):
     pass
 
-__all__ = ('Handler', 'CoroHandler', 'TransitionResult',
-           'StrictTransitionResult', 'CoroTransitionResult', 'handle',
-           'may_handle', 'either_msg', 'either_handle', 'MachineError',
-           'TransitionFailed')
+__all__ = ('Handler', 'CoroHandler', 'TransitionResult', 'StrictTransitionResult', 'CoroTransitionResult', 'handle',
+           'may_handle', 'either_msg', 'either_handle', 'MachineError', 'TransitionFailed')

@@ -12,12 +12,10 @@ from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
-from ribosome.machine.message_base import (message, Message, Nop, Done, Quit,
-                                           PlugCommand, Stop)
-from ribosome.machine.base import (ModularMachine, Machine, Transitions,
-                                   HandlerJob, MachineBase)
-from ribosome.machine.transition import (TransitionResult, Coroutine,
-                                         may_handle, handle)
+from ribosome.machine.message_base import message, Message, Nop, Done, Quit, PlugCommand, Stop
+from ribosome.machine.base import ModularMachine, Machine, Transitions, HandlerJob, MachineBase
+from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle, handle, CoroTransitionResult,
+                                         _recover_error, CoroExecutionHandler)
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
 
@@ -153,7 +151,7 @@ class StateMachineBase(ModularMachine):
     def _send(self, data, msg: Message):
         return (
             Try(self.loop_process, data, msg)
-            .right_or_map(L(TransitionResult.failed)(data, _))
+            .value_or(L(TransitionResult.failed)(data, _))
         )
 
     @may_handle(Nop)
@@ -234,11 +232,28 @@ class StateMachineBase(ModularMachine):
         return result.data
 
     async def _successful_transition(self, data, msg, sent):
-        job = HandlerJob(self, data, msg, None, self._data_type)
-        result = await sent.await_coro(job.dispatch_transition_result)
+        result = (
+            await self._execute_coro_result(data, msg, sent)
+            if isinstance(sent, CoroTransitionResult) else
+            sent
+        )
         for pub in result.pub:
             await self._publish(pub)
         return result
+
+    async def _execute_coro_result(self, data: Data, msg: Message, ctr: CoroTransitionResult) -> None:
+        job = HandlerJob(self, data, msg, CoroExecutionHandler(self, 'coroutine result', msg, None, 1.0),
+                         self._data_type)
+        try:
+            result0 = await ctr.coro.coro
+            result = job.dispatch_transition_result(_recover_error(self, result0))
+        except Exception as e:
+            return job.handle_transition_error(e)
+        else:
+            if result.resend:
+                msg = 'Cannot resend {} from coro {}, use .pub on messages'
+                self.log.warn(msg.format(result.resend, ctr.coro))
+            return result
 
     def _failed_transition(self, msg, sent):
         errmsg = sent.error_message

@@ -8,13 +8,14 @@ import asyncio
 import toolz
 
 import amino
-from amino import Maybe, _, List, Map, Empty, L, __, Just, Eval, Either, Lists, Nothing
+from amino import Maybe, _, List, Map, Empty, L, __, Just, Eval, Either, Lists, Left, Right
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
 from amino.func import flip
 from amino.state import StateT
 from amino.tc.optional import Optional
+from amino.id import Id
 
 from ribosome.machine.message_base import Message, Publish, message
 from ribosome.logging import Logging, print_ribo_log_info
@@ -22,7 +23,7 @@ from ribosome.data import Data
 from ribosome.nvim import NvimIO
 from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
                                          may_handle, TransitionFailed, Coroutine, MachineError, WrappedHandler, Error,
-                                         Debug, handle, _task_result)
+                                         Debug, handle, _task_result, TransitionException)
 from ribosome.machine.message_base import _machine_attr, Nop
 from ribosome.request.command import StateCommand
 
@@ -69,7 +70,6 @@ class HandlerJob(Logging):
         self.data_type = data_type
         self.start_time = time.time()
 
-    @property
     def run(self):
         result = self._execute_transition(self.handler, self.data, self.msg)
         return self.dispatch_transition_result(result)
@@ -142,6 +142,8 @@ class HandlerJob(Logging):
             (data, result) = res1.get_or_else((self.data, Nop()))
         elif res0.tpe == Either:
             (data, result) = res1.value_or(lambda a: (self.data, Error(str(a))))
+        elif res0.tpe == Id:
+            (data, result) = res1.value
         else:
             return List(Error(f'invalid effect for transition result `State`: {res0.tpe}#{res1}'))
         r2 = (
@@ -191,8 +193,7 @@ class Machine(MachineBase):
 
     @property
     def _handlers(self):
-        methods = inspect.getmembers(type(self),
-                                     lambda a: hasattr(a, _machine_attr))
+        methods = inspect.getmembers(type(self), lambda a: hasattr(a, _machine_attr))
         return List.wrap(methods).map2(L(Handler.create)(self, _, _))
 
     @property
@@ -207,7 +208,7 @@ class Machine(MachineBase):
         self.prepare(msg)
         handler = self._resolve_handler(msg, prio)
         job = HandlerJob(self, data, msg, handler, self._data_type)
-        result = job.run
+        result = job.run()
         self._check_time(job.start_time, msg)
         return result
 
@@ -276,18 +277,38 @@ class Machine(MachineBase):
     @may_handle(RunCorosParallel)
     def run_coros_parallel(self, data: Data, msg: RunCorosParallel) -> Message:
         async def wrap() -> Maybe[List[Message]]:
-            results = await asyncio.gather(*msg.coros)
-            return Just(Lists.wrap(results))
+            try:
+                results = await asyncio.gather(*msg.coros)
+            except Exception as e:
+                self.log.caught_exception('running coroutines', e)
+                return Left(f'running coros failed: {e}')
+            else:
+                return Right(Lists.wrap(results))
         return wrap()
 
     @may_handle(RunIOsParallel)
     def run_ios_parallel(self, data: Data, msg: RunIOsParallel) -> Message:
         coros = msg.ios / _.coro
-        return RunCorosParallel(coros)
+        async def wrap() -> Maybe[List[Message]]:
+            try:
+                results = await asyncio.gather(*coros)
+            except Exception as e:
+                self.log.caught_exception('running coroutines', e)
+                return Left(f'running coros failed: {e}')
+            else:
+                return Right(
+                    Lists.wrap(results) /
+                    __.value_or(lambda a: TransitionException('running IOs in parallel', a.cause).pub)
+                )
+        return wrap()
 
     @may_handle(Error)
     def message_error(self, data, msg):
         self.log.error(msg.message)
+
+    @may_handle(TransitionException)
+    def transition_exception(self, data, msg):
+        self.log.caught_exception(msg.context, msg.exc)
 
     @may_handle(Debug)
     def message_debug(self, data, msg):
