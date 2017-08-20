@@ -32,7 +32,6 @@ class Transit(Generic[D], TransAction):
     def __init__(self, trans: StateT[Id, D, 'Propagate']) -> None:
         self.trans = trans
 
-    @property
     def _arg_desc(self) -> List[str]:
         return List(str(self.trans))
 
@@ -46,7 +45,6 @@ class Propagate(TransAction):
     def __init__(self, messages: List[Message]) -> None:
         self.messages = messages
 
-    @property
     def _arg_desc(self) -> List[str]:
         return self.messages / str
 
@@ -64,7 +62,6 @@ class TransStep(Generic[R], ToStr, metaclass=AlgebraMeta, base=True):
     def error(self) -> bool:
         return isinstance(self, TransEffectError)
 
-    @property
     def _arg_desc(self) -> List[str]:
         return List(str(self.data))
 

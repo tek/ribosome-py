@@ -910,8 +910,7 @@ class Syntax(Logging):
         return self.cmd('match', group, pat, *a, **kw)
 
     def cmd(self, cmdname, group, pat, *a, **kw):
-        c = 'syntax {} {} /{}/ {}'.format(cmdname, group, pat,
-                                          self._opts(*a, **kw))
+        c = 'syntax {} {} /{}/ {}'.format(cmdname, group, pat, self._opts(*a, **kw))
         self.target.cmd(c)
 
     def link(self, group, to):

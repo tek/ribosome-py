@@ -105,7 +105,6 @@ class Handler(Generic[M, D, R], Logging, ToStr):
     def run(self, data: D, msg: Msg) -> R:
         ...
 
-    @property
     def _arg_desc(self) -> List[str]:
         return List(self.name, str(self.message), str(self.fun))
 
