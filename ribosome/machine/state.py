@@ -246,8 +246,11 @@ class StateMachineBase(ModularMachine):
         return result
 
     async def _execute_coro_result(self, data: Data, msg: Message, ctr: CoroTransitionResult) -> None:
-        job = DynHandlerJob(self, data, msg, CoroExecutionHandler(self, 'coroutine result', msg, None, 1.0),
-                            self._data_type)
+        try:
+            job = DynHandlerJob(self, data, msg, CoroExecutionHandler(self, 'coroutine result', msg, None, 1.0, True),
+                                self._data_type)
+        except Exception as e:
+            return TransitionResult.failed(data, f'failed to create coro handler job: {e}')
         try:
             result0 = await ctr.coro.coro
             result = job.dispatch_transition_result(_recover_error(self, result0))

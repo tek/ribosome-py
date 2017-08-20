@@ -111,10 +111,10 @@ class Handler(Generic[M, D, R], Logging, ToStr):
 
 class DynHandler(Generic[M, D], Handler[M, D, DynTrans]):
 
-    def run(self, data, msg) -> Maybe[Any]:
+    def run(self, data, msg) -> DynTrans:
         return _recover_error(self, self.execute(data, msg))
 
-    def execute(self, data, msg) -> Maybe[Any]:
+    def execute(self, data, msg) -> DynTrans:
         return self.fun(self.machine, data, msg)
 
 
@@ -142,11 +142,14 @@ class AlgHandler(Generic[M, D], Handler[M, D, TransAction]):
 
 class CoroHandler(Handler):
 
-    def run(self, data, msg):
+    def run(self, data, msg) -> Maybe[Coroutine]:
         return Maybe(Coroutine(self.fun(data, msg)))
 
+    def execute(self, data, msg) -> Maybe[Coroutine]:
+        ...
 
-class CoroExecutionHandler(Handler):
+
+class CoroExecutionHandler(DynHandler):
     pass
 
 

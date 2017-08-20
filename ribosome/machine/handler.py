@@ -4,9 +4,9 @@ from typing import Any, Sequence, TypeVar, Generic, Type, Callable, Tuple
 import asyncio
 
 import amino
-from amino import Maybe, _, List, Map, Just, Eval, Either
+from amino import Maybe, _, List, Map, Just
 from amino.task import Task
-from amino.state import StateT
+from amino.state import StateT, EvalState, MaybeState, EitherState, IdState
 from amino.tc.optional import Optional
 from amino.id import Id
 from amino.util.string import blue
@@ -144,21 +144,21 @@ class DynHandlerJob(HandlerJob):
 
     def transform_state(self, res0: StateT):
         res1 = res0.run(self.data)
-        if res0.tpe == Eval:
+        if isinstance(res0, EvalState):
             (data, result) = res1._value()
-        elif res0.tpe == Maybe:
+        elif isinstance(res0, MaybeState):
             (data, result) = res1.get_or_else((self.data, Nop()))
-        elif res0.tpe == Either:
+        elif isinstance(res0, EitherState):
             (data, result) = res1.value_or(lambda a: (self.data, Error(str(a))))
-        elif res0.tpe == Id:
+        elif isinstance(res0, IdState):
             (data, result) = res1.value
         else:
             return List(Error(f'invalid effect for transition result `State`: {res0.tpe}#{res1}'))
         r2 = (
-            result.get_or_else(Nop())
-            if Optional.exists(type(result)) else
             Nop()
             if result is None else
+            result.get_or_else(Nop())
+            if Optional.exists(type(result)) else
             result
         )
         return (
