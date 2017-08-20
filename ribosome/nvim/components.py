@@ -163,8 +163,7 @@ class NvimComponent(Logging):
     def threadsafe_subprocess(self):
         def set_watcher(vim: Any) -> None:
             try:
-                asyncio.get_child_watcher().attach_loop(
-                    asyncio.get_event_loop())
+                asyncio.get_child_watcher().attach_loop(asyncio.get_event_loop())
             except Exception:
                 pass
         self.async(set_watcher)
@@ -608,6 +607,13 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
     def import_pvar_path(self, name: str) -> Maybe[A]:
         return self.buffer.vars.p(name).o(lambda: self.vars.p(name)).flat_map(Either.import_path)
+
+    def function_exists(self, name: str) -> Boolean:
+        return self.call('exists', f'*{name}').true
+
+    def execute(self, code: Union[str, List[str]]) -> None:
+        lines = code if isinstance(code, List) else Lists.lines(code)
+        return self.call('execute', list(lines))
 
 
 class AsyncVimCallProxy():

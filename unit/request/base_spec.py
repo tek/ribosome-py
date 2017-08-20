@@ -1,18 +1,13 @@
 import json
 
-from amino import Just
+from kallikrein import k, Expectation
+from kallikrein.matchers import equal
+from kallikrein.matchers.maybe import be_just
 
-from ribosome.request.base import (RequestHandler, MessageRequestHandler,
-                                   JsonMessageRequestHandler)
+from ribosome.request.base import RequestHandler, MessageRequestHandler, JsonMessageRequestHandler
 from ribosome.machine import message
 
-from unit._support.spec import Spec
-
-
-BasicMessage = message(
-    'BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
-
-
+BasicMessage = message('BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
 JsonMessage = message('JsonMessage', 'a', 'b')
 
 
@@ -31,16 +26,32 @@ class JsonMessageRH(RH, JsonMessageRequestHandler):
     pass
 
 
-class RequestHandlerSpec(Spec):
+class RequestHandlerSpec:
+    '''request handlers
+    command name $name
+    parameter count $nargs
+    zero parameters $none
+    one parameter $one
+    one optional parameter $one_opt
+    two parameters $two
+    two parameters, one optional $two_one_opt
+    two optional parameters $two_opt
+    six parameters $six
+    varargs $var
+    message request handler $message
+    json message request handler $json_message
+    '''
 
-    def name(self):
+    def name(self) -> Expectation:
         def cmd_name(a, b, c=2):
             pass
-        RH(cmd_name).name.should.equal('CmdName')
         other_name = 'OtherName'
-        RH(cmd_name, other_name).name.should.equal(other_name)
+        return (
+            k(RH(cmd_name).name).must(equal('CmdName')) &
+            k(RH(cmd_name, other_name).name).must(equal(other_name))
+        )
 
-    def nargs(self):
+    def nargs(self) -> Expectation:
         def none():
             pass
         def one(a):
@@ -53,117 +64,141 @@ class RequestHandlerSpec(Spec):
             pass
         def check(fun, nargs, spec):
             c = RH(fun)
-            c.nargs.should.equal(nargs)
-            c.count_spec.should.equal(spec)
-        check(none, 0, 'none')
-        check(one, 1, 'exactly 1')
-        check(two, '+', 'exactly 2')
-        check(two_default, '+', 'between 1 and 2')
-        check(more, '+', 'at least 3')
+            return (
+                k(c.nargs).must(equal(nargs)) &
+                k(c.count_spec).must(equal(spec))
+            )
+        return (
+            check(none, 0, 'none') &
+            check(one, 1, 'exactly 1') &
+            check(two, '+', 'exactly 2') &
+            check(two_default, '+', 'between 1 and 2') &
+            check(more, '+', 'at least 3')
+        )
 
-    def none(self):
+    def none(self) -> Expectation:
         def fun():
             pass
         c = RH(fun)
-        c.min.should.equal(0)
-        c.max.should.equal(Just(0))
-        c.check_length([]).should.be.ok
-        c.check_length([1]).should_not.be.ok
+        return (
+            k(c.min).must(equal(0)) &
+            k(c.max).must(be_just(0)) &
+            k(c.check_length([])).true &
+            k(c.check_length([1])).false
+        )
 
-    def one(self):
+    def one(self) -> Expectation:
         def fun(a):
             pass
         c = RH(fun)
-        c.min.should.equal(1)
-        c.max.should.equal(Just(1))
-        c.check_length([]).should_not.be.ok
-        c.check_length([1]).should.be.ok
-        c.check_length([1, 2]).should_not.be.ok
+        return (
+            k(c.min).must(equal(1)) &
+            k(c.max).must(be_just(1)) &
+            k(c.check_length([])).false &
+            k(c.check_length([1])).true &
+            k(c.check_length([1, 2])).false
+        )
 
-    def one_opt(self):
+    def one_opt(self) -> Expectation:
         def fun(a=1):
             pass
         c = RH(fun)
-        c.min.should.equal(0)
-        c.max.should.equal(Just(1))
-        c.check_length([]).should.be.ok
-        c.check_length([1]).should.be.ok
-        c.check_length([1, 2]).should_not.be.ok
+        return (
+            k(c.min).must(equal(0)) &
+            k(c.max).must(be_just(1)) &
+            k(c.check_length([])).true &
+            k(c.check_length([1])).true &
+            k(c.check_length([1, 2])).false
+        )
 
-    def two(self):
+    def two(self) -> Expectation:
         def fun(a, b):
             pass
         c = RH(fun)
-        c.min.should.equal(2)
-        c.max.should.equal(Just(2))
-        c.check_length([]).should_not.be.ok
-        c.check_length([1]).should_not.be.ok
-        c.check_length([1, 2]).should.be.ok
-        c.check_length([1, 2, 3]).should_not.be.ok
+        return (
+            k(c.min).must(equal(2)) &
+            k(c.max).must(be_just(2)) &
+            k(c.check_length([])).false &
+            k(c.check_length([1])).false &
+            k(c.check_length([1, 2])).true &
+            k(c.check_length([1, 2, 3])).false
+        )
 
-    def two_one_opt(self):
+    def two_one_opt(self) -> Expectation:
         def fun(a, b=1):
             pass
         c = RH(fun)
-        c.min.should.equal(1)
-        c.max.should.equal(Just(2))
-        c.check_length([]).should_not.be.ok
-        c.check_length([1]).should.be.ok
-        c.check_length([1, 2]).should.be.ok
-        c.check_length([1, 2, 3]).should_not.be.ok
+        return (
+            k(c.min).must(equal(1)) &
+            k(c.max).must(be_just(2)) &
+            k(c.check_length([])).false &
+            k(c.check_length([1])).true &
+            k(c.check_length([1, 2])).true &
+            k(c.check_length([1, 2, 3])).false
+        )
 
-    def two_opt(self):
+    def two_opt(self) -> Expectation:
         def fun(a=1, b=1):
             pass
         c = RH(fun)
-        c.min.should.equal(0)
-        c.max.should.equal(Just(2))
-        c.check_length([]).should.be.ok
-        c.check_length([1]).should.be.ok
-        c.check_length([1, 2]).should.be.ok
-        c.check_length([1, 2, 3]).should_not.be.ok
+        return (
+            k(c.min).must(equal(0)) &
+            k(c.max).must(be_just(2)) &
+            k(c.check_length([])).true &
+            k(c.check_length([1])).true &
+            k(c.check_length([1, 2])).true &
+            k(c.check_length([1, 2, 3])).false
+        )
 
-    def six(self):
+    def six(self) -> Expectation:
         def fun(a, b, c, d, e, f):
             pass
         c = RH(fun)
-        c.min.should.equal(6)
-        c.max.should.equal(Just(6))
-        c.check_length([]).should_not.be.ok
-        c.check_length([1]).should_not.be.ok
-        c.check_length([1, 2, 3, 4, 5, 6]).should.be.ok
-        c.check_length([1, 2, 3, 4, 5, 6, 7]).should_not.be.ok
+        return (
+            k(c.min).must(equal(6)) &
+            k(c.max).must(be_just(6)) &
+            k(c.check_length([])).false &
+            k(c.check_length([1])).false &
+            k(c.check_length([1, 2, 3, 4, 5, 6])).true &
+            k(c.check_length([1, 2, 3, 4, 5, 6, 7])).false
+        )
 
-    def var(self):
+    def var(self) -> Expectation:
         def fun(a, b=1, *args):
             pass
         c = RH(fun)
-        c.min.should.equal(1)
-        c.max.is_just.should_not.be.ok
-        c.check_length([]).should_not.be.ok
-        c.check_length([1]).should.be.ok
-        c.check_length([1, 2]).should.be.ok
-        c.check_length([1, 2, 3]).should.be.ok
+        return (
+            k(c.min).must(equal(1)) &
+            k(c.max.is_just).false &
+            k(c.check_length([])).false &
+            k(c.check_length([1])).true &
+            k(c.check_length([1, 2])).true &
+            k(c.check_length([1, 2, 3])).true
+        )
 
-    def message(self):
+    def message(self) -> Expectation:
         def cmd_name():
             pass
         c = MessageRH(cmd_name, BasicMessage)
-        c.check_length(['a']).should_not.be.ok
-        c.check_length(['a', 'b']).should.be.ok
-        c.check_length(['a', 'b', 'c']).should.be.ok
-        c.check_length(['a', 'b', 'c', 'd']).should.be.ok
-        c.check_length(['a', 'b', 'c', 'd', 'e']).should_not.be.ok
+        return (
+            k(c.check_length(['a'])).false &
+            k(c.check_length(['a', 'b'])).true &
+            k(c.check_length(['a', 'b', 'c'])).true &
+            k(c.check_length(['a', 'b', 'c', 'd'])).true &
+            k(c.check_length(['a', 'b', 'c', 'd', 'e'])).false
+        )
 
-    def json_message(self):
+    def json_message(self) -> Expectation:
         def cmd_name():
             pass
         c = JsonMessageRH(cmd_name, JsonMessage)
-        c.check_length(['a']).should_not.be.ok
-        c.check_length(['a', 'b']).should.be.ok
         json_arg = dict(a=dict(b=2, c=[4, 5]), d=5, e=['a', 'z'])
         regular = [2, 3]
         args = c._extract_args(regular + json.dumps(json_arg).split())
-        list(args).should.equal(regular + [json_arg])
+        return (
+            k(c.check_length(['a'])).false &
+            k(c.check_length(['a', 'b'])).true &
+            k(list(args)).must(equal(regular + [json_arg]))
+        )
 
 __all__ = ('RequestHandlerSpec',)

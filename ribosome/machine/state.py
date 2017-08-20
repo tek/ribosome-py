@@ -12,15 +12,20 @@ from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
-from ribosome.machine.message_base import message, Message, Nop, Done, Quit, PlugCommand, Stop
-from ribosome.machine.base import ModularMachine, Machine, Transitions, HandlerJob, MachineBase
+from ribosome.machine.message_base import message, Message
+from ribosome.machine.base import MachineI, MachineBase
 from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle, handle, CoroTransitionResult,
                                          _recover_error, CoroExecutionHandler)
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
+from ribosome.machine.messages import Nop, Done, Quit, PlugCommand, Stop
+from ribosome.machine.handler import DynHandlerJob
+from ribosome.machine.modular import ModularMachine
+from ribosome.machine.transitions import Transitions
 
 import amino
 from amino import Maybe, Map, Try, _, L, __, Empty, Just, Either, List, Left
+from amino.util.string import red, blue
 
 Callback = message('Callback', 'func')
 Info = message('Info', 'message')
@@ -107,7 +112,7 @@ class AsyncIOThread(threading.Thread, AsyncIOBase):
 
 class StateMachineBase(ModularMachine):
 
-    def __init__(self, sub: List[Machine]=List(), parent=None, title=None
+    def __init__(self, sub: List[MachineBase]=List(), parent=None, title=None
                  ) -> None:
         self.data = None
         self._messages = None
@@ -186,8 +191,7 @@ class StateMachineBase(ModularMachine):
 
     @handle(Envelope)
     def message_envelope(self, data, msg):
-        return self.sub.find(_.uuid == msg.to) / __.loop_process(data,
-                                                                 msg.message)
+        return self.sub.find(_.uuid == msg.to) / __.loop_process(data, msg.message)
 
     @may_handle(IfUnhandled)
     def if_unhandled(self, data, msg):
@@ -242,8 +246,8 @@ class StateMachineBase(ModularMachine):
         return result
 
     async def _execute_coro_result(self, data: Data, msg: Message, ctr: CoroTransitionResult) -> None:
-        job = HandlerJob(self, data, msg, CoroExecutionHandler(self, 'coroutine result', msg, None, 1.0),
-                         self._data_type)
+        job = DynHandlerJob(self, data, msg, CoroExecutionHandler(self, 'coroutine result', msg, None, 1.0),
+                            self._data_type)
         try:
             result0 = await ctr.coro.coro
             result = job.dispatch_transition_result(_recover_error(self, result0))
@@ -255,10 +259,21 @@ class StateMachineBase(ModularMachine):
                 self.log.warn(msg.format(result.resend, ctr.coro))
             return result
 
-    def _failed_transition(self, msg, sent):
-        errmsg = sent.error_message
+    def _failed_transition(self, msg, sent: TransitionResult):
         msg_name = type(msg).__name__
-        self.log.error('error handling {}: {}'.format(msg_name, errmsg))
+        def log_error() -> None:
+            errmsg = sent.error_message
+            self.log.error(f'''{red('error')} handling {blue(msg_name)}: {errmsg}''')
+        def log_exc(e: Exception) -> None:
+            self.log.caught_exception(f'handling {blue(msg_name)}', e)
+        def log_verbose() -> None:
+            sent.exception / log_exc
+        try:
+            log_error()
+            if amino.development:
+                log_verbose()
+        except Exception as e:
+            self.log.error(f'error in `failed_transition`: {e}')
         return sent
 
     def _unhandled_message(self, msg, sent):
@@ -322,7 +337,7 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         threading.Thread(target=self.send_sync, args=(msg,)).start()
 
 
-class PluginStateMachine(MachineBase):
+class PluginStateMachine(MachineI):
 
     def __init__(self, plugins: List[str]) -> None:
         self.sub = plugins.flat_map(self.start_plugin)
@@ -371,8 +386,7 @@ class PluginStateMachine(MachineBase):
 # FIXME why is the title param ignored?
 class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None
-                 ) -> None:
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None) -> None:
         HasNvim.__init__(self, vim)
         PluginStateMachine.__init__(self, plugins)
 
@@ -447,4 +461,4 @@ class SubTransitions(Transitions, TransitionHelpers):
     def record_lens(self, tpe, name) -> Maybe[Lens]:
         return Empty()
 
-__all__ = ('Machine', 'Message', 'StateMachine', 'PluginStateMachine', 'Info')
+__all__ = ('Message', 'StateMachine', 'PluginStateMachine', 'Info')

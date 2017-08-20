@@ -1,9 +1,12 @@
 from ribosome.request import command
 
-from unit._support.spec import Spec
+from kallikrein import kf
+from kallikrein.matchers.end_with import end_with
 
 
-class CommandSpec(Spec):
+class CommandSpec:
+    '''vim command decorator $decorator
+    '''
 
     def decorator(self):
         default = 1
@@ -14,9 +17,11 @@ class CommandSpec(Spec):
         c = Cmd()
         def wrap(args):
             return c.cmd_name(args)
-        wrap([]).should.equal(default)
         val = 2
-        wrap([val]).should.equal(val)
-        wrap([1, 2]).endswith('between 0 and 1 ([1, 2])').should.be.ok
+        return (
+            (kf(wrap, []) == default) &
+            (kf(wrap, [val]) == val) &
+            (kf(wrap, [1, 2])).must(end_with('between 0 and 1 ([1, 2])'))
+        )
 
 __all__ = ('CommandSpec',)

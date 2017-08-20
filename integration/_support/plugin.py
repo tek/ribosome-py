@@ -70,7 +70,7 @@ class Mach(Logging):
     @may_handle(RunParallel)
     def run_parallel(self, data: Data, msg: RunParallel) -> Message:
         async def go(n: int) -> None:
-            self.log.test(f'sleeping in {n}')
+            self.log.info(f'sleeping in {n}')
             await asyncio.sleep(.1)
             return Nop().pub
         coros = Lists.range(3) / go
@@ -79,7 +79,7 @@ class Mach(Logging):
     @may_handle(RunParallelIOs)
     def run_parallel_ios(self, data: Data, msg: RunParallelIOs) -> Message:
         def go(n: int) -> None:
-            self.log.test(f'sleeping in {n}')
+            self.log.info(f'sleeping in {n}')
             time.sleep(.1)
             return Nop().pub
         ios = Lists.range(3) / L(IO.delay)(go, _)

@@ -11,6 +11,7 @@ from pyrsistent import PRecord
 _machine_attr = '_machine'
 _message_attr = '_message'
 _prio_attr = '_prio'
+_dyn_attr = '_dyn'
 default_prio = 0.5
 fallback_prio = 0.3
 override_prio = 0.8
@@ -82,8 +83,7 @@ class MessageMeta(_PRecordMeta):
 @functools.total_ordering
 class Message(PRecord, metaclass=MessageMeta, skip_fields=True):
     ''' Interface between vim commands and state.
-    Provides a constructor that allows specification of fields via
-    positional arguments.
+    Provides a constructor that allows specification of fields via positional arguments.
     '''
     time = field(float)
     prio = dfield(0.5)
@@ -135,12 +135,4 @@ class Publish(Message, fields=('message',)):
     def __str__(self):
         return 'Publish({})'.format(str(self.message))
 
-
-Nop = message('Nop')
-Stop = message('Stop')
-Quit = message('Quit')
-Done = message('Done')
-PlugCommand = message('PlugCommand', 'plug', 'msg')
-
-__all__ = ('message', 'Message', 'json_message', 'Publish', 'Nop', 'Stop',
-           'Quit', 'Done', 'PlugCommand')
+__all__ = ('message', 'Message', 'json_message', 'Publish')

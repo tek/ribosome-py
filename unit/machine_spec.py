@@ -1,11 +1,13 @@
 from concurrent.futures import Future
 
 from ribosome.machine import may_handle, message, ModularMachine, Transitions
-from ribosome import Machine, StateMachine
+from ribosome import StateMachine
+from ribosome.machine.base import MachineBase
+
+from kallikrein import k, unsafe_k
+from kallikrein.matchers.maybe import be_just
 
 from amino import List, Map
-
-from unit._support.spec import Spec
 
 M1 = message('M1')
 M2 = message('M2')
@@ -14,7 +16,7 @@ M4 = message('M4')
 M5 = message('M5', 'res')
 
 
-class _A(Machine):
+class _A(MachineBase):
 
     @may_handle(M3)
     def m3(self, data, m):
@@ -25,7 +27,7 @@ class _A(Machine):
         return (data + ('a', True)), M2().pub, M3()
 
 
-class _B(Machine):
+class _B(MachineBase):
 
     @may_handle(M2)
     def m2(self, data, m):
@@ -51,19 +53,22 @@ class _Z(StateMachine):
         self.goal.set_result(m.res)
 
 
-class PublishSpec(Spec):
+class PublishSpec:
+    '''publish a message across machines $publish
+    '''
 
     def setup(self):
-        super().setup()
-        Machine._data_type = Map
+        MachineBase._data_type = Map
 
     def publish(self):
         with _Z(List(_A('a'), _B('b'))).transient() as z:
             res = z.send_sync(M1())
-            z.goal.result().should.be.ok
-        res.should.have.key('a').being.ok
-        res.should.have.key('b').being.ok
-        res.should.have.key('c').being.ok
+            unsafe_k(z.goal.result()).true
+        return (
+            k(res.lift('a')).must(be_just(True)) &
+            k(res.lift('b')).must(be_just(True)) &
+            k(res.lift('c')).must(be_just(True))
+        )
 
 
 class _CTransitions(Transitions):
@@ -86,14 +91,18 @@ class _C(ModularMachine):
         return data, M5(self.res).pub
 
 
-class ModularSpec(Spec):
+class ModularSpec:
+    '''publish a message from a modular machine $publish
+    '''
 
     def publish(self):
         data = 'data'
         name = 'c'
         with _Z(List(_C(name, data))).transient() as z:
             res = z.send_sync(M1())
-            z.goal.result().should.equal(data)
-            res.sub_states[name][data].should.equal(data)
+        return (
+            (k(z.goal.result()) == data) &
+            (k(res.sub_states[name][data]) == data)
+        )
 
 __all__ = ('PublishSpec', 'ModularSpec')

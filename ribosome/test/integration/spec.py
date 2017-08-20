@@ -309,8 +309,7 @@ class PluginIntegrationSpec(VimIntegrationSpec):
         mod = cls.__module__
         name = cls.__name__
         rp_path = temp_file('ribosome', 'spec', 'plugin.py')
-        rp_path.write_text(rplugin_template.format(plugin_module=mod,
-                                                   plugin_class=name))
+        rp_path.write_text(rplugin_template.format(plugin_module=mod, plugin_class=name))
         return rp_path
 
 __all__ = ('VimIntegrationSpec', 'PluginIntegrationSpec')

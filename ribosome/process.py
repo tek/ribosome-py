@@ -1,3 +1,4 @@
+import abc
 from pathlib import Path
 import shutil
 from contextlib import contextmanager
@@ -30,8 +31,7 @@ class Result(object):
                 else 'subprocess failed: {} ({})'.format(self.msg, self.job))
 
     def __repr__(self):
-        return '{}({}, {}, {})'.format(self.__class__.__name__, self.job,
-                                       self.success, self.msg)
+        return '{}({}, {}, {})'.format(self.__class__.__name__, self.job, self.success, self.msg)
 
     @property
     def msg(self):
@@ -84,8 +84,7 @@ class Job(Record):
         return self.client.cwd
 
     def __str__(self):
-        return 'Job({}, {}, {})'.format(self.client.name, self.exe,
-                                        ' '.join(self.args))
+        return 'Job({}, {}, {})'.format(self.client.name, self.exe, ' '.join(self.args))
 
     def run(self):
         self.loop.run_until_complete(self.status)
@@ -99,7 +98,12 @@ class Job(Record):
         return self.status.done() and self.result.success
 
 
-class ProcessExecutor(Logging):
+@contextmanager
+def _dummy_ctx():
+    yield
+
+
+class ProcessExecutor(Logging, abc.ABC):
     ''' Handler for subprocess execution
     Because python handles signals only on the main thread and
     subprocess notifcations, like their termination, is noticed by
@@ -113,9 +117,9 @@ class ProcessExecutor(Logging):
     indefinitely with a <defunct> process.
     '''
 
-    def __init__(self, vim: NvimFacade, loop=None) -> None:
-        self.vim = vim
+    def __init__(self, loop=None, main_loop_ctx=_dummy_ctx) -> None:
         self.loop = loop or asyncio.get_event_loop()
+        self.main_loop_ctx = main_loop_ctx
         self.current = Map()  # type: Map[Any, Job]
 
     async def process(self, job: Job):
@@ -134,7 +138,7 @@ class ProcessExecutor(Logging):
             return -111, '', msg
         try:
             out, err = None, None
-            with self._main_event_loop():
+            with self.main_loop_ctx():
                 proc = await self.process(job)
                 out, err = await proc.communicate(job.stdin)
             if out is None or err is None:
@@ -168,7 +172,7 @@ class ProcessExecutor(Logging):
 
     @property
     def watcher_ready(self) -> bool:
-        with self._main_event_loop():
+        with self.main_loop_ctx():
             watcher = asyncio.get_child_watcher()
         return (
             watcher is not None and
@@ -190,14 +194,6 @@ class ProcessExecutor(Logging):
     def ready(self):
         return self.current.is_empty
 
-    def _main_event_loop(self):
-        return (self.vim.threadsafe_subprocess() if ribosome.in_vim else
-                self._dummy_ctx())
-
-    @contextmanager
-    def _dummy_ctx(self):
-        yield
-
     def _run_jobs(self):
         self.current.valmap(lambda job: job.run())
 
@@ -211,4 +207,14 @@ class ProcessExecutor(Logging):
                 await asyncio.sleep(0.001)
         loop.run_until_complete(waiter())
 
-__all__ = ('ProcessExecutor', 'Result', 'Job')
+
+class NvimProcessExecutor(ProcessExecutor):
+
+    def __init__(self, vim: NvimFacade, loop=None) -> None:
+        self.vim = vim
+        super().__init__(loop, self._main_event_loop)
+
+    def _main_event_loop(self):
+        return self.vim.threadsafe_subprocess() if ribosome.in_vim else _dummy_ctx()
+
+__all__ = ('ProcessExecutor', 'Result', 'Job', 'NvimProcessExecutor')
