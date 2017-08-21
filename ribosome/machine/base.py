@@ -1,7 +1,7 @@
 import time
 import uuid
 import inspect
-from typing import Callable, TypeVar, Type
+from typing import Callable, TypeVar, Type, Any
 import asyncio
 
 import toolz
@@ -15,7 +15,7 @@ from amino.func import flip
 from ribosome.machine.message_base import Message
 from ribosome.logging import print_ribo_log_info
 from ribosome.data import Data
-from ribosome.nvim import NvimIO
+from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.machine.interface import MachineI
 from ribosome.machine.transition import (Handler, TransitionResult, may_handle, Error, Debug, handle, _task_result,
                                          _recover_error, DynHandler)
@@ -24,13 +24,13 @@ from ribosome.request.command import StateCommand
 from ribosome.process import NvimProcessExecutor
 from ribosome.machine.messages import (NvimIOTask, RunIO, UnitTask, DataTask, RunCorosParallel, SubProcessSync,
                                        RunIOsParallel, ShowLogInfo, Nop, RunIOAlg, TransitionException)
-from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob, AlgResultValidator
+from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
 from ribosome.machine import trans
 
 A = TypeVar('A')
 
 
-def io(f: Callable):
+def io(f: Callable[[NvimFacade], Any]) -> NvimIOTask:
     return NvimIOTask(NvimIO(f))
 
 
@@ -148,7 +148,7 @@ class MachineBase(MachineI):
         return self._run_io(msg.cons(Task.now(data)))
 
     @may_handle(RunCorosParallel)
-    def run_coros_parallel(self, data: Data, msg: RunCorosParallel) -> Message:
+    def message_run_coros_parallel(self, data: Data, msg: RunCorosParallel) -> Message:
         async def wrap() -> Either[str, List[Message]]:
             try:
                 results = await asyncio.gather(*msg.coros)
@@ -160,12 +160,12 @@ class MachineBase(MachineI):
         return wrap()
 
     @may_handle(SubProcessSync)
-    async def sub_process_sync(self, data: Data, msg: SubProcessSync) -> Message:
+    async def message_sub_process_sync(self, data: Data, msg: SubProcessSync) -> Message:
         executor = NvimProcessExecutor(self.vim)
         return msg.result(await executor.run(msg.job))
 
     @may_handle(RunIOsParallel)
-    def run_ios_parallel(self, data: Data, msg: RunIOsParallel) -> Message:
+    def message_run_ios_parallel(self, data: Data, msg: RunIOsParallel) -> Message:
         coros = msg.ios / _.coro
         async def wrap() -> Maybe[List[Message]]:
             try:
