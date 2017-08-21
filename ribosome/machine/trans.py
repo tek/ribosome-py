@@ -226,8 +226,7 @@ lift = dispatch_alg(_lifter, TransStep, 'lift_', _lifter.lift_res)
 
 
 def extract(output: O, effects: List[TransEffect]) -> TransAction:
-    eff = List(strict) if effects.empty else effects
-    trans_result = cont(eff, False, lambda f: f(output)) | output
+    trans_result = cont(effects, False, lambda f: f(output)) | output
     return lift(trans_result)
 
 
@@ -239,8 +238,8 @@ def decorate(transition, msg_type, prio) -> None:
     return transition
 
 
-def multi(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
-          ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
+def base(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
+         ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
     def add_handler(func: Callable[[M], R]):
         @functools.wraps(func)
         def transition(m, *a) -> None:
@@ -249,14 +248,19 @@ def multi(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
     return add_handler
 
 
-def one(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
-        ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
-    return multi(msg_type, *effects, single, prio=prio)
-
-
 def unit(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
          ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
-    return multi(msg_type, *effects, none, prio=prio)
+    return base(msg_type, *effects, none, prio=prio)
+
+
+def one(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
+        ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
+    return base(msg_type, *effects, single, prio=prio)
+
+
+def multi(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
+          ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
+    return base(msg_type, *effects, strict, prio=prio)
 
 
 def relay(msg_type: Type[Msg], prio: float=default_prio) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
