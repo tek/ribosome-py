@@ -177,6 +177,16 @@ class TransEffectSingleMessage(TransEffect[Message]):
         return Lift(Propagate.one(data)) if tail.empty else TransEffectError('cannot apply trans effects to Message')
 
 
+class TransEffectMessages(TransEffect[List[Message]]):
+
+    @property
+    def tpe(self) -> Type[List[Message]]:
+        return List
+
+    def extract(self, data: List[Message], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+        return Lift(Propagate(data)) if tail.empty else TransEffectError('cannot apply trans effects to Messages')
+
+
 class TransEffectUnit(TransEffect[None]):
 
     @property
@@ -192,6 +202,7 @@ st = TransEffectIdState()
 io = TransEffectIO()
 coro = TransEffectCoro()
 single = TransEffectSingleMessage()
+strict = TransEffectMessages()
 none = TransEffectUnit()
 
 
@@ -215,7 +226,8 @@ lift = dispatch_alg(_lifter, TransStep, 'lift_', _lifter.lift_res)
 
 
 def extract(output: O, effects: List[TransEffect]) -> TransAction:
-    trans_result = cont(effects, False, lambda f: f(output)) | output
+    eff = List(strict) if effects.empty else effects
+    trans_result = cont(eff, False, lambda f: f(output)) | output
     return lift(trans_result)
 
 
