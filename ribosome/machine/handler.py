@@ -1,16 +1,18 @@
 import abc
 import time
-from typing import Any, Sequence, TypeVar, Generic, Type, Callable, Tuple
+from typing import Any, Sequence, TypeVar, Generic, Type, Tuple
 import asyncio
 
 import amino
-from amino import Maybe, _, List, Map, Just
+from amino import Maybe, _, List, Map, Just, Either, L, __, Right
 from amino.task import Task
 from amino.state import StateT, EvalState, MaybeState, EitherState, IdState
 from amino.tc.optional import Optional
 from amino.id import Id
 from amino.util.string import blue
 from amino.dispatch import dispatch_alg
+from amino.tc.base import TypeClass
+from amino.func import flip
 
 from ribosome.logging import Logging
 from ribosome.machine.message_base import Message, Publish
@@ -19,7 +21,7 @@ from ribosome.machine.transition import (Handler, TransitionResult, CoroTransiti
 from ribosome.machine.messages import RunTask, UnitTask, DataTask, Nop
 from ribosome.machine.interface import MachineI
 from ribosome.data import Data
-from ribosome.machine.trans import TransAction, Transit, Propagate, Unit
+from ribosome.machine.trans import TransAction, Transit, Propagate, Unit, TransFailure
 
 
 def is_seq(a):
@@ -50,6 +52,11 @@ def create_result(data: D, msgs: List[Message]) -> TransitionResult:
     pub, resend = msgs.split_type(Publish)
     pub_msgs = pub.map(_.message)
     return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)
+
+
+def create_failure(data: D, desc: str, error: str) -> TransitionResult:
+    msg = f'{desc}: {error}'
+    return TransitionResult.failed(data, msg)
 
 
 class HandlerJob(Generic[M, D], Logging):
@@ -168,28 +175,57 @@ class DynHandlerJob(HandlerJob):
         )
 
 
-class AlgResultValidator(Generic[D], Logging):
+A = TypeVar('A')
 
-    def __init__(self, data: D) -> None:
-        self.data = data
 
-    def validate(self, trans: TransAction) -> TransitionResult:
-        new_state, result = self.transit(trans)
-        return create_result(new_state, result)
+class UnpackTransState(Generic[A], TypeClass[A]):
+
+    @abc.abstractmethod
+    def unpack(self, a: A, data: D) -> Either[Message, Tuple[D, List[Message]]]:
+        ...
+
+
+class UnpackIdState(Generic[D], UnpackTransState[IdState[D, List[Message]]], tpe=IdState):
+
+    def unpack(self, a: IdState[D, List[Message]], data: D) -> Either[Message, Tuple[D, List[Message]]]:
+        return Right(a.run(data).value)
+
+
+class UnpackEitherState(Generic[D], UnpackTransState[EitherState[D, List[Message]]], tpe=EitherState):
+
+    def unpack(self, a: EitherState[D, List[Message]], data: D) -> Either[Message, Tuple[D, List[Message]]]:
+        return a.run(data)
+
+
+class AlgResultValidator(Logging):
+
+    def __init__(self, desc: str) -> None:
+        self.desc = desc
 
     @property
-    def transit(self) -> Callable[[TransAction], Tuple[D, List[Message]]]:
-        return dispatch_alg(self, TransAction, 'transit_')
+    def validate(self) -> TransitionResult:
+        return dispatch_alg(self, TransAction, 'validate_')
 
-    def transit_transit(self, action: Transit) -> Tuple[D, List[Message]]:
-        new_state, result = action.trans.run(self.data).value
-        return new_state, result.messages
+    def failure(self, data: D, error: str) -> TransitionResult:
+        return create_failure(data, self.desc, error)
 
-    def transit_propagate(self, action: Propagate) -> Tuple[D, List[Message]]:
-        return self.data, action.messages
+    def validate_transit(self, action: Transit, data: D) -> TransitionResult:
+        return (
+            UnpackTransState.e_for(action.trans)
+            .flat_map(__.unpack(action.trans, data))
+            .map2(flip)
+            .map2(self.validate)
+            .value_or(L(self.failure)(data, _))
+        )
 
-    def transit_unit(self, action: Unit) -> Tuple[D, List[Message]]:
-        return self.data, List()
+    def validate_propagate(self, action: Propagate, data: D) -> TransitionResult:
+        return create_result(data, action.messages)
+
+    def validate_unit(self, action: Unit, data: D) -> TransitionResult:
+        return create_result(data, action.messages)
+
+    def validate_trans_failure(self, action: TransFailure, data: D) -> TransitionResult:
+        return self.failure(data, action.message)
 
 
 class AlgHandlerJob(HandlerJob):
@@ -200,13 +236,13 @@ class AlgHandlerJob(HandlerJob):
         except Exception as e:
             return self.exception(e)
         else:
-            return AlgResultValidator(self.data).validate(r)
+            return AlgResultValidator(self.trans_desc).validate(r, self.data)
 
     def exception(self, e: Exception) -> StateT[Id, D, R]:
         if amino.development:
             err = f'transitioning {self.trans_desc}'
             self.log.caught_exception(err, e)
             raise TransitionFailed(str(e)) from e
-        return TransitionResult.failed(self.data, f'{self.trans_desc}: {msg}')
+        return create_failure(self.data, self.trans_desc, f'exception raised: {e}')
 
 __all__ = ('Handlers', 'HandlerJob', 'AlgHandlerJob', 'DynHandlerJob')

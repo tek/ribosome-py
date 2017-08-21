@@ -10,7 +10,7 @@ from amino import Left, L, _, Map, List, Just, Lists, IO
 from amino.state import EvalState
 from ribosome.logging import Logging
 from ribosome.request import function, msg_function, msg_command
-from ribosome.machine import message, may_handle, handle, Machine, Message, Nop
+from ribosome.machine import message, may_handle, handle, MachineBase, Message, Nop
 from ribosome.machine.state import UnloopedRootMachine, RunScratchMachine, RootMachine
 from ribosome.machine.transition import Fatal, may_fallback
 from ribosome.machine.scratch import ScratchMachine, Mapping
@@ -97,7 +97,7 @@ class MachUnlooped(Mach, UnloopedRootMachine):
 class ScratchM(ScratchMachine):
 
     def __init__(self, vim: NvimFacade, scratch: ScratchBuffer,
-                 parent: Machine) -> None:
+                 parent: MachineBase) -> None:
         super().__init__(vim, scratch, parent=parent, title='scratch')
 
     @property

@@ -1,5 +1,6 @@
 from kallikrein import Expectation
-from kallikrein.matchers import contain
+from kallikrein.matchers.maybe import be_just
+from kallikrein.matchers.end_with import end_with
 
 from amino import Either, Right
 
@@ -11,6 +12,7 @@ class HandlerSpec(IntegrationSpecBase):
     '''typed transition handler
     nested handlers $nested
     unit handler $unit
+    EitherState handler $est
     '''
 
     @property
@@ -20,11 +22,16 @@ class HandlerSpec(IntegrationSpecBase):
     def nested(self) -> Expectation:
         self.vim.cmd('HandlerStart')
         self.vim.cmd_sync('Msg')
-        return self._log_line(-1, contain('nothing'))
+        return self._log_line(-1, be_just('nothing'))
 
     def unit(self) -> Expectation:
         self.vim.cmd('HandlerStart')
         self.vim.cmd_sync('Unit')
-        return self._log_line(-1, contain('unit'))
+        return self._log_line(-1, be_just('unit'))
+
+    def est(self) -> Expectation:
+        self.vim.cmd('HandlerStart')
+        self.vim.cmd_sync('Est')
+        return self._log_line(-1, be_just(end_with(': est')))
 
 __all__ = ('HandlerSpec',)

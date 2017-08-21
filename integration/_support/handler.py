@@ -2,7 +2,7 @@ from ribosome import NvimStatePlugin
 
 from amino.lazy import lazy
 from amino import List, Right, Left, Either, Id, IO
-from amino.state import IdState, StateT
+from amino.state import IdState, StateT, EitherState
 from ribosome.logging import Logging
 from ribosome.request import msg_command
 from ribosome.machine import message
@@ -13,10 +13,11 @@ from ribosome.record import field
 from ribosome.machine.base import MachineBase
 from ribosome.machine import trans
 
-
 Msg = message('Msg')
 Msg2 = message('Msg2')
 Msg3 = message('Msg3')
+Msg4 = message('Msg4')
+Msg5 = message('Msg5')
 
 
 class Env(Data):
@@ -38,9 +39,17 @@ class HTrans(SubTransitions, HasNvim, Logging):
         return Left('nothing')
 
     @trans.unit(Msg3, trans.st)
-    def unit(self) -> Either[str, Msg]:
+    def unit(self) -> IdState[Env, Msg]:
         self.log.info('unit')
         return IdState.set(1)
+
+    @trans.one(Msg4, trans.est)
+    def est(self) -> EitherState[Env, Msg]:
+        return EitherState.pure(Msg5())
+
+    @trans.one(Msg5, trans.est)
+    def est_fail(self) -> EitherState[Env, Msg]:
+        return EitherState(Left('est'))
 
 
 class Plugin(SubMachine, HasNvim, Logging):
@@ -62,6 +71,7 @@ class Mach(UnloopedRootMachine):
     def title(self):
         return 'mach'
 
+    @property
     def init(self):
         return Env(vim=self.vim)
 
@@ -81,6 +91,10 @@ class HandlerSpecPlugin(NvimStatePlugin, Logging, name='handler'):
 
     @msg_command(Msg3, sync=True)
     def unit(self):
+        pass
+
+    @msg_command(Msg4, sync=True)
+    def est(self):
         pass
 
 __all__ = ('HandlerSpecPlugin',)

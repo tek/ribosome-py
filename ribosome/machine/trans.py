@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Type, Generic, Coroutine
 import functools
 
 from amino import Either, List, Lists, IO, Id, L, _, Maybe
-from amino.state import IdState, StateT
+from amino.state import IdState, StateT, EitherState
 from amino.util.string import red, green, ToStr
 from amino.dispatch import dispatch_alg
 from amino.algebra import AlgebraMeta, Algebra
@@ -20,7 +20,7 @@ Msg = TypeVar('Msg', bound=Message)
 R = TypeVar('R')
 N = TypeVar('N')
 O = TypeVar('O')
-E = TypeVar('E')
+G = TypeVar('G')
 
 
 class TransAction(Algebra, base=True):
@@ -56,6 +56,16 @@ class Unit(TransAction):
 
     def _arg_desc(self) -> List[str]:
         return List()
+
+
+class TransFailure(TransAction):
+
+    def __init__(self, message: str) -> None:
+        super().__init__(List())
+        self.message = message
+
+    def _arg_desc(self) -> List[str]:
+        return List(self.message)
 
 
 class TransStep(Generic[R], ToStr, metaclass=AlgebraMeta, base=True):
@@ -101,7 +111,7 @@ class TransEffect(Generic[R], abc.ABC, Logging):
         return (
             self.extract(data, tail, in_state)
             if isinstance(data, self.tpe) else
-            TransEffectError(f'invalid type: {red(data)} / {green(self.tpe)}')
+            TransEffectError(f'result {red(data)} does not have type {green(self.tpe.__qualname__)}')
         )
 
 
@@ -121,28 +131,45 @@ class TransEffectEither(Generic[R], TransEffect[Either[str, R]]):
         return Lift(nested.value_or(L(Error)(_) >> Propagate.one))
 
 
-class TransEffectIdState(TransEffect):
+class TransEffectStateT(Generic[G, D, R], TransEffect[StateT[G, D, R]]):
+
+    def check(self, result: TransEffect[R]) -> None:
+        return (
+            TransEffectError(f'`State` trans result `{result}` is not a `TransStep`')
+            if not isinstance(result, TransStep) else
+            TransEffectError('found nested `State` in transition result')
+            if result.strict else
+            TransEffectError(result.data)
+            if result.error else
+            result.data
+        )
+
+
+class TransEffectIdState(Generic[D, R], TransEffectStateT[Id, D, R]):
 
     @property
-    def tpe(self) -> Type[StateT[Id, D, R]]:
-        return StateT
+    def tpe(self) -> Type[IdState[D, R]]:
+        return IdState
 
     def extract(self, data: IdState, tail: List[TransEffect], in_state: bool) -> IdState:
-        def check(result: TransEffect[R]) -> None:
-            return (
-                Propagate.one(f'`State` trans result `{result}` is not a `TransStep`')
-                if not isinstance(result, TransStep) else
-                Propagate.one(Error('found nested `State` in transition result'))
-                if result.strict else
-                Propagate.one(Error(result.data))
-                if result.error else
-                result.data
-            )
-
         return (
             TransEffectError('cannot nest `State` in transition result')
             if in_state else
-            Strict(cont(tail, True, lambda run: data.map(lambda inner: check(run(inner)))) | data)
+            Strict(cont(tail, True, lambda run: data.map(lambda inner: self.check(run(inner)))) | data)
+        )
+
+
+class TransEffectEitherState(Generic[D, R], TransEffectStateT[Either, D, R]):
+
+    @property
+    def tpe(self) -> Type[EitherState[D, R]]:
+        return EitherState
+
+    def extract(self, data: EitherState[D, R], tail: List[TransEffect], in_state: bool) -> IdState:
+        return (
+            TransEffectError('cannot nest `State` in transition result')
+            if in_state else
+            Strict(cont(tail, True, lambda run: data.map(lambda inner: self.check(run(inner)))) | data)
         )
 
 
@@ -154,7 +181,7 @@ class TransEffectIO(Generic[R], TransEffect[IO[R]]):
 
     def extract(self, data: IO[R], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
         io = cont(tail, False, data.map) | data
-        return Lift(Propagate.one(RunIOAlg(io.map(lift))))
+        return Lift(Propagate.one(RunIOAlg(io.map(L(lift)(_, in_state)))))
 
 
 class TransEffectCoro(TransEffect):
@@ -199,6 +226,7 @@ class TransEffectUnit(TransEffect[None]):
 
 e = TransEffectEither()
 st = TransEffectIdState()
+est = TransEffectEitherState()
 io = TransEffectIO()
 coro = TransEffectCoro()
 single = TransEffectSingleMessage()
@@ -208,17 +236,22 @@ none = TransEffectUnit()
 
 class Lifter(Logging):
 
-    def lift_lift(self, res: Lift) -> TransAction:
-        return lift(res.data)
+    def lift_lift(self, res: Lift, in_state: bool) -> TransAction:
+        return lift(res.data, in_state)
 
-    def lift_strict(self, res: Strict) -> TransAction:
-        return Transit(res.data / lift)
+    def lift_strict(self, res: Strict, in_state: bool) -> TransAction:
+        return Transit(res.data / L(lift)(_, True))
 
-    def lift_trans_effect_error(self, res: TransEffectError) -> TransAction:
-        return Transit(IdState.pure(Propagate.one(Error(res.data))))
+    def lift_trans_effect_error(self, res: TransEffectError, in_state: bool) -> TransAction:
+        return TransFailure(res.data)
+        # return prop if in_state else Transit(IdState.pure(prop))
 
-    def lift_res(self, res: R) -> R:
-        return res
+    def lift_res(self, res: R, in_state: bool) -> TransAction:
+        return (
+            res
+            if isinstance(res, TransAction) else
+            TransFailure(f'transition did not produce `TransAction`: {{red(res)}}')
+        )
 
 
 _lifter = Lifter()
@@ -227,7 +260,7 @@ lift = dispatch_alg(_lifter, TransStep, 'lift_', _lifter.lift_res)
 
 def extract(output: O, effects: List[TransEffect]) -> TransAction:
     trans_result = cont(effects, False, lambda f: f(output)) | output
-    return lift(trans_result)
+    return lift(trans_result, False)
 
 
 def decorate(transition, msg_type, prio) -> None:

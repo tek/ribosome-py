@@ -226,10 +226,10 @@ class StateMachineBase(ModularMachine):
         msg = await self._messages.get()
         sent = self._send(data, msg)
         result = (
-            await self._successful_transition(data, msg, sent)
-            if sent.handled else
             self._failed_transition(msg, sent)
             if sent.failure else
+            await self._successful_transition(data, msg, sent)
+            if sent.handled else
             self._unhandled_message(msg, sent)
         )
         self._messages.task_done()
@@ -268,7 +268,7 @@ class StateMachineBase(ModularMachine):
             errmsg = sent.error_message
             self.log.error(f'''{red('error')} handling {blue(msg_name)}: {errmsg}''')
         def log_exc(e: Exception) -> None:
-            self.log.caught_exception(f'handling {blue(msg_name)}', e)
+            self.log.caught_exception_error(f'handling {blue(msg_name)}', e)
         def log_verbose() -> None:
             sent.exception / log_exc
         try:

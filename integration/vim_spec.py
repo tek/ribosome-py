@@ -1,13 +1,19 @@
-from amino import Right, List, __, Map, Left
-from amino.test.spec_spec import later
+from amino import Right, List, __, Map
 
-from ribosome.test.integration.spec_spec import VimIntegrationSureHelpers
+from ribosome.test.integration.klk import later
+
+from kallikrein import kf, k
+from kallikrein.matchers.either import be_right, be_left
+from kallikrein.matchers.maybe import be_just
 
 from integration._support.facade import FacadeTestPlugin
 from integration._support.base import IntegrationSpecBase
 
 
-class VimSpec(IntegrationSpecBase, VimIntegrationSureHelpers):
+class VimSpec(IntegrationSpecBase):
+    '''NvimFacade
+    get and set variables $vars
+    '''
 
     @property
     def _prefix(self):
@@ -25,13 +31,15 @@ class VimSpec(IntegrationSpecBase, VimIntegrationSureHelpers):
         content = [List.random_string()]
         self.vim.cmd_sync('Go')
         self.vim.buffer.vars.set_p(vname, content)
-        later(lambda: self.vim.buffer.vars.pl(vname).should.contain(content))
+        later(kf(self.vim.buffer.vars.pl, vname).must(be_right(content)))
         var = (
             self.vim.call('AllVars') /
             Map //
             __.get('b:{}_{}'.format(self._prefix, vname))
         )
-        var.should.contain(str(content))
-        self.vim.vars.p(vname).should.be.a(Left)
+        return (
+            k(var).must(be_just(str(content))) &
+            kf(self.vim.vars.p, vname).must(be_left)
+        )
 
 __all__ = ('VimSpec',)
