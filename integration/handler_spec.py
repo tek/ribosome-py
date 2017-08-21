@@ -9,16 +9,22 @@ from integration._support.base import IntegrationSpecBase
 
 class HandlerSpec(IntegrationSpecBase):
     '''typed transition handler
-    test $test
+    nested handlers $nested
+    unit handler $unit
     '''
 
     @property
     def plugin_class(self) -> Either[str, type]:
         return Right(HandlerSpecPlugin)
 
-    def test(self) -> Expectation:
+    def nested(self) -> Expectation:
         self.vim.cmd('HandlerStart')
         self.vim.cmd_sync('Msg')
         return self._log_line(-1, contain('nothing'))
+
+    def unit(self) -> Expectation:
+        self.vim.cmd('HandlerStart')
+        self.vim.cmd_sync('Unit')
+        return self._log_line(-1, contain('unit'))
 
 __all__ = ('HandlerSpec',)

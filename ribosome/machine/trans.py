@@ -24,12 +24,15 @@ E = TypeVar('E')
 
 
 class TransAction(Algebra, base=True):
-    pass
+
+    def __init__(self, messages: List[Message]) -> None:
+        self.messages = messages
 
 
 class Transit(Generic[D], TransAction):
 
     def __init__(self, trans: StateT[Id, D, 'Propagate']) -> None:
+        super().__init__(List())
         self.trans = trans
 
     def _arg_desc(self) -> List[str]:
@@ -42,11 +45,17 @@ class Propagate(TransAction):
     def one(msg: Message) -> TransAction:
         return Propagate(List(msg))
 
-    def __init__(self, messages: List[Message]) -> None:
-        self.messages = messages
-
     def _arg_desc(self) -> List[str]:
         return self.messages / str
+
+
+class Unit(TransAction):
+
+    def __init__(self) -> None:
+        super().__init__(List())
+
+    def _arg_desc(self) -> List[str]:
+        return List()
 
 
 class TransStep(Generic[R], ToStr, metaclass=AlgebraMeta, base=True):
@@ -168,11 +177,22 @@ class TransEffectSingleMessage(TransEffect[Message]):
         return Lift(Propagate.one(data)) if tail.empty else TransEffectError('cannot apply trans effects to Message')
 
 
+class TransEffectUnit(TransEffect[None]):
+
+    @property
+    def tpe(self) -> Type[Message]:
+        return type(None)
+
+    def extract(self, data: Message, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+        return Lift(Unit()) if tail.empty else TransEffectError('cannot apply trans effects to unit')
+
+
 e = TransEffectEither()
 st = TransEffectIdState()
 io = TransEffectIO()
 coro = TransEffectCoro()
 single = TransEffectSingleMessage()
+none = TransEffectUnit()
 
 
 class Lifter(Logging):
@@ -220,6 +240,11 @@ def multi(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
 def one(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
         ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
     return multi(msg_type, *effects, single, prio=prio)
+
+
+def unit(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
+         ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
+    return multi(msg_type, *effects, none, prio=prio)
 
 
 def relay(msg_type: Type[Msg], prio: float=default_prio) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:

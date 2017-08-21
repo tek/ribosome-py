@@ -16,6 +16,7 @@ from ribosome.machine import trans
 
 Msg = message('Msg')
 Msg2 = message('Msg2')
+Msg3 = message('Msg3')
 
 
 class Env(Data):
@@ -35,6 +36,11 @@ class HTrans(SubTransitions, HasNvim, Logging):
     @trans.one(Msg2, trans.e)
     def msg2(self) -> Either[str, Msg]:
         return Left('nothing')
+
+    @trans.unit(Msg3, trans.st)
+    def unit(self) -> Either[str, Msg]:
+        self.log.info('unit')
+        return IdState.set(1)
 
 
 class Plugin(SubMachine, HasNvim, Logging):
@@ -71,6 +77,10 @@ class HandlerSpecPlugin(NvimStatePlugin, Logging, name='handler'):
 
     @msg_command(Msg, sync=True)
     def msg(self):
+        pass
+
+    @msg_command(Msg3, sync=True)
+    def unit(self):
         pass
 
 __all__ = ('HandlerSpecPlugin',)

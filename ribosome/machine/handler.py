@@ -19,7 +19,7 @@ from ribosome.machine.transition import (Handler, TransitionResult, CoroTransiti
 from ribosome.machine.messages import RunTask, UnitTask, DataTask, Nop
 from ribosome.machine.interface import MachineI
 from ribosome.data import Data
-from ribosome.machine.trans import TransAction, Transit, Propagate
+from ribosome.machine.trans import TransAction, Transit, Propagate, Unit
 
 
 def is_seq(a):
@@ -187,6 +187,9 @@ class AlgResultValidator(Generic[D], Logging):
 
     def transit_propagate(self, action: Propagate) -> Tuple[D, List[Message]]:
         return self.data, action.messages
+
+    def transit_unit(self, action: Unit) -> Tuple[D, List[Message]]:
+        return self.data, List()
 
 
 class AlgHandlerJob(HandlerJob):
