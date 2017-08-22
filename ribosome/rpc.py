@@ -1,7 +1,7 @@
 import inspect
 from types import FunctionType
 
-from amino import Map, Maybe, Lists, List, Path
+from amino import Map, Maybe, Lists, List, _, L
 from amino.util.string import camelcaseify
 
 from ribosome.nvim import NvimFacade
@@ -25,7 +25,7 @@ def handler(method_name: str, fun: FunctionType) -> Maybe[HandlerSpec]:
     return Maybe(getattr(fun, '_nvim_rpc_spec', None)) / Map // HandlerSpec.cons
 
 
-def register_handler_args(host: str, spec: HandlerSpec, plugin_file: Path) -> List[str]:
+def register_handler_args(host: str, spec: HandlerSpec, plugin_file: str) -> List[str]:
     pat = spec.opts.get('pattern', '*')
     suf = f':{pat}' if type == 'autocmd' else ''
     rpc_method = f'{plugin_file}:{spec.tpe}:{spec.name}{suf}'
@@ -33,17 +33,20 @@ def register_handler_args(host: str, spec: HandlerSpec, plugin_file: Path) -> Li
     return List(f'remote#define#{fun_prefix}OnHost', host, rpc_method, spec.sync, spec.name, spec.opts)
 
 
-def setup_rpc(vim: NvimFacade, name: str, plugin_class: type) -> None:
-    plugin_file = inspect.getfile(plugin_class)
-    ribo_log.test('-------------')
-    ribo_log.test(plugin_file)
-    if not vim.command_exists(f'{camelcaseify(name)}Start'):
-        rp_handlers = Lists.wrap(inspect.getmembers(plugin_class)).flat_map2(handler)
-        for spec in rp_handlers:
-            ribo_log.test(spec)
-            args = register_handler_args(name, spec, plugin_file)
-            ribo_log.test(args)
-            r = vim.call(*args)
-            ribo_log.test(r)
+def define_handler(vim: NvimFacade, host: str, spec: HandlerSpec, plugin_file: str) -> None:
+    ribo_log.test(f'define_handler {spec} {host}')
+    args = register_handler_args(host, spec, plugin_file)
+    ribo_log.test(args)
+    return vim.call(*args)
 
-__all__ = ('setup_rpc',)
+
+def setup_rpc(vim: NvimFacade, host: str, plugin_class: type) -> List[str]:
+    plugin_file = inspect.getfile(plugin_class)
+    test_cmd_name = f'{camelcaseify(host)}Start'
+    if not vim.command_exists(test_cmd_name):
+        rp_handlers = Lists.wrap(inspect.getmembers(plugin_class)).flat_map2(handler)
+        return rp_handlers / L(define_handler)(vim, host, _, plugin_file)
+    else:
+        return List()
+
+__all__ = ('setup_rpc', 'HandlerSpec')

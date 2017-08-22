@@ -1,9 +1,10 @@
 import abc
+import inspect
 from typing import Union, Any, Callable
 
 import neovim
 
-from amino import env
+from amino.util.string import camelcaseify
 
 from ribosome.nvim import NvimFacade
 from ribosome.machine import StateMachine
@@ -11,7 +12,7 @@ from ribosome.logging import nvim_logging, Logging
 from ribosome.request import msg_command, msg_function, command
 from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
-from ribosome.rpc import setup_rpc
+from ribosome.rpc import setup_rpc, define_handler, HandlerSpec
 
 
 class NvimPlugin(Logging):
@@ -23,10 +24,10 @@ class NvimPlugin(Logging):
             setup_plugin(cls, name, prefix or name)
 
     def __init__(self, nvim: Union[NvimFacade, neovim.Nvim]) -> None:
-        self.vim = NvimFacade(nvim, self.name) if isinstance(nvim, neovim.Nvim) else nvim
+        self.vim = NvimFacade(nvim, self.plugin_name) if isinstance(nvim, neovim.Nvim) else nvim
         self.setup_logging()
-        if 'SETUP_RPC' in env:
-            setup_rpc(self.vim, self.name, type(self))
+        spec = HandlerSpec('command', 1, f'{camelcaseify(self.plugin_name)}SetupRpc', dict())
+        define_handler(self.vim, self.plugin_name, spec, inspect.getfile(type(self)))
 
     def setup_logging(self) -> None:
         self.file_log_handler = nvim_logging(self.vim)
@@ -36,12 +37,15 @@ class NvimPlugin(Logging):
         return self.vim.loop
 
     @property
-    def name(self) -> str:
-        return type(self) or 'ribosome'
+    def plugin_name(self) -> str:
+        return type(self).name or 'ribosome'
 
     @abc.abstractmethod
     def start_plugin(self) -> None:
         ...
+
+    def setup_rpc(self) -> None:
+        setup_rpc(self.vim, self.plugin_name, type(self))
 
     def set_log_level(self, level: str) -> None:
         self.file_log_handler.setLevel(level)
@@ -75,5 +79,6 @@ def setup_plugin(cls: type, name: str, prefix: str) -> None:
     handler('log_level', lambda n: command(name=n)(lambda self, *a, **kw: self.set_log_level(*a, **kw)))
     msg_fun('mapping', Mapping)
     name_handler('start', lambda n: command(sync=True, name=n)(lambda self, *a, **kw: self.start_plugin(*a, **kw)))
+    name_handler('setup_rpc', lambda n: command(sync=True, name=n)(lambda self, *a, **kw: self.setup_rpc(*a, **kw)))
 
 __all__ = ('NvimPlugin', 'NvimStatePlugin')
