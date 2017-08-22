@@ -611,6 +611,9 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def function_exists(self, name: str) -> Boolean:
         return self.call('exists', f'*{name}').true
 
+    def command_exists(self, name: str) -> Boolean:
+        return self.call('exists', f':{name}').true
+
     def execute(self, code: Union[str, List[str]]) -> None:
         lines = code if isinstance(code, List) else Lists.lines(code)
         return self.call('execute', list(lines))
