@@ -552,11 +552,23 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def autocmd(self, name, pattern, cmd):
         return NvimCmd(self, 'autocmd', '{} {} {}'.format(name, pattern, cmd))
 
-    def call(self, name, *args, **kw):
+    def call(self, name: str, *args: Any, sync=True, **kw: Any) -> Either[str, A]:
         return (
-            Try(self.vim.call, name, *args, **kw)
+            Try(self.vim.call, name, *args, async=not sync, **kw)
+            .leffect(L(self._call_error)(name, args, kw, _, sync))
             .lmap(lambda a: 'vim call `{}` failed: {}'.format(format_funcall(name, args, kw), a))
         )
+
+    def _call_error(self, name: str, args: tuple, kw: dict, err: Exception, sync: bool) -> None:
+        if amino.development:
+            a = '' if sync else 'a'
+            msg = f'calling {a}sync nvim function `{format_funcall(name, args, kw)}`'
+            if isinstance(err, Exception):
+                self.log.caught_exception(msg, err)
+            else:
+                self.log.error(f'{msg}: {err}')
+        else:
+            self.log.error(decode(err))
 
     def eval(self, expr):
         return self.vim.eval(expr)
