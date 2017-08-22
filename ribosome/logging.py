@@ -7,8 +7,9 @@ from toolz import merge
 import amino
 from amino.lazy import lazy
 import amino.logging
-from amino.logging import amino_logger, init_loglevel, amino_root_file_logging, DDEBUG, print_log_info, VERBOSE
-from amino import Path, env
+from amino.logging import (amino_logger, init_loglevel, amino_root_file_logging, DDEBUG, print_log_info, VERBOSE,
+                           LazyRecord)
+from amino import Path, Logger
 
 import ribosome  # noqa
 from ribosome import options
@@ -29,9 +30,9 @@ class NvimHandler(logging.Handler):
         }
         super().__init__()
 
-    def emit(self, record: logging.LogRecord) -> None:
+    def emit(self, record: LazyRecord) -> None:
         dispatcher = self.dispatchers.get(record.levelno, self.vim.echom)
-        dispatcher(record.getMessage())
+        dispatcher(record.short())
 
 
 class NvimFilter(logging.Filter):
@@ -39,12 +40,13 @@ class NvimFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         return record.exc_info is None
 
+
 nvim_filter = NvimFilter()
 ribo_log = log = ribosome_root_logger = amino_logger('nvim')
 _nvim_logging_initialized = False
 
 
-def ribosome_logger(name: str) -> logging.Logger:
+def ribosome_logger(name: str) -> Logger:
     return ribosome_root_logger.getChild(name)
 
 
@@ -79,7 +81,7 @@ def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: d
 class Logging(amino.logging.Logging):
 
     @lazy
-    def _log(self) -> logging.Logger:
+    def _log(self) -> Logger:
         return ribosome_logger(self.__class__.__name__)
 
 

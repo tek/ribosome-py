@@ -181,8 +181,8 @@ class MachineBase(MachineI):
         return wrap()
 
     @may_handle(Error)
-    def message_error(self, data, msg):
-        self.log.error(msg.message)
+    def message_error(self, data: Data, msg: Error) -> None:
+        self.log.error(msg)
 
     @may_handle(Info)
     def message_info(self, data: Data, msg: Info) -> None:

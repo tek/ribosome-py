@@ -18,7 +18,7 @@ from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle
                                          _recover_error, CoroExecutionHandler)
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
-from ribosome.machine.messages import Nop, Done, Quit, PlugCommand, Stop
+from ribosome.machine.messages import Nop, Done, Quit, PlugCommand, Stop, Error
 from ribosome.machine.handler import DynHandlerJob
 from ribosome.machine.modular import ModularMachine
 from ribosome.machine.transitions import Transitions
@@ -265,7 +265,7 @@ class StateMachineBase(ModularMachine):
         msg_name = type(msg).__name__
         def log_error() -> None:
             errmsg = sent.error_message
-            self.log.error(f'''{red('error')} handling {blue(msg_name)}: {errmsg}''')
+            self.log.error(Error(f'''{red('error')} handling {blue(msg_name)}''', prefix=errmsg))
         def log_exc(e: Exception) -> None:
             self.log.caught_exception_error(f'handling {blue(msg_name)}', e)
         def log_verbose() -> None:
@@ -463,4 +463,4 @@ class SubTransitions(Transitions, TransitionHelpers):
     def record_lens(self, tpe, name) -> Maybe[Lens]:
         return Empty()
 
-__all__ = ('Message', 'StateMachine', 'PluginStateMachine', 'Info')
+__all__ = ('Message', 'StateMachine', 'PluginStateMachine')

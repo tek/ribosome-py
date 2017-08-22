@@ -1,6 +1,9 @@
-from amino import Nothing
+import abc
 
-from ribosome.machine.message_base import message
+from amino import Nothing
+from amino.logging import LogError
+
+from ribosome.machine.message_base import message, Message
 
 Nop = message('Nop')
 Stop = message('Stop')
@@ -18,12 +21,27 @@ ShowLogInfo = message('ShowLogInfo')
 RunIOsParallel = message('RunIOsParallel', 'ios')
 RunCorosParallel = message('RunCorosParallel', 'coros')
 SubProcessSync = message('SubProcessSync', 'job', 'result')
-Error = message('Error', 'message')
 Warning = message('Warning', 'message')
 Debug = message('Debug', 'message')
 Coroutine = message('Coroutine', 'coro')
 TransitionException = message('TransitionException', 'context', 'exc')
 
+
+class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
+
+    @property
+    def message(self) -> str:
+        pre = f'{self.prefix}: ' if self.prefix else ''
+        return f'{pre}{self.main}'
+
+    @property
+    def full(self) -> str:
+        return self.message
+
+    @property
+    def short(self) -> str:
+        return self.main
+
 __all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'NvimIOTask', 'RunTask', 'UnitTask', 'DataTask',
            'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg', 'Error',
-           'Warning', 'Debug', 'Coroutine', 'TransitionException')
+           'Warning', 'Debug', 'Coroutine', 'TransitionException', 'Info')
