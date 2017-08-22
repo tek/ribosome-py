@@ -3,12 +3,15 @@ from typing import Union, Any, Callable
 
 import neovim
 
+from amino import env
+
 from ribosome.nvim import NvimFacade
 from ribosome.machine import StateMachine
 from ribosome.logging import nvim_logging, Logging
 from ribosome.request import msg_command, msg_function, command
 from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
+from ribosome.rpc import setup_rpc
 
 
 class NvimPlugin(Logging):
@@ -22,6 +25,8 @@ class NvimPlugin(Logging):
     def __init__(self, nvim: Union[NvimFacade, neovim.Nvim]) -> None:
         self.vim = NvimFacade(nvim, self.name) if isinstance(nvim, neovim.Nvim) else nvim
         self.setup_logging()
+        if 'SETUP_RPC' in env:
+            setup_rpc(self.vim, self.name, type(self))
 
     def setup_logging(self) -> None:
         self.file_log_handler = nvim_logging(self.vim)
@@ -32,7 +37,7 @@ class NvimPlugin(Logging):
 
     @property
     def name(self) -> str:
-        return 'ribosome'
+        return type(self) or 'ribosome'
 
     @abc.abstractmethod
     def start_plugin(self) -> None:
