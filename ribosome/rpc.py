@@ -52,9 +52,8 @@ def register_handler_args(host: str, spec: RpcHandlerSpec, plugin_file: str) -> 
 
 
 def define_handler(vim: NvimFacade, host: str, spec: RpcHandlerSpec, plugin_file: str) -> None:
-    ribo_log.test(f'define_handler {spec} {host}')
+    ribo_log.debug1(lambda: f'defining {spec} on {host}')
     args = register_handler_args(host, spec, plugin_file)
-    ribo_log.test(args)
     return vim.call(*args)
 
 
