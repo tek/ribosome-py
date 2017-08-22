@@ -14,7 +14,7 @@ from amino.either import Right, Left
 import ribosome
 from ribosome.logging import Logging
 from ribosome.nvim import NvimFacade
-from ribosome.record import Record, any_field, field, list_field, maybe_field
+from ribosome.record import Record, any_field, field, list_field, maybe_field, map_field
 
 
 class Result(object):
@@ -50,6 +50,7 @@ class Job(Record):
     client = field(JobClient)
     exe = field(str)
     args = list_field()
+    kw = map_field()
     loop = any_field()
     pipe_in = maybe_field(str)
 
@@ -131,6 +132,7 @@ class ProcessExecutor(Logging, abc.ABC):
             stderr=PIPE,
             cwd=str(job.cwd),
             loop=self.loop,
+            **job.kw,
         )
 
     async def _execute(self, job: Job):
