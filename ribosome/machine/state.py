@@ -28,7 +28,6 @@ from amino import Maybe, Map, Try, _, L, __, Empty, Just, Either, List, Left
 from amino.util.string import red, blue
 
 Callback = message('Callback', 'func')
-Info = message('Info', 'message')
 Envelope = message('Envelope', 'message', 'to')
 RunMachine = json_message('RunMachine', 'machine')
 KillMachine = message('KillMachine', 'uuid')

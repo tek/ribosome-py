@@ -2,7 +2,7 @@ from amino import Right, List, __, Map
 
 from ribosome.test.integration.klk import later
 
-from kallikrein import kf, k
+from kallikrein import kf, k, Expectation
 from kallikrein.matchers.either import be_right, be_left
 from kallikrein.matchers.maybe import be_just
 
@@ -23,10 +23,7 @@ class VimSpec(IntegrationSpecBase):
     def plugin_class(self):
         return Right(FacadeTestPlugin)
 
-    def _last_output(self, content):
-        later(lambda: self._log_out.last.should.contain(content), timeout=1)
-
-    def vars(self):
+    def vars(self) -> Expectation:
         vname = List.random_string()
         content = [List.random_string()]
         self.vim.cmd_sync('Go')

@@ -23,7 +23,7 @@ from ribosome.machine.message_base import _machine_attr
 from ribosome.request.command import StateCommand
 from ribosome.process import NvimProcessExecutor
 from ribosome.machine.messages import (NvimIOTask, RunIO, UnitTask, DataTask, RunCorosParallel, SubProcessSync,
-                                       RunIOsParallel, ShowLogInfo, Nop, RunIOAlg, TransitionException)
+                                       RunIOsParallel, ShowLogInfo, Nop, RunIOAlg, TransitionException, Info)
 from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
 from ribosome.machine import trans
 
@@ -183,6 +183,10 @@ class MachineBase(MachineI):
     @may_handle(Error)
     def message_error(self, data, msg):
         self.log.error(msg.message)
+
+    @may_handle(Info)
+    def message_info(self, data: Data, msg: Info) -> None:
+        self.log.info(msg.message)
 
     @may_handle(TransitionException)
     def transition_exception(self, data, msg):

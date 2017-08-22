@@ -13,6 +13,7 @@ RunIO = RunTask
 RunIOAlg = message('RunIOAlg', 'io', opt_fields=(('msg', Nothing),))
 UnitTask = message('UnitTask', 'task', opt_fields=(('msg', Nothing),))
 DataTask = message('DataTask', 'cons', opt_fields=(('msg', Nothing),))
+Info = message('Info', 'message')
 ShowLogInfo = message('ShowLogInfo')
 RunIOsParallel = message('RunIOsParallel', 'ios')
 RunCorosParallel = message('RunCorosParallel', 'coros')
