@@ -19,19 +19,20 @@ class NvimIOInstances(ImplicitInstances):
         return Map({Monad: NvimIOMonad()})
 
 
-class NvimIO(Generic[A], Implicits, implicits=True, imp_mod='ribosome.nvim.io',
-             imp_cls='NvimIOInstances'):
+class NvimIO(Generic[A], Implicits, implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
 
     def __init__(self, run: Callable[[NvimComponent], A]) -> None:
         self.run = run
 
-    def unsafe_perform_io(self, vim) -> Either[Exception, A]:
+    def attempt(self, vim) -> Either[Exception, A]:
         try:
             return Right(self.run(vim))
         except Exception as e:
             return Left(e)
 
-    def effect(self, f: Callable[[A], Any]):
+    unsafe_perform_io = attempt
+
+    def effect(self, f: Callable[[A], Any]) -> 'NvimIO[A]':
         def wrap(v):
             ret = self.run(v)
             f(ret)
@@ -41,13 +42,12 @@ class NvimIO(Generic[A], Implicits, implicits=True, imp_mod='ribosome.nvim.io',
     __mod__ = effect
 
 
-class NvimIOMonad(Monad):
+class NvimIOMonad(Monad[NvimIO]):
 
     def pure(self, a: A):
         return NvimIO(lambda v: a)
 
-    def flat_map(self, fa: NvimIO[A], f: Callable[[A], NvimIO[B]]
-                 ) -> NvimIO[B]:
+    def flat_map(self, fa: NvimIO[A], f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
         g = lambda v: f(fa.run(v)).run(v)
         return NvimIO(g)
 
