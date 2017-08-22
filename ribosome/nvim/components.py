@@ -180,7 +180,7 @@ class NvimComponent(Logging):
     def clean(self):
         self.vars.clean()
 
-    def _cmd(self, line: str, verbose=False, sync=False):
+    def _cmd(self, line: str, verbose=False, sync=False) -> Either[Exception, None]:
         l = line if verbose else 'silent {}'.format(line)
         return Try(self.vim.command, l, async=not sync)
 

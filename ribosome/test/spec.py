@@ -103,10 +103,11 @@ class MockNvimFacade(MockNvim, NvimFacade):
 class MockNvimSpec(Spec):
 
     def __init__(self, prefix):
-        super().__init__()
+        Spec.__init__(self)
         self.prefix = prefix
 
     def setup(self):
+        Spec.setup(self)
         ribosome.in_vim = False
         self.vim = MockNvimFacade(self.prefix)
         self.vim_mock = flexmock(self.vim)

@@ -113,12 +113,11 @@ class MachineBase(MachineI):
             self._command_by_message_name(name)
             .map(lambda a: StateCommand(a[0]))
             .map(__.dispatch(self, args))
-            .or_else(L(self._invalid_command)(name, _))
+            .or_else(L(self._invalid_command)(name))
         )
 
     def _invalid_command(self, name):
-        self.log.error(
-            'plugin "{}" has no command "{}"'.format(self.title, name))
+        self.log.error('plugin "{}" has no command "{}"'.format(self.title, name))
         return Empty()
 
     @may_handle(NvimIOTask)
