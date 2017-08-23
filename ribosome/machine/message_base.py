@@ -52,13 +52,12 @@ def _update_field_metadata(inst, fields, opt_fields, varargs):
 
 class MessageMeta(_PRecordMeta, abc.ABCMeta):
 
-    def __new__(cls, name, bases, namespace, fields=[], opt_fields=[],
-                varargs=None, skip_fields=False, **kw):
+    def __new__(cls, name, bases, namespace, fields=[], opt_fields=[], varargs=None, skip_fields=False, **kw):
         ''' create a subclass of PRecord
         **fields** is a list of strings used as names of mandatory PRecord fields
         **opt_fields** is a list of (string, default) used as fields with initial values
-        the order of the names is preserved in **_field_order** **varargs** is an optional field name where unmatched
-        args are stored.
+        the order of the names is preserved in **_field_order**.
+        **varargs** is an optional field name where unmatched args are stored.
         **skip_fields** indicates that the current class is a base class (like Message). If those classes were processed
         here, all their subclasses would share the metadata, and get all fields set by other subclasses.
         **_field_count_min** and **_field_count_max** are used by `MessageCommand`
