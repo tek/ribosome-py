@@ -5,14 +5,14 @@ import asyncio
 from functools import wraps
 from threading import Thread
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, Callable
 
 import neovim
 from neovim.api import Nvim
 
 from amino.test import fixture_path, temp_dir, temp_file
 
-from amino import List, Maybe, Either, Left, __, Map, env, Path
+from amino import List, Maybe, Either, Left, __, Map, env, Path, Lists
 from amino.lazy import lazy
 from amino.test.path import base_dir, pkg_dir
 from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase
@@ -169,15 +169,30 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def _log_out(self) -> List[str]:
         return List.wrap(self.logfile.read_text().splitlines())
 
-    def _json_cmd(self, cmd: str, data: dict) -> str:
+    def _cmd(self, cmd: str, args: List[str]) -> str:
+        return args.cons(cmd).join_tokens
+
+    def _json_cmd(self, cmd: str, args: List[str], data: dict) -> str:
         j = json.dumps(data).replace('"', '\\"')
-        return '{} {}'.format(cmd, j)
+        return f'{cmd} {args.join_tokens} {j}'
 
-    def json_cmd(self, cmd: str, **data: str) -> Either[Exception, str]:
-        return self.vim.cmd(self._json_cmd(cmd, data))
+    def _run_cmd(self, f: Callable[..., Either[Exception, str]], cmd: str) -> Either[Exception, str]:
+        try:
+            return f(cmd)
+        finally:
+            self._wait(.1)
 
-    def json_cmd_sync(self, cmd: str, **data: str) -> Either[Exception, str]:
-        return self.vim.cmd_sync(self._json_cmd(cmd, data))
+    def cmd(self, cmd: str, *args: str) -> Either[Exception, str]:
+        return self._run_cmd(self.vim.cmd, self._cmd(cmd, Lists.wrap(args)))
+
+    def cmd_sync(self, cmd: str, *args: str) -> Either[Exception, str]:
+        return self._run_cmd(self.vim.cmd_sync, self._cmd(cmd, Lists.wrap(args)))
+
+    def json_cmd(self, cmd: str, *args: str, **data: str) -> Either[Exception, str]:
+        return self.cmd(self._json_cmd(cmd, Lists.wrap(args), data))
+
+    def json_cmd_sync(self, cmd: str, *args: str, **data: str) -> Either[Exception, str]:
+        return self.cmd_sync(self._json_cmd(cmd, Lists.wrap(args), data))
 
     @property
     def content(self) -> List[str]:
