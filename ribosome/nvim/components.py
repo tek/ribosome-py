@@ -823,7 +823,7 @@ class Vars(OptVar):
     def pm(self, name):
         return self.pd(name) / Map
 
-    def pb(self, name: str):
+    def pb(self, name: str) -> Either[str, Boolean]:
         return self.typed(bool, self.p(name)) / Boolean
 
     def pi(self, name: str):
