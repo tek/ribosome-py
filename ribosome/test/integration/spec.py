@@ -283,6 +283,10 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
 
 class PluginIntegrationSpec(VimIntegrationSpec):
 
+    def setup(self):
+        self.log_format = '{message}'
+        super().setup()
+
     def _post_start_neovim(self):
         super()._post_start_neovim()
         self._setup_handlers()
