@@ -181,7 +181,7 @@ class MessageRequestHandler(RequestHandler):
                 self.log.error('bad args to {}: {}'.format(name, e))
             else:
                 sync = self._sync | obj.default_sync
-                sender = obj.state.send_sync if sync else obj.state.send
+                sender = obj.state().send_sync if sync else obj.state().send
                 sender(msg)
         else:
             msg = 'msg_{} can only be used on NvimStatePlugin ({})'
