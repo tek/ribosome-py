@@ -158,6 +158,9 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def _post_start(self) -> None:
         pass
 
+    def _var_becomes(self, name, value) -> None:
+        return self._wait_for(lambda: self.vim.vars(name).contains(value))
+
     def _pvar_becomes(self, name, value) -> None:
         return self._wait_for(lambda: self.vim.vars.p(name).contains(value))
 
