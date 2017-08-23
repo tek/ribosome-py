@@ -41,6 +41,7 @@ class NvimPlugin(Logging):
 
     def setup_rpc(self) -> None:
         setup_rpc(self.vim, self.plugin_name, type(self))
+        self.start_plugin()
 
     def set_log_level(self, level: str) -> None:
         self.file_log_handler.setLevel(level)
