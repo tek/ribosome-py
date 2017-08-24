@@ -36,7 +36,7 @@ class RpcHandlerSpec(ToStr):
 
 def handler(method_name: str, fun: FunctionType) -> Maybe[RpcHandlerSpec]:
     def get(name: str) -> Maybe[A]:
-        return Maybe(getattr(fun, name, None))
+        return Maybe.getattr(fun, name)
     return (
         List('_nvim_rpc_spec', '_nvim_rpc_method_name', '_nvim_prefix_plugin_path')
         .traverse(get, Maybe)
