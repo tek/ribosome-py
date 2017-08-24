@@ -39,7 +39,7 @@ def mk_unite_action(Unite):
         def uc_wrap(f):
             @neovim.function(handler)
             def f_wrap(self, args):
-                _unite_word(args, key) / L(f)(self, _) % self.state.send
+                _unite_word(args, key) / L(f)(self, _) % self.state().send
             return f_wrap
         return uc_wrap
     return decorator
@@ -49,7 +49,7 @@ def _unite_function(name, msg, param_cb):
     @neovim.function(name, sync=True)
     def _unite_dispatcher(self, args):
         params = param_cb(List.wrap(args))
-        params / UniteSyntax % self.state.send
+        params / UniteSyntax % self.state().send
     return _unite_dispatcher
 
 
