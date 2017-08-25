@@ -74,7 +74,7 @@ def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: d
             )
             return amino_root_file_logging(**kw)
         _nvim_logging_initialized = True
-        logfile = options.nvim_log_file.value | (Path.home() / '.cache' / 'ribosome')
+        logfile = options.nvim_log_file.value | str(Path.home() / '.cache' / 'ribosome' / 'nvim')
         return file_log(logfile)
 
 
