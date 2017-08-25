@@ -11,7 +11,7 @@ from ribosome.logging import nvim_logging, Logging
 from ribosome.request import msg_command, msg_function, command, function
 from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
-from ribosome.rpc import setup_rpc, rpc_handlers
+from ribosome.rpc import rpc_handlers
 
 
 class NvimPlugin(Logging):
