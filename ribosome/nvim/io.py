@@ -41,10 +41,16 @@ class NvimIO(Generic[A], Implicits, implicits=True, imp_mod='ribosome.nvim.io', 
     def pure(a: A) -> 'NvimIO[A]':
         return NvimIO(lambda v: a)
 
+    @staticmethod
+    def failed(msg: str) -> 'NvimIO[A]':
+        def fail() -> A:
+            raise Exception(msg)
+        return NvimIO(lambda v: fail())
+
     def __init__(self, run: Callable[[NvimComponent], A]) -> None:
         self.run = run
 
-    def attempt(self, vim) -> Either[Exception, A]:
+    def attempt(self, vim: NvimComponent) -> Either[Exception, A]:
         try:
             return Right(self.run(vim))
         except Exception as e:
