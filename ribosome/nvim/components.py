@@ -540,13 +540,13 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
     def doautocmd(self, name, pat=''):
         c = 'doautocmd <nomodeline> {} {}'.format(name, pat)
-        self.cmd(c)
+        return self.cmd(c)
 
     def uautocmd(self, name):
-        self.doautocmd('User', name)
+        return self.doautocmd('User', name)
 
     def pautocmd(self, name):
-        self.uautocmd('{}{}'.format(camelcaseify(self.prefix), name))
+        return self.uautocmd('{}{}'.format(camelcaseify(self.prefix), name))
 
     def autocmd(self, name, pattern, cmd):
         return NvimCmd(self, 'autocmd', '{} {} {}'.format(name, pattern, cmd))
