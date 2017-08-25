@@ -1,11 +1,11 @@
 import inspect
 from types import FunctionType
-from typing import TypeVar
+from typing import TypeVar, Callable, Union
 
-from amino import Map, Maybe, Lists, List, _, L
+from amino import Map, Maybe, Lists, List, _, L, Either
 from amino.util.string import camelcaseify, ToStr
 
-from ribosome.nvim import NvimFacade
+from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log
 
 A = TypeVar('A')
@@ -55,6 +55,10 @@ def define_handler(vim: NvimFacade, host: str, spec: RpcHandlerSpec, plugin_file
     ribo_log.debug1(lambda: f'defining {spec} on {host}')
     args = register_handler_args(host, spec, plugin_file)
     return vim.call(*args)
+
+
+def rpc_handlers(plugin_class: type) -> List[RpcHandlerSpec]:
+    return Lists.wrap(inspect.getmembers(plugin_class)).flat_map2(handler)
 
 
 def setup_rpc(vim: NvimFacade, host: str, plugin_class: type) -> List[str]:

@@ -3,13 +3,15 @@ from typing import Union, Any, Callable
 
 import neovim
 
+from amino import List, _
+
 from ribosome.nvim import NvimFacade
 from ribosome.machine import StateMachine
 from ribosome.logging import nvim_logging, Logging
-from ribosome.request import msg_command, msg_function, command
+from ribosome.request import msg_command, msg_function, command, function
 from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
-from ribosome.rpc import setup_rpc
+from ribosome.rpc import setup_rpc, rpc_handlers
 
 
 class NvimPlugin(Logging):
@@ -43,6 +45,9 @@ class NvimPlugin(Logging):
         setup_rpc(self.vim, self.plugin_name, type(self))
         self.start_plugin()
 
+    def rpc_handlers(self) -> List[dict]:
+        return list(rpc_handlers(type(self)) / _.encode)
+
     def set_log_level(self, level: str) -> None:
         self.file_log_handler.setLevel(level)
 
@@ -75,6 +80,7 @@ def setup_plugin(cls: type, name: str, prefix: str) -> None:
     handler('log_level', lambda n: command(name=n)(lambda self, *a, **kw: self.set_log_level(*a, **kw)))
     msg_fun('mapping', Mapping)
     name_handler('start', lambda n: command(sync=True, name=n)(lambda self, *a, **kw: self.start_plugin(*a, **kw)))
-    name_handler('setup_rpc', lambda n: command(sync=True, name=n)(lambda self, *a, **kw: self.setup_rpc(*a, **kw)))
+    name_handler('rpc_handlers',
+                 lambda n: function(sync=True, name=n)(lambda self, *a, **kw: self.rpc_handlers(*a, **kw)))
 
 __all__ = ('NvimPlugin', 'NvimStatePlugin')
