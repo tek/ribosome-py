@@ -551,9 +551,12 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def autocmd(self, name, pattern, cmd):
         return NvimCmd(self, 'autocmd', '{} {} {}'.format(name, pattern, cmd))
 
+    def _call(self, name: str, *args: Any, sync=True, **kw: Any) -> Either[Exception, A]:
+        return Try(self.vim.call, name, *args, async=not sync, **kw)
+
     def call(self, name: str, *args: Any, sync=True, **kw: Any) -> Either[str, A]:
         return (
-            Try(self.vim.call, name, *args, async=not sync, **kw)
+            self._call(name, *args, sync=sync, **kw)
             .leffect(L(self._call_error)(name, args, kw, _, sync))
             .lmap(lambda a: 'vim call `{}` failed: {}'.format(format_funcall(name, args, kw), a))
         )
@@ -630,15 +633,12 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         return self.call('execute', list(lines))
 
     def call_once_defined(self, name: str, *args: str, timeout: int=3, **kw: str) -> Either[str, A]:
-        found = False
-        result = None
+        result = Left('not started yet')
         start = time.time()
-        while not found and time.time() - start < timeout:
+        while not result.is_right and time.time() - start < timeout:
             time.sleep(.01)
-            result = self.call(name, *args, **kw)
-            self.log.test(result.value)
-            found = not (result.is_left and 'no request handler registered' in str(result.value))
-        return result if found else Left(f'function {name} did not appear')
+            result = self._call(name, *args, **kw)
+        return result.lmap(lambda a: f'function {name} did not appear: {a}')
 
 
 class AsyncVimCallProxy():
