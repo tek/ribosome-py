@@ -240,8 +240,7 @@ class NvimComponent(Logging):
 
 class NvimCmd:
 
-    def __init__(self, vim: NvimComponent, name: str, args: str='',
-                 range=Empty(), silent=True) -> None:
+    def __init__(self, vim: NvimComponent, name: str, args: str='', range=Empty(), silent=True) -> None:
         self.vim = vim
         self.name = name
         self.args = args
@@ -629,6 +628,17 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def execute(self, code: Union[str, List[str]]) -> None:
         lines = code if isinstance(code, List) else Lists.lines(code)
         return self.call('execute', list(lines))
+
+    def call_once_defined(self, name: str, *args: str, timeout: int=3, **kw: str) -> Either[str, A]:
+        found = False
+        result = None
+        start = time.time()
+        while not found and time.time() - start < timeout:
+            time.sleep(.01)
+            result = self.call(name, *args, **kw)
+            self.log.test(result.value)
+            found = not (result.is_left and 'no request handler registered' in str(result.value))
+        return result if found else Left(f'function {name} did not appear')
 
 
 class AsyncVimCallProxy():

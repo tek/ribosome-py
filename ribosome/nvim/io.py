@@ -34,6 +34,10 @@ class NvimIO(Generic[A], Implicits, implicits=True, imp_mod='ribosome.nvim.io', 
         return NvimIO.wrap_either(__.call(name, *args, **kw))
 
     @staticmethod
+    def call_once_defined(name: str, *args: Any, **kw: Any) -> 'NvimIO[A]':
+        return NvimIO.wrap_either(__.call_once_defined(name, *args, **kw))
+
+    @staticmethod
     def pure(a: A) -> 'NvimIO[A]':
         return NvimIO(lambda v: a)
 
