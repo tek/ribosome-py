@@ -1,23 +1,25 @@
+import abc
 import uuid
 import json
-from typing import Callable, Union, Pattern, Tuple, TypeVar
+from typing import Callable, Union, Pattern, Tuple, TypeVar, Any, Type
 
 import pyrsistent
-from typing import Any
 
 from lenses import Lens, lens
 
 from toolz import merge
 
-from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try, Maybe, Just, Path, I, Regex, do)
+from amino import List, Empty, Boolean, _, Map, Left, L, __, Either, Try, Maybe, Just, Path, I, Regex, do, Right
 from amino.lazy import LazyMeta, Lazy, lazy
 from amino.lazy_list import LazyList
 from amino.tc.optional import Optional
 from amino.tc.foldable import Foldable
+from amino.util.string import ToStr
 
 from ribosome.logging import Logging
 
 A = TypeVar('A')
+B = TypeVar('B')
 
 
 def any_field(**kw: Any) -> pyrsistent.field:
@@ -68,11 +70,22 @@ def maybe_field(tpe=None, factory=None, initial=Empty(), **kw: Any) -> pyrsisten
                  factory=fact, **kw)
 
 
-def either_field(rtpe, ltpe=str, initial=Left('pristine'), **kw: Any) -> pyrsistent.field:
+def either_factory(fact, tpe: Type[B]) -> Callable[[Either[A, B]], bool]:
+    def f(val: Either[A, B]) -> bool:
+        return val / (lambda v: v if isinstance(v, tpe) else fact(v))
+    return f
+
+
+def either_field(rtpe, ltpe=str, factory=None, initial=Left('pristine'), **kw: Any) -> pyrsistent.field:
+    fact = I if factory is None else either_factory(factory, rtpe)
     err = 'must be Either[{}, {}]'.format(ltpe, rtpe)
     check = lambda t, a: (isinstance(a, t), err)
     inv = __.cata(L(check)(ltpe, _), L(check)(rtpe, _))
-    return field(Either, initial=initial, invariant=inv, **kw)
+    return field(Either, initial=initial, invariant=inv, factory=fact, **kw)
+
+
+def path_field(**kw: Any) -> pyrsistent.field:
+    return field(Path, factory=Path, **kw)
 
 
 class OptionalInvariant:
@@ -185,7 +198,7 @@ class FieldProxy(FieldMutator):
         return self.tpe(name, self.target)
 
 
-class RecordMeta(LazyMeta, pyrsistent.PClassMeta):
+class RecordMeta(LazyMeta, pyrsistent.PClassMeta, abc.ABCMeta):
 
     @property
     def mandatory_fields(self):
@@ -209,7 +222,7 @@ class RecordMeta(LazyMeta, pyrsistent.PClassMeta):
         return self._field_names - 'uuid'
 
 
-class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
+class Record(pyrsistent.PClass, Lazy, ToStr, Logging, metaclass=RecordMeta):
 
     @classmethod
     def args_from_opt(cls, opt: Map):
@@ -218,6 +231,9 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
             return name, ctor(Just(value))
         def list_arg(name, field, value):
             return name, value
+        def either_arg(name, field, value):
+            ctor = field.factory
+            return name, ctor(Right(value))
         def regular_arg(name, field, value):
             return name, value
         def arg(name, field):
@@ -225,6 +241,7 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
                 may_arg if Maybe in field.type else
                 list_arg if List in field.type else
                 may_arg if isinstance(field.factory, OptionalFactory) else
+                either_arg if Either in field.type else
                 regular_arg
             )
             return opt.get(name) / L(cb)(name, field, _)
@@ -252,6 +269,10 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
     def _str_name(self):
         return self._name
 
+    def _arg_desc(self) -> List[str]:
+        extra_named = self._str_extra_named.map2('{}={}'.format)
+        return (self._str_extra + extra_named) / str
+
     @property
     def _str_extra(self) -> List:
         return List()
@@ -259,11 +280,6 @@ class Record(pyrsistent.PClass, Lazy, Logging, metaclass=RecordMeta):
     @property
     def _str_extra_named(self) -> Map:
         return Map()
-
-    def __str__(self):
-        extra_named = self._str_extra_named.map2('{}={}'.format)
-        return '{}({})'.format(self._str_name,
-                               (self._str_extra + extra_named).join_comma)
 
     @lazy
     def setter(self):
