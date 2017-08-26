@@ -65,6 +65,7 @@ class _PluginSpecBase(IntegrationSpecBase):
         self._log_contains('sleeping in 1')
         return self._log_contains('sleeping in 0')
 
+
 class LoopedPluginSpec(_PluginSpecBase):
     __doc__ = specs.format('permanent main loop thread')
 

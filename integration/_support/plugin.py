@@ -121,7 +121,7 @@ class TestPlugin(NvimStatePlugin, Logging):
     test_scratch = 'test scratch'
 
     def start_plugin(self) -> None:
-        self.state.start()
+        self.state().start()
 
     @neovim.function('Value', sync=True)
     def value(self, args):
@@ -176,14 +176,20 @@ class TestPlugin(NvimStatePlugin, Logging):
 class TestPluginLooped(TestPlugin):
 
     @lazy
-    def state(self) -> MachLooped:
+    def _state(self) -> MachLooped:
         return MachLooped(self.vim.proxy, title='spec')
+
+    def state(self) -> MachLooped:
+        return self._state
 
 
 class TestPluginUnlooped(TestPlugin):
 
     @lazy
-    def state(self) -> MachUnlooped:
+    def _state(self) -> MachUnlooped:
         return MachUnlooped(self.vim.proxy, title='spec')
+
+    def state(self) -> MachUnlooped:
+        return self._state
 
 __all__ = ('TestPlugin',)
