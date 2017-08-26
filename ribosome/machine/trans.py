@@ -45,6 +45,10 @@ class Propagate(TransAction):
     def one(msg: Message) -> TransAction:
         return Propagate(List(msg))
 
+    @staticmethod
+    def maybe(msg: Maybe[Message]) -> TransAction:
+        return Propagate(msg.to_list)
+
     def _arg_desc(self) -> List[str]:
         return self.messages / str
 
@@ -120,13 +124,24 @@ def cont(tail: List[TransEffect], in_state: bool, f: Callable[[Callable[[R], Tra
     return tail.detach_head.map2(lambda h, t: f(lambda a: h.run(a, t, in_state)))
 
 
+class TransEffectMaybe(Generic[R], TransEffect[Maybe[R]]):
+
+    @property
+    def tpe(self) -> Type[Maybe[R]]:
+        return Maybe
+
+    def extract(self, data: Maybe[N], tail: List[TransEffect], in_state: bool) -> TransStep:
+        nested = data.map(lambda a: cont(tail, in_state, lambda run: Lift(run(a))) | a)
+        return Lift(Propagate.maybe(nested))
+
+
 class TransEffectEither(Generic[R], TransEffect[Either[str, R]]):
 
     @property
     def tpe(self) -> Type[Either[str, R]]:
         return Either
 
-    def extract(self, data: Either[R, N], tail: List[TransEffect], in_state: bool) -> TransStep:
+    def extract(self, data: Either[str, R], tail: List[TransEffect], in_state: bool) -> TransStep:
         nested = data.map(lambda a: cont(tail, in_state, lambda run: Lift(run(a))) | a)
         return Lift(nested.value_or(L(Error)(_) >> Propagate.one))
 
@@ -224,6 +239,7 @@ class TransEffectUnit(TransEffect[None]):
         return Lift(Unit()) if tail.empty else TransEffectError('cannot apply trans effects to unit')
 
 
+m = TransEffectMaybe()
 e = TransEffectEither()
 st = TransEffectIdState()
 est = TransEffectEitherState()
@@ -301,4 +317,4 @@ def relay(msg_type: Type[Msg], prio: float=default_prio) -> Callable[[Callable[[
         return decorate(func, msg_type, prio)
     return add_handler
 
-__all__ = ('multi', 'e', 'st', 'io', 'coro', 'single', 'one', 'relay')
+__all__ = ('multi', 'coro', 'single', 'one', 'relay')
