@@ -11,7 +11,7 @@ from amino.algebra import AlgebraMeta, Algebra
 from ribosome.machine.message_base import Message, default_prio, _machine_attr, _message_attr, _prio_attr, _dyn_attr
 from ribosome.data import Data
 from ribosome.machine.interface import MachineI
-from ribosome.machine.messages import RunIOAlg, Error
+from ribosome.machine.messages import RunIOAlg, Error, Nop
 from ribosome.logging import Logging
 
 M = TypeVar('M', bound=MachineI)
@@ -132,7 +132,7 @@ class TransEffectMaybe(Generic[R], TransEffect[Maybe[R]]):
 
     def extract(self, data: Maybe[N], tail: List[TransEffect], in_state: bool) -> TransStep:
         nested = data.map(lambda a: cont(tail, in_state, lambda run: Lift(run(a))) | a)
-        return Lift(Propagate.maybe(nested))
+        return Lift(nested | Propagate.one(Nop()))
 
 
 class TransEffectEither(Generic[R], TransEffect[Either[str, R]]):
@@ -260,7 +260,6 @@ class Lifter(Logging):
 
     def lift_trans_effect_error(self, res: TransEffectError, in_state: bool) -> TransAction:
         return TransFailure(res.data)
-        # return prop if in_state else Transit(IdState.pure(prop))
 
     def lift_res(self, res: R, in_state: bool) -> TransAction:
         return (
