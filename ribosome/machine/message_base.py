@@ -1,13 +1,12 @@
 import abc
 import functools
 import time
+import inspect
+from typing import Optional
 
 from amino import Map, List, Empty, Just, __
 
-from ribosome.record import any_field, dfield, list_field, field
-
-from pyrsistent._precord import _PRecordMeta
-from pyrsistent import PRecord
+from ribosome.record import any_field, dfield, list_field, field, RecordMeta, Record
 
 _machine_attr = '_machine'
 _message_attr = '_message'
@@ -50,7 +49,7 @@ def _update_field_metadata(inst, fields, opt_fields, varargs):
         else Just(inst._field_count_min + len(opt_fields)))
 
 
-class MessageMeta(_PRecordMeta, abc.ABCMeta):
+class MessageMeta(RecordMeta, abc.ABCMeta):
 
     def __new__(cls, name, bases, namespace, fields=[], opt_fields=[], varargs=None, skip_fields=False, **kw):
         ''' create a subclass of PRecord
@@ -74,7 +73,7 @@ class MessageMeta(_PRecordMeta, abc.ABCMeta):
 
 
 @functools.total_ordering
-class Message(PRecord, metaclass=MessageMeta, skip_fields=True):
+class Message(Record, metaclass=MessageMeta, skip_fields=True):
     ''' Interface between vim commands and state.
     Provides a constructor that allows specification of fields via positional arguments.
     '''
@@ -112,13 +111,19 @@ class Message(PRecord, metaclass=MessageMeta, skip_fields=True):
         return self.set(prio=float(prio))
 
 
-def message(name, *fields, **kw):
-    return MessageMeta.__new__(MessageMeta, name, (Message,), {}, fields=fields, **kw)
+def message_definition_module() -> Optional[str]:
+    return inspect.currentframe().f_back.f_back.f_globals['__name__']
 
 
-def json_message(name, *fields, **kw):
+def message(name, *fields, mod=None, **kw):
+    module = mod or message_definition_module()
+    return MessageMeta(name, (Message,), dict(__module__=module), fields=fields, **kw)
+
+
+def json_message(name, *fields, mod=None, **kw):
     opt = (('options', Map()),)
-    return message(name, *fields, opt_fields=opt, **kw)
+    module = mod or message_definition_module()
+    return message(name, *fields, opt_fields=opt, mod=module, **kw)
 
 
 class Publish(Message, fields=('message',)):
