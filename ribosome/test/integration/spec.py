@@ -10,10 +10,14 @@ from typing import Any, Callable, Generic, TypeVar, Type
 import neovim
 from neovim.api import Nvim
 
-from amino.test import fixture_path, temp_dir, temp_file
+from kallikrein import Expectation, kf
+from kallikrein.matchers.typed import have_type
+from kallikrein.matchers import contain
+from kallikrein.matchers.either import be_right
 
 from amino import List, Maybe, Either, Left, __, Map, env, Path, Lists, _
 from amino.lazy import lazy
+from amino.test import fixture_path, temp_dir, temp_file
 from amino.test.path import base_dir, pkg_dir
 from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase
 from amino.util.string import camelcase
@@ -26,6 +30,7 @@ from ribosome.test.fixtures import rplugin_template
 from ribosome.rpc import rpc_handlers, RpcHandlerSpec
 from ribosome.machine import Message
 from ribosome.record import decode_json
+from ribosome.test.integration.klk import later
 
 A = TypeVar('A', bound=NvimPlugin)
 
@@ -291,6 +296,9 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
         self.root.sub.cat(self.root) % __.report()
 
 
+M = TypeVar('M', bound=Message)
+
+
 class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
 
     def setup(self) -> None:
@@ -327,6 +335,9 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
 
     def message_log(self) -> Either[str, List[Message]]:
         return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
+
+    def seen_message(self, tpe: Type[M]) -> Expectation:
+        return later(kf(self.message_log).must(be_right(contain(have_type(tpe)))))
 
     @property
     def rplugin_path(self) -> Either[str, Path]:
