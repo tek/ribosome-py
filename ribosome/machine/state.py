@@ -323,16 +323,13 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
 
     def send_sync(self, msg, timeout=medium_timeout):
         self.log.debug('send {} in {}'.format(msg, self.title))
-        done = concurrent.futures.Future()  # type: concurrent.futures.Future
+        done = concurrent.futures.Future()
         async def go():
             if self._messages is not None:
                 await self._messages.put(msg)
             result = await self._process_messages()
             done.set_result(result)
-        if self._loop.is_running():
-            self._loop.call_soon_threadsafe(go())
-        else:
-            self._loop.run_until_complete(go())
+        self._loop.run_until_complete(go())
         return done.result(timeout)
 
     def send(self, msg):
