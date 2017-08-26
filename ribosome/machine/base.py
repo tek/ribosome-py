@@ -90,6 +90,9 @@ class MachineBase(MachineI):
             return z.accum(self.loop_process(z.data, m))
         return self.process(data, msg, prio).fold(loop)
 
+    def log_message(self, msg: Message) -> None:
+        pass
+
     def _resolve_handler(self, msg, prio):
         f = __.handler(msg)
         return (
