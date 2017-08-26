@@ -153,12 +153,11 @@ class RequestHandler(Logging, metaclass=abc.ABCMeta):
 
 class MessageRequestHandler(RequestHandler):
 
-    def __init__(self, fun: Callable[[], Any], msg: type, sync=None,
-                 **kw) -> None:
+    def __init__(self, fun: Callable[[], Any], msg: type, sync=False, **kw) -> None:
         self._message = msg
         self._fun_name = fun.__name__
-        self._sync = Maybe.check(sync)
-        super().__init__(self._message.__init__, **kw)  # type: ignore
+        self._sync = sync
+        super().__init__(self._message.__init__, sync=sync, **kw)  # type: ignore
 
     @property
     def _infer_name(self):
@@ -180,7 +179,7 @@ class MessageRequestHandler(RequestHandler):
                 name = self._message.__name__
                 self.log.error('bad args to {}: {}'.format(name, e))
             else:
-                sync = self._sync | obj.default_sync
+                sync = self._sync
                 sender = obj.state().send_sync if sync else obj.state().send
                 sender(msg)
         else:

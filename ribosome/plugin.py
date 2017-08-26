@@ -58,10 +58,6 @@ class NvimStatePlugin(NvimPlugin):
     def state(self) -> StateMachine:
         ...
 
-    @property
-    def default_sync(self) -> bool:
-        return False
-
 
 def setup_plugin(cls: type, name: str, prefix: str) -> None:
     def name_handler(suf: str, handler: Callable[[str], Callable[..., None]]) -> None:
