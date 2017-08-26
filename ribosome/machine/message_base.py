@@ -88,12 +88,6 @@ class Message(Record, metaclass=MessageMeta, skip_fields=True):
         ext_kw = field_map ** kw + ('time', time.time())
         return super().__new__(cls, **ext_kw)
 
-    def __init__(self, *args, **kw):
-        ''' this is necessary to catch the call from pyrsistent's
-        evolver that is initializing instances
-        '''
-        pass
-
     @property
     def pub(self):
         return Publish(self)

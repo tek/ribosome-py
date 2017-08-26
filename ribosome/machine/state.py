@@ -1,10 +1,11 @@
-from typing import Callable
+import time
+from typing import Callable, Awaitable
 from typing import Optional  # NOQA
 import abc
 import threading
 import asyncio
 from contextlib import contextmanager
-import concurrent.futures
+from concurrent.futures import Future as CFuture, TimeoutError
 
 from lenses import Lens
 
@@ -327,19 +328,40 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         while not self._messages.empty():
             await self._step()
 
-    def send_sync(self, msg, timeout=medium_timeout):
-        self.log.debug('send {} in {}'.format(msg, self.title))
-        done = concurrent.futures.Future()
-        async def go():
-            if self._messages is not None:
-                await self._messages.put(msg)
-            result = await self._process_messages()
-            done.set_result(result)
-        self._loop.run_until_complete(go())
-        return done.result(timeout)
+    def run_coro_when_free(self, coro: Awaitable) -> None:
+        while self._loop.is_running():
+            time.sleep(.01)
+        self._loop.run_until_complete(coro)
 
-    def send(self, msg):
-        threading.Thread(target=self.send_sync, args=(msg,)).start()
+    async def send_and_process(self, msg: Message) -> None:
+        if self._messages is not None:
+            await self._messages.put(msg)
+            await self._process_messages()
+
+    def send_thread(self, msg: Message, asy: bool) -> None:
+        a = 'a' if asy else ''
+        desc = f'send {msg} {a}sync in {self.title}'
+        self.log.debug(desc)
+        done = CFuture()
+        def run() -> None:
+            try:
+                self.run_coro_when_free(self.send_and_process(msg))
+            except Exception as e:
+                self.log.caught_exception_error(desc, e)
+                done.set_result(False)
+            else:
+                done.set_result(True)
+        threading.Thread(target=run).start()
+        return done
+
+    def send_sync(self, msg, timeout=medium_timeout) -> None:
+        try:
+            self.send_thread(msg, False).result(timeout)
+        except TimeoutError as e:
+            self.log.warn(f'timed out waiting for processing of {msg} in {self.title}')
+
+    def send(self, msg: Message) -> CFuture:
+        return self.send_thread(msg, True)
 
 
 class PluginStateMachine(MachineI):
@@ -371,8 +393,7 @@ class PluginStateMachine(MachineI):
     def plugin(self, title):
         return self.sub.find(_.title == title)
 
-    def plug_command(self, plug_name: str, cmd_name: str, args: list=[],
-                     sync=False):
+    def plug_command(self, plug_name: str, cmd_name: str, args: list=[], sync=False):
         sender = self.send_sync if sync else self.send
         plug = self.plugin(plug_name)
         cmd = plug.flat_map(lambda a: a.command(cmd_name, List(args)))

@@ -176,7 +176,7 @@ class MachineBase(MachineI):
                 results = await asyncio.gather(*coros)
             except Exception as e:
                 self.log.caught_exception('running coroutines', e)
-                return Left(f'running coros failed: {e}')
+                return Left(TransitionException('running coroutines', e))
             else:
                 return Right(
                     Lists.wrap(results) /

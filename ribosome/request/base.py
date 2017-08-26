@@ -177,11 +177,14 @@ class MessageRequestHandler(RequestHandler):
                 msg = self._message(*args)
             except Exception as e:
                 name = self._message.__name__
-                self.log.error('bad args to {}: {}'.format(name, e))
+                self.log.error(f'bad args to {name}: {e}')
             else:
-                sync = self._sync
-                sender = obj.state().send_sync if sync else obj.state().send
-                sender(msg)
+                try:
+                    sync = self._sync
+                    sender = obj.state().send_sync if sync else obj.state().send
+                    sender(msg)
+                except Exception as e:
+                    self.log.caught_exception_error(f'sending {msg} from request handler {self.name}', e)
         else:
             msg = 'msg_{} can only be used on NvimStatePlugin ({})'
             self.log.error(msg.format(self.desc, obj))
