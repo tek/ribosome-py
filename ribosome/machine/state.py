@@ -111,11 +111,12 @@ class AsyncIOThread(threading.Thread, AsyncIOBase):
 
 class StateMachineBase(ModularMachine):
 
-    def __init__(self, sub: List[MachineBase]=List(), parent=None, title=None
-                 ) -> None:
+    def __init__(self, sub: List[MachineBase]=List(), parent=None, title=None, debug=False) -> None:
+        self.sub = sub
+        self.debug = debug
         self.data = None
         self._messages = None
-        self.sub = sub
+        self.message_log = List()
         ModularMachine.__init__(self, parent, title=None)
 
     @property
@@ -153,10 +154,15 @@ class StateMachineBase(ModularMachine):
         return Try(eval, expr, None, dict(data=data, plugins=plugins))
 
     def _send(self, data, msg: Message):
+        self.log_message(msg)
         return (
             Try(self.loop_process, data, msg)
             .value_or(L(TransitionResult.failed)(data, _))
         )
+
+    def log_message(self, msg: Message) -> None:
+        if self.debug:
+            self.message_log.append(msg)
 
     @may_handle(Nop)
     def _nop(self, data: Data, msg):
@@ -406,17 +412,16 @@ class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
 class RootMachine(StateMachine, RootMachineBase):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None
-                 ) -> None:
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None) -> None:
         StateMachine.__init__(self, title=title)
         RootMachineBase.__init__(self, vim, plugins)
 
 
 class UnloopedRootMachine(UnloopedStateMachine, RootMachineBase):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None
-                 ) -> None:
-        UnloopedStateMachine.__init__(self, title=title)
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None) -> None:
+        debug = vim.vars.p('debug') | False
+        UnloopedStateMachine.__init__(self, title=title, debug=debug)
         RootMachineBase.__init__(self, vim, plugins)
 
 

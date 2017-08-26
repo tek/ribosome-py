@@ -9,7 +9,7 @@ from lenses import Lens, lens
 
 from toolz import merge
 
-from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try, Maybe, Just, Path, I, Regex)
+from amino import (List, Empty, Boolean, _, Map, Left, L, __, Either, Try, Maybe, Just, Path, I, Regex, do)
 from amino.lazy import LazyMeta, Lazy, lazy
 from amino.lazy_list import LazyList
 from amino.tc.optional import Optional
@@ -330,6 +330,16 @@ def _decode_json_obj(obj):
         m
     )
 
+Rec = TypeVar('Rec', bound=Record)
+
+
+@do
+def decode_json_record(obj: dict) -> Either[str, Rec]:
+    m = yield Try(Map, obj)
+    tpe_path = yield m.lift('__type__').to_either(f'json object {obj} has no `__type__` field')
+    tpe = yield Either.import_path(tpe_path)
+    yield Try(tpe.from_opt, m)
+
 
 class EncodeJson(json.JSONEncoder):
 
@@ -366,7 +376,6 @@ def encode_json(data):
 def decode_json(data):
     return _code_json(data, _decode_json, 'de')
 
-__all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field',
-           'bool_field', 'any_field', 'encode_json', 'decode_json',
-           'int_field', 'uuid_field', 'map_field', 'either_field', 'str_field',
-           'float_field')
+__all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field', 'bool_field', 'any_field', 'encode_json',
+           'decode_json', 'int_field', 'uuid_field', 'map_field', 'either_field', 'str_field', 'float_field',
+           'decode_json_record')

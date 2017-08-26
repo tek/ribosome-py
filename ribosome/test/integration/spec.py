@@ -5,23 +5,29 @@ import asyncio
 from functools import wraps
 from threading import Thread
 from contextlib import contextmanager
-from typing import Any, Callable
+from typing import Any, Callable, Generic, TypeVar, Type
 
 import neovim
 from neovim.api import Nvim
 
 from amino.test import fixture_path, temp_dir, temp_file
 
-from amino import List, Maybe, Either, Left, __, Map, env, Path, Lists
+from amino import List, Maybe, Either, Left, __, Map, env, Path, Lists, _
 from amino.lazy import lazy
 from amino.test.path import base_dir, pkg_dir
 from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase
+from amino.util.string import camelcase
 
 import ribosome
 from ribosome.logging import Logging
-from ribosome import NvimFacade
+from ribosome import NvimFacade, NvimPlugin
 from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
+from ribosome.rpc import rpc_handlers, RpcHandlerSpec
+from ribosome.machine import Message
+from ribosome.record import decode_json
+
+A = TypeVar('A', bound=NvimPlugin)
 
 
 class IntegrationSpecBase(AminoIntegrationSpecBase):
@@ -148,6 +154,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def _post_start_neovim(self) -> None:
         rtp = fixture_path('config', 'rtp')
         self.vim.options.amend_l('runtimepath', rtp)
+        self.vim.vars.set_p('debug', True)
 
     def _pre_start(self) -> None:
         pass
@@ -284,43 +291,52 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
         self.root.sub.cat(self.root) % __.report()
 
 
-class PluginIntegrationSpec(VimIntegrationSpec):
+class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
 
-    def setup(self):
+    def setup(self) -> None:
         self.log_format = '{message}'
         super().setup()
 
-    def _post_start_neovim(self):
+    def _post_start_neovim(self) -> None:
         super()._post_start_neovim()
         self._setup_handlers()
 
-    def _setup_handlers(self):
+    def _setup_handlers(self) -> None:
         rp_path = self.rplugin_path.get_or_raise
-        rp_handlers = self.handlers.get_or_raise
+        rp_handlers = self.handlers(rp_path).get_or_raise
         self.vim.call(
             'remote#host#RegisterPlugin',
             'python3',
             str(rp_path),
-            rp_handlers,
+            rp_handlers / _.encode,
         )
 
     @property
-    def plugin_class(self) -> Either[str, type]:
+    def plugin_class(self) -> Either[str, Type[A]]:
         name = self.__class__.__name__
         e = 'property {}.plugin_class must return amino.Right(YourPluginClass)'
         return Left(e.format(name))
 
     @property
+    def plugin_name(self) -> str:
+        return camelcase(self.plugin_class.get_or_raise.name)
+
+    @property
+    def plugin_prefix(self) -> str:
+        return camelcase(self.plugin_class.get_or_raise.prefix)
+
+    def message_log(self) -> Either[str, List[Message]]:
+        return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
+
+    @property
     def rplugin_path(self) -> Either[str, Path]:
         return self.plugin_class / self._auto_rplugin
 
-    @property
-    def handlers(self):
-        return self.plugin_class / self._auto_handlers
+    def handlers(self, rp_path: Path) -> Either[str, List[dict]]:
+        return Either.import_from_file(rp_path, 'SpecPlugin') / self._auto_handlers
 
-    def _auto_handlers(self, cls):
-        import inspect
-        return List.wrap(inspect.getmembers(cls)).flat_map2(self._auto_handler)
+    def _auto_handlers(self, cls) -> List[RpcHandlerSpec]:
+        return rpc_handlers(cls)
 
     def _auto_handler(self, method_name, fun):
         fix = lambda v: int(v) if isinstance(v, bool) else v
@@ -330,7 +346,7 @@ class PluginIntegrationSpec(VimIntegrationSpec):
     def _auto_rplugin(self, cls):
         mod = cls.__module__
         name = cls.__name__
-        rp_path = temp_file('ribosome', 'spec', 'plugin.py')
+        rp_path = temp_file('ribosome', 'spec', 'spec_plugin.py')
         rp_path.write_text(rplugin_template.format(plugin_module=mod, plugin_class=name))
         return rp_path
 

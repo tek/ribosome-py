@@ -27,7 +27,7 @@ except Exception as e:
     raise
 
 @neovim.plugin
-class Plugin({plugin_class}):
+class SpecPlugin({plugin_class}, debug=True):
     pass
 '''
 

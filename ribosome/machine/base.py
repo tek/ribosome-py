@@ -85,8 +85,10 @@ class MachineBase(MachineI):
         pass
 
     def loop_process(self, data, msg, prio=None):
-        sender = lambda z, m: z.accum(self.loop_process(z.data, m))
-        return self.process(data, msg, prio).fold(sender)
+        def loop(z, m) -> None:
+            self.parent % __.log_message(m)
+            return z.accum(self.loop_process(z.data, m))
+        return self.process(data, msg, prio).fold(loop)
 
     def _resolve_handler(self, msg, prio):
         f = __.handler(msg)
