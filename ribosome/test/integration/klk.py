@@ -1,24 +1,25 @@
 import time
 from datetime import datetime
-from typing import Callable, Any, Union
+from typing import Callable, Any, Union, Type, TypeVar
 
 from amino.test.spec import default_timeout
 from amino import List
 
-from kallikrein import kf
+from kallikrein import Expectation, kf
 from kallikrein.expectable import Expectable
 from kallikrein.matcher import Matcher
 from kallikrein.matchers.length import have_length
 from kallikrein.matchers.comparison import greater
-from kallikrein.expectation import Expectation
 from kallikrein.matchers import contain
 from kallikrein.matchers.lines import have_lines
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.either import be_right
+from kallikrein.matchers.typed import have_type
 
 from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationSpec, ExternalIntegrationSpec,
                                             PluginIntegrationSpec)
 from ribosome.nvim.components import Buffer
+from ribosome.machine import Message
 
 
 def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> None:
@@ -32,6 +33,9 @@ def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0
 
 def later(exp: Expectation, timeout: float=None, intval: float=0.1) -> None:
     return later_f(lambda: exp, timeout, intval)
+
+
+M = TypeVar('M', bound=Message)
 
 
 class VimIntegrationKlkHelpers(VimIntegrationSpecI):
@@ -99,6 +103,9 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
 
     def _messages_contain(self, line: str) -> Expectation:
         return later(kf(lambda: self.vim.messages).must(contain(line)))
+
+    def seen_message(self, tpe: Type[M], **kw) -> Expectation:
+        return later(kf(self.message_log).must(be_right(contain(have_type(tpe)))), **kw)
 
 
 class VimIntegrationKlkSpec(VimIntegrationSpec, VimIntegrationKlkHelpers):
