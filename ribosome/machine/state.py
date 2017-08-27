@@ -354,7 +354,7 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         threading.Thread(target=run).start()
         return done
 
-    def send_sync(self, msg, timeout=medium_timeout) -> None:
+    def send_sync(self, msg, timeout=long_timeout) -> None:
         try:
             self.send_thread(msg, False).result(timeout)
         except TimeoutError as e:
