@@ -9,7 +9,7 @@ from lenses import Lens, lens
 
 from toolz import merge
 
-from amino import List, Empty, Boolean, _, Map, Left, L, __, Either, Try, Maybe, Just, Path, I, Regex, do, Right
+from amino import List, Empty, Boolean, _, Map, Left, L, __, Either, Try, Maybe, Just, Path, I, Regex, do, Right, Lists
 from amino.lazy import LazyMeta, Lazy, lazy
 from amino.lazy_list import LazyList
 from amino.tc.optional import Optional
@@ -40,7 +40,8 @@ def _foldable_type_field_inv(eff: Any, tpe: type) -> Callable[[Any], Tuple[bool,
         else:
             bad = a.find(lambda b: not isinstance(b, tpe))
             bad_tpe = bad | ''
-            err = 'must be {}[{}], found {}'.format(eff, tpe.__name__, bad_tpe)
+            name = Lists.wrap(tpe).map(lambda a: a.__name__).mk_string('|') if isinstance(tpe, tuple) else tpe.__name__
+            err = 'must be {}[{}], found {}'.format(eff, name, bad_tpe)
             return not bad.present, err
     return inv
 
