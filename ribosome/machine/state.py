@@ -390,7 +390,7 @@ class PluginStateMachine(MachineI):
             else Left('module does not define class `Plugin`')
         )
 
-    def plugin(self, title):
+    def plugin(self, title: str) -> Maybe[MachineBase]:
         return self.sub.find(_.title == title)
 
     def plug_command(self, plug_name: str, cmd_name: str, args: list=[], sync=False):
@@ -404,8 +404,8 @@ class PluginStateMachine(MachineI):
 
     @may_handle(PlugCommand)
     def _plug_command(self, data, msg):
-        self.log.debug(
-            'sending command {} to plugin {}'.format(msg.msg, msg.plug.title))
+        self.log.debug('sending command {} to plugin {}'.format(msg.msg, msg.plug.title))
+        self.log_message(msg.msg)
         return msg.plug.process(data, msg.msg)
 
 
