@@ -858,6 +858,13 @@ class Vars(OptVar):
         )
         return Map(lines)
 
+    def ensure(self, name: str, default: Any) -> None:
+        if not self.exists(name):
+            self.set(name, default)
+
+    def ensure_p(self, name: str, default: Any) -> None:
+        self.ensure(self.prefixed(name), default)
+
 
 class Options(OptVar):
 
