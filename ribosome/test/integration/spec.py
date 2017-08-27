@@ -277,7 +277,7 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
 
     @property
     def root(self):
-        return self.plugin.state
+        return self.plugin.state()
 
     def teardown(self):
         VimIntegrationSpec.teardown(self)
