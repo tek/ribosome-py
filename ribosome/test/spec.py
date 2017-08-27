@@ -1,9 +1,9 @@
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 from contextlib import contextmanager
 
 from flexmock import flexmock
 
-from amino import may, Maybe, List
+from amino import List
 from amino.test.spec_spec import Spec
 
 import ribosome
@@ -20,22 +20,13 @@ class MockOptions(Options):
 
 class MockVars(Vars):
 
-    def __init__(self, vim) -> None:
+    def __init__(self, vim, vars: dict) -> None:
         super().__init__(vim)
-        self.vars = dict()
+        self.vars = vars
         self.prefix = vim.prefix
 
-    @may
-    def __call__(self, name: str) -> Maybe[str]:  # type: ignore
-        v = self.vars.get(name)
-        if v is None:
-            ignore_names = ['_machine', '_message',
-                            '{}__message'.format(self.prefix),
-                            '{}__machine'.format(self.prefix),
-                            ]
-            if name not in ignore_names:
-                self.log.error('variable not found: {}'.format(name))
-        return v
+    def _get(self, name: str) -> Optional[Any]:
+        return self.vars.get(name)
 
     def set(self, name, value):
         self.vars[name] = value
@@ -43,9 +34,9 @@ class MockVars(Vars):
 
 class MockNvim(object):
 
-    def __init__(self, prefix) -> None:
+    def __init__(self, prefix, vars: dict) -> None:
         self.prefix = prefix
-        self._vars = MockVars(self)
+        self._vars = MockVars(self, vars)
         self._options = MockOptions(self)
 
     @property
@@ -78,8 +69,8 @@ class MockBuffer(MockNvim, Buffer):
 
 class MockNvimFacade(MockNvim, NvimFacade):
 
-    def __init__(self, prefix):
-        MockNvim.__init__(self, prefix)
+    def __init__(self, prefix: str, vars: dict=dict()) -> None:
+        MockNvim.__init__(self, prefix, vars)
         self.target = self
 
     @property
