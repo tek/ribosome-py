@@ -769,6 +769,9 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
     def i(self, name: str):
         return self.typed(int, self(name))
 
+    def exists(self, name: str) -> Boolean:
+        return self(name).is_right
+
 
 # FIXME recording variable name for eventual cleanup only works with a global
 # NvimFacade instance
