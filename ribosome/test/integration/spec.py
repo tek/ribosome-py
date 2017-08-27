@@ -324,6 +324,10 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
     def plugin_prefix(self) -> str:
         return camelcase(self.plugin_class.get_or_raise.prefix)
 
+    @property
+    def state(self) -> Any:
+        return self.vim.call(f'{self.plugin_prefix}State').flat_map(decode_json).get_or_raise
+
     def message_log(self) -> Either[str, List[Message]]:
         return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
 

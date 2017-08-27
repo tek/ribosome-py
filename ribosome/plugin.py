@@ -54,10 +54,10 @@ class NvimPlugin(Logging):
 
 class NvimStatePlugin(NvimPlugin):
 
-    def __init_subclass__(cls: type, name: str=None, prefix: str=None, debug=False) -> None:
+    def __init_subclass__(cls: type, name: str=None, prefix: str=None, debug: bool=False) -> None:
         super().__init_subclass__(name, prefix, debug)
-        if debug and cls.name:
-            setup_debug_state_plugin(cls, cls.name, cls.prefix)
+        if cls.name:
+            setup_state_plugin(cls, cls.name, cls.prefix, debug)
 
     @abc.abstractmethod
     def state(self) -> StateMachine:
@@ -65,6 +65,9 @@ class NvimStatePlugin(NvimPlugin):
 
     def message_log(self) -> List[Message]:
         return self.state().message_log // encode_json
+
+    def state_data(self) -> str:
+        return self.state().data.json | '{}'
 
 
 UnitF = Callable[..., None]
@@ -109,8 +112,10 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     help.handler('plug', command, cls.plug_command)
 
 
-def setup_debug_state_plugin(cls: Type[NvimStatePlugin], name: str, prefix: str) -> None:
+def setup_state_plugin(cls: Type[NvimStatePlugin], name: str, prefix: str, debug: bool) -> None:
     help = Helpers(cls, name, prefix)
-    help.name_handler('message_log', function, cls.message_log, sync=True)
+    help.handler('state', function, cls.state_data)
+    if debug:
+        help.name_handler('message_log', function, cls.message_log, sync=True)
 
 __all__ = ('NvimPlugin', 'NvimStatePlugin')
