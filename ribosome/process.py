@@ -144,7 +144,7 @@ class ProcessExecutor(Logging, abc.ABC):
                 proc = await self.process(job)
                 out, err = await proc.communicate(job.stdin)
             if out is None or err is None:
-                return err('executing {} failed'.format(job))
+                return error('executing {} failed'.format(job))
             else:
                 msg = '{} executed successfully ({}, {})'.format(job, out, err)
                 self.log.debug(msg)
