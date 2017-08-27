@@ -335,8 +335,12 @@ class Record(pyrsistent.PClass, Lazy, ToStr, Logging, metaclass=RecordMeta):
         return Map(type(self)._field_names_no_uuid.apzip(L(getattr)(self, _)))
 
     @property
-    def json(self):
+    def json_repr(self):
         return merge(self.to_map(), dict(__type__=self.__path__))
+
+    @property
+    def json(self) -> Either[str, str]:
+        return encode_json(self)
 
 
 def _decode_json_obj(obj):
@@ -362,8 +366,8 @@ class EncodeJson(json.JSONEncoder):
 
     def default(self, obj):
         return (
-            obj.json
-            if hasattr(obj, 'json') else
+            obj.json_repr
+            if hasattr(obj, 'json_repr') else
             str(obj)
             if isinstance(obj, (uuid.UUID, Path)) else
             super().default(obj)
