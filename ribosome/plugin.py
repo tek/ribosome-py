@@ -48,6 +48,9 @@ class NvimPlugin(Logging):
     def set_log_level(self, level: str) -> None:
         self.file_log_handler.setLevel(level)
 
+    def plug_command(self, plug_name: str, cmd_name: str, *args: str) -> None:
+        self.state().plug_command(plug_name, cmd_name, args)
+
 
 class NvimStatePlugin(NvimPlugin):
 
@@ -103,6 +106,7 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     help.msg_fun('mapping', Mapping)
     help.name_handler('start', command, cls.start_plugin, sync=True)
     help.name_handler('rpc_handlers', function, cls.rpc_handlers, sync=True)
+    help.handler('plug', command, cls.plug_command)
 
 
 def setup_debug_state_plugin(cls: Type[NvimStatePlugin], name: str, prefix: str) -> None:
