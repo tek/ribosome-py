@@ -1,5 +1,5 @@
 import re
-from typing import TypeVar, Callable, Any, Union
+from typing import TypeVar, Callable, Any, Union, Optional
 from pathlib import Path
 import threading
 from concurrent import futures
@@ -706,7 +706,7 @@ class AsyncVimProxy():
 class OptVar(Logging, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    def _get(self, name):
+    def _get(self, name: str) -> Optional[Any]:
         ...
 
     @property
@@ -719,7 +719,8 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
             msg = '{} not found: {}'.format(self._desc, name)
             self.log.debug(msg)
             return Left(msg)
-        return Right(decode(v))
+        else:
+            return Right(decode(v))
 
     def set(self, name, value):
         self.log.debug('setting {} {} to \'{}\''.format(self._desc, name, value))
@@ -745,8 +746,7 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
             if isinstance(v, tpe):
                 return Right(v)
             else:
-                msg = 'invalid type {} for {} {} (wanted {})'.format(
-                    type(v), self._desc, v, tpe)
+                msg = 'invalid type {} for {} {} (wanted {})'.format(type(v), self._desc, v, tpe)
                 self.log.error(msg)
                 return Left(msg)
         return value.flat_map(check)
