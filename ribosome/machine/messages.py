@@ -27,6 +27,8 @@ Warning = message('Warning', 'message')
 Debug = message('Debug', 'message')
 Coroutine = message('Coroutine', 'coro')
 TransitionException = message('TransitionException', 'context', 'exc')
+UpdateRecord = json_message('UpdateRecord', 'tpe', 'name')
+UpdateState = json_message('UpdateState', 'tpe', 'name')
 
 
 class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
@@ -45,5 +47,6 @@ class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
         return self.main
 
 __all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'NvimIOTask', 'RunTask', 'UnitTask', 'DataTask',
-           'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg', 'Error',
-           'Warning', 'Debug', 'Coroutine', 'TransitionException', 'Info')
+           'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg', 'RunNvimIO',
+           'RunNvimIOAlg', 'Error', 'Warning', 'Debug', 'Coroutine', 'TransitionException', 'Info', 'UpdateRecord',
+           'UpdateState')

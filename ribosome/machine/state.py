@@ -1,5 +1,5 @@
 import time
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Generator, Any
 from typing import Optional  # NOQA
 import abc
 import threading
@@ -19,14 +19,16 @@ from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle
                                          _recover_error, CoroExecutionHandler)
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
-from ribosome.machine.messages import Nop, Done, Quit, PlugCommand, Stop, Error
+from ribosome.machine.messages import Nop, Done, Quit, PlugCommand, Stop, Error, UpdateRecord, UpdateState
 from ribosome.machine.handler import DynHandlerJob
 from ribosome.machine.modular import ModularMachine
 from ribosome.machine.transitions import Transitions
+from ribosome.machine import trans
 
 import amino
-from amino import Maybe, Map, Try, _, L, __, Empty, Just, Either, List, Left
+from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do
 from amino.util.string import red, blue
+from amino.state import State
 
 Callback = message('Callback', 'func')
 Envelope = message('Envelope', 'message', 'to')
@@ -35,7 +37,6 @@ KillMachine = message('KillMachine', 'uuid')
 RunScratchMachine = json_message('RunScratchMachine', 'machine')
 Init = message('Init')
 IfUnhandled = message('IfUnhandled', 'msg', 'unhandled')
-UpdateRecord = json_message('UpdateRecord', 'tpe', 'name')
 
 short_timeout = 3
 medium_timeout = 3
@@ -272,7 +273,7 @@ class StateMachineBase(ModularMachine):
         msg_name = type(msg).__name__
         def log_error() -> None:
             errmsg = sent.error_message
-            self.log.error(Error(f'''{red('error')} handling {blue(msg_name)}''', prefix=errmsg))
+            self.log.error(Error(errmsg, prefix=f'''{red('error')} handling {blue(msg_name)}'''))
         def log_exc(e: Exception) -> None:
             self.log.caught_exception_error(f'handling {blue(msg_name)}', e)
         def log_verbose() -> None:
@@ -484,6 +485,18 @@ class SubTransitions(Transitions, TransitionHelpers):
         )
 
     def record_lens(self, tpe, name) -> Maybe[Lens]:
-        return Empty()
+        return Nothing
 
-__all__ = ('Message', 'StateMachine', 'PluginStateMachine')
+    @trans.unit(UpdateState, trans.st)
+    @do
+    def message_update_state(self) -> Generator[State[Data, None], Any, State[Data, None]]:
+        mod = __.update_from_opt(self.msg.options)
+        l = yield self.state_lens(self.msg.tpe, self.msg.name)
+        yield State.modify(lambda s: l.map(__.modify(mod)) | s)
+
+    def state_lens(self, tpe: str, name: str) -> State[Data, Maybe[Lens]]:
+        return State.pure(Nothing)
+
+__all__ = ('StateMachine', 'PluginStateMachine', 'AsyncIOThread', 'StateMachineBase', 'UnloopedStateMachine',
+           'PluginStateMachine', 'RootMachineBase', 'RootMachine', 'UnloopedRootMachine', 'SubMachine',
+           'SubTransitions')

@@ -8,11 +8,12 @@ from amino import List, _
 from ribosome.nvim import NvimFacade
 from ribosome.machine import StateMachine, Message
 from ribosome.logging import nvim_logging, Logging
-from ribosome.request import msg_command, msg_function, command, function
+from ribosome.request import msg_command, msg_function, command, function, json_msg_command
 from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
 from ribosome.rpc import rpc_handlers
 from ribosome.record import encode_json
+from ribosome.machine.messages import UpdateState
 
 
 class NvimPlugin(Logging):
@@ -98,6 +99,9 @@ class Helpers:
     def msg_fun(self, suf: str, msg: type) -> None:
         self.handler(suf, msg_function, lambda: None, msg)
 
+    def json_msg_cmd(self, suf: str, msg: type) -> None:
+        self.handler(suf, json_msg_command, lambda: None, msg)
+
 
 def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> None:
     help = Helpers(cls, name, prefix)
@@ -115,6 +119,7 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
 def setup_state_plugin(cls: Type[NvimStatePlugin], name: str, prefix: str, debug: bool) -> None:
     help = Helpers(cls, name, prefix)
     help.handler('state', function, cls.state_data)
+    help.json_msg_cmd('update_state', UpdateState)
     if debug:
         help.name_handler('message_log', function, cls.message_log, sync=True)
 
