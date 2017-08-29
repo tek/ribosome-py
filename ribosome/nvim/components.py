@@ -202,8 +202,7 @@ class NvimComponent(Logging):
         return self.cmd(line, verbose=verbose, sync=True)
 
     def cmd_output(self, line: str) -> List[str]:
-        return List.wrap(
-            self.vim.command_output('silent {}'.format(line)).splitlines())
+        return Lists.wrap(self.vim.command_output('silent {}'.format(line)).splitlines())
 
     def _cmd_success(self, line: str, result, sync: bool):
         if sync:
@@ -217,7 +216,7 @@ class NvimComponent(Logging):
             a = '' if sync else 'a'
             msg = f'running nvim {a}sync cmd `{line}`'
             if isinstance(err, Exception):
-                self.log.caught_exception(msg, err)
+                self.log.caught_exception_error(msg, err)
             else:
                 self.log.error(f'{msg}: {err}')
         else:
