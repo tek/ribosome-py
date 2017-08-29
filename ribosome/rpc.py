@@ -3,12 +3,13 @@ import inspect
 from types import FunctionType
 from typing import TypeVar, Callable, Union, Any, Dict
 
-from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do
-from amino.util.string import camelcaseify, ToStr
+from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean
+from amino.util.string import camelcaseify
 from amino.list import Nil
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log
+from ribosome.record import Record, field, int_field, str_field, bool_field
 
 A = TypeVar('A')
 
@@ -40,7 +41,20 @@ def rpc_autocmd_opt(key: str, value: Union[str, int]) -> Maybe[str]:
 RHS = TypeVar('RHS', bound='RpcHandlerSpec')
 
 
-class RpcHandlerSpec(ToStr):
+def from_bool(a: Union[int, bool, Boolean]) -> int:
+    return int(a.value) if isinstance(a, Boolean) else int(a) if isinstance(a, bool) else a
+
+
+class RpcHandlerSpec(Record):
+    sync = int_field(factory=from_bool)
+    name = str_field()
+    opts = field(dict)
+    method = str_field()
+    prefix = bool_field()
+
+    @staticmethod
+    def cons(Ctor: type, sync: Union[int, bool], name: str, opts: dict, method: str, prefix: bool) -> 'RpcHandlerSpec':
+        return Ctor(sync=sync, name=name, opts=opts, method=method, prefix=prefix)
 
     @staticmethod
     @do
@@ -50,17 +64,17 @@ class RpcHandlerSpec(ToStr):
         tpe = yield m.lift('type')
         Ctor = yield ctors.lift(tpe)
         sync, name, opts = yield m.get_all('sync', 'name', 'opts')
-        yield Just(Ctor(sync, name, opts, method, prefix))
+        yield Just(RpcHandlerSpec.cons(Ctor, sync, name, opts, method, prefix))
 
     @staticmethod
     def cmd(sync: int, name: str, opts: dict) -> 'RpcHandlerSpec':
         method = f'command:{name}'
-        return RpcCommandSpec(sync, name, opts, method, True)
+        return RpcHandlerSpec.cons(RpcCommandSpec, sync, name, opts, method, True)
 
     @staticmethod
     def fun(sync: int, name: str, opts: dict) -> 'RpcHandlerSpec':
         method = f'function:{name}'
-        return RpcFunctionSpec(sync, name, opts, method, True)
+        return RpcHandlerSpec.cons(RpcFunctionSpec, sync, name, opts, method, True)
 
     @staticmethod
     @do
@@ -68,13 +82,6 @@ class RpcHandlerSpec(ToStr):
         m = Map(data)
         method, prefix = yield m.get_all('method', 'prefix')
         yield RpcHandlerSpec.from_spec(m, method, prefix)
-
-    def __init__(self, sync: int, name: str, opts: dict, method: str, prefix: bool) -> None:
-        self.sync = int(sync) if isinstance(sync, bool) else sync
-        self.name = name
-        self.opts = opts
-        self.method = method
-        self.prefix = prefix
 
     @abc.abstractproperty
     def tpe(self) -> str:
@@ -115,8 +122,12 @@ class RpcHandlerSpec(ToStr):
             name=self.name,
             opts=self.opts,
             method=self.method,
-            prefix=int(self.prefix),
+            prefix=int(self.prefix.value),
         )
+
+    @abc.abstractproperty
+    def undef_cmdline(self) -> str:
+        ...
 
 
 class RpcCommandSpec(RpcHandlerSpec):
@@ -141,6 +152,10 @@ class RpcCommandSpec(RpcHandlerSpec):
     def def_cmd(self) -> str:
         return 'command!'
 
+    @property
+    def undef_cmdline(self) -> str:
+        return f'delcommand {self.name}'
+
 
 class RpcFunctionSpec(RpcHandlerSpec):
 
@@ -163,6 +178,10 @@ class RpcFunctionSpec(RpcHandlerSpec):
     @property
     def def_cmd(self) -> str:
         return 'function!'
+
+    @property
+    def undef_cmdline(self) -> str:
+        return f'delfunction {self.name}'
 
 
 class RpcAutocommandSpec(RpcHandlerSpec):
@@ -187,6 +206,10 @@ class RpcAutocommandSpec(RpcHandlerSpec):
     def def_cmd(self) -> str:
         return 'autocmd'
 
+    @property
+    def undef_cmdline(self) -> str:
+        return f'autocmd! {self.name}'
+
 
 def handler(method_name: str, fun: FunctionType) -> Maybe[RpcHandlerSpec]:
     def get(name: str) -> Maybe[A]:
@@ -210,11 +233,9 @@ def define_handler_native(vim: NvimFacade, host: str, spec: RpcHandlerSpec, plug
     return vim.call(*args)
 
 
-class DefinedHandler(ToStr):
-
-    def __init__(self, spec: RpcHandlerSpec, channel: int) -> None:
-        self.spec = spec
-        self.channel = channel
+class DefinedHandler(Record):
+    spec = field(RpcHandlerSpec)
+    channel = int_field()
 
     def _arg_desc(self) -> List[str]:
         return List(str(self.spec), str(self.channel))
@@ -237,7 +258,7 @@ def define_handler_cmd(rhs_f: Callable[[str], str], channel: int, spec: RpcHandl
 def define_handler_io(rhs: Callable[[str], str], channel: int, spec: RpcHandlerSpec, plugin_file: str
                       ) -> NvimIO[DefinedHandler]:
     tokens = define_handler_cmd(rhs, channel, spec, plugin_file)
-    return NvimIO.cmd_sync(tokens.join_tokens).replace(DefinedHandler(spec, channel))
+    return NvimIO.cmd_sync(tokens.join_tokens).replace(DefinedHandler(spec=spec, channel=channel))
 
 
 def define_function(channel: int, spec: RpcHandlerSpec, plugin_file: str) -> NvimIO[DefinedHandler]:
