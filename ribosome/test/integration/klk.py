@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Callable, Any, Union, Type, TypeVar
 
 from amino.test.spec import default_timeout
-from amino import List
+from amino import List, __
 
 from kallikrein import Expectation, kf
 from kallikrein.expectable import Expectable
@@ -22,7 +22,7 @@ from ribosome.nvim.components import Buffer
 from ribosome.machine import Message
 
 
-def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> None:
+def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> Expectation:
     to = default_timeout if timeout is None else timeout
     start = datetime.now()
     while (not exp().unsafe_eval and (datetime.now() - start).total_seconds() < to):
@@ -106,6 +106,10 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
 
     def seen_message(self, tpe: Type[M], **kw) -> Expectation:
         return later(kf(self.message_log).must(be_right(contain(have_type(tpe)))), **kw)
+
+    def seen_times(self, tpe: Type[M], count: int, **kw) -> Expectation:
+        seen = lambda: self.message_log() / __.filter_type(tpe)
+        return later(kf(seen).must(be_right(have_length(count))), **kw)
 
 
 class VimIntegrationKlkSpec(VimIntegrationSpec, VimIntegrationKlkHelpers):
