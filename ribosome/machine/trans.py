@@ -11,8 +11,9 @@ from amino.algebra import AlgebraMeta, Algebra
 from ribosome.machine.message_base import Message, default_prio, _machine_attr, _message_attr, _prio_attr, _dyn_attr
 from ribosome.data import Data
 from ribosome.machine.interface import MachineI
-from ribosome.machine.messages import RunIOAlg, Error, Nop
+from ribosome.machine.messages import RunIOAlg, Error, Nop, RunNvimIOAlg
 from ribosome.logging import Logging
+from ribosome.nvim import NvimIO
 
 M = TypeVar('M', bound=MachineI)
 D = TypeVar('D', bound=Data)
@@ -199,6 +200,17 @@ class TransEffectIO(Generic[R], TransEffect[IO[R]]):
         return Lift(Propagate.one(RunIOAlg(io.map(L(lift)(_, in_state)))))
 
 
+class TransEffectNvimIO(Generic[R], TransEffect[NvimIO[R]]):
+
+    @property
+    def tpe(self) -> Type[NvimIO[R]]:
+        return NvimIO
+
+    def extract(self, data: NvimIO[R], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+        io = cont(tail, False, data.map) | data
+        return Lift(Propagate.one(RunNvimIOAlg(io.map(L(lift)(_, in_state)))))
+
+
 class TransEffectCoro(TransEffect):
 
     @property
@@ -244,6 +256,7 @@ e = TransEffectEither()
 st = TransEffectIdState()
 est = TransEffectEitherState()
 io = TransEffectIO()
+nio = TransEffectNvimIO()
 coro = TransEffectCoro()
 single = TransEffectSingleMessage()
 strict = TransEffectMessages()

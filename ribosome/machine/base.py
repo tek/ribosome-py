@@ -1,12 +1,12 @@
 import time
 import uuid
 import inspect
-from typing import Callable, TypeVar, Type, Any
+from typing import Callable, TypeVar, Type, Any, Generic
 import asyncio
 
 import toolz
 
-from amino import Maybe, _, List, Map, Empty, L, __, Just, Either, Lists, Left, Right
+from amino import Maybe, _, List, Map, Empty, L, __, Just, Either, Lists, Left, Right, IO
 from amino.util.string import camelcaseify
 from amino.task import Task
 from amino.lazy import lazy
@@ -22,19 +22,21 @@ from ribosome.machine.transition import (Handler, TransitionResult, may_handle, 
 from ribosome.machine.message_base import _machine_attr
 from ribosome.request.command import StateCommand
 from ribosome.process import NvimProcessExecutor
-from ribosome.machine.messages import (NvimIOTask, RunIO, UnitTask, DataTask, RunCorosParallel, SubProcessSync,
-                                       RunIOsParallel, ShowLogInfo, Nop, RunIOAlg, TransitionException, Info)
+from ribosome.machine.messages import (NvimIOTask, RunIO, UnitTask, RunCorosParallel, SubProcessSync, RunIOsParallel,
+                                       ShowLogInfo, Nop, RunIOAlg, TransitionException, Info, RunNvimIOAlg, RunNvimIO,
+                                       DataTask)
 from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
 from ribosome.machine import trans
 
 A = TypeVar('A')
+D = TypeVar('D', bound=Data)
 
 
 def io(f: Callable[[NvimFacade], Any]) -> NvimIOTask:
     return NvimIOTask(NvimIO(f))
 
 
-class MachineBase(MachineI):
+class MachineBase(Generic[D], MachineI):
     _data_type = Data
 
     def __init__(self, parent: 'Machine'=None, title=None) -> None:
@@ -73,7 +75,7 @@ class MachineBase(MachineI):
     def handler_job_type(self, handler: Handler) -> Type[HandlerJob]:
         return DynHandlerJob if handler.dyn else AlgHandlerJob
 
-    def process(self, data: Data, msg, prio=None) -> TransitionResult:
+    def process(self, data: D, msg, prio=None) -> TransitionResult:
         self.prepare(msg)
         handler = self._resolve_handler(msg, prio)
         job = self.handler_job_type(handler)(self, data, msg, handler, self._data_type)
@@ -101,7 +103,7 @@ class MachineBase(MachineI):
             (self._message_handlers.get(prio) // f)
         ) | (lambda: self._default_handler)
 
-    def unhandled(self, data: Data, msg: Message):
+    def unhandled(self, data: D, msg: Message):
         return Just(TransitionResult.unhandled(data))
 
     def _command_by_message_name(self, name: str):
@@ -126,33 +128,47 @@ class MachineBase(MachineI):
         return Empty()
 
     @may_handle(NvimIOTask)
-    def message_nvim_io(self, data: Data, msg):
+    def message_nvim_io(self, data: D, msg):
         msg.io.unsafe_perform_io(self.vim)
 
-    def _run_io(self, task):
-        result = task.attempt
+    def _run_nio(self, io: RunNvimIOAlg) -> Either[str, List[Message]]:
+        result = io.attempt(self.vim)
         if result.value is None:
-            self.log.error('Task returned None: {}'.format(task))
+            self.log.error(f'NvimIO returned None: {io}')
+        return result
+
+    @trans.multi(RunNvimIO, trans.e)
+    def message_run_nvim_io(self, data: D, msg: RunNvimIO) -> Either[str, List[Message]]:
+        return self._run_nio(msg.io)
+
+    @trans.relay(RunNvimIOAlg)
+    def message_run_nvim_io_alg(self, data: D, msg: RunNvimIOAlg) -> Either[str, List[Message]]:
+        return _task_result(self._run_nio(msg.io))
+
+    def _run_io(self, io: IO[A]) -> Either[str, List[Message]]:
+        result = io.attempt
+        if result.value is None:
+            self.log.error(f'IO returned None: {io}')
         return _task_result(result)
 
     @handle(RunIO)
-    def message_run_io(self, data: Data, msg):
+    def message_run_io(self, data: D, msg):
         return self._run_io(msg.task)
 
     @trans.relay(RunIOAlg)
-    def message_run_io_alg(self, data: Data, msg: RunIOAlg):
+    def message_run_io_alg(self, data: D, msg: RunIOAlg):
         return self._run_io(msg.io)
 
     @handle(UnitTask)
-    def message_run_unit_task(self, data: Data, msg):
+    def message_run_unit_task(self, data: D, msg):
         return self._run_io(msg.task.replace(Just(Nop())))
 
     @handle(DataTask)
-    def message_data_task(self, data: Data, msg):
+    def message_data_task(self, data: D, msg):
         return self._run_io(msg.cons(Task.now(data)))
 
     @may_handle(RunCorosParallel)
-    def message_run_coros_parallel(self, data: Data, msg: RunCorosParallel) -> Message:
+    def message_run_coros_parallel(self, data: D, msg: RunCorosParallel) -> Message:
         async def wrap() -> Either[str, List[Message]]:
             try:
                 results = await asyncio.gather(*msg.coros)
@@ -164,12 +180,12 @@ class MachineBase(MachineI):
         return wrap()
 
     @may_handle(SubProcessSync)
-    async def message_sub_process_sync(self, data: Data, msg: SubProcessSync) -> Message:
+    async def message_sub_process_sync(self, data: D, msg: SubProcessSync) -> Message:
         executor = NvimProcessExecutor(self.vim)
         return msg.result(await executor.run(msg.job))
 
     @may_handle(RunIOsParallel)
-    def message_run_ios_parallel(self, data: Data, msg: RunIOsParallel) -> Message:
+    def message_run_ios_parallel(self, data: D, msg: RunIOsParallel) -> Message:
         coros = msg.ios / _.coro
         async def wrap() -> Maybe[List[Message]]:
             try:
@@ -185,11 +201,11 @@ class MachineBase(MachineI):
         return wrap()
 
     @may_handle(Error)
-    def message_error(self, data: Data, msg: Error) -> None:
+    def message_error(self, data: D, msg: Error) -> None:
         self.log.error(msg)
 
     @may_handle(Info)
-    def message_info(self, data: Data, msg: Info) -> None:
+    def message_info(self, data: D, msg: Info) -> None:
         self.log.info(msg.message)
 
     @may_handle(TransitionException)
@@ -201,7 +217,7 @@ class MachineBase(MachineI):
         self.log.debug(msg.message)
 
     @may_handle(ShowLogInfo)
-    def show_log_info(self, data: Data, msg: ShowLogInfo) -> Message:
+    def show_log_info(self, data: D, msg: ShowLogInfo) -> Message:
         print_ribo_log_info(self.log.verbose)
 
     def bubble(self, msg):

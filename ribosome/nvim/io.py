@@ -30,6 +30,10 @@ class NvimIO(Generic[A], Implicits, implicits=True, imp_mod='ribosome.nvim.io', 
         return NvimIO.wrap_either(__.cmd_sync(cmdline, verbose=verbose))
 
     @staticmethod
+    def cmd(cmdline: str, verbose=False) -> 'NvimIO[str]':
+        return NvimIO.wrap_either(__.cmd(cmdline, verbose=verbose))
+
+    @staticmethod
     def call(name: str, *args: Any, **kw: Any) -> 'NvimIO[A]':
         return NvimIO.wrap_either(__.call(name, *args, **kw))
 

@@ -3,7 +3,7 @@ import abc
 from amino import Nothing
 from amino.logging import LogError
 
-from ribosome.machine.message_base import message, Message
+from ribosome.machine.message_base import message, Message, json_message
 
 Nop = message('Nop')
 Stop = message('Stop')
@@ -14,6 +14,8 @@ NvimIOTask = message('NvimIOTask', 'io')
 RunTask = message('RunTask', 'task', opt_fields=(('msg', Nothing),))
 RunIO = RunTask
 RunIOAlg = message('RunIOAlg', 'io', opt_fields=(('msg', Nothing),))
+RunNvimIO = message('RunNvimIO', 'io')
+RunNvimIOAlg = message('RunNvimIOAlg', 'io')
 UnitTask = message('UnitTask', 'task', opt_fields=(('msg', Nothing),))
 DataTask = message('DataTask', 'cons', opt_fields=(('msg', Nothing),))
 Info = message('Info', 'message')

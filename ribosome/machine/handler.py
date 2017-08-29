@@ -9,7 +9,7 @@ from amino.task import Task
 from amino.state import StateT, EvalState, MaybeState, EitherState, IdState
 from amino.tc.optional import Optional
 from amino.id import Id
-from amino.util.string import blue
+from amino.util.string import blue, ToStr
 from amino.dispatch import dispatch_alg
 from amino.tc.base import TypeClass
 from amino.func import flip
@@ -59,7 +59,7 @@ def create_failure(data: D, desc: str, error: str) -> TransitionResult:
     return TransitionResult.failed(data, msg)
 
 
-class HandlerJob(Generic[M, D], Logging):
+class HandlerJob(Generic[M, D], Logging, ToStr):
 
     def __init__(self, machine: M, data: D, msg: Message, handler: Handler, data_type: Type[D]) -> None:
         self.machine = machine
@@ -76,6 +76,9 @@ class HandlerJob(Generic[M, D], Logging):
     @property
     def trans_desc(self) -> str:
         return blue(f'{self.machine.title}.{self.handler.name}')
+
+    def _arg_desc(self) -> List[str]:
+        return List(str(self.msg))
 
 
 class DynHandlerJob(HandlerJob):
