@@ -7,10 +7,10 @@ from amino import List, __
 
 from kallikrein import Expectation, kf
 from kallikrein.expectable import Expectable
-from kallikrein.matcher import Matcher
+from kallikrein.matcher import BoundMatcher
 from kallikrein.matchers.length import have_length
 from kallikrein.matchers.comparison import greater
-from kallikrein.matchers import contain
+from kallikrein.matchers import contain, equal
 from kallikrein.matchers.lines import have_lines
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.either import be_right
@@ -55,18 +55,19 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
     def contentkf(self) -> Expectable:
         return kf(lambda: self._buffer_out)
 
-    def _list_line(self, log: Callable[[], List[str]], index: int, matcher: Matcher) -> Expectation:
+    def _list_line(self, log: Callable[[], List[str]], index: int, matcher: BoundMatcher) -> Expectation:
         minlen = index if index >= 0 else abs(index + 1)
         return later(
             kf(log).must(have_length(greater(minlen))) &
             kf(lambda: log().lift(index)).must(matcher)
         )
 
-    def _log_line(self, index: int, matcher: Matcher) -> Expectation:
+    def _log_line(self, index: int, matcher: BoundMatcher) -> Expectation:
         return self._list_line(lambda: self._log_out, index, matcher)
 
-    def _log_contains(self, line: str) -> Expectation:
-        return later(kf(lambda: self._log_out).must(contain(line)))
+    def _log_contains(self, target: Union[str, BoundMatcher[str]]) -> Expectation:
+        matcher = target if isinstance(target, BoundMatcher) else equal(target)
+        return later(kf(lambda: self._log_out).must(contain(matcher)))
 
     def _log_equals(self, lines: Union[str, List[str]]) -> Expectation:
         return later(kf(lambda: self._log_out).must(have_lines(lines)))
@@ -77,7 +78,7 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
     def _buffer_length(self, length: int) -> Expectation:
         return later(self.contentkf.must(have_length(length)))
 
-    def _buffer_line(self, index: int, matcher: Matcher) -> Expectation:
+    def _buffer_line(self, index: int, matcher: BoundMatcher) -> Expectation:
         return self._list_line(lambda: self._buffer_out, index, be_just(matcher))
 
     def _buffer_contains(self, line: str) -> Expectation:
