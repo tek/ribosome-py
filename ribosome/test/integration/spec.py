@@ -164,16 +164,6 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def _post_start(self) -> None:
         pass
 
-    def _var_becomes(self, name, value) -> None:
-        return self._wait_for(lambda: self.vim.vars(name).contains(value))
-
-    def _pvar_becomes(self, name, value) -> None:
-        return self._wait_for(lambda: self.vim.vars.p(name).contains(value))
-
-    def _pvar_becomes_map(self, name, value, f) -> None:
-        return self._wait_for(
-            lambda: self.vim.vars.p(name).map(f).contains(value))
-
     @property
     def _log_out(self) -> List[str]:
         return List.wrap(self.logfile.read_text().splitlines())

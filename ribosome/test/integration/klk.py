@@ -112,6 +112,22 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
         seen = lambda: self.message_log() / __.filter_type(tpe)
         return later(kf(seen).must(be_right(have_length(count))), **kw)
 
+    def var_is(self, name: str, value: Any) -> Expectation:
+        return kf(self.vim.vars, name).must(be_right(value))
+
+    def var_becomes(self, name: str, value: Any) -> Expectation:
+        return later(self.var_is(name, value))
+
+    def pvar_is(self, name: str, value: Any) -> Expectation:
+        return kf(self.vim.vars.p, name).must(be_right(value))
+
+    def pvar_becomes(self, name: str, value: Any) -> Expectation:
+        return later(self.pvar_is(name, value))
+
+    def pvar_becomes_map(self, name: str, value: Any, f: Callable[[Any], Any]) -> Expectation:
+        return later(kf(lambda: self.vim.vars.p(name).map(f)).must(be_right(value)))
+        return self._wait_for(lambda: self.vim.vars.p(name).map(f).contains(value))
+
 
 class VimIntegrationKlkSpec(VimIntegrationSpec, VimIntegrationKlkHelpers):
     pass
