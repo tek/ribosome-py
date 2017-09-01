@@ -40,8 +40,17 @@ class NvimPlugin(Logging):
         return type(self).name or 'ribosome'
 
     @abc.abstractmethod
-    def start_plugin(self) -> None:
+    def stage_1(self) -> None:
         ...
+
+    def stage_2(self) -> None:
+        pass
+
+    def stage_3(self) -> None:
+        pass
+
+    def stage_4(self) -> None:
+        pass
 
     def rpc_handlers(self) -> List[dict]:
         return list(rpc_handlers(type(self)) / _.encode)
@@ -111,7 +120,10 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     help.msg_cmd('show_log_info', ShowLogInfo)
     help.handler('log_level', command, cls.set_log_level)
     help.msg_fun('mapping', Mapping)
-    help.name_handler('start', command, cls.start_plugin, sync=True)
+    help.name_handler('stage_1', command, cls.stage_1, sync=True)
+    help.name_handler('stage_2', command, cls.stage_2, sync=True)
+    help.name_handler('stage_3', command, cls.stage_3, sync=True)
+    help.name_handler('stage_4', command, cls.stage_4, sync=True)
     help.name_handler('rpc_handlers', function, cls.rpc_handlers, sync=True)
     help.handler('plug', command, cls.plug_command)
 
