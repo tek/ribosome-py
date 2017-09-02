@@ -199,7 +199,7 @@ class RpcFunctionSpec(RpcHandlerSpec):
 
     @property
     def rpc_args(self) -> List[str]:
-        return Nil
+        return List('a:000')
 
     @property
     def def_cmd(self) -> str:
