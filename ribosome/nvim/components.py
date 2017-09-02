@@ -184,7 +184,7 @@ class NvimComponent(Logging):
         l = line if verbose else 'silent {}'.format(line)
         return Try(self.vim.command, l, async=not sync)
 
-    def cmd(self, line: str, verbose=False, sync=False):
+    def cmd(self, line: str, verbose=False, sync=False, report=True) -> Either[Exception, None]:
         ''' Wrap **Nvim.command**, default to async.
         **verbose** prevents the use of **silent**, which is used by
         default because headless nvim will deadlock if a command's
@@ -193,24 +193,26 @@ class NvimComponent(Logging):
         return (
             self._cmd(line, verbose, sync)
             .bieffect(
-                L(self._cmd_error)(line, _, sync),
+                L(self._cmd_error)(line, _, sync, report),
                 L(self._cmd_success)(line, _, sync)
             )
         )
 
-    def cmd_sync(self, line: str, verbose=False):
-        return self.cmd(line, verbose=verbose, sync=True)
+    def cmd_sync(self, line: str, verbose=False, report=True) -> Either[Exception, None]:
+        return self.cmd(line, verbose=verbose, sync=True, report=report)
 
     def cmd_output(self, line: str) -> List[str]:
         return Lists.wrap(self.vim.command_output('silent {}'.format(line)).splitlines())
 
-    def _cmd_success(self, line: str, result, sync: bool):
+    def _cmd_success(self, line: str, result, sync: bool) -> None:
         if sync:
             self.log.debug('result of cmd \'{}\': {}'.format(line, result))
         else:
             self.log.debug('async cmd \'{}\''.format(line))
 
-    def _cmd_error(self, line, exc, sync):
+    def _cmd_error(self, line, exc, sync, report: bool) -> None:
+        if not report:
+            return
         err = exc.cause if isinstance(exc, TaskException) else exc
         if amino.development:
             a = '' if sync else 'a'
@@ -222,18 +224,18 @@ class NvimComponent(Logging):
         else:
             self.log.error(decode(err))
 
-    def vcmd(self, line: str, sync=False):
-        return self.cmd(line, verbose=True, sync=sync)
+    def vcmd(self, line: str, sync=False, report=True) -> Either[Exception, None]:
+        return self.cmd(line, verbose=True, sync=sync, report=report)
 
-    def normal(self, keys):
+    def normal(self, keys) -> Either[Exception, None]:
         return self.cmd_sync('normal! {}'.format(keys))
 
     @property
-    def syntax(self):
+    def syntax(self) -> 'Syntax':
         return Syntax(self)
 
     @lazy
-    def root(self):
+    def root(self) -> 'NvimFacade':
         return NvimFacade(self.vim, self.prefix)
 
 
@@ -537,17 +539,17 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         else:
             self.log.info('\n'.join(text))
 
-    def doautocmd(self, name, pat=''):
+    def doautocmd(self, name, pat='') -> Either[Exception, None]:
         c = 'doautocmd <nomodeline> {} {}'.format(name, pat)
         return self.cmd(c)
 
-    def uautocmd(self, name):
+    def uautocmd(self, name) -> Either[Exception, None]:
         return self.doautocmd('User', name)
 
-    def pautocmd(self, name):
+    def pautocmd(self, name) -> Either[Exception, None]:
         return self.uautocmd('{}{}'.format(camelcaseify(self.prefix), name))
 
-    def autocmd(self, name, pattern, cmd):
+    def autocmd(self, name, pattern, cmd) -> NvimCmd:
         return NvimCmd(self, 'autocmd', '{} {} {}'.format(name, pattern, cmd))
 
     def _call(self, name: str, *args: Any, sync=True, **kw: Any) -> Either[Exception, A]:
