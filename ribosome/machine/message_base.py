@@ -112,6 +112,10 @@ class Message(Record, metaclass=MessageMeta, skip_fields=True):
     def at(self, prio):
         return self.set(prio=float(prio))
 
+    @property
+    def _str_extra(self) -> List[Any]:
+        return Lists.wrap(self._field_order) // L(Maybe.getattr)(self, _) + self.bang.l('bang!')
+
 
 def message_definition_module() -> Optional[str]:
     return inspect.currentframe().f_back.f_back.f_globals['__name__']
