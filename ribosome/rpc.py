@@ -18,6 +18,8 @@ def rpc_cmd_opt(key: str, value: Union[str, int]) -> Maybe[str]:
     return (
         Just(f'-nargs={value}')
         if key == 'nargs' else
+        Just('-bang')
+        if key == 'bang' else
         Nothing
     )
 
@@ -26,6 +28,8 @@ def rpc_cmd_arg(key: str, value: Union[str, int]) -> Maybe[str]:
     return (
         Just(f'[<f-args>]')
         if key == 'nargs' else
+        Just('<q-bang> == "!"')
+        if key == 'bang' else
         Nothing
     )
 
@@ -130,6 +134,27 @@ class RpcHandlerSpec(Record):
         ...
 
 
+class RpcCommandArgs:
+
+    def __init__(self, data: Map) -> None:
+        self.data = data
+
+    @property
+    def tokens(self) -> List[str]:
+        return self.nargs + self.bang
+
+    @property
+    def nargs(self) -> List[str]:
+        return self.arg('nargs', lambda a: List('[<f-args>]'))
+
+    @property
+    def bang(self) -> List[str]:
+        return self.arg('bang', lambda a: List("<q-bang> == '!'"))
+
+    def arg(self, name: str, result: Callable[[str], List[str]]) -> List[str]:
+        return self.data.lift(name) / result | Nil
+
+
 class RpcCommandSpec(RpcHandlerSpec):
 
     @property
@@ -146,7 +171,8 @@ class RpcCommandSpec(RpcHandlerSpec):
 
     @property
     def rpc_args(self) -> List[str]:
-        return Map(self.opts).map2(rpc_cmd_arg).join
+        help = RpcCommandArgs(Map(self.opts))
+        return help.tokens
 
     @property
     def def_cmd(self) -> str:
