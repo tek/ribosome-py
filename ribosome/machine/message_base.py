@@ -2,9 +2,9 @@ import abc
 import functools
 import time
 import inspect
-from typing import Optional
+from typing import Optional, Any, TypeVar, Type, Callable
 
-from amino import Map, List, Empty, Just, __
+from amino import Map, List, Empty, Just, __, L, Maybe, _, Lists
 
 from ribosome.record import any_field, dfield, list_field, field, RecordMeta, Record, bool_field
 
@@ -71,6 +71,8 @@ class MessageMeta(RecordMeta, abc.ABCMeta):
     def __init__(cls, name, bases, namespace, **kw):
         super().__init__(name, bases, namespace)
 
+M = TypeVar('M', bound='Message')
+
 
 @functools.total_ordering
 class Message(Record, metaclass=MessageMeta, skip_fields=True):
@@ -89,6 +91,10 @@ class Message(Record, metaclass=MessageMeta, skip_fields=True):
         field_map = vmap ** Map(zip(cls._field_order, sargs))
         ext_kw = field_map ** kw + ('time', time.time())
         return super().__new__(cls, **ext_kw)
+
+    @classmethod
+    def from_msg(cls: Type[M], other: 'Message') -> Callable[..., M]:
+        return lambda *a, **kw: cls(*a, bang=other.bang, range=other.range, **kw)
 
     @property
     def pub(self):
