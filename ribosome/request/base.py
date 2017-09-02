@@ -1,7 +1,8 @@
 import abc
 import json
 import inspect
-from typing import Callable, Any, Tuple
+from numbers import Number
+from typing import Callable, Any, Tuple, Union
 
 from amino import List, Maybe, Right, Left, may, _, Just, Map, Try, Either
 from amino.util.string import camelcaseify
@@ -17,12 +18,12 @@ def parse_int(i: Any) -> Either[str, int]:
     )
 
 
-def try_int(val):
+def to_int(val: Union[int, str, None]) -> Union[int, str, None]:
     return int(val) if isinstance(val, str) and str.isdigit() else val
 
 
-def numeric(val):
-    return isinstance(val, int)
+def numeric(val: Any) -> bool:
+    return isinstance(val, Number)
 
 
 class ParseError(Exception):
@@ -35,20 +36,20 @@ class RequestHandler(Logging, metaclass=abc.ABCMeta):
             self,
             fun: Callable[..., Any],
             name: str=None,
-            nargs=None,
+            nargs: Union[str, int]=None,
             min: int=None,
             max: int=None,
-            **kw
+            **kw: str
     ) -> None:
         self._fun = fun
-        self._argspec = inspect.getfullargspec(fun)  # type: ignore
+        self._argspec = inspect.getfullargspec(fun)
         self._params = List.wrap(self._argspec.args)
         self._param_count = self._params.length - (1 if self._params.head.contains('self') else 0)
         self._name = Maybe(name)
-        self._nargs = Maybe(try_int(nargs))
+        self._nargs = Maybe(to_int(nargs))
         self._min = Maybe(min)
         self._max = Maybe(max)
-        self._kw = kw
+        self._kw = Map(kw)
 
     @abc.abstractproperty
     def desc(self):
@@ -63,7 +64,7 @@ class RequestHandler(Logging, metaclass=abc.ABCMeta):
         return Map()
 
     @property
-    def nargs(self):
+    def nargs(self) -> Union[str, int]:
         return self._nargs\
             .map(lambda a: '+' if numeric(a) and a > 1 else a)\
             .get_or_else(self._infer_nargs)
@@ -171,10 +172,14 @@ class MessageRequestHandler(RequestHandler):
     def max(self):
         return self._message._field_count_max
 
+    @property
+    def message_kw(self) -> Map:
+        return self._kw.at('bang', 'range')
+
     def _call_fun(self, obj, *args):
         if isinstance(obj, ribosome.NvimStatePlugin):
             try:
-                msg = self._message(*args)
+                msg = self._message(*args, **self.message_kw)
             except Exception as e:
                 name = self._message.__name__
                 self.log.error(f'bad args to {name}: {e}')

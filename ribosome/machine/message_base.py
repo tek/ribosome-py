@@ -6,7 +6,7 @@ from typing import Optional
 
 from amino import Map, List, Empty, Just, __
 
-from ribosome.record import any_field, dfield, list_field, field, RecordMeta, Record
+from ribosome.record import any_field, dfield, list_field, field, RecordMeta, Record, bool_field
 
 _machine_attr = '_machine'
 _message_attr = '_message'
@@ -79,6 +79,8 @@ class Message(Record, metaclass=MessageMeta, skip_fields=True):
     '''
     time = field(float)
     prio = dfield(0.5)
+    bang = bool_field()
+    range = any_field(initial=0)
 
     def __new__(cls, *args, **kw):
         count = len(cls._field_order)
