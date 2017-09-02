@@ -88,11 +88,11 @@ class MachineBase(Generic[D], MachineI):
 
     def loop_process(self, data, msg, prio=None):
         def loop(z, m) -> None:
-            self.parent % __.log_message(m)
+            self.parent % __.log_message(m, self.title)
             return z.accum(self.loop_process(z.data, m))
         return self.process(data, msg, prio).fold(loop)
 
-    def log_message(self, msg: Message) -> None:
+    def log_message(self, msg: Message, name: str) -> None:
         pass
 
     def _resolve_handler(self, msg, prio):
@@ -225,7 +225,7 @@ class MachineBase(Generic[D], MachineI):
 
     def _check_time(self, start_time, msg):
         dur = time.time() - start_time
-        self.log.debug(self._format_report(msg, dur))
+        self.log.debug1(self._format_report, msg, dur)
         if dur > self._min_report_time:
             self._reports = self._reports.cat((msg, dur))
 

@@ -136,7 +136,6 @@ class StateMachineBase(ModularMachine):
         return self._messages.put(msg)
 
     def send(self, msg: Message, prio=0.5):
-        self.log.debug('send {} in {}'.format(msg, self.title))
         if self._messages is not None:
             return asyncio.run_coroutine_threadsafe(self._messages.put(msg), self._loop)
 
@@ -156,13 +155,14 @@ class StateMachineBase(ModularMachine):
         return Try(eval, expr, None, dict(data=data, plugins=plugins))
 
     def _send(self, data, msg: Message):
-        self.log_message(msg)
+        self.log_message(msg, self.title)
         return (
             Try(self.loop_process, data, msg)
             .value_or(L(TransitionResult.failed)(data, _))
         )
 
-    def log_message(self, msg: Message) -> None:
+    def log_message(self, msg: Message, name: str) -> None:
+        self.log.debug('processing {} in {}'.format(msg, name))
         if self.debug:
             self.message_log.append(msg)
 
@@ -406,7 +406,7 @@ class PluginStateMachine(MachineI):
     @may_handle(PlugCommand)
     def _plug_command(self, data, msg):
         self.log.debug('sending command {} to plugin {}'.format(msg.msg, msg.plug.title))
-        self.log_message(msg.msg)
+        self.log_message(msg.msg, self.title)
         return msg.plug.process(data, msg.msg)
 
 
