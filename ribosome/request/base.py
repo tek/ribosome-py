@@ -146,7 +146,7 @@ class RequestHandler(Logging, metaclass=abc.ABCMeta):
 
     def dispatch(self, obj, rpc_args):
         argl = List.wrap(rpc_args)
-        args = argl.lift(0) | List()
+        args = argl.head | List()
         bang = argl.lift(1).contains(1)
         if self.check_length(args):
             return self._call_fun(obj, *args, bang=bang)

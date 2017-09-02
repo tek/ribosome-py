@@ -16,8 +16,8 @@ def mk_unite_candidates(Unite):
         handler = getattr(Unite, '{}_candidates'.format(name))
         def uc_wrap(f):
             @neovim.function(handler, sync=True)
-            def f_wrap(*a, **kw):
-                return f(*a, **kw) / _convert_candidate
+            def f_wrap(self, args):
+                return f(self, args) / _convert_candidate
             return f_wrap
         return uc_wrap
     return decorator
@@ -36,12 +36,12 @@ def _unite_word(args, key):
 def mk_unite_action(Unite):
     def decorator(name, key='word'):
         handler = getattr(Unite, name)
-        def uc_wrap(f):
+        def ua_wrap(f):
             @neovim.function(handler)
             def f_wrap(self, args):
                 _unite_word(args, key) / L(f)(self, _) % self.state().send
             return f_wrap
-        return uc_wrap
+        return ua_wrap
     return decorator
 
 
