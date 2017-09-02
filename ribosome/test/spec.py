@@ -80,8 +80,8 @@ class MockNvimFacade(MockNvim, NvimFacade):
     def switch_root(self, root):
         pass
 
-    def async(self, f: Callable[['NvimFacade'], Any]):
-        return f(self)
+    def async(self, f: Callable[['NvimFacade'], Any], *a, **kw):
+        return f(self, *a, **kw)
 
     @contextmanager
     def main_event_loop(self):
