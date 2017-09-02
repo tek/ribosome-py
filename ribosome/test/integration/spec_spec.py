@@ -1,3 +1,5 @@
+from typing import Callable, Any
+
 from amino.test.spec_spec import later, IntegrationSpec
 
 from ribosome.test.integration.spec import VimIntegrationSpec, ExternalIntegrationSpec, PluginIntegrationSpec
@@ -20,6 +22,18 @@ class VimIntegrationSureHelpers:
 
     def _buffer_length(self, length) -> None:
         later(lambda: self.content.should.have.length_of(length))
+
+    def _wait_for(self, assertion: Callable[..., bool], *a: Any, **kw: Any) -> None:
+        later(assertion, *a, **kw)
+
+    def _var_becomes(self, name, value) -> None:
+        return self._wait_for(lambda: self.vim.vars(name).contains(value))
+
+    def _pvar_becomes(self, name, value) -> None:
+        return self._wait_for(lambda: self.vim.vars.p(name).contains(value))
+
+    def _pvar_becomes_map(self, name, value, f) -> None:
+        return self._wait_for(lambda: self.vim.vars.p(name).map(f).contains(value))
 
 
 class VimIntegrationSpecSpec(VimIntegrationSpec, IntegrationSpec, VimIntegrationSureHelpers):
@@ -52,7 +66,7 @@ class ExternalIntegrationSpecSpec(ExternalIntegrationSpec, IntegrationSpec, VimI
         VimIntegrationSpec.teardown(self)
 
 
-class PluginIntegrationSpecSpec(PluginIntegrationSpec, IntegrationSpec, VimIntegrationSureHelpers):
+class PluginIntegrationSpecSpec(PluginIntegrationSpec, VimIntegrationSureHelpers):
 
     def __init__(self) -> None:
         IntegrationSpec.__init__(self)
