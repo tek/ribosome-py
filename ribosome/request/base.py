@@ -141,13 +141,15 @@ class RequestHandler(Logging, metaclass=abc.ABCMeta):
         self.log.error(err)
         return err
 
-    def _call_fun(self, obj, *args):
+    def _call_fun(self, obj, *args, **kw):
         return self._fun(obj, *args)
 
     def dispatch(self, obj, rpc_args):
-        args = List.wrap(rpc_args).lift(0).get_or_else(List())
+        argl = List.wrap(rpc_args)
+        args = argl.lift(0) | List()
+        bang = argl.lift(1).contains(1)
         if self.check_length(args):
-            return self._call_fun(obj, *args)
+            return self._call_fun(obj, *args, bang=bang)
         else:
             return self.error(args)
 
@@ -172,14 +174,10 @@ class MessageRequestHandler(RequestHandler):
     def max(self):
         return self._message._field_count_max
 
-    @property
-    def message_kw(self) -> Map:
-        return self._kw.at('bang', 'range')
-
-    def _call_fun(self, obj, *args):
+    def _call_fun(self, obj, *args, **kw):
         if isinstance(obj, ribosome.NvimStatePlugin):
             try:
-                msg = self._message(*args, **self.message_kw)
+                msg = self._message(*args, **kw)
             except Exception as e:
                 name = self._message.__name__
                 self.log.error(f'bad args to {name}: {e}')
@@ -231,12 +229,12 @@ class JsonMessageRequestHandler(MessageRequestHandler):
         params = parse(data) if data else {}
         return pos_args + (Map(params),)
 
-    def _call_fun(self, obj, *args):
+    def _call_fun(self, obj, *args, **kw):
         try:
             real_args = self._extract_args(args)
         except ParseError as e:
             self.log.error(e)
         else:
-            super(JsonMessageRequestHandler, self)._call_fun(obj, *real_args)
+            super(JsonMessageRequestHandler, self)._call_fun(obj, *real_args, **kw)
 
 __all__ = ('RequestHandler', 'MessageRequestHandler', 'JsonMessageRequestHandler')

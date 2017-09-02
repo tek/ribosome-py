@@ -32,8 +32,8 @@ class StateCommand(MessageCommand):
             pass
         super(StateCommand, self).__init__(fun, msg, **kw)
 
-    def _call_fun(self, obj, *args):
-        return self._message(*args)
+    def _call_fun(self, obj, *args, **kw):
+        return self._message(*args, **kw)
 
     @property
     def _infer_name(self):
