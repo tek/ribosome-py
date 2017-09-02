@@ -633,13 +633,27 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         lines = code if isinstance(code, List) else Lists.lines(code)
         return self.call('execute', list(lines))
 
-    def call_once_defined(self, name: str, *args: str, timeout: int=3, **kw: str) -> Either[str, A]:
-        result = Left('not started yet')
+    def run_once_defined(self, job: Callable[[], Either[str, A]], err: Callable[[str], str], timeout: int=3, **kw: str
+                         ) -> Either[str, A]:
+        result: Either[str, A] = Left('not started yet')
         start = time.time()
         while not result.is_right and time.time() - start < timeout:
             time.sleep(.01)
-            result = self._call(name, *args, **kw)
-        return result.lmap(lambda a: f'function {name} did not appear: {a}')
+            result = job()
+        return result.lmap(err)
+
+    def call_once_defined(self, name: str, *args: str, **kw: Any) -> Either[str, A]:
+        return self.run_once_defined(L(self._call)(name, *args, **kw), lambda a: f'function {name} did not appear: {a}',
+                                     **kw)
+
+    def cmd_once_defined(self, name: str, *args: str, **kw: Any) -> Either[str, A]:
+        return self.run_once_defined(L(self.cmd_sync)(name, *args, report=False, **kw),
+                                     lambda a: f'cmd {name} did not appear: {a}',
+                                     **kw)
+
+    def wait_for_command(self, name: str, **kw) -> Either[str, None]:
+        f = lambda: self.command_exists(name).e('', None)
+        return self.run_once_defined(f, lambda a: 'command {name} did not appear', **kw)
 
 
 class AsyncVimCallProxy():
