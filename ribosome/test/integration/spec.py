@@ -286,9 +286,14 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
         self.log_format = '{message}'
         super().setup()
 
+    @property
+    def autostart_plugin(self) -> bool:
+        return True
+
     def _post_start_neovim(self) -> None:
         super()._post_start_neovim()
-        self._setup_handlers()
+        if self.autostart_plugin:
+            self._setup_handlers()
 
     def _setup_handlers(self) -> None:
         rp_path = self.rplugin_path.get_or_raise
