@@ -182,7 +182,8 @@ class MachineBase(Generic[D], MachineI):
     @may_handle(SubProcessSync)
     async def message_sub_process_sync(self, data: D, msg: SubProcessSync) -> Message:
         executor = NvimProcessExecutor(self.vim)
-        return msg.result(await executor.run(msg.job))
+        await executor.run(msg.job)
+        return msg.result(msg.job.result)
 
     @may_handle(RunIOsParallel)
     def message_run_ios_parallel(self, data: D, msg: RunIOsParallel) -> Message:
