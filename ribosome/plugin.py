@@ -3,7 +3,7 @@ from typing import Union, Any, Callable, Type
 
 import neovim
 
-from amino import List, _
+from amino import List
 
 from ribosome.nvim import NvimFacade
 from ribosome.machine import StateMachine, Message
@@ -11,7 +11,7 @@ from ribosome.logging import nvim_logging, Logging
 from ribosome.request import msg_command, msg_function, command, function, json_msg_command
 from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
-from ribosome.rpc import rpc_handlers
+from ribosome.rpc import rpc_handlers_json
 from ribosome.record import encode_json
 from ribosome.machine.messages import UpdateState
 
@@ -53,7 +53,7 @@ class NvimPlugin(Logging):
         pass
 
     def rpc_handlers(self) -> List[dict]:
-        return list(rpc_handlers(type(self)) / _.encode)
+        return rpc_handlers_json(type(self))
 
     def set_log_level(self, level: str) -> None:
         self.file_log_handler.setLevel(level)

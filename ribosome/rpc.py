@@ -3,7 +3,7 @@ import inspect
 from types import FunctionType
 from typing import TypeVar, Callable, Union, Any, Dict
 
-from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean
+from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean, _, L
 from amino.util.string import camelcaseify
 from amino.list import Nil
 
@@ -314,7 +314,15 @@ def define_handler(channel: int, spec: RpcHandlerSpec, plugin_name: str, plugin_
         return NvimIO.failed(f'invalid type for {spec}')
 
 
+def define_handlers(channel: int, specs: List[RpcHandlerSpec], plugin_name: str, plugin_file: str
+                    ) -> NvimIO[List[DefinedHandler]]:
+    return specs.traverse(L(define_handler)(channel, _, plugin_name, plugin_file), NvimIO)
+
 def rpc_handlers(plugin_class: type) -> List[RpcHandlerSpec]:
     return Lists.wrap(inspect.getmembers(plugin_class)).flat_map2(handler)
 
-__all__ = ('RpcHandlerSpec', 'handler', 'define_handler', 'rpc_handlers')
+
+def rpc_handlers_json(plugin_class: type) -> List[str]:
+        return list(rpc_handlers(plugin_class) / _.encode)
+
+__all__ = ('RpcHandlerSpec', 'handler', 'define_handler', 'define_handlers', 'rpc_handlers', 'rpc_handlers_json')
