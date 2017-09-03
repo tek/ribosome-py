@@ -63,8 +63,7 @@ shutdown = False
 class NvimComponent(Logging):
 
     def __init__(self, vim, target, prefix: str) -> None:
-        if ribosome.in_vim and isinstance(target, (AsyncVimProxy,
-                                                   NvimComponent)):
+        if ribosome.in_vim and isinstance(target, (AsyncVimProxy, NvimComponent)):
             msg = '{} created with non-native target {}'
             raise Exception(msg.format(self, target))
         self.vim = vim
@@ -104,15 +103,14 @@ class NvimComponent(Logging):
         '''
         if not shutdown:
             msg = 'running {} on main thread blocking'
-            self.log.ddebug(
-                lambda: msg.format(format_funcall(f.__name__, a, kw)))
+            self.log.debug2(lambda: msg.format(format_funcall(f.__name__, a, kw)))
             result_fut = futures.Future()  # type: futures.Future
             @functools.wraps(f)
             def cb() -> None:
                 result_fut.set_result(f(self, *a, **kw))
             self._run_on_main_thread(cb)
             result = result_fut.result()
-            self.log.ddebug('async returns {}'.format(result))
+            self.log.debug2('async returns {}'.format(result))
             return result
         else:
             return f(self, *a, **kw)
@@ -122,15 +120,13 @@ class NvimComponent(Logging):
         '''
         frame = inspect.currentframe()  # type: ignore
         def dispatch():
-            self.log.ddebug(
-                lambda: 'running on main thread: {}'.format(
-                    format_funcall(f.__name__, a, kw)))
+            self.log.debug2(lambda: 'running on main thread: {}'.format(format_funcall(f.__name__, a, kw)))
             try:
                 f(*a, **kw)
             except NvimError as e:
                 self._report_nvim_error(e, frame)
             else:
-                self.log.ddebug('{} successful'.format(f.__name__))
+                self.log.debug2('{} successful'.format(f.__name__))
         self.vim.session.threadsafe_call(dispatch)
 
     def _report_nvim_error(self, err, frame):
@@ -671,8 +667,7 @@ class AsyncVimCallProxy():
         return self._vim.async(proxy_call, self._target, self.name, *a, **kw)
 
     def __repr__(self):
-        return '{}({}, {})'.format(self.__class__.__name__, self.name,
-                                   self._target)
+        return '{}({}, {})'.format(self.__class__.__name__, self.name, self._target)
 
 
 class AsyncVimProxy():

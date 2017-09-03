@@ -1,6 +1,6 @@
 from typing import TypeVar, Callable, Any, Generic
 
-from amino.tc.base import ImplicitInstances, Implicits
+from amino.tc.base import ImplicitInstances, F
 from amino.lazy import lazy
 from amino.tc.monad import Monad
 from amino import Either, Right, Left, __
@@ -19,7 +19,7 @@ class NvimIOInstances(ImplicitInstances):
         return Map({Monad: NvimIOMonad()})
 
 
-class NvimIO(Generic[A], Implicits, implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
+class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
 
     @staticmethod
     def wrap_either(f: Callable[[NvimComponent], A]) -> 'NvimIO[A]':

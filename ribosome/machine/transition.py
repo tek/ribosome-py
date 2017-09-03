@@ -122,7 +122,10 @@ class WrappedHandler(Generic[M, D, T], DynHandler[M, D]):
 
     def __init__(self, trans_tpe: Type[T], machine: MachineI, name: str, fun: Callable[[MachineI, D, M], DynTrans],
                  message: Type[M], prio: float, dyn: bool) -> None:
-        super().__init__(machine, name, lambda mach, d, msg: fun(trans_tpe(mach, d, msg)), message, prio, dyn)
+        def wrapper(mach: MachineI, d: Data, msg: M) -> R:
+            trans = trans_tpe(mach, d, msg)
+            return fun(trans)
+        super().__init__(machine, name, wrapper, message, prio, dyn)
 
     @staticmethod
     def create(machine: MachineI, name: str, fun: Callable[[MachineI, D, M], R], tpe: Type[T]

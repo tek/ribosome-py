@@ -10,12 +10,12 @@ from amino.algebra import AlgebraMeta, Algebra
 
 from ribosome.machine.message_base import Message, default_prio, _machine_attr, _message_attr, _prio_attr, _dyn_attr
 from ribosome.data import Data
-from ribosome.machine.interface import MachineI
 from ribosome.machine.messages import RunIOAlg, Error, Nop, RunNvimIOAlg
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO
+from ribosome.machine.transitions import Transitions
 
-M = TypeVar('M', bound=MachineI)
+M = TypeVar('M', bound=Transitions)
 D = TypeVar('D', bound=Data)
 Msg = TypeVar('Msg', bound=Message)
 R = TypeVar('R')
@@ -251,10 +251,10 @@ class TransEffectUnit(TransEffect[None]):
         return Lift(Unit()) if tail.empty else TransEffectError('cannot apply trans effects to unit')
 
 
-m = TransEffectMaybe()
+m: TransEffectMaybe = TransEffectMaybe()
 e = TransEffectEither()
 st = TransEffectIdState()
-est = TransEffectEitherState()
+est: TransEffectEitherState = TransEffectEitherState()
 io = TransEffectIO()
 nio = TransEffectNvimIO()
 coro = TransEffectCoro()

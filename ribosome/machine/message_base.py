@@ -92,6 +92,9 @@ class Message(Record, metaclass=MessageMeta, skip_fields=True):
         ext_kw = field_map ** kw + ('time', time.time())
         return super().__new__(cls, **ext_kw)
 
+    def __init__(self, *a: Any, **kw: Any) -> None:
+        pass
+
     @classmethod
     def from_msg(cls: Type[M], other: 'Message') -> Callable[..., M]:
         return lambda *a, **kw: cls(*a, bang=other.bang, range=other.range, **kw)
