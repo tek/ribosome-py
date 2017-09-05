@@ -8,7 +8,7 @@ import amino
 from amino.lazy import lazy
 import amino.logging
 from amino.logging import (amino_logger, init_loglevel, amino_root_file_logging, DDEBUG, print_log_info, VERBOSE,
-                           LazyRecord)
+                           LazyRecord, TEST)
 from amino import Path, Logger
 
 import ribosome  # noqa
@@ -22,7 +22,6 @@ class NvimHandler(logging.Handler):
     def __init__(self, vim: 'ribosome.NvimFacade') -> None:
         self.vim = vim
         self.dispatchers = {
-            VERBOSE: self.vim.echom,
             logging.INFO: self.vim.echo,
             logging.WARN: self.vim.echowarn,
             logging.ERROR: self.vim.echoerr,
@@ -75,6 +74,7 @@ def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: d
             return amino_root_file_logging(**kw)
         _nvim_logging_initialized = True
         logfile = options.nvim_log_file.value | str(Path.home() / '.cache' / 'ribosome' / 'nvim')
+        options.ribo_log_file.value % (lambda f: amino_root_file_logging(logfile=Path(f), level=TEST))
         return file_log(logfile)
 
 
