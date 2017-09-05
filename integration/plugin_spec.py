@@ -105,4 +105,4 @@ class UnloopedPluginSpec(_PluginSpecBase):
     def ios_parallel(self) -> Expectation:
         return self._ios_parallel()
 
-__all__ = ('LoopedPluginSpec',)
+__all__ = ('LoopedPluginSpec', 'UnloopedPluginSpec')
