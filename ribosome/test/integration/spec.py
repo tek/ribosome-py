@@ -123,8 +123,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
             'RIBOSOME_FILE_LOG_FMT=\'{}\''.format(self.log_format),
         )
         cmd = tuple(tmux_env + self._cmdline)
-        out = self._tmux_window.cmd(
-            'split-window', '-d', '-P', '-F#{pane_id}', *cmd).stdout
+        out = self._tmux_window.cmd('split-window', '-d', '-P', '-F#{pane_id}', *cmd).stdout
         self._tmux_pane = Pane(self._tmux_window, pane_id=out[0])
         self.neovim = neovim.attach('socket', path=self.nvim_socket)
         self.neovim.command('python3 sys.path.insert(0, \'{}\')'.format(path))
@@ -335,11 +334,6 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
 
     def _auto_handlers(self, cls) -> List[RpcHandlerSpec]:
         return rpc_handlers(cls)
-
-    def _auto_handler(self, method_name, fun):
-        fix = lambda v: int(v) if isinstance(v, bool) else v
-        m = Maybe(getattr(fun, '_nvim_rpc_spec', None))
-        return m / Map / __.valmap(fix)
 
     def _auto_rplugin(self, cls):
         mod = cls.__module__
