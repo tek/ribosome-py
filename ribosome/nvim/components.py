@@ -53,7 +53,7 @@ def echohl(text: Union[str, List[str]], hl: str, prefix: Maybe[str]=Empty()):
     return echo(text).cons(f'echohl {hl}').cat('echohl None')
 
 
-def on_main_thread():
+def not_on_main_thread():
     return threading.current_thread() != threading.main_thread()
 
 
@@ -73,7 +73,7 @@ class NvimComponent(Logging):
         self._options = Options(self)
 
     def __repr__(self):
-        n = '' if on_main_thread() else self._details
+        n = '' if not_on_main_thread() else self._details
         return '{}({}, {})'.format(self.__class__.__name__, self.prefix, n)
 
     @property
@@ -90,14 +90,13 @@ class NvimComponent(Logging):
 
     @property
     def loop(self):
-        return self.vim.session._session._async_session._msgpack_stream\
-            ._event_loop._loop
+        return self.vim._session._async_session._msgpack_stream._event_loop._loop
 
     def delay(self, f, timeout):
         cb = lambda: self.__run_on_main_thread(f)
         threading.Timer(1.0, cb).start()
 
-    def async(self, f: Callable[['NvimComponent'], Any], *a, **kw):
+    def async_call(self, f: Callable[['NvimComponent'], Any], *a, **kw):
         ''' run a callback function on the main thread and return its
         value (blocking). the callback receives 'self' as an argument.
         '''
@@ -115,6 +114,8 @@ class NvimComponent(Logging):
         else:
             return f(self, *a, **kw)
 
+    async = async_call
+
     def _run_on_main_thread(self, f: Callable[..., Any], *a, **kw):
         ''' run a callback function on the host's main thread
         '''
@@ -127,7 +128,7 @@ class NvimComponent(Logging):
                 self._report_nvim_error(e, frame)
             else:
                 self.log.debug2('{} successful'.format(f.__name__))
-        self.vim.session.threadsafe_call(dispatch)
+        self.vim._session.threadsafe_call(dispatch)
 
     def _report_nvim_error(self, err, frame):
         self.log.error('async vim call failed with \'{}\''.format(decode(err)))
@@ -140,7 +141,7 @@ class NvimComponent(Logging):
         '''
         def get_event_loop(v) -> Any:
             return asyncio.get_event_loop()
-        main = self.async(get_event_loop)
+        main = self.async_call(get_event_loop)
         fut = main.create_future()
         if not main.is_running():
             self._run_on_main_thread(main.run_until_complete, fut)
@@ -162,7 +163,7 @@ class NvimComponent(Logging):
                 asyncio.get_child_watcher().attach_loop(asyncio.get_event_loop())
             except Exception:
                 pass
-        self.async(set_watcher)
+        self.async_call(set_watcher)
         with self.main_event_loop() as main:
             yield main
 
@@ -664,7 +665,7 @@ class AsyncVimCallProxy():
     def __call__(self, *a, **kw):
         def proxy_call(vim, target, name, *a, **kw) -> None:
             return getattr(target, name)(*a, **kw)
-        return self._vim.async(proxy_call, self._target, self.name, *a, **kw)
+        return self._vim.async_call(proxy_call, self._target, self.name, *a, **kw)
 
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.name, self._target)
@@ -680,7 +681,7 @@ class AsyncVimProxy():
 
     @property
     def _need_relay(self):
-        return self.allow_async_relay and on_main_thread()
+        return self.allow_async_relay and not_on_main_thread()
 
     def __getattr__(self, name):
         if self._need_relay:
@@ -700,10 +701,10 @@ class AsyncVimProxy():
         else:
             return getattr(self._target, name)
 
-    def _async_attr(self, name):
-        def proxy_getattr(vim, target, name) -> None:
+    def _async_attr(self, name: str) -> Any:
+        def proxy_getattr(vim, target: NvimComponent, name: str) -> Any:
             return getattr(target, name)
-        return self._vim.async(proxy_getattr, self._target, name)
+        return self._vim.async_call(proxy_getattr, self._target, name)
 
     def __eq__(self, other):
         return self.__getattr__('__eq__')(other)
@@ -789,11 +790,11 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
 # NvimFacade instance
 class Vars(OptVar):
 
-    def __init__(self, vim) -> None:
+    def __init__(self, vim: NvimComponent) -> None:
         self.vim = vim
-        self._vars = set()  # type: set
+        self._vars: set = set()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '{}({!r})'.format(self.__class__.__name__, self.vim)
 
     @property
