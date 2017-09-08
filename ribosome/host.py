@@ -61,16 +61,20 @@ def start_uv_host(plug: str, tpe: Type[NP]) -> None:
 def start_host(plug: str, cls: str, uv_loop: bool) -> None:
     def go(tpe: Type[NP]) -> None:
         (start_uv_host if uv_loop else start_asyncio_host)(plug, tpe)
-    Either.import_path(cls) % go
+    return Either.import_path(cls) % go
 
 
 def cli() -> None:
     native = neovim.attach('stdio')
     vim = NvimFacade(native, 'ribosome_start_host')
     nvim_logging(vim)
+    file, cls = sys.argv[1:3]
+    def error(msg: str) -> None:
+        ribo_log.error(f'invalid rplugin class: {cls}')
     try:
-        start_host(sys.argv[1], sys.argv[2], False)
+        start_host(file, cls, False).leffect(error)
     except Exception as e:
         ribo_log.caught_exception_error(f'starting host with args `{sys.argv}`', e)
+
 
 __all__ = ('start_host', 'cli')
