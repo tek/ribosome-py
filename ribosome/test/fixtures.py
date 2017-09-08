@@ -29,6 +29,8 @@ except Exception as e:
 @neovim.plugin
 class SpecPlugin({plugin_class}, debug=True):
     pass
+
+__all__ = ('SpecPlugin',)
 '''
 
 __all__ = ('rplugin_template',)

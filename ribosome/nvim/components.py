@@ -503,6 +503,14 @@ class Tab(HasWindows):
 
 class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
+    @staticmethod
+    def stdio_with_logging(name: str) -> 'NvimFacade':
+        from ribosome.logging import nvim_logging
+        native = neovim.attach('stdio')
+        vim = NvimFacade(native, name)
+        nvim_logging(vim)
+        return vim
+
     def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
         super().__init__(vim, vim, prefix)
 
@@ -653,6 +661,9 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def wait_for_command(self, name: str, timeout: int=3) -> Either[str, None]:
         f = lambda: self.command_exists(name).e('', None)
         return self.run_once_defined(f, lambda a: 'cmd {name} did not appear', timeout=timeout)
+
+    def define_function(self, name: str, params: List[str], body: str) -> None:
+        self.cmd_sync(f'function! {name}({params.join_comma})\n{body}\nendfunction')
 
 
 class AsyncVimCallProxy():
