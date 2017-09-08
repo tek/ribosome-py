@@ -46,6 +46,9 @@ warn_no_handler = True
 
 class AsyncIOBase(Logging, abc.ABC):
 
+    def __init__(self) -> None:
+        self._messages: asyncio.PriorityQueue = None
+
     def _init_asyncio(self):
         self._loop = (
             asyncio.new_event_loop()
@@ -63,6 +66,7 @@ class AsyncIOThread(threading.Thread, AsyncIOBase):
 
     def __init__(self) -> None:
         threading.Thread.__init__(self)
+        AsyncIOBase.__init__(self)
         self.done = threading.Event()
         self.quit_now = threading.Event()
         self.running = threading.Event()
@@ -117,7 +121,7 @@ class StateMachineBase(ModularMachine):
         self.sub = sub
         self.debug = debug
         self.data = None
-        self._messages = None
+        self._messages: asyncio.PriorityQueue = None
         self.message_log = List()
         ModularMachine.__init__(self, parent, title=None)
 
@@ -311,6 +315,10 @@ class StateMachine(StateMachineBase, AsyncIOThread):
 
 
 class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
+
+    def __init__(self, *a, **kw) -> None:
+        StateMachineBase.__init__(self, *a, **kw)
+        AsyncIOBase.__init__(self)
 
     def start(self):
         self.data = self.init
