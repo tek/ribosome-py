@@ -251,16 +251,16 @@ class TransEffectUnit(TransEffect[None]):
         return Lift(Unit()) if tail.empty else TransEffectError('cannot apply trans effects to unit')
 
 
-m: TransEffectMaybe = TransEffectMaybe()
-e = TransEffectEither()
-st = TransEffectIdState()
-est: TransEffectEitherState = TransEffectEitherState()
-io = TransEffectIO()
-nio = TransEffectNvimIO()
-coro = TransEffectCoro()
-single = TransEffectSingleMessage()
-strict = TransEffectMessages()
-none = TransEffectUnit()
+m: TransEffect = TransEffectMaybe()
+e: TransEffect = TransEffectEither()
+st: TransEffect = TransEffectIdState()
+est: TransEffect = TransEffectEitherState()
+io: TransEffect = TransEffectIO()
+nio: TransEffect = TransEffectNvimIO()
+coro: TransEffect = TransEffectCoro()
+single: TransEffect = TransEffectSingleMessage()
+strict: TransEffect = TransEffectMessages()
+none: TransEffect = TransEffectUnit()
 
 
 class Lifter(Logging):
