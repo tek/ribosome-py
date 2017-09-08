@@ -128,6 +128,12 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
         return later(kf(lambda: self.vim.vars.p(name).map(f)).must(be_right(value)))
         return self._wait_for(lambda: self.vim.vars.p(name).map(f).contains(value))
 
+    def command_exists(self, name: str, **kw) -> Expectation:
+        return later(kf(self.vim.command_exists, name).true, **kw)
+
+    def command_exists_not(self, name: str, **kw: Any) -> Expectation:
+        return later(kf(self.vim.command_exists, name).false, **kw)
+
 
 class VimIntegrationKlkSpec(VimIntegrationSpec, VimIntegrationKlkHelpers):
     pass

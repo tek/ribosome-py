@@ -1,0 +1,3 @@
+from ribosome.host import cli
+
+cli()

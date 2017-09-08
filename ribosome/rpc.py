@@ -4,7 +4,7 @@ from types import FunctionType
 from typing import TypeVar, Callable, Union, Any, Dict
 
 from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean, _, L
-from amino.util.string import camelcaseify
+from amino.util.string import camelcaseify, ToStr
 from amino.list import Nil
 
 from ribosome.nvim import NvimFacade, NvimIO
@@ -247,6 +247,20 @@ def handler(method_name: str, fun: FunctionType) -> Maybe[RpcHandlerSpec]:
     )
 
 
+class RpcHandlerFunction(ToStr):
+
+    def __init__(self, func: Callable, spec: RpcHandlerSpec) -> None:
+        self.func = func
+        self.spec = spec
+
+    def _arg_desc(self) -> List[str]:
+        return List(str(self.spec))
+
+
+def handler_function(method_name: str, fun: FunctionType) -> Maybe[RpcHandlerFunction]:
+    return handler(method_name, fun) / L(RpcHandlerFunction)(fun, _)
+
+
 def register_handler_args(host: str, spec: RpcHandlerSpec, plugin_file: str) -> List[str]:
     fun_prefix = camelcaseify(spec.tpe)
     return List(f'remote#define#{fun_prefix}OnHost', host, spec.rpc_method, spec.sync, spec.name, spec.opts)
@@ -318,6 +332,7 @@ def define_handlers(channel: int, specs: List[RpcHandlerSpec], plugin_name: str,
                     ) -> NvimIO[List[DefinedHandler]]:
     return specs.traverse(L(define_handler)(channel, _, plugin_name, plugin_file), NvimIO)
 
+
 def rpc_handlers(plugin_class: type) -> List[RpcHandlerSpec]:
     return Lists.wrap(inspect.getmembers(plugin_class)).flat_map2(handler)
 
@@ -325,4 +340,9 @@ def rpc_handlers(plugin_class: type) -> List[RpcHandlerSpec]:
 def rpc_handlers_json(plugin_class: type) -> List[str]:
         return list(rpc_handlers(plugin_class) / _.encode)
 
-__all__ = ('RpcHandlerSpec', 'handler', 'define_handler', 'define_handlers', 'rpc_handlers', 'rpc_handlers_json')
+
+def rpc_handler_functions(plugin_class: type) -> List[RpcHandlerFunction]:
+    return Lists.wrap(inspect.getmembers(plugin_class)).flat_map2(handler_function)
+
+__all__ = ('RpcHandlerSpec', 'handler', 'define_handler', 'define_handlers', 'rpc_handlers', 'rpc_handlers_json',
+           'rpc_handler_functions')

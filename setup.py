@@ -16,5 +16,10 @@ setup(
         'amino~=10.9.4',
         'neovim~=0.1.13',
         'pyrsistent~=0.12.3',
-    ]
+    ],
+    entry_points={
+        'console_scripts': [
+            'ribosome_start_host = ribosome.host:cli',
+        ],
+    },
 )

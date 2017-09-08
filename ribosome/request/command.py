@@ -1,3 +1,5 @@
+import functools
+
 import neovim
 
 from ribosome.request.base import RequestHandler, MessageRequestHandler, JsonMessageRequestHandler
@@ -12,6 +14,7 @@ class Command(RequestHandler):
     @property
     def neovim_cmd(self):
         @neovim.command(self.name, nargs=self.nargs, **self.kw)
+        @functools.wraps(self._fun)
         def neovim_cmd_wrapper(obj, *rpc_args):
             return self.dispatch(obj, rpc_args)
         return neovim_cmd_wrapper
