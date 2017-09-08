@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version_parts = (10, 19, 1)
+version_parts = (10, 19, 2)
 version = '.'.join(map(str, version_parts))
 
 setup(
@@ -16,6 +16,7 @@ setup(
         'amino~=10.9.4',
         'neovim~=0.1.13',
         'pyrsistent~=0.12.3',
+        'pyuv~=1.4.0',
     ],
     entry_points={
         'console_scripts': [
