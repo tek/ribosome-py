@@ -50,6 +50,10 @@ class Propagate(TransAction):
     def maybe(msg: Maybe[Message]) -> TransAction:
         return Propagate(msg.to_list)
 
+    @staticmethod
+    def from_either(res: Either[str, TransAction]) -> TransAction:
+        return res.value_or(lambda a: Propagate.one(Error(a)))
+
     def _arg_desc(self) -> List[str]:
         return self.messages / str
 
@@ -303,7 +307,7 @@ def base(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
          ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
     def add_handler(func: Callable[[M], R]):
         @functools.wraps(func)
-        def transition(m, *a) -> None:
+        def transition(m, *a) -> TransAction:
             return extract(func(m, *a), Lists.wrap(effects))
         return decorate(transition, msg_type, prio)
     return add_handler

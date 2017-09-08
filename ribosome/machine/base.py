@@ -27,6 +27,7 @@ from ribosome.machine.messages import (NvimIOTask, RunIO, UnitTask, RunCorosPara
                                        DataTask)
 from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
 from ribosome.machine import trans
+from ribosome.machine.trans import Propagate
 
 A = TypeVar('A')
 D = TypeVar('D', bound=Data)
@@ -143,7 +144,7 @@ class MachineBase(Generic[D], MachineI):
 
     @trans.relay(RunNvimIOAlg)
     def message_run_nvim_io_alg(self, data: D, msg: RunNvimIOAlg) -> Either[str, List[Message]]:
-        return _task_result(self._run_nio(msg.io))
+        return Propagate.from_either(self._run_nio(msg.io))
 
     def _run_io(self, io: IO[A]) -> Either[str, List[Message]]:
         result = io.attempt
