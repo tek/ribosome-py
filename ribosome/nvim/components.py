@@ -521,7 +521,7 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         return lines.traverse(L(self._cmd)(_, True), Right)
 
     def echo(self, text: Union[str, List[str]]):
-        self._echo(echo(text, 'echo', prefix=Empty()))
+        self._echo(echo(text, 'echo', prefix=Just(self.prefix)))
 
     def echom(self, text: Union[str, List[str]]):
         self._echo(echo(text, prefix=Just(self.prefix)))
