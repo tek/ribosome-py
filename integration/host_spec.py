@@ -36,7 +36,7 @@ class HostSpec(PluginIntegrationKlkSpec):
         ).get_or_raise
         handlers = rpc_handlers(self.plugin_class.get_or_raise)
         define_handlers(channel, handlers, 'host', str(plug)).attempt(self.vim).get_or_raise
-        self._wait(1)
+        self._wait(.2)
         self.command_exists('Go')
         return later(kf(self.cmd_sync, 'Go').must(be_right))
 
