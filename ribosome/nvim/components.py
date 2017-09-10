@@ -22,7 +22,7 @@ from amino import Maybe, List, Map, Boolean, Empty, Just, __, _, Try, Either, Le
 from amino.util.string import decode
 from amino.util.fun import format_funcall
 from amino.lazy import lazy
-from amino.task import TaskException
+from amino.io import IOException
 
 import ribosome
 from ribosome.logging import Logging
@@ -210,7 +210,7 @@ class NvimComponent(Logging):
     def _cmd_error(self, line, exc, sync, report: bool) -> None:
         if not report:
             return
-        err = exc.cause if isinstance(exc, TaskException) else exc
+        err = exc.cause if isinstance(exc, IOException) else exc
         if amino.development:
             a = '' if sync else 'a'
             msg = f'running nvim {a}sync cmd `{line}`'

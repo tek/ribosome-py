@@ -5,7 +5,7 @@ from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
 from amino import Maybe, may, Either, Just, Left, I, List, Nothing, _, __, Id
-from amino.task import TaskException
+from amino.io import IOException
 from amino.util.exception import format_exception
 from amino.state import StateT
 from amino.util.string import ToStr
@@ -61,7 +61,7 @@ def _recover_error(handler: Any, result: Any) -> Maybe[Any]:
         return result
 
 
-def _task_result(result):
+def _io_result(result):
     return result.cata(Left, I)
 
 D = TypeVar('D', bound=Data)
@@ -199,7 +199,7 @@ class TransitionResult(Record):
     @property
     def error_message(self):
         def format(err):
-            return str(err.cause if isinstance(err, TaskException) else err)
+            return str(err.cause if isinstance(err, IOException) else err)
         return self.error / format | 'unknown error'
 
     @property
@@ -209,7 +209,7 @@ class TransitionResult(Record):
                 e.__cause__
                 if isinstance(e, TransitionFailed) and e.__cause__ is not None else
                 e.cause
-                if isinstance(e, TaskException) else
+                if isinstance(e, IOException) else
                 e
             )
         return self.error // (lambda err: Just(analyze(err)) if isinstance(err, Exception) else Nothing)

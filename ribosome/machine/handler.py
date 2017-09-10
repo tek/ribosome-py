@@ -5,7 +5,7 @@ import asyncio
 
 import amino
 from amino import Maybe, _, List, Map, Just, Either, L, __, Right
-from amino.task import Task
+from amino.io import IO
 from amino.state import StateT, EvalState, MaybeState, EitherState, IdState
 from amino.tc.optional import Optional
 from amino.id import Id
@@ -18,7 +18,7 @@ from ribosome.logging import Logging
 from ribosome.machine.message_base import Message, Publish
 from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
                                          TransitionFailed, Coroutine, MachineError, Error)
-from ribosome.machine.messages import RunTask, UnitTask, DataTask, Nop
+from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop
 from ribosome.machine.interface import MachineI
 from ribosome.data import Data
 from ribosome.machine.trans import TransAction, Transit, Propagate, Unit, TransFailure
@@ -141,14 +141,14 @@ class DynHandlerJob(HandlerJob):
     def transform_result(self, result):
         if asyncio.iscoroutine(result) or isinstance(result, asyncio.futures.Future):
             return Coroutine(result).pub
-        elif isinstance(result, Task):
-            return RunTask(result, Just(self.msg))
-        elif isinstance(result, RunTask):
-            return RunTask(result.task, Just(self.msg))
-        elif isinstance(result, UnitTask):
-            return UnitTask(result.task, Just(self.msg))
-        elif isinstance(result, DataTask):
-            return DataTask(result.cons, Just(self.msg))
+        elif isinstance(result, IO):
+            return RunIO(result, Just(self.msg))
+        elif isinstance(result, RunIO):
+            return RunIO(result.io, Just(self.msg))
+        elif isinstance(result, UnitIO):
+            return UnitIO(result.io, Just(self.msg))
+        elif isinstance(result, DataIO):
+            return DataIO(result.cons, Just(self.msg))
         else:
             return result
 

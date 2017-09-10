@@ -5,7 +5,7 @@ from ribosome import NvimFacade
 from ribosome.logging import Logging
 from ribosome.nvim.components import Syntax
 
-from amino import List, Map, _, L, Maybe, Task, __
+from amino import List, Map, _, L, Maybe, IO, __
 
 
 class UniteMessage(Message, varargs='unite_args'):
@@ -90,8 +90,8 @@ class UniteSource(UniteEntity):
         extra = self.syntax / L(self._syntax_templ.format)(self.name, _) | ''
         return self._templ.format(self.name, self.source, self.kind, extra)
 
-    def syntax_task(self, syntax: Syntax) -> Task:
-        return Task.zero
+    def syntax_task(self, syntax: Syntax) -> IO:
+        return IO.zero
 
 
 class UniteKind(UniteEntity):

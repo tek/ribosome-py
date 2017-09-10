@@ -8,7 +8,7 @@ import toolz
 
 from amino import Maybe, _, List, Map, Empty, L, __, Just, Either, Lists, Left, Right, IO
 from amino.util.string import camelcaseify
-from amino.task import Task
+from amino.io import IO
 from amino.lazy import lazy
 from amino.func import flip
 
@@ -17,14 +17,14 @@ from ribosome.logging import print_ribo_log_info
 from ribosome.data import Data
 from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.machine.interface import MachineI
-from ribosome.machine.transition import (Handler, TransitionResult, may_handle, Error, Debug, handle, _task_result,
+from ribosome.machine.transition import (Handler, TransitionResult, may_handle, Error, Debug, handle, _io_result,
                                          _recover_error, DynHandler)
 from ribosome.machine.message_base import _machine_attr
 from ribosome.request.command import StateCommand
 from ribosome.process import NvimProcessExecutor
-from ribosome.machine.messages import (NvimIOTask, RunIO, UnitTask, RunCorosParallel, SubProcessSync, RunIOsParallel,
-                                       ShowLogInfo, Nop, RunIOAlg, TransitionException, Info, RunNvimIOAlg, RunNvimIO,
-                                       DataTask)
+from ribosome.machine.messages import (RunNvimIO, RunIO, UnitIO, RunCorosParallel, SubProcessSync, RunIOsParallel,
+                                       ShowLogInfo, Nop, RunIOAlg, TransitionException, Info, RunNvimIOAlg, DataIO,
+                                       RunNvimUnitIO)
 from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
 from ribosome.machine import trans
 from ribosome.machine.trans import Propagate
@@ -33,8 +33,12 @@ A = TypeVar('A')
 D = TypeVar('D', bound=Data)
 
 
-def io(f: Callable[[NvimFacade], Any]) -> NvimIOTask:
-    return NvimIOTask(NvimIO(f))
+def nio(f: Callable[[NvimFacade], Any]) -> RunNvimIO:
+    return RunNvimIO(NvimIO(f))
+
+
+def unit_nio(f: Callable[[NvimFacade], None]) -> RunNvimUnitIO:
+    return RunNvimUnitIO(NvimIO(f))
 
 
 class MachineBase(Generic[D], MachineI):
@@ -128,8 +132,8 @@ class MachineBase(Generic[D], MachineI):
         self.log.error('plugin "{}" has no command "{}"'.format(self.title, name))
         return Empty()
 
-    @may_handle(NvimIOTask)
-    def message_nvim_io(self, data: D, msg):
+    @may_handle(RunNvimUnitIO)
+    def message_run_nvim_unit_io(self, data: D, msg: RunNvimUnitIO):
         msg.io.unsafe_perform_io(self.vim)
 
     def _run_nio(self, io: RunNvimIOAlg) -> Either[str, List[Message]]:
@@ -150,23 +154,23 @@ class MachineBase(Generic[D], MachineI):
         result = io.attempt
         if result.value is None:
             self.log.error(f'IO returned None: {io}')
-        return _task_result(result)
+        return _io_result(result)
 
     @handle(RunIO)
     def message_run_io(self, data: D, msg):
-        return self._run_io(msg.task)
+        return self._run_io(msg.io)
 
     @trans.relay(RunIOAlg)
     def message_run_io_alg(self, data: D, msg: RunIOAlg):
         return self._run_io(msg.io)
 
-    @handle(UnitTask)
-    def message_run_unit_task(self, data: D, msg):
-        return self._run_io(msg.task.replace(Just(Nop())))
+    @handle(UnitIO)
+    def message_run_unit_io(self, data: D, msg):
+        return self._run_io(msg.io.replace(Just(Nop())))
 
-    @handle(DataTask)
-    def message_data_task(self, data: D, msg):
-        return self._run_io(msg.cons(Task.now(data)))
+    @handle(DataIO)
+    def message_data_io(self, data: D, msg):
+        return self._run_io(msg.cons(IO.now(data)))
 
     @may_handle(RunCorosParallel)
     def message_run_coros_parallel(self, data: D, msg: RunCorosParallel) -> Message:

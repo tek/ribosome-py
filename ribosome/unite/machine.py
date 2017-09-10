@@ -5,14 +5,14 @@ from amino import List, __, _
 from ribosome.unite import UniteMessage, UniteSource
 from ribosome.unite.data import UniteKind, UniteSyntax
 from ribosome.machine import handle
-from ribosome.machine.base import UnitTask
+from ribosome.machine.base import UnitIO
 
 
 class UniteTransitions:
 
     @handle(UniteSyntax)
     def syntax(self):
-        return self.machine.syntax(self.msg.source) / UnitTask
+        return self.machine.syntax(self.msg.source) / UnitIO
 
 
 class UniteMachine:

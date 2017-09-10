@@ -5,10 +5,10 @@ from typing import Callable
 from ribosome.machine import message, handle, may_handle
 from ribosome.nvim import HasNvim, NvimFacade, ScratchBuffer
 from ribosome.machine.state import KillMachine, SubMachine
-from ribosome.machine.base import UnitTask
+from ribosome.machine.base import UnitIO
 
 from amino import Map, Boolean, __, Empty
-from amino.task import Task
+from amino.io import IO
 from amino.lazy import lazy
 
 Mapping = message('Mapping', 'uuid', 'keyseq')
@@ -70,7 +70,7 @@ class ScratchMachine(SubMachine, HasNvim, metaclass=abc.ABCMeta):
 
     @may_handle(Quit)
     def quit(self, data, msg):
-        close = Task.delay(self.scratch.close)
-        return UnitTask(close), KillMachine(self.uuid).pub
+        close = IO.delay(self.scratch.close)
+        return UnitIO(close), KillMachine(self.uuid).pub
 
 __all__ = ('ScratchMachine',)

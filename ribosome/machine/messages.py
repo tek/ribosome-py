@@ -1,5 +1,3 @@
-import abc
-
 from amino import Nothing
 from amino.logging import LogError
 
@@ -10,14 +8,13 @@ Stop = message('Stop')
 Quit = message('Quit')
 Done = message('Done')
 PlugCommand = message('PlugCommand', 'plug', 'msg')
-NvimIOTask = message('NvimIOTask', 'io')
-RunTask = message('RunTask', 'task', opt_fields=(('msg', Nothing),))
-RunIO = RunTask
-RunIOAlg = message('RunIOAlg', 'io', opt_fields=(('msg', Nothing),))
 RunNvimIO = message('RunNvimIO', 'io')
+RunNvimUnitIO = message('RunNvimUnitIO', 'io')
+RunIO = message('RunIO', 'io', opt_fields=(('msg', Nothing),))
+RunIOAlg = message('RunIOAlg', 'io', opt_fields=(('msg', Nothing),))
 RunNvimIOAlg = message('RunNvimIOAlg', 'io')
-UnitTask = message('UnitTask', 'task', opt_fields=(('msg', Nothing),))
-DataTask = message('DataTask', 'cons', opt_fields=(('msg', Nothing),))
+UnitIO = message('UnitIO', 'io', opt_fields=(('msg', Nothing),))
+DataIO = message('DataIO', 'cons', opt_fields=(('msg', Nothing),))
 Info = message('Info', 'message')
 ShowLogInfo = message('ShowLogInfo')
 RunIOsParallel = message('RunIOsParallel', 'ios')
@@ -46,7 +43,7 @@ class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
     def short(self) -> str:
         return self.main
 
-__all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'NvimIOTask', 'RunTask', 'UnitTask', 'DataTask',
-           'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg', 'RunNvimIO',
+__all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'RunNvimIO', 'RunNvimUnitIO', 'UnitIO', 'DataIO',
+           'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg',
            'RunNvimIOAlg', 'Error', 'Warning', 'Debug', 'Coroutine', 'TransitionException', 'Info', 'UpdateRecord',
            'UpdateState')
