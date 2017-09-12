@@ -26,7 +26,7 @@ from ribosome.machine.transitions import Transitions
 from ribosome.machine import trans
 
 import amino
-from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do
+from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists
 from amino.util.string import red, blue
 from amino.state import State
 
@@ -305,7 +305,7 @@ class StateMachine(StateMachineBase, AsyncIOThread):
         AsyncIOThread.__init__(self)
         StateMachineBase.__init__(self, *a, **kw)
 
-    def wait_for_running(self):
+    def wait_for_running(self) -> None:
         self.running.wait(medium_timeout)
 
     async def _main(self, data):
@@ -389,6 +389,7 @@ class PluginStateMachine(MachineI):
             Either.import_module(name),
             Either.import_module('{}.plugins.{}'.format(self.title, name))
         )
+        # TODO .traverse(_.swap).swap
         errors = mods.filter(_.is_left) / _.value
         return mods.find(_.is_right) | Left(errors)
 
@@ -402,10 +403,10 @@ class PluginStateMachine(MachineI):
     def plugin(self, title: str) -> Maybe[MachineBase]:
         return self.sub.find(_.title == title)
 
-    def plug_command(self, plug_name: str, cmd_name: str, args: list=[], sync=False):
+    def plug_command(self, plug_name: str, cmd_name: str, args: tuple=(), sync=False):
         sender = self.send_sync if sync else self.send
         plug = self.plugin(plug_name)
-        cmd = plug.flat_map(lambda a: a.command(cmd_name, List(args)))
+        cmd = plug.flat_map(lambda a: a.command(cmd_name, Lists.wrap(args)))
         plug.ap2(cmd, PlugCommand) % sender
 
     def plug_command_sync(self, *a, **kw):
@@ -421,7 +422,7 @@ class PluginStateMachine(MachineI):
 # FIXME why is the title param ignored?
 class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None) -> None:
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title: str=None) -> None:
         HasNvim.__init__(self, vim)
         PluginStateMachine.__init__(self, plugins)
 

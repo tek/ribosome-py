@@ -1,5 +1,6 @@
 import re
-from typing import TypeVar, Callable, Any, Union, Optional
+import typing
+from typing import TypeVar, Callable, Any, Union, Optional, Generic, Type
 from pathlib import Path
 import threading
 from concurrent import futures
@@ -13,7 +14,8 @@ import time
 import functools
 
 import neovim
-from neovim.api import NvimError
+from neovim.api import NvimError, Nvim
+from neovim.api.common import Remote
 
 from amino.util.string import camelcaseify
 
@@ -29,40 +31,43 @@ from ribosome.logging import Logging
 from ribosome.request.base import parse_int
 
 
-def squote(text):
+def squote(text: str) -> str:
     return text.replace("'", "''")
 
 
-def dquote(text):
+def dquote(text: str) -> str:
     return text.replace('"', '\\"')
 
 
-def quote(text):
+def quote(text: str) -> str:
     return dquote(squote(text))
+
 
 A = TypeVar('A')
 
 
-def echo(text: Union[str, List[str]], cmd='echom', prefix: Maybe[str]=Empty()) -> List[str]:
+def echo(text: Union[str, List[str]], cmd: str='echom', prefix: Maybe[str]=Empty()) -> List[str]:
     lines = text if isinstance(text, List) else Lists.lines(text)
     pre = prefix.map(_ + ': ') | ''
     return lines.map(lambda a: '{} "{}{}"'.format(cmd, pre, dquote(a)))
 
 
-def echohl(text: Union[str, List[str]], hl: str, prefix: Maybe[str]=Empty()):
+def echohl(text: Union[str, List[str]], hl: str, prefix: Maybe[str]=Empty()) -> List[str]:
     return echo(text).cons(f'echohl {hl}').cat('echohl None')
 
 
-def not_on_main_thread():
+def not_on_main_thread() -> bool:
     return threading.current_thread() != threading.main_thread()
 
 
 shutdown = False
 
+R = TypeVar('R', bound=Remote)
 
-class NvimComponent(Logging):
 
-    def __init__(self, vim, target, prefix: str) -> None:
+class NvimComponent(Generic[R], Logging):
+
+    def __init__(self, vim: Nvim, target: Union['NvimComponent', 'AsyncVimProxy', R], prefix: str) -> None:
         if ribosome.in_vim and isinstance(target, (AsyncVimProxy, NvimComponent)):
             msg = '{} created with non-native target {}'
             raise Exception(msg.format(self, target))
@@ -72,31 +77,31 @@ class NvimComponent(Logging):
         self._vars = Vars(self)
         self._options = Options(self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         n = '' if not_on_main_thread() else self._details
         return '{}({}, {})'.format(self.__class__.__name__, self.prefix, n)
 
     @property
-    def vars(self):
+    def vars(self) -> 'AsyncVimProxy[Vars]':
         return AsyncVimProxy(self._vars, self)
 
     @property
-    def options(self):
+    def options(self) -> 'AsyncVimProxy[Options]':
         return AsyncVimProxy(self._options, self)
 
     @property
-    def _details(self):
+    def _details(self) -> str:
         return ''
 
     @property
-    def loop(self):
+    def loop(self) -> Any:
         return self.vim._session._async_session._msgpack_stream._event_loop._loop
 
-    def delay(self, f, timeout):
-        cb = lambda: self.__run_on_main_thread(f)
+    def delay(self, f: Callable[[], None], timeout: float) -> None:
+        cb = lambda: self._run_on_main_thread(f)
         threading.Timer(1.0, cb).start()
 
-    def async_call(self, f: Callable[['NvimComponent'], Any], *a, **kw):
+    def async_call(self, f: Callable[..., Any], *a: Any, **kw: Any) -> Any:
         ''' run a callback function on the main thread and return its
         value (blocking). the callback receives 'self' as an argument.
         '''
@@ -109,18 +114,18 @@ class NvimComponent(Logging):
                 result_fut.set_result(f(self, *a, **kw))
             self._run_on_main_thread(cb)
             result = result_fut.result()
-            self.log.debug2('async returns {}'.format(result))
+            self.log.debug2(lambda: f'async returns {result}')
             return result
         else:
             return f(self, *a, **kw)
 
     async = async_call
 
-    def _run_on_main_thread(self, f: Callable[..., Any], *a, **kw):
+    def _run_on_main_thread(self, f: Callable[..., Any], *a: Any, **kw: Any) -> None:
         ''' run a callback function on the host's main thread
         '''
-        frame = inspect.currentframe()  # type: ignore
-        def dispatch():
+        frame = inspect.currentframe()
+        def dispatch() -> None:
             self.log.debug2(lambda: 'running on main thread: {}'.format(format_funcall(f.__name__, a, kw)))
             try:
                 f(*a, **kw)
@@ -130,7 +135,7 @@ class NvimComponent(Logging):
                 self.log.debug2('{} successful'.format(f.__name__))
         self.vim._session.threadsafe_call(dispatch)
 
-    def _report_nvim_error(self, err, frame):
+    def _report_nvim_error(self, err: str, frame: traceback.FrameSummary) -> None:
         self.log.error('async vim call failed with \'{}\''.format(decode(err)))
         self.log.error(''.join(traceback.format_stack(frame)[:-5]))
 
@@ -267,7 +272,7 @@ class HasBuffer(NvimComponent, metaclass=abc.ABCMeta):
     def buffer(self):
         return Buffer(self.vim, self._internal_buffer, self.prefix).proxy
 
-    @abc.abstractproperty  # type: ignore
+    @abc.abstractproperty
     def _internal_buffer(self):
         ...
 
@@ -294,7 +299,7 @@ class HasWindow(HasBuffer):
     def window(self):
         return Window(self.vim, self._internal_window, self.prefix).proxy
 
-    @abc.abstractproperty  # type: ignore
+    @abc.abstractproperty
     def _internal_window(self):
         ...
 
@@ -338,7 +343,7 @@ class HasTab(HasWindow):
     def tab(self):
         return Tab(self.vim, self._internal_tab, self.prefix).proxy
 
-    @abc.abstractproperty  # type: ignore
+    @abc.abstractproperty
     def _internal_tab(self):
         ...
 
@@ -666,26 +671,26 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         self.cmd_sync(f'function! {name}({params.join_comma})\n{body}\nendfunction')
 
 
-class AsyncVimCallProxy():
+class AsyncVimCallProxy(Generic[A]):
 
-    def __init__(self, target, vim, name):
+    def __init__(self, target: A, vim: NvimComponent, name: str) -> None:
         self._target = target
         self._vim = vim
         self.name = name
 
-    def __call__(self, *a, **kw):
-        def proxy_call(vim, target, name, *a, **kw) -> None:
+    def __call__(self, *a: Any, **kw: Any) -> Any:
+        def proxy_call(vim: NvimComponent, target: A, name: str, *a: Any, **kw: Any) -> Any:
             return getattr(target, name)(*a, **kw)
         return self._vim.async_call(proxy_call, self._target, self.name, *a, **kw)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '{}({}, {})'.format(self.__class__.__name__, self.name, self._target)
 
 
-class AsyncVimProxy():
+class AsyncVimProxy(Generic[A]):
     allow_async_relay = True
 
-    def __init__(self, target, vim):
+    def __init__(self, target: A, vim: NvimComponent) -> None:
         self._vim = vim
         self._target = target
         self._target_tpe = type(target)
@@ -727,17 +732,21 @@ class AsyncVimProxy():
         return self.__getattr__('__call__')(*a, **kw)
 
 
-class OptVar(Logging, metaclass=abc.ABCMeta):
+class OptVar(Logging, abc.ABC):
 
     @abc.abstractmethod
     def _get(self, name: str) -> Optional[Any]:
         ...
 
-    @property
-    def _desc(self):
+    @abc.abstractmethod
+    def _set(self, name: str, value: A) -> None:
         ...
 
-    def __call__(self, name) -> Either[str, str]:
+    @property
+    def _desc(self) -> str:
+        ...
+
+    def __call__(self, name: str) -> Either[str, Any]:
         v = self._get(name)
         if v is None:
             msg = '{} not found: {}'.format(self._desc, name)
@@ -746,7 +755,7 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
         else:
             return Right(decode(v))
 
-    def set(self, name, value):
+    def set(self, name: str, value: A) -> None:
         self.log.debug('setting {} {} to \'{}\''.format(self._desc, name, value))
         try:
             self._set(name, value)
@@ -755,7 +764,7 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
             self.log.exception(msg.format(self._desc, name, value))
 
     def path(self, name: str) -> Either[str, Path]:
-        return self(name).map(lambda a: Path(a).expanduser())  # type: ignore
+        return self(name).map(lambda a: Path(a).expanduser())
 
     def dir(self, name: str) -> Either[str, Path]:
         var = self.path(name)
@@ -765,8 +774,8 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
             self.log.error(msg.format(name, var))
         return val
 
-    def typed(self, tpe: type, value: Either[str, A]) -> Either[str, A]:
-        def check(v: A):
+    def typed(self, tpe: Type[A], value: Either[str, Any]) -> Either[str, A]:
+        def check(v: A) -> Either[str, A]:
             if isinstance(v, tpe):
                 return Right(v)
             else:
@@ -775,22 +784,22 @@ class OptVar(Logging, metaclass=abc.ABCMeta):
                 return Left(msg)
         return value.flat_map(check)
 
-    def s(self, name):
+    def s(self, name: str) -> Either[str, str]:
         return self.typed(str, self(name))
 
-    def l(self, name):
-        return self.typed(list, self(name))
+    def l(self, name: str) -> Either[str, List]:
+        return self.typed(list, self(name)) / Lists.wrap
 
-    def d(self, name):
+    def d(self, name: str) -> Either[str, dict]:
         return self.typed(dict, self(name))
 
-    def m(self, name):
+    def m(self, name: str) -> Either[str, Map]:
         return self.d(name) / Map
 
-    def b(self, name: str):
+    def b(self, name: str) -> Either[str, Boolean]:
         return self.typed(bool, self(name)) / Boolean
 
-    def i(self, name: str):
+    def i(self, name: str) -> Either[str, int]:
         return self.typed(int, self(name))
 
     def exists(self, name: str) -> Boolean:
