@@ -52,6 +52,9 @@ class NvimPlugin(Logging):
     def stage_4(self) -> None:
         pass
 
+    def quit(self) -> None:
+        pass
+
     def rpc_handlers(self) -> List[dict]:
         return rpc_handlers_json(type(self))
 
@@ -124,6 +127,7 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     help.name_handler('stage_2', command, cls.stage_2, sync=True)
     help.name_handler('stage_3', command, cls.stage_3, sync=True)
     help.name_handler('stage_4', command, cls.stage_4, sync=True)
+    help.name_handler('quit', command, cls.quit, sync=True)
     help.name_handler('rpc_handlers', function, cls.rpc_handlers, sync=True)
     help.handler('plug', command, cls.plug_command)
 

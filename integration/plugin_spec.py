@@ -3,6 +3,7 @@ from amino import Right, Either
 from kallikrein import Expectation, unsafe_k
 from kallikrein.matchers.either import be_right
 from kallikrein.matchers.maybe import be_just
+from kallikrein.matchers.end_with import end_with
 
 from integration._support.plugin import TestPluginLooped, TestPlugin, TestPluginUnlooped
 from integration._support.base import IntegrationSpecBase
@@ -19,7 +20,7 @@ execute IOs in parallel $ios_parallel
 class _PluginSpecBase(IntegrationSpecBase):
 
     def _last_output(self, content):
-        return self._log_line(-1, be_just(content))
+        return self._log_line(-1, be_just(end_with(content)))
 
     def _startup(self) -> Expectation:
         i = 99932
