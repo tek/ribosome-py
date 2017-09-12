@@ -67,6 +67,9 @@ class NvimPlugin(Logging):
     def append_python_path(self, path: str) -> None:
         sys.path.append(path)
 
+    def show_python_path(self) -> typing.List[str]:
+        return sys.path
+
 
 class NvimStatePlugin(NvimPlugin):
 

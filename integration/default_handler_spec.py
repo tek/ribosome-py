@@ -1,5 +1,6 @@
-from kallikrein import k, Expectation, kf
+from kallikrein import Expectation, kf
 from kallikrein.matchers.either import be_right
+from kallikrein.matchers import contain
 
 from amino import Right, Either
 from amino.test import temp_dir
@@ -21,19 +22,23 @@ class DefaultHandlerSpecPlugin(NvimPlugin, name='plug'):
 
 class DefaultHandlerSpec(IntegrationSpecBase):
     '''
-    test $test
+    append a directory to the plugin's `sys.path` $append_path
     '''
 
     @property
     def plugin_class(self) -> Either[str, type]:
         return Right(DefaultHandlerSpecPlugin)
 
-    def test(self) -> Expectation:
+    def append_path(self) -> Expectation:
         pkg = temp_dir('default_handler', 'pp', 'pkg')
         pp = pkg.parent
         file = pkg / '__init__.py'
         file.write_text(f'class {class_name}: pass')
-        self.cmd_sync('PlugAppendPythonPath', str(pp))
-        return kf(self.vim.call, 'TestPath').must(be_right(class_name))
+        self.vim.call('PlugAppendPythonPath', str(pp))
+        path = self.vim.call('PlugShowPythonPath')
+        return (
+            kf(self.vim.call, 'TestPath').must(be_right(class_name)) &
+            kf(self.vim.call, 'PlugShowPythonPath').must(be_right(contain(str(pp))))
+        )
 
 __all__ = ('DefaultHandlerSpec',)
