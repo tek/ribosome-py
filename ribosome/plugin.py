@@ -138,7 +138,8 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     help.name_handler('quit', command, cls.quit, sync=True)
     help.name_handler('rpc_handlers', function, cls.rpc_handlers, sync=True)
     help.handler('plug', command, cls.plug_command)
-    help.name_handler('append_python_path', command, cls.append_python_path)
+    help.name_handler('append_python_path', function, cls.append_python_path)
+    help.name_handler('show_python_path', function, cls.show_python_path)
 
 
 def setup_state_plugin(cls: Type[NvimStatePlugin], name: str, prefix: str, debug: bool) -> None:
