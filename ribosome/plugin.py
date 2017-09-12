@@ -64,6 +64,9 @@ class NvimPlugin(Logging):
     def plug_command(self, plug_name: str, cmd_name: str, *args: str) -> None:
         self.state().plug_command(plug_name, cmd_name, args)
 
+    def append_python_path(self, path: str) -> None:
+        sys.path.append(path)
+
 
 class NvimStatePlugin(NvimPlugin):
 
@@ -130,6 +133,7 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     help.name_handler('quit', command, cls.quit, sync=True)
     help.name_handler('rpc_handlers', function, cls.rpc_handlers, sync=True)
     help.handler('plug', command, cls.plug_command)
+    help.name_handler('append_python_path', command, cls.append_python_path)
 
 
 def setup_state_plugin(cls: Type[NvimStatePlugin], name: str, prefix: str, debug: bool) -> None:
