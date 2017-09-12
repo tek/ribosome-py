@@ -35,7 +35,6 @@ class DefaultHandlerSpec(IntegrationSpecBase):
         file = pkg / '__init__.py'
         file.write_text(f'class {class_name}: pass')
         self.vim.call('PlugAppendPythonPath', str(pp))
-        path = self.vim.call('PlugShowPythonPath')
         return (
             kf(self.vim.call, 'TestPath').must(be_right(class_name)) &
             kf(self.vim.call, 'PlugShowPythonPath').must(be_right(contain(str(pp))))
