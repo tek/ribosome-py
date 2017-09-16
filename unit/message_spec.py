@@ -15,8 +15,8 @@ class MessageSpec:
     def test(self) -> Expectation:
         mod = self.__module__
         return (
-            (k(Mess().json['__type__']) == f'{mod}.Mess') &
-            (k(JMess().json['__type__']) == f'{mod}.JMess')
+            (k(Mess().json_repr['__type__']) == f'{mod}.Mess') &
+            (k(JMess().json_repr['__type__']) == f'{mod}.JMess')
         )
 
 __all__ = ('MessageSpec',)

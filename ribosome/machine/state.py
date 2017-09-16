@@ -1,6 +1,6 @@
 import time
-from typing import Callable, Awaitable, Generator, Any
-from typing import Optional  # NOQA
+from typing import Callable, Awaitable, Generator, Any, Union, TypeVar, Generic, Type
+from typing import Optional  # noqa
 import abc
 import threading
 import asyncio
@@ -21,12 +21,14 @@ from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
 from ribosome.machine.messages import Nop, Done, Quit, PlugCommand, Stop, Error, UpdateRecord, UpdateState
 from ribosome.machine.handler import DynHandlerJob
-from ribosome.machine.modular import ModularMachine
+from ribosome.machine.modular import ModularMachine, ModularMachine2
 from ribosome.machine.transitions import Transitions
 from ribosome.machine import trans
+from ribosome.settings import PluginSettings, Config
+from ribosome.record import field
 
 import amino
-from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists
+from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, Nil
 from amino.util.string import red, blue
 from amino.state import State
 
@@ -320,14 +322,14 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         StateMachineBase.__init__(self, *a, **kw)
         AsyncIOBase.__init__(self)
 
-    def start(self):
+    def start(self) -> None:
         self.data = self.init
         self._init_asyncio()
 
     def stop(self, shutdown=True) -> None:
         pass
 
-    def wait_for_running(self):
+    def wait_for_running(self) -> None:
         pass
 
     def process_messages(self):
@@ -382,7 +384,7 @@ class PluginStateMachine(MachineI):
         def report(errs):
             msg = 'invalid {} plugin module "{}": {}'
             self.log.error(msg.format(self.title, name, errs))
-        return (self._find_plugin(name) // self._inst_plugin).leffect(report)
+        return (self._find_plugin(name) // self._inst_plugin).o(lambda: self.extra_plugin(name)).leffect(report)
 
     def _find_plugin(self, name: str):
         mods = List(
@@ -399,6 +401,9 @@ class PluginStateMachine(MachineI):
             if hasattr(mod, 'Plugin')
             else Left('module does not define class `Plugin`')
         )
+
+    def extra_plugin(self, name: str) -> Either[str, MachineI]:
+        return Left('not implemented')
 
     def plugin(self, title: str) -> Maybe[MachineBase]:
         return self.sub.find(_.title == title)
@@ -443,17 +448,76 @@ class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
 class RootMachine(StateMachine, RootMachineBase):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None) -> None:
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title: str=Optional[None]) -> None:
         StateMachine.__init__(self, title=title)
         RootMachineBase.__init__(self, vim, plugins)
 
 
+T = TypeVar('T', bound=Transitions)
+
+
+class SubMachine2(Generic[T], ModularMachine2[T], TransitionHelpers):
+
+    def __init__(self, vim: NvimFacade, trans: Type[T], parent: Optional[MachineI]=None, title: Optional[str]=None
+                 ) -> None:
+        super().__init__(parent, title)
+        self.vim = vim
+        self.trans = trans
+
+    @property
+    def transitions(self) -> Type[T]:
+        return self.trans
+
+    def new_state(self):
+        pass
+
+
 class UnloopedRootMachine(UnloopedStateMachine, RootMachineBase):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title=None) -> None:
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title: str=Optional[None]) -> None:
         debug = vim.vars.p('debug') | False
         UnloopedStateMachine.__init__(self, title=title, debug=debug)
         RootMachineBase.__init__(self, vim, plugins)
+
+
+class AutoData(Data):
+    config = field(Config)
+
+    @property
+    def _str_extra(self) -> List[Any]:
+        return List(self.config)
+
+
+Settings = TypeVar('Settings', bound=PluginSettings)
+D = TypeVar('D', bound=AutoData)
+
+
+class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
+
+    def __init__(self, vim: NvimFacade, config: Config[Settings, D], title: str) -> None:
+        self.config = config
+        self.available_plugins = self.config.plugins
+        active_plugins = config.settings.components.value_or(Nil).attempt(vim) | Nil
+        UnloopedRootMachine.__init__(self, vim, active_plugins, title)
+
+    def extra_plugin(self, name: str) -> Either[str, MachineI]:
+        return (
+            self.available_plugins
+            .lift(name)
+            .to_either(f'no auto plugin defined for`{name}`')
+            .flat_map(self.inst_auto)
+        )
+
+    def inst_auto(self, plug: Union[str, Type]) -> Either[str, MachineI]:
+        return (
+            Right(SubMachine2(self.vim, plug))
+            if isinstance(plug, type) and issubclass(plug, Transitions) else
+            Left(f'invalid tpe for auto plugin: {plug}')
+        )
+
+    @property
+    def init(self) -> D:
+        return self.config.state_type(config=self.config, vim_facade=Just(self.vim))
 
 
 class SubMachine(ModularMachine, TransitionHelpers):

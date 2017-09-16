@@ -1,3 +1,4 @@
+import abc
 import inspect
 from typing import TypeVar, Generic, Type
 
@@ -20,6 +21,22 @@ class ModularMachine(Generic[T], MachineBase):
         handlers = (
             List.wrap(methods)
             .map2(L(WrappedHandler.create)(self, _, _, self.Transitions))
+        )
+        return handlers + super()._handlers
+
+
+class ModularMachine2(Generic[T], MachineBase):
+
+    @abc.abstractproperty
+    def transitions(self) -> Type[T]:
+        ...
+
+    @property
+    def _handlers(self):
+        methods = inspect.getmembers(self.transitions, lambda a: hasattr(a, _machine_attr))
+        handlers = (
+            List.wrap(methods)
+            .map2(L(WrappedHandler.create)(self, _, _, self.transitions))
         )
         return handlers + super()._handlers
 

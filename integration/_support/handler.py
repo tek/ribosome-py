@@ -76,7 +76,7 @@ class Mach(UnloopedRootMachine):
         return Env(vim=self.vim)
 
 
-class HandlerSpecPlugin(NvimStatePlugin, Logging, name='handler'):
+class HandlerSpecPlugin(NvimStatePlugin, Logging, pname='handler'):
 
     @lazy
     def _state(self) -> Mach:
@@ -85,7 +85,7 @@ class HandlerSpecPlugin(NvimStatePlugin, Logging, name='handler'):
     def state(self) -> Mach:
         return self._state
 
-    def start_plugin(self) -> None:
+    def stage_1(self) -> None:
         self.state().start()
 
     @msg_command(Msg, sync=True)

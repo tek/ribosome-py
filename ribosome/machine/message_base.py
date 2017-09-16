@@ -124,7 +124,7 @@ def message_definition_module() -> Optional[str]:
     return inspect.currentframe().f_back.f_back.f_globals['__name__']
 
 
-def message(name, *fields, mod=None, **kw):
+def message(name: str, *fields: str, mod: str=None, **kw: Any) -> Type[M]:
     module = mod or message_definition_module()
     return MessageMeta(name, (Message,), dict(__module__=module), fields=fields, **kw)
 

@@ -26,7 +26,7 @@ class VimSpec(IntegrationSpecBase):
     def vars(self) -> Expectation:
         vname = List.random_string()
         content = [List.random_string()]
-        self.vim.cmd_sync('Go')
+        self.vim.cmd_once_defined('Go')
         self.vim.buffer.vars.set_p(vname, content)
         later(kf(self.vim.buffer.vars.pl, vname).must(be_right(content)))
         var = (

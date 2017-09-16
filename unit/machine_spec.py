@@ -4,7 +4,7 @@ from ribosome.machine import may_handle, message, ModularMachine, Transitions
 from ribosome import StateMachine
 from ribosome.machine.base import MachineBase
 
-from kallikrein import k, unsafe_k
+from kallikrein import k, unsafe_k, pending
 from kallikrein.matchers.maybe import be_just
 
 from amino import List, Map
@@ -60,6 +60,7 @@ class PublishSpec:
     def setup(self):
         MachineBase._data_type = Map
 
+    @pending
     def publish(self):
         with _Z(List(_A('a'), _B('b'))).transient() as z:
             res = z.send_sync(M1())

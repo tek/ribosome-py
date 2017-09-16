@@ -13,7 +13,7 @@ from integration._support.base import IntegrationSpecBase
 class_name = 'ZeeKlass'
 
 
-class DefaultHandlerSpecPlugin(NvimPlugin, name='plug'):
+class DefaultHandlerSpecPlugin(NvimPlugin, pname='plug'):
 
     @function()
     def test_path(self) -> str:

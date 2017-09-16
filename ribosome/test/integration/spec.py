@@ -10,7 +10,7 @@ from typing import Any, Callable, Generic, TypeVar, Type
 import neovim
 from neovim.api import Nvim
 
-from amino import List, Maybe, Either, Left, __, Map, env, Path, Lists, _
+from amino import List, Either, Left, __, env, Path, Lists, _
 from amino.lazy import lazy
 from amino.test import fixture_path, temp_dir, temp_file
 from amino.test.path import base_dir, pkg_dir
@@ -25,6 +25,8 @@ from ribosome.test.fixtures import rplugin_template
 from ribosome.rpc import rpc_handlers, RpcHandlerSpec
 from ribosome.machine import Message
 from ribosome.record import decode_json
+from ribosome.settings import PluginSettings, Config
+from ribosome.machine.state import AutoData
 
 A = TypeVar('A', bound=NvimPlugin)
 
@@ -342,4 +344,44 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
         rp_path.write_text(rplugin_template.format(plugin_module=mod, plugin_class=name))
         return rp_path
 
-__all__ = ('VimIntegrationSpec', 'PluginIntegrationSpec')
+
+Settings = TypeVar('Settings', bound=PluginSettings)
+Data = TypeVar('Data', bound=AutoData)
+
+
+class AutoPluginIntegrationSpec(Generic[Settings, Data], VimIntegrationSpec):
+
+    def setup(self) -> None:
+        self.log_format = '{message}'
+        super().setup()
+
+    @abc.abstractmethod
+    def module(self) -> str:
+        ...
+
+    @abc.abstractmethod
+    def config_name(self) -> str:
+        ...
+
+    @property
+    def autostart_plugin(self) -> bool:
+        return True
+
+    def _post_start_neovim(self) -> None:
+        super()._post_start_neovim()
+        if self.autostart_plugin:
+            self._setup_handlers()
+
+    def _setup_handlers(self) -> None:
+        stderr_handler_name = 'RibosomeJobStderr'
+        stderr_handler_body = '''echo 'error starting rpc job on channel ' . a:id . ': ' . string(a:data)'''
+        self.vim.define_function(stderr_handler_name, List('id', 'data', 'event'), stderr_handler_body)
+        cmd = f'from ribosome.host import start_config; start_config({self.module()!r}, {self.config_name()!r})'
+        (
+            self.vim
+            .call('jobstart', ['python3', '-c', cmd], dict(rpc=True, on_stderr=stderr_handler_name))
+            .get_or_raise
+        )
+
+
+__all__ = ('VimIntegrationSpec', 'ExternalIntegrationSpec', 'PluginIntegrationSpec')

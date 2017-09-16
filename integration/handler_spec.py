@@ -20,17 +20,17 @@ class HandlerSpec(IntegrationSpecBase):
         return Right(HandlerSpecPlugin)
 
     def nested(self) -> Expectation:
-        self.vim.cmd('HandlerStart')
+        self.vim.cmd_once_defined('HandlerStage1')
         self.vim.cmd_sync('Msg')
-        return self._log_line(-1, be_just('nothing'))
+        return self._log_line(-1, be_just(end_with('nothing')))
 
     def unit(self) -> Expectation:
-        self.vim.cmd('HandlerStart')
+        self.vim.cmd('HandlerStage1')
         self.vim.cmd_sync('Unit')
-        return self._log_line(-1, be_just('unit'))
+        return self._log_line(-1, be_just(end_with('unit')))
 
     def est(self) -> Expectation:
-        self.vim.cmd('HandlerStart')
+        self.vim.cmd('HandlerStage1')
         self.vim.cmd_sync('Est')
         return self._log_line(-1, be_just(end_with(': est')))
 

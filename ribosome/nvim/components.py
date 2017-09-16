@@ -519,6 +519,10 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def __init__(self, vim: neovim.Nvim, prefix: str) -> None:
         super().__init__(vim, vim, prefix)
 
+    @property
+    def channel_id(self) -> int:
+        return self.vim.channel_id
+
     def runtime(self, path: str, verbose=True):
         return self.cmd_sync('runtime! {}.vim'.format(path), verbose=verbose)
 

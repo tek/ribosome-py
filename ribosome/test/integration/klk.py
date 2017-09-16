@@ -1,6 +1,6 @@
 import time
 from datetime import datetime
-from typing import Callable, Any, Union, Type, TypeVar
+from typing import Callable, Any, Union, Type, TypeVar, Generic
 
 from amino.test.spec import default_timeout
 from amino import List, __
@@ -17,9 +17,11 @@ from kallikrein.matchers.either import be_right
 from kallikrein.matchers.typed import have_type
 
 from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationSpec, ExternalIntegrationSpec,
-                                            PluginIntegrationSpec)
+                                            PluginIntegrationSpec, AutoPluginIntegrationSpec)
 from ribosome.nvim.components import Buffer
 from ribosome.machine import Message
+from ribosome.settings import PluginSettings
+from ribosome.machine.state import AutoData
 
 
 def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> Expectation:
@@ -146,5 +148,14 @@ class ExternalIntegrationKlkSpec(ExternalIntegrationSpec, VimIntegrationKlkHelpe
 class PluginIntegrationKlkSpec(PluginIntegrationSpec, VimIntegrationKlkHelpers):
     pass
 
+
+Settings = TypeVar('Settings', bound=PluginSettings)
+Data = TypeVar('Data', bound=AutoData)
+
+
+class AutoPluginIntegrationKlkSpec(Generic[Settings, Data], AutoPluginIntegrationSpec[Settings, Data],
+                                   VimIntegrationKlkHelpers):
+    pass
+
 __all__ = ('VimIntegrationKlkHelpers', 'VimIntegrationKlkSpec', 'ExternalIntegrationKlkSpec',
-           'PluginIntegrationKlkSpec')
+           'PluginIntegrationKlkSpec', 'AutoPluginIntegrationKlkSpec')

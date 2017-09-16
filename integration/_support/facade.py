@@ -1,10 +1,12 @@
 from ribosome import command, function, NvimStatePlugin
 
-from amino import List
 from ribosome.logging import Logging
 
 
 class FacadeTestPlugin(NvimStatePlugin, Logging):
+
+    def state(self) -> None:
+        pass
 
     @function()
     def all_vars(self):

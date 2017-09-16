@@ -26,6 +26,10 @@ Coroutine = message('Coroutine', 'coro')
 TransitionException = message('TransitionException', 'context', 'exc')
 UpdateRecord = json_message('UpdateRecord', 'tpe', 'name')
 UpdateState = json_message('UpdateState', 'tpe', 'name')
+Stage1 = message('Stage1')
+Stage2 = message('Stage2')
+Stage3 = message('Stage3')
+Stage4 = message('Stage4')
 
 
 class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
@@ -46,4 +50,4 @@ class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
 __all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'RunNvimIO', 'RunNvimUnitIO', 'UnitIO', 'DataIO',
            'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg',
            'RunNvimIOAlg', 'Error', 'Warning', 'Debug', 'Coroutine', 'TransitionException', 'Info', 'UpdateRecord',
-           'UpdateState')
+           'UpdateState', 'Stage1', 'Stage2', 'Stage3', 'Stage4')
