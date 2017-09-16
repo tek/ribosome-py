@@ -20,7 +20,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'ribosome_start_host = ribosome.host:cli',
+            'ribosome_start_plugin = ribosome.cli:start_plugin',
         ],
     },
 )
