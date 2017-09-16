@@ -99,24 +99,26 @@ def log() -> Logger:
     return ribo_log
 
 
-def start(desc: str, target: str, cls: Callable[[str], Either[str, Tuple[str, Type[NP]]]]) -> None:
+def start(desc: str, target: str, cls: Callable[[str], Either[str, Tuple[str, Type[NP]]]]) -> int:
     def error(msg: str) -> None:
         log().error(f'invalid rplugin {desc} `{target}`: {msg}')
     try:
         cls(target).map(L(start_host)(_, True, PluginHost)).leffect(error)
+        return 0
     except Exception as e:
         log().caught_exception_error(f'starting host with {desc} `{target}`', e)
+        return 1
 
 
-def start_file(file: str) -> None:
-    start('file', file, cls_from_file)
+def start_file(file: str) -> int:
+    return start('file', file, cls_from_file)
 
 
-def start_cls(cls: str) -> None:
-    start('class', cls, cls_from_path)
+def start_cls(cls: str) -> int:
+    return start('class', cls, cls_from_path)
 
 
-def start_config(mod: str, name: str) -> None:
+def start_config(mod: str, name: str) -> int:
     def error(msg: ImportFailure) -> None:
         log().error(str(msg))
     def run(config: Config) -> None:
@@ -126,12 +128,10 @@ def start_config(mod: str, name: str) -> None:
         start_host((config.name, Plug), True, PluginHost)
     try:
         Either.import_name(mod, name).cata(error, run)
+        return 0
     except Exception as e:
         log().caught_exception_error(f'starting host from config', e)
+        return 1
 
 
-def cli() -> None:
-    start_file(sys.argv[1])
-
-
-__all__ = ('start_host', 'cli', 'start_file', 'start_cls')
+__all__ = ('start_host', 'start_file', 'start_cls')
