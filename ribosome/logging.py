@@ -64,7 +64,7 @@ def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: d
                 if options.development and options.spec else
                 options.file_log_level.value | logging.INFO
             )
-            logfile = Path('{}_ribo_{}'.format(prefix, os.getpid()))
+            logfile = Path(f'{prefix}_{vim.prefix}_{os.getpid()}')
             fmt = options.file_log_fmt.value / (lambda fmt: dict(fmt=fmt)) | dict()
             kw = merge(
                 file_kw,
