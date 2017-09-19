@@ -19,7 +19,7 @@ from kallikrein.matchers.typed import have_type
 from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationSpec, ExternalIntegrationSpec,
                                             PluginIntegrationSpec, AutoPluginIntegrationSpec)
 from ribosome.nvim.components import Buffer
-from ribosome.machine import Message
+from ribosome.machine.message_base import Message
 from ribosome.settings import PluginSettings
 from ribosome.machine.state import AutoData
 

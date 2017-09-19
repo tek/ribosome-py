@@ -5,7 +5,7 @@ from amino import List, Right, Left, Either, Id, IO
 from amino.state import IdState, StateT, EitherState
 from ribosome.logging import Logging
 from ribosome.request import msg_command
-from ribosome.machine import message
+from ribosome.machine.message_base import message
 from ribosome.machine.state import UnloopedRootMachine, SubMachine, SubTransitions
 from ribosome.nvim import NvimFacade, HasNvim, AsyncVimProxy
 from ribosome.data import Data

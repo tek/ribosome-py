@@ -5,7 +5,7 @@ from kallikrein.matchers import equal
 from kallikrein.matchers.maybe import be_just
 
 from ribosome.request.base import RequestHandler, MessageRequestHandler, JsonMessageRequestHandler
-from ribosome.machine import message
+from ribosome.machine.message_base import message
 
 BasicMessage = message('BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
 JsonMessage = message('JsonMessage', 'a', 'b')

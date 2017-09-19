@@ -9,9 +9,10 @@ from amino import List
 
 import ribosome.nvim.components
 from ribosome.nvim import NvimFacade
-from ribosome.machine import Message
+from ribosome.machine.message_base import Message
 from ribosome.logging import nvim_logging, Logging
-from ribosome.request import msg_command, msg_function, command, function, json_msg_command
+from ribosome.request.command import msg_command, command, json_msg_command
+from ribosome.request.function import msg_function, function
 from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
 from ribosome.rpc import rpc_handlers_json

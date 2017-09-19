@@ -2,10 +2,11 @@ import re
 import abc
 from typing import Callable
 
-from ribosome.machine import message, handle, may_handle
+from ribosome.machine.message_base import message
 from ribosome.nvim import HasNvim, NvimFacade, ScratchBuffer
 from ribosome.machine.state import KillMachine, SubMachine
 from ribosome.machine.base import UnitIO
+from ribosome.machine.transition import may_handle, handle
 
 from amino import Map, Boolean, __, Empty
 from amino.io import IO

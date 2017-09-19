@@ -25,10 +25,10 @@ from amino.util.string import decode
 from amino.util.fun import format_funcall
 from amino.lazy import lazy
 from amino.io import IOException
+from amino.util.numeric import parse_int
 
 import ribosome
 from ribosome.logging import Logging
-from ribosome.request.base import parse_int
 
 
 def squote(text: str) -> str:

@@ -3,8 +3,8 @@ from kallikrein import Expectation
 from amino import Map
 
 from ribosome.plugin import Config, PluginSettings
-from ribosome.machine import message
-from ribosome.machine.state import SubTransitions, AutoData
+from ribosome.machine.message_base import message
+from ribosome.machine.state import SubTransitions
 from ribosome.machine import trans
 from ribosome.machine.messages import Stage1
 from ribosome.settings import RequestHandlers, RequestHandler, Plain

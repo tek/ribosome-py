@@ -23,7 +23,7 @@ from ribosome import NvimFacade, NvimPlugin
 from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
 from ribosome.rpc import rpc_handlers, RpcHandlerSpec
-from ribosome.machine import Message
+from ribosome.machine.message_base import Message
 from ribosome.record import decode_json
 from ribosome.settings import PluginSettings, Config
 from ribosome.machine.state import AutoData

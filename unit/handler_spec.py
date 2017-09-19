@@ -4,7 +4,7 @@ from kallikrein import Expectation, k
 from kallikrein.matchers.typed import have_type
 from kallikrein.matchers.maybe import be_just
 
-from ribosome.machine import trans, message
+from ribosome.machine.message_base import trans, message
 from ribosome.machine.messages import RunIOAlg
 from ribosome.machine.handler import AlgResultValidator
 from ribosome.machine.trans import Transit
