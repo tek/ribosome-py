@@ -166,7 +166,7 @@ class AutoPlugin(Generic[Settings, D], NvimStatePlugin, metaclass=AutoPluginMeta
 
     def create_root(self) -> AutoRootMachine[Settings, D]:
         title = self.plugin_name
-        return AutoRootMachine(self.vim, self.config, title)
+        return AutoRootMachine(self.vim.proxy, self.config, title)
 
     def stage_1(self) -> None:
         self.root.start()
