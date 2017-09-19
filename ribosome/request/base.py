@@ -2,20 +2,14 @@ import abc
 import json
 import inspect
 from numbers import Number
-from typing import Callable, Any, Tuple, Union
+from typing import Callable, Any, Tuple, Union, Generic, TypeVar, Type
 
 from amino import List, Maybe, Right, Left, may, _, Just, Map, Try, Either
 from amino.util.string import camelcaseify
 
 import ribosome
+from ribosome.machine.message_base import Message
 from ribosome.logging import Logging
-
-
-def parse_int(i: Any) -> Either[str, int]:
-    return Right(i) if isinstance(i, int) else (
-        Right(int(i)) if isinstance(i, str) and i.isdigit() else
-        Left('could not parse int {}'.format(i))
-    )
 
 
 def to_int(val: Union[int, str, None]) -> Union[int, str, None]:
@@ -154,13 +148,16 @@ class RequestHandler(Logging, metaclass=abc.ABCMeta):
             return self.error(args)
 
 
-class MessageRequestHandler(RequestHandler):
+M = TypeVar('M', bound=Message)
 
-    def __init__(self, fun: Callable[[], Any], msg: type, sync=False, **kw) -> None:
+
+class MessageRequestHandler(Generic[M], RequestHandler):
+
+    def __init__(self, fun: Callable[[], Any], msg: Type[M], sync: bool=False, **kw: Any) -> None:
         self._message = msg
         self._fun_name = fun.__name__
         self._sync = sync
-        super().__init__(self._message.__init__, sync=sync, **kw)  # type: ignore
+        super().__init__(self._message.__init__, sync=sync, **kw)
 
     @property
     def _infer_name(self):
@@ -199,9 +196,9 @@ class MessageRequestHandler(RequestHandler):
         return msg_dispatch_wrapper
 
 
-class JsonMessageRequestHandler(MessageRequestHandler):
+class JsonMessageRequestHandler(Generic[M], MessageRequestHandler):
 
-    def __init__(self, fun: Callable[[], Any], msg: type, **kw) -> None:
+    def __init__(self, fun: Callable[[], Any], msg: Type[M], **kw) -> None:
         super(JsonMessageRequestHandler, self).__init__(fun, msg, **kw)
 
     @property
