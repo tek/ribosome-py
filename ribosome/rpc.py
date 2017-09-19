@@ -341,8 +341,8 @@ def rpc_handlers_json(plugin_class: type) -> List[str]:
         return list(rpc_handlers(plugin_class) / _.encode)
 
 
-def rpc_handler_functions(plugin_class: type) -> List[RpcHandlerFunction]:
-    return Lists.wrap(inspect.getmembers(plugin_class)).flat_map2(handler_function)
+def rpc_handler_functions(plugin: Any) -> List[RpcHandlerFunction]:
+    return Lists.wrap(inspect.getmembers(plugin)).flat_map2(handler_function)
 
 __all__ = ('RpcHandlerSpec', 'handler', 'define_handler', 'define_handlers', 'rpc_handlers', 'rpc_handlers_json',
            'rpc_handler_functions')

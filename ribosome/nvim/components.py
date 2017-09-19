@@ -47,13 +47,13 @@ A = TypeVar('A')
 
 
 def echo(text: Union[str, List[str]], cmd: str='echom', prefix: Maybe[str]=Empty()) -> List[str]:
-    lines = text if isinstance(text, List) else Lists.lines(text)
+    lines = text if isinstance(text, List) else Lists.lines(str(text))
     pre = prefix.map(_ + ': ') | ''
     return lines.map(lambda a: '{} "{}{}"'.format(cmd, pre, dquote(a)))
 
 
 def echohl(text: Union[str, List[str]], hl: str, prefix: Maybe[str]=Empty()) -> List[str]:
-    return echo(text).cons(f'echohl {hl}').cat('echohl None')
+    return echo(text, prefix=prefix).cons(f'echohl {hl}').cat('echohl None')
 
 
 def not_on_main_thread() -> bool:
@@ -68,12 +68,12 @@ R = TypeVar('R', bound=Remote)
 class NvimComponent(Generic[R], Logging):
 
     def __init__(self, vim: Nvim, target: Union['NvimComponent', 'AsyncVimProxy', R], prefix: str) -> None:
-        if ribosome.in_vim and isinstance(target, (AsyncVimProxy, NvimComponent)):
-            msg = '{} created with non-native target {}'
-            raise Exception(msg.format(self, target))
         self.vim = vim
         self.target = target
         self.prefix = prefix
+        if ribosome.in_vim and isinstance(target, (AsyncVimProxy, NvimComponent)):
+            msg = '{} created with non-native target {}'
+            raise Exception(msg.format(self, target))
         self._vars = Vars(self)
         self._options = Options(self)
 
@@ -208,9 +208,9 @@ class NvimComponent(Generic[R], Logging):
 
     def _cmd_success(self, line: str, result, sync: bool) -> None:
         if sync:
-            self.log.debug('result of cmd \'{}\': {}'.format(line, result))
+            self.log.debug1(lambda: f'result of cmd \'{line}\': {result}')
         else:
-            self.log.debug('async cmd \'{}\''.format(line))
+            self.log.debug1('async cmd \'{}\''.format(line))
 
     def _cmd_error(self, line, exc, sync, report: bool) -> None:
         if not report:
@@ -577,15 +577,13 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         )
 
     def _call_error(self, name: str, args: tuple, kw: dict, err: Exception, sync: bool) -> None:
-        if amino.development:
-            a = '' if sync else 'a'
-            msg = f'calling {a}sync nvim function `{format_funcall(name, args, kw)}`'
-            if isinstance(err, Exception):
-                self.log.caught_exception(msg, err)
-            else:
-                self.log.error(f'{msg}: {err}')
-        else:
-            self.log.error(decode(err))
+        a = '' if sync else 'a'
+        header = f'calling {a}sync nvim function `{format_funcall(name, args, kw)}`'
+        thread_error = str(err) == "'NoneType' object has no attribute 'switch'"
+        msg = 'thread scheduling error' if isinstance(err, Exception) and thread_error else str(err)
+        if isinstance(err, Exception) and amino.development:
+            self.log.caught_exception(header, err)
+        self.log.error(f'{header}: {msg}')
 
     def eval(self, expr):
         return self.vim.eval(expr)

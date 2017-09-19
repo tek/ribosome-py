@@ -24,7 +24,7 @@ from ribosome.machine.handler import DynHandlerJob
 from ribosome.machine.modular import ModularMachine, ModularMachine2
 from ribosome.machine.transitions import Transitions
 from ribosome.machine import trans
-from ribosome.settings import PluginSettings, Config
+from ribosome.settings import PluginSettings, Config, AutoData
 from ribosome.record import field
 
 import amino
@@ -480,14 +480,6 @@ class UnloopedRootMachine(UnloopedStateMachine, RootMachineBase):
         RootMachineBase.__init__(self, vim, plugins)
 
 
-class AutoData(Data):
-    config = field(Config)
-
-    @property
-    def _str_extra(self) -> List[Any]:
-        return List(self.config)
-
-
 Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D', bound=AutoData)
 
@@ -497,7 +489,7 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
     def __init__(self, vim: NvimFacade, config: Config[Settings, D], title: str) -> None:
         self.config = config
         self.available_plugins = self.config.plugins
-        active_plugins = config.settings.components.value_or(Nil).attempt(vim) | Nil
+        active_plugins = config.settings.components.value.attempt(vim).join | config.default_components
         UnloopedRootMachine.__init__(self, vim, active_plugins, title)
 
     def extra_plugin(self, name: str) -> Either[str, MachineI]:
