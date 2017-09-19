@@ -1,21 +1,19 @@
 from kallikrein import Expectation
 
-from amino import Map
+from amino import Map, __, List
 
 from ribosome.plugin import Config, PluginSettings
 from ribosome.machine.message_base import message
 from ribosome.machine.state import SubTransitions
 from ribosome.machine import trans
 from ribosome.machine.messages import Stage1
-from ribosome.settings import RequestHandlers, RequestHandler, Plain
+from ribosome.settings import RequestHandler, Plain, AutoData
 from ribosome.nvim import NvimIO
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 
-Msg = message('Msg')
-
-
-class Env(AutoData):
-    pass
+Msg1 = message('Msg1')
+Msg2 = message('Msg2')
+val = 71
 
 
 class Core(SubTransitions):
@@ -24,28 +22,26 @@ class Core(SubTransitions):
     def stage_1(self) -> None:
         pass
 
-    @trans.unit(Msg, trans.nio)
+    @trans.unit(Msg1, trans.nio)
     def msg1(self) -> NvimIO[None]:
-        return NvimIO(lambda v: v.vars.set('success', 1))
+        return NvimIO(__.vars.set('msg_cmd_success', val))
 
-
-class APSettings(PluginSettings):
-    pass
+    @trans.unit(Msg2, trans.nio)
+    def msg2(self) -> NvimIO[None]:
+        return NvimIO(__.vars.set('autocmd_success', val))
 
 
 auto_config = Config(
     name='plug',
-    prefix='plug',
-    state_type=Env,
     plugins=Map(core=Core),
-    settings=APSettings(),
-    request_handlers=RequestHandlers.cons(
-        RequestHandler.msg_cmd(Msg)('msg', prefix=Plain, sync=True)
+    request_handlers=List(
+        RequestHandler.msg_cmd(Msg1)('msg1', prefix=Plain(), sync=True),
+        RequestHandler.msg_autocmd(Msg2)('vim_resized', prefix=Plain())
     ),
 )
 
 
-class AutoPluginSpec(AutoPluginIntegrationKlkSpec[APSettings, Env]):
+class AutoPluginSpec(AutoPluginIntegrationKlkSpec[PluginSettings, AutoData]):
     '''
     zero-setup plugin $auto_plugin
     '''
@@ -66,7 +62,8 @@ class AutoPluginSpec(AutoPluginIntegrationKlkSpec[APSettings, Env]):
 
     def auto_plugin(self) -> Expectation:
         self.vim.cmd_once_defined('PlugStage1')
-        self.cmd_sync('Msg')
-        return self.var_becomes('success', 1)
+        self.cmd_sync('Msg1')
+        self.vim.doautocmd('VimResized')
+        return self.var_becomes('msg_cmd_success', val) & self.var_becomes('autocmd_success', val)
 
 __all__ = ('AutoPluginSpec',)
