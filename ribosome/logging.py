@@ -49,6 +49,23 @@ def ribosome_logger(name: str) -> Logger:
     return ribosome_root_logger.getChild(name)
 
 
+def ribosome_file_logging(name: str, file_kw: dict=dict()) -> None:
+    prefix_path = options.nvim_log_file.value | (lambda: amino.logging.log_dir() / 'nvim')
+    level = (
+        DDEBUG
+        if options.development and options.spec else
+        options.file_log_level.value | logging.DEBUG
+    )
+    logfile = Path(f'{prefix_path}_ribo_{name}_{os.getpid()}')
+    fmt = options.file_log_fmt.value / (lambda fmt: dict(fmt=fmt)) | dict()
+    kw = merge(
+        file_kw,
+        dict(level=level, logfile=logfile),
+        fmt
+    )
+    return amino_root_file_logging(**kw)
+
+
 def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: dict=dict()) -> logging.Handler:
     global _nvim_logging_initialized
     if not _nvim_logging_initialized:
@@ -58,24 +75,9 @@ def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: d
         handler.addFilter(nvim_filter)
         ribosome_root_logger.addHandler(handler)
         init_loglevel(handler, VERBOSE)
-        def file_log(prefix: str) -> logging.Handler:
-            level = (
-                DDEBUG
-                if options.development and options.spec else
-                options.file_log_level.value | logging.INFO
-            )
-            logfile = Path(f'{prefix}_{vim.prefix}_{os.getpid()}')
-            fmt = options.file_log_fmt.value / (lambda fmt: dict(fmt=fmt)) | dict()
-            kw = merge(
-                file_kw,
-                dict(level=level, logfile=logfile),
-                fmt
-            )
-            return amino_root_file_logging(**kw)
         _nvim_logging_initialized = True
-        logfile = options.nvim_log_file.value | str(Path.home() / '.cache' / 'ribosome' / 'nvim')
         options.ribo_log_file.value % (lambda f: amino_root_file_logging(logfile=Path(f), level=TEST))
-        return file_log(logfile)
+        return ribosome_file_logging(vim.prefix, file_kw)
 
 
 class Logging(amino.logging.Logging):
