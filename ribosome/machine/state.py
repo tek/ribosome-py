@@ -139,7 +139,7 @@ class StateMachineBase(ModularMachine):
     def _publish(self, msg):
         return self._messages.put(msg)
 
-    def send(self, msg: Message, prio=0.5):
+    def send(self, msg: Message):
         if self._messages is not None:
             return asyncio.run_coroutine_threadsafe(self._messages.put(msg), self._loop)
 
@@ -342,24 +342,27 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
             time.sleep(.01)
         self._loop.run_until_complete(coro)
 
-    async def send_and_process(self, msg: Message) -> None:
+    def send_and_process(self, msg: Message) -> None:
         if self._messages is not None:
-            await self._messages.put(msg)
-            await self._process_messages()
+            self._messages.put_nowait(msg)
+            if not self._loop.is_running():
+                self._loop.run_until_complete(self._process_messages())
 
     def send_thread(self, msg: Message, asy: bool) -> None:
         a = 'a' if asy else ''
-        desc = f'send {msg} {a}sync in {self.title}'
+        desc = f'send {msg} {a}sync at {msg.prio} in {self.title}'
         self.log.debug(desc)
         done = CFuture()
         def run() -> None:
+            self.log.test(f'proc {msg}')
             try:
-                self.run_coro_when_free(self.send_and_process(msg))
+                self.send_and_process(msg)
             except Exception as e:
                 self.log.caught_exception_error(desc, e)
                 done.set_result(False)
             else:
                 done.set_result(True)
+            self.log.test(f'end {msg}')
         threading.Thread(target=run).start()
         return done
 
