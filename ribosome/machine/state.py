@@ -1,6 +1,5 @@
 import time
-from typing import Callable, Awaitable, Generator, Any, Union, TypeVar, Generic, Type
-from typing import Optional  # noqa
+from typing import Callable, Awaitable, Generator, Any, Union, TypeVar, Generic, Type, Optional
 import abc
 import threading
 import asyncio
@@ -25,10 +24,9 @@ from ribosome.machine.modular import ModularMachine, ModularMachine2
 from ribosome.machine.transitions import Transitions
 from ribosome.machine import trans
 from ribosome.settings import PluginSettings, Config, AutoData
-from ribosome.record import field
 
 import amino
-from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, Nil
+from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried
 from amino.util.string import red, blue
 from amino.state import State
 
@@ -125,7 +123,7 @@ class StateMachineBase(ModularMachine):
         self.data = None
         self._messages: asyncio.PriorityQueue = None
         self.message_log = List()
-        ModularMachine.__init__(self, parent, title=None)
+        ModularMachine.__init__(self, parent, title=title)
 
     @property
     def init(self) -> Data:
@@ -430,7 +428,6 @@ class PluginStateMachine(MachineI):
         return msg.plug.process(data, msg.msg)
 
 
-# FIXME why is the title param ignored?
 class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
     def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title: str=None) -> None:
@@ -464,7 +461,7 @@ T = TypeVar('T', bound=Transitions)
 
 class SubMachine2(Generic[T], ModularMachine2[T], TransitionHelpers):
 
-    def __init__(self, vim: NvimFacade, trans: Type[T], parent: Optional[MachineI]=None, title: Optional[str]=None
+    def __init__(self, vim: NvimFacade, trans: Type[T], title: Optional[str], parent: Optional[MachineI]=None
                  ) -> None:
         super().__init__(parent, title)
         self.vim = vim
@@ -480,7 +477,7 @@ class SubMachine2(Generic[T], ModularMachine2[T], TransitionHelpers):
 
 class UnloopedRootMachine(UnloopedStateMachine, RootMachineBase):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title: str=Optional[None]) -> None:
+    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title: Optional[str]=None) -> None:
         debug = vim.vars.p('debug') | False
         UnloopedStateMachine.__init__(self, title=title, debug=debug)
         RootMachineBase.__init__(self, vim, plugins)
@@ -494,7 +491,7 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
 
     def __init__(self, vim: NvimFacade, config: Config[Settings, D], title: str) -> None:
         self.config = config
-        self.available_components = self.config.components
+        self.available_components = config.components
         additional_components = config.settings.components.value.attempt(vim).join | config.default_components
         components = config.core_components + additional_components
         UnloopedRootMachine.__init__(self, vim, components, title)
@@ -504,13 +501,16 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
             self.available_components
             .lift(name)
             .to_either(f'no auto plugin defined for `{name}`')
-            .flat_map(self.inst_auto)
+            .flat_map(self.inst_auto(name))
         )
 
-    def inst_auto(self, plug: Union[str, Type]) -> Either[str, MachineI]:
+    @curried
+    def inst_auto(self, name: str, plug: Union[str, Type]) -> Either[str, MachineI]:
         return (
-            Right(SubMachine2(self.vim, plug))
+            Right(SubMachine2(self.vim, plug, name, self))
             if isinstance(plug, type) and issubclass(plug, Transitions) else
+            Right(plug(self, name))
+            if isinstance(plug, type) and issubclass(plug, MachineBase) else
             Left(f'invalid tpe for auto plugin: {plug}')
         )
 
@@ -561,7 +561,7 @@ class SubTransitions(Transitions, TransitionHelpers):
 
     @trans.unit(UpdateState, trans.st)
     @do
-    def message_update_state(self) -> Generator[State[Data, None], Any, State[Data, None]]:
+    def message_update_state(self) -> Generator[State[Data, None], Any, None]:
         mod = __.update_from_opt(self.msg.options)
         l = yield self.state_lens(self.msg.tpe, self.msg.name)
         yield State.modify(lambda s: l.map(__.modify(mod)) | s)
@@ -569,6 +569,10 @@ class SubTransitions(Transitions, TransitionHelpers):
     def state_lens(self, tpe: str, name: str) -> State[Data, Maybe[Lens]]:
         return State.pure(Nothing)
 
+
+class Component(SubTransitions):
+    pass
+
 __all__ = ('StateMachine', 'PluginStateMachine', 'AsyncIOThread', 'StateMachineBase', 'UnloopedStateMachine',
            'PluginStateMachine', 'RootMachineBase', 'RootMachine', 'UnloopedRootMachine', 'SubMachine',
-           'SubTransitions')
+           'SubTransitions', 'Component')

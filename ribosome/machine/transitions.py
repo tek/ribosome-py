@@ -4,6 +4,7 @@ from amino.lazy import lazy
 from ribosome.data import Data
 from ribosome.machine.message_base import Message
 from ribosome.machine.interface import MachineI
+from ribosome.nvim import NvimFacade
 
 
 class Transitions:
@@ -35,5 +36,9 @@ class Transitions:
 
     def with_local(self, new_data):
         return self.data.with_sub_state(self.name, new_data)
+
+    @property
+    def vim(self) -> NvimFacade:
+        return self.machine.vim
 
 __all__ = ('Transitions',)

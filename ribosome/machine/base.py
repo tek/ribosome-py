@@ -1,7 +1,7 @@
 import time
 import uuid
 import inspect
-from typing import Callable, TypeVar, Type, Any, Generic
+from typing import Callable, TypeVar, Type, Any, Generic, Optional
 import asyncio
 
 import toolz
@@ -44,18 +44,16 @@ def unit_nio(f: Callable[[NvimFacade], None]) -> RunNvimUnitIO:
 class MachineBase(Generic[D], MachineI):
     _data_type = Data
 
-    def __init__(self, parent: 'Machine'=None, title=None) -> None:
-        self.parent = Maybe(parent)
-        self._title = Maybe(title)
+    def __init__(self, parent: Optional[MachineI]=None, title: Optional[str]=None) -> None:
+        self.parent = Maybe.optional(parent)
+        self._title = Maybe.optional(title)
         self.uuid = uuid.uuid4()
         self._reports = List()
         self._min_report_time = 0.1
 
     @property
-    def title(self):
-        return self._title.or_else(
-            List.wrap(type(self).__module__.rsplit('.')).reversed.lift(1)
-        ) | 'machine'
+    def title(self) -> str:
+        return self._title.o(List.wrap(type(self).__module__.rsplit('.')).reversed.lift(1)) | 'machine'
 
     @lazy
     def _message_handlers(self):
