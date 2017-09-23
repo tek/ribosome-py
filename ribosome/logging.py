@@ -57,11 +57,9 @@ def ribosome_file_logging(name: str, file_kw: dict=dict()) -> None:
         options.file_log_level.value | logging.DEBUG
     )
     logfile = Path(f'{prefix_path}_ribo_{name}_{os.getpid()}')
-    fmt = options.file_log_fmt.value / (lambda fmt: dict(fmt=fmt)) | dict()
     kw = merge(
         file_kw,
-        dict(level=level, logfile=logfile),
-        fmt
+        dict(level=level, logfile=logfile)
     )
     return amino_root_file_logging(**kw)
 
@@ -76,7 +74,8 @@ def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: d
         ribosome_root_logger.addHandler(handler)
         init_loglevel(handler, VERBOSE)
         _nvim_logging_initialized = True
-        options.ribo_log_file.value % (lambda f: amino_root_file_logging(logfile=Path(f), level=TEST))
+        fmt = options.file_log_fmt.value / (lambda fmt: dict(fmt=fmt)) | dict()
+        options.ribo_log_file.value % (lambda f: amino_root_file_logging(logfile=Path(f), level=TEST, **fmt))
         return ribosome_file_logging(vim.prefix, file_kw)
 
 
