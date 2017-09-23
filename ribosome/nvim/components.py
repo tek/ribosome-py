@@ -672,6 +672,13 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def define_function(self, name: str, params: List[str], body: str) -> None:
         self.cmd_sync(f'function! {name}({params.join_comma})\n{body}\nendfunction')
 
+    def cd(self, dir: Path) -> None:
+        return self.vim.chdir(str(dir))
+
+    @property
+    def cwd(self) -> Either[str, Path]:
+        return self.call('getcwd') // L(Try)(Path, _)
+
 
 class AsyncVimCallProxy(Generic[A]):
 
