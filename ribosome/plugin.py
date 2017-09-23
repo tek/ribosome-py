@@ -17,7 +17,7 @@ from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
 from ribosome.rpc import rpc_handlers_json
 from ribosome.record import encode_json
-from ribosome.machine.messages import UpdateState, Stage1, Stage2, Stage3, Stage4
+from ribosome.machine.messages import UpdateState, Stage1, Stage2, Stage3, Stage4, Quit
 from ribosome.machine.state import AutoRootMachine, AutoData, RootMachineBase
 from ribosome.settings import Config, PluginSettings, Full, Short
 
@@ -174,13 +174,16 @@ class AutoPlugin(Generic[Settings, D], NvimStatePlugin, metaclass=AutoPluginMeta
         self.root.send(Stage1())
 
     def stage_2(self) -> None:
-        self.root.send(Stage2())
+        self.root.send(Stage2().at(0.6))
 
     def stage_3(self) -> None:
-        self.root.send(Stage3())
+        self.root.send(Stage3().at(0.7))
 
     def stage_4(self) -> None:
-        self.root.send(Stage4())
+        self.root.send(Stage4().at(0.8))
+
+    def quit(self) -> None:
+        self.root.send(Quit())
 
     def state(self) -> RootMachineBase:
         return self.root
