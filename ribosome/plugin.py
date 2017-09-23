@@ -17,7 +17,7 @@ from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
 from ribosome.rpc import rpc_handlers_json
 from ribosome.record import encode_json
-from ribosome.machine.messages import UpdateState, Stage1
+from ribosome.machine.messages import UpdateState, Stage1, Stage2, Stage3, Stage4
 from ribosome.machine.state import AutoRootMachine, AutoData, RootMachineBase
 from ribosome.settings import Config, PluginSettings, Full, Short
 
@@ -173,6 +173,15 @@ class AutoPlugin(Generic[Settings, D], NvimStatePlugin, metaclass=AutoPluginMeta
         self.root.wait_for_running()
         self.root.send(Stage1())
 
+    def stage_2(self) -> None:
+        self.root.send(Stage2())
+
+    def stage_3(self) -> None:
+        self.root.send(Stage3())
+
+    def stage_4(self) -> None:
+        self.root.send(Stage4())
+
     def state(self) -> RootMachineBase:
         return self.root
 
@@ -244,11 +253,11 @@ def setup_auto_plugin(cls: Type[AutoPlugin], config: Config[Settings, D]) -> Non
         dispatcher = handler.dispatcher
         helper = (
             help.short_handler
-            if handler.prefix is Short else
+            if isinstance(handler.prefix, Short) else
             help.name_handler
-            if handler.prefix is Full else
+            if isinstance(handler.prefix, Full) else
             help.handler
         )
-        helper(handler.name, dispatcher.decorator(), lambda: None, *dispatcher.args)
+        helper(handler.name, dispatcher.decorator(), lambda: None, *dispatcher.args, **handler.options)
 
 __all__ = ('NvimPlugin', 'NvimStatePlugin')

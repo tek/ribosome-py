@@ -137,9 +137,13 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def _nvim_facade(self, vim: Nvim) -> NvimFacade:
         return NvimFacade(vim, self._prefix)
 
-    @property
+    @abc.abstractproperty
     def _prefix(self) -> str:
-        return ''
+        ...
+
+    @abc.abstractmethod
+    def plugin_name(self) -> str:
+        ...
 
     def teardown(self) -> None:
         IntegrationSpecBase.teardown(self)
@@ -197,6 +201,9 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     @property
     def content(self) -> List[str]:
         return self.vim.buffer.content
+
+    def message_log(self) -> Either[str, List[Message]]:
+        return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
 
 
 def main_looped(fun):
@@ -324,9 +331,6 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
     def state(self) -> Any:
         return self.vim.call(f'{self.plugin_prefix}State').flat_map(decode_json).get_or_raise
 
-    def message_log(self) -> Either[str, List[Message]]:
-        return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
-
     @property
     def rplugin_path(self) -> Either[str, Path]:
         return self.plugin_class / self._auto_rplugin
@@ -362,6 +366,10 @@ class AutoPluginIntegrationSpec(Generic[Settings, Data], VimIntegrationSpec):
     @abc.abstractmethod
     def config_name(self) -> str:
         ...
+
+    @property
+    def plugin_name(self) -> str:
+        return camelcase(self._prefix)
 
     @property
     def autostart_plugin(self) -> bool:

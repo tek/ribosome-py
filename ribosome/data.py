@@ -2,13 +2,14 @@ from amino import Map
 
 from typing import Callable, Any
 
-from ribosome.record import Record, field, maybe_field
+from ribosome.record import Record, field, maybe_field, bool_field
 from ribosome.nvim import NvimFacade, AsyncVimProxy
 
 
 class Data(Record):
     vim_facade = maybe_field((NvimFacade, AsyncVimProxy))
     sub_states = field(Map, initial=Map())
+    debug = bool_field()
 
     def sub_state_m(self, name):
         return self.sub_states.get(name)

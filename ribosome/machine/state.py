@@ -384,11 +384,17 @@ class PluginStateMachine(MachineI):
         def report(errs):
             msg = 'invalid {} plugin module "{}": {}'
             self.log.error(msg.format(self.title, name, errs))
-        return (self._find_plugin(name) // self._inst_plugin).o(lambda: self.extra_plugin(name)).leffect(report)
+        return (
+            (self._find_plugin(name) // self._inst_plugin)
+            .lmap(List)
+            .accum_error_f(lambda: self.extra_plugin(name).lmap(List))
+            .leffect(report)
+        )
 
     def _find_plugin(self, name: str):
         mods = List(
             Either.import_module(name),
+            Either.import_module('{}.components.{}'.format(self.title, name)),
             Either.import_module('{}.plugins.{}'.format(self.title, name))
         )
         # TODO .traverse(_.swap).swap
@@ -488,15 +494,16 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
 
     def __init__(self, vim: NvimFacade, config: Config[Settings, D], title: str) -> None:
         self.config = config
-        self.available_plugins = self.config.plugins
-        active_plugins = config.settings.components.value.attempt(vim).join | config.default_components
-        UnloopedRootMachine.__init__(self, vim, active_plugins, title)
+        self.available_components = self.config.components
+        additional_components = config.settings.components.value.attempt(vim).join | config.default_components
+        components = config.core_components + additional_components
+        UnloopedRootMachine.__init__(self, vim, components, title)
 
     def extra_plugin(self, name: str) -> Either[str, MachineI]:
         return (
-            self.available_plugins
+            self.available_components
             .lift(name)
-            .to_either(f'no auto plugin defined for`{name}`')
+            .to_either(f'no auto plugin defined for `{name}`')
             .flat_map(self.inst_auto)
         )
 

@@ -52,10 +52,10 @@ class PluginSetting(Generic[A, B], ToStr):
 
     @property
     def value_or_default(self) -> NvimIO[A]:
-        return self.value / __.value_or(self.default)
+        return self.value / __.get_or_else(self.default)
 
     def value_or(self, default: A) -> NvimIO[A]:
-        return self.value / __.value_or(default)
+        return self.value / __.get_or_else(default)
 
     def _arg_desc(self) -> List[str]:
         return List(self.name, str(self.prefix), str(self.tpe))
@@ -88,7 +88,7 @@ components_help = '''The plugin can run an arbitrary set of sub-components that 
 They receive all messages the core of the plugin processes and have access to the plugin state.
 They can define nvim request handlers with the decorator `trans.xyz`.
 The entries of this setting can either be names of the builtin components or arbitrary python module paths that define
-custom plugins.
+custom components.
 '''
 str_setting = setting_ctor(str, lambda a: Right(a))
 list_setting = setting_ctor(list, cast(Callable[[Iterable[A]], Either[str, List[B]]], (lambda a: Right(Lists.wrap(a)))))
@@ -168,11 +168,17 @@ class Plain(PrefixStyle):
 
 class RequestHandler(ToStr):
 
-    def __init__(self, dispatcher: RequestDispatcher, name: str, prefix: PrefixStyle=Short(), sync: bool=False) -> None:
+    def __init__(
+            self,
+            dispatcher: RequestDispatcher,
+            name: str,
+            prefix: PrefixStyle=Short(),
+            options: Map[str, Any]=Map()
+    ) -> None:
         self.dispatcher = dispatcher
         self.name = name
         self.prefix = prefix
-        self.sync = sync
+        self.options = options
 
     @staticmethod
     def msg_cmd(msg: Type[M]) -> 'RequestHandlerBuilder':
@@ -186,8 +192,12 @@ class RequestHandler(ToStr):
     def msg_autocmd(msg: Type[M]) -> 'RequestHandlerBuilder':
         return RequestHandlerBuilder(MsgAutocmd(msg))
 
+    @staticmethod
+    def json_msg_cmd(msg: Type[M]) -> 'RequestHandlerBuilder':
+        return RequestHandlerBuilder(JsonMsgCmd(msg))
+
     def _arg_desc(self) -> List[str]:
-        return List(str(self.dispatcher), self.name, str(self.prefix), str(self.sync))
+        return List(str(self.dispatcher), self.name, str(self.prefix), str(self.options))
 
 
 class RequestHandlerBuilder:
@@ -195,8 +205,8 @@ class RequestHandlerBuilder:
     def __init__(self, dispatcher: RequestDispatcher) -> None:
         self.dispatcher = dispatcher
 
-    def __call__(self, name: str, prefix: PrefixStyle=Short(), sync: bool=False) -> RequestHandler:
-        return RequestHandler(self.dispatcher, name, prefix, sync)
+    def __call__(self, name: str, prefix: PrefixStyle=Short(), **options: Any) -> RequestHandler:
+        return RequestHandler(self.dispatcher, name, prefix, Map(options))
 
 
 class RequestHandlers(ToStr):
@@ -223,22 +233,24 @@ class Config(Generic[Settings, S], ToStr):
             self,
             name: str,
             prefix: Optional[str]=None,
-            plugins: Map[str, Union[str, Type[T]]]=Map(),
+            components: Map[str, Union[str, Type[T]]]=Map(),
             state_type: Optional[Type[S]]=None,
             settings: Optional[Settings]=None,
             request_handlers: List[RequestHandler]=Nil,
+            core_components: List[str]=Nil,
             default_components: List[str]=Nil
     ) -> None:
         self.name = name
         self.prefix = prefix or name
-        self.plugins = plugins
+        self.components = components
         self.state_type = state_type or AutoData
         self.settings = settings or PluginSettings()
         self.request_handlers = RequestHandlers.cons(*request_handlers)
+        self.core_components = core_components
         self.default_components = default_components
 
     def _arg_desc(self) -> List[str]:
-        return List(str(self.plugins), str(self.settings), str(self.request_handlers))
+        return List(str(self.components), str(self.settings), str(self.request_handlers))
 
 
 class AutoData(Data):
@@ -247,6 +259,10 @@ class AutoData(Data):
     @property
     def _str_extra(self) -> List[Any]:
         return List(self.config)
+
+    @property
+    def settings(self) -> Settings:
+        return self.config.settings
 
 __all__ = ('PluginSetting', 'setting_ctor', 'PluginSettings', 'str_setting', 'list_setting', 'Config',
            'RequestHandlers', 'RequestHandler')
