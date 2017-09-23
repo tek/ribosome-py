@@ -1,7 +1,6 @@
-import abc
 import inspect
 import functools
-from typing import TypeVar, Type, Callable, Tuple, Generic, Generator, Any
+from typing import TypeVar, Type, Callable, Tuple, Generator, Any
 from types import ModuleType
 
 from neovim.msgpack_rpc import MsgpackStream, AsyncSession, Session
@@ -28,14 +27,7 @@ NP = TypeVar('NP', bound=NvimPlugin)
 D = TypeVar('D')
 
 
-class PluginHostI(Generic[D], Host, Logging):
-
-    @abc.abstractmethod
-    def _load(self, data: D) -> None:
-        ...
-
-
-class PluginHost(PluginHostI[Tuple[str, Type[NP]]]):
+class PluginHost(Host, Logging):
 
     def _load(self, data: Tuple[str, Type[NP]]) -> None:
         amino_log.debug(f'loading host with {data}')
@@ -64,18 +56,15 @@ def session(Loop: Loop, *args: str, transport_type: str='stdio', **kwargs: str) 
     return Session(AsyncSession(MsgpackStream(Loop(transport_type, *args, **kwargs))))
 
 
-PH = TypeVar('PH', bound=PluginHostI)
-
-
-def host(loop: Loop, tpe: Type[PH]) -> PH:
+def host(loop: Loop) -> PluginHost:
     sess = session(loop)
     nvim = Nvim.from_session(sess)
-    return tpe(nvim)
+    return PluginHost(nvim)
 
 
-def start_host(data: D, uv_loop: bool, tpe: Type[PluginHostI[D]]) -> int:
+def start_host(data: Tuple[str, Type[NP]], uv_loop: bool) -> int:
     Loop = UvEventLoop if uv_loop else AsyncioEventLoop
-    host(Loop, tpe).start(data)
+    host(Loop).start(data)
     return 0
 
 
@@ -119,7 +108,7 @@ def start(desc: str, target: str, cls: Callable[[str], Either[str, Tuple[str, Ty
         nvim_log().error(err)
     try:
         amino_log.debug(f'starting rplugin {desc} `{target}`')
-        cls(target).map(L(start_host)(_, True, PluginHost)).leffect(error)
+        cls(target).map(L(start_host)(_, True)).leffect(error)
         return 0
     except Exception as e:
         nvim_log().caught_exception_error(f'starting host with {desc} `{target}`', e)
@@ -137,7 +126,7 @@ def start_config_stage_1(cls: Either[str, Type[NP]], config: Config) -> int:
     class Plug(sup, config=config, pname=config.name, prefix=config.prefix, debug=debug):
         def __init__(self, vim: Nvim) -> None:
             super().__init__(vim, config)
-    return start_host((config.name, Plug), True, PluginHost)
+    return start_host((config.name, Plug), True)
 
 
 def setup_log() -> None:
