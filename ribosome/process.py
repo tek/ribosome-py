@@ -7,9 +7,10 @@ from typing import Tuple
 import asyncio
 from asyncio.subprocess import PIPE
 
-from amino import Map, Future, __, Boolean, _, L
+from amino import Map, Future, __, Boolean, _, L, List
 from amino.lazy import lazy
 from amino.either import Right, Left
+from amino.util.string import ToStr
 
 import ribosome
 from ribosome.logging import Logging
@@ -17,7 +18,7 @@ from ribosome.nvim import NvimFacade
 from ribosome.record import Record, any_field, field, list_field, maybe_field, map_field
 
 
-class Result(object):
+class Result(ToStr):
 
     def __init__(self, job: 'Job', success: bool, out: str, err: str) -> None:
         self.job = job
@@ -25,13 +26,8 @@ class Result(object):
         self.out = out
         self.err = err
 
-    def __str__(self):
-        return ('subprocess finished successfully'
-                if self.success
-                else 'subprocess failed: {} ({})'.format(self.msg, self.job))
-
-    def __repr__(self):
-        return '{}({}, {}, {})'.format(self.__class__.__name__, self.job, self.success, self.msg)
+    def _arg_desc(self) -> List[str]:
+        return List(str(self.job), str(self.success), self.msg)
 
     @property
     def msg(self):
@@ -124,6 +120,7 @@ class ProcessExecutor(Logging, abc.ABC):
         self.current = Map()  # type: Map[Any, Job]
 
     async def process(self, job: Job):
+        self.log.debug(f'creating subprocess for {job}')
         return await asyncio.create_subprocess_exec(
             job.exe,
             *job.args,
@@ -142,6 +139,7 @@ class ProcessExecutor(Logging, abc.ABC):
             out, err = None, None
             with self.main_loop_ctx():
                 proc = await self.process(job)
+                self.log.debug(f'awaiting {job} on the main loop')
                 out, err = await proc.communicate(job.stdin)
             if out is None or err is None:
                 return error('executing {} failed'.format(job))
@@ -158,8 +156,7 @@ class ProcessExecutor(Logging, abc.ABC):
         returned by ensure_future(), obtainable via task.result()
         '''
         if not self.watcher_ready:
-            msg = 'child watcher unattached when executing {}'.format(job)
-            self.log.error(msg)
+            self.log.error(f'child watcher unattached when executing {job}')
             job.cancel('unattached watcher')
         elif not self.can_execute(job):
             self.log.error('invalid execution job: {}'.format(job))
