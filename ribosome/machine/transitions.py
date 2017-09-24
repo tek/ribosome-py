@@ -1,4 +1,4 @@
-from amino import Map
+from amino import Map, Maybe, Just
 from amino.lazy import lazy
 
 from ribosome.data import Data
@@ -20,8 +20,8 @@ class Transitions(Machine):
         return self.machine.name
 
     @property
-    def parent(self) -> Machine:
-        return self.machine
+    def parent(self) -> Maybe[Machine]:
+        return Just(self.machine)
 
     @property
     def log(self):
