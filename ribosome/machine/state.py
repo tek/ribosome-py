@@ -462,8 +462,7 @@ T = TypeVar('T', bound=Transitions)
 
 class SubMachine2(Generic[T], ModularMachine2[T], TransitionHelpers):
 
-    def __init__(self, vim: NvimFacade, trans: Type[T], title: Optional[str], parent: Optional[MachineI]=None
-                 ) -> None:
+    def __init__(self, vim: NvimFacade, trans: Type[T], title: Optional[str], parent: Optional[MachineI]=None) -> None:
         super().__init__(parent, title)
         self.vim = vim
         self.trans = trans
@@ -510,8 +509,8 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
         return (
             Right(SubMachine2(self.vim, plug, name, self))
             if isinstance(plug, type) and issubclass(plug, Transitions) else
-            Right(plug(self, name))
-            if isinstance(plug, type) and issubclass(plug, MachineBase) else
+            Right(plug(self.vim, name, self))
+            if isinstance(plug, type) and issubclass(plug, SubMachine2) else
             Left(f'invalid tpe for auto plugin: {plug}')
         )
 
