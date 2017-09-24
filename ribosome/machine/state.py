@@ -460,7 +460,7 @@ class RootMachine(StateMachine, RootMachineBase):
 T = TypeVar('T', bound=Transitions)
 
 
-class SubMachine2(Generic[T], ModularMachine2[T], TransitionHelpers):
+class ComponentMachine(Generic[T], ModularMachine2[T], TransitionHelpers):
 
     def __init__(self, vim: NvimFacade, trans: Type[T], title: Optional[str], parent: Optional[MachineI]=None) -> None:
         super().__init__(parent, title)
@@ -524,10 +524,10 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
     @curried
     def inst_auto(self, name: str, plug: Union[str, Type]) -> Either[str, MachineI]:
         return (
-            Right(SubMachine2(self.vim, plug, name, self))
+            Right(ComponentMachine(self.vim, plug, name, self))
             if isinstance(plug, type) and issubclass(plug, Transitions) else
             Right(plug(self.vim, name, self))
-            if isinstance(plug, type) and issubclass(plug, SubMachine2) else
+            if isinstance(plug, type) and issubclass(plug, ComponentMachine) else
             Left(List(f'invalid tpe for auto component: {plug}'))
         )
 
@@ -591,4 +591,5 @@ class Component(SubTransitions):
     pass
 
 __all__ = ('StateMachine', 'PluginStateMachine', 'AsyncIOThread', 'StateMachineBase', 'UnloopedStateMachine',
-           'RootMachineBase', 'RootMachine', 'UnloopedRootMachine', 'SubMachine', 'SubTransitions', 'Component')
+           'RootMachineBase', 'RootMachine', 'UnloopedRootMachine', 'SubMachine', 'SubTransitions', 'Component',
+           'ComponentMachine')
