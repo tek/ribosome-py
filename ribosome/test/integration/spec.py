@@ -123,6 +123,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
             'PYTHONPATH={}'.format(path),
             'RIBOSOME_LOG_FILE={}'.format(self.logfile),
             'RIBOSOME_FILE_LOG_FMT=\'{}\''.format(self.log_format),
+            'AMINO_DEVELOPMENT=1',
         )
         cmd = tuple(tmux_env + self._cmdline)
         out = self._tmux_window.cmd('split-window', '-d', '-P', '-F#{pane_id}', *cmd).stdout

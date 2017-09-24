@@ -26,7 +26,7 @@ from ribosome.machine import trans
 from ribosome.settings import PluginSettings, Config, AutoData
 
 import amino
-from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried
+from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried, Boolean
 from amino.util.string import red, blue
 from amino.state import State
 
@@ -155,8 +155,8 @@ class StateMachineBase(ModularMachine):
     def eval_expr(self, expr: str, pre: Callable=lambda a, b: (a, b)):
         sub = self.sub
         sub_map = Map(sub / (lambda a: (a.title, a)))
-        data, plugins = pre(self.data, sub_map)
-        return Try(eval, expr, None, dict(data=data, plugins=plugins))
+        data, components = pre(self.data, sub_map)
+        return Try(eval, expr, None, dict(data=data, components=components))
 
     def _send(self, data, msg: Message):
         self.log_message(msg, self.title)
@@ -376,46 +376,46 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
 
 class PluginStateMachine(MachineI):
 
-    def __init__(self, plugins: List[str]) -> None:
-        self.sub = plugins.flat_map(self.start_plugin)
+    def __init__(self, components: List[str]) -> None:
+        self.sub = components.flat_map(self.start_components)
 
-    def start_plugin(self, name: str):
+    def start_components(self, name: str):
         def report(errs):
-            msg = 'invalid {} plugin module "{}": {}'
+            msg = 'invalid {} component module "{}": {}'
             self.log.error(msg.format(self.title, name, errs))
         return (
-            (self._find_plugin(name) // self._inst_plugin)
+            (self._find_component(name) // self._inst_component)
             .lmap(List)
-            .accum_error_f(lambda: self.extra_plugin(name).lmap(List))
+            .accum_error_f(lambda: self.extra_component(name))
             .leffect(report)
         )
 
-    def _find_plugin(self, name: str):
+    def _find_component(self, name: str) -> Either[List[str], MachineI]:
         mods = List(
             Either.import_module(name),
-            Either.import_module('{}.components.{}'.format(self.title, name)),
-            Either.import_module('{}.plugins.{}'.format(self.title, name))
+            Either.import_module(f'{self.title}.components.{name}'),
+            Either.import_module(f'{self.title}.plugins.{name}'),
         )
         # TODO .traverse(_.swap).swap
         errors = mods.filter(_.is_left) / _.value
         return mods.find(_.is_right) | Left(errors)
 
-    def _inst_plugin(self, mod):
+    def _inst_component(self, mod):
         return (
-            Try(getattr(mod, 'Plugin'), self.vim, self)
-            if hasattr(mod, 'Plugin')
-            else Left('module does not define class `Plugin`')
+            Try(getattr(mod, 'Component'), self.vim, self)
+            if hasattr(mod, 'Component')
+            else Left('module does not define class `Component`')
         )
 
-    def extra_plugin(self, name: str) -> Either[str, MachineI]:
-        return Left('not implemented')
+    def extra_component(self, name: str) -> Either[List[str], MachineI]:
+        return Left(List('not implemented'))
 
-    def plugin(self, title: str) -> Maybe[MachineBase]:
+    def component(self, title: str) -> Maybe[MachineBase]:
         return self.sub.find(_.title == title)
 
     def plug_command(self, plug_name: str, cmd_name: str, args: tuple=(), sync=False):
         sender = self.send_sync if sync else self.send
-        plug = self.plugin(plug_name)
+        plug = self.component(plug_name)
         cmd = plug.flat_map(lambda a: a.command(cmd_name, Lists.wrap(args)))
         plug.ap2(cmd, PlugCommand) % sender
 
@@ -424,16 +424,16 @@ class PluginStateMachine(MachineI):
 
     @may_handle(PlugCommand)
     def _plug_command(self, data, msg):
-        self.log.debug('sending command {} to plugin {}'.format(msg.msg, msg.plug.title))
+        self.log.debug('sending command {} to component {}'.format(msg.msg, msg.plug.title))
         self.log_message(msg.msg, self.title)
         return msg.plug.process(data, msg.msg)
 
 
 class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title: str=None) -> None:
+    def __init__(self, vim: NvimFacade, components: List[str]=List(), title: str=None) -> None:
         HasNvim.__init__(self, vim)
-        PluginStateMachine.__init__(self, plugins)
+        PluginStateMachine.__init__(self, components)
 
     @property
     def title(self):
@@ -452,9 +452,9 @@ class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
 class RootMachine(StateMachine, RootMachineBase):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title: str=Optional[None]) -> None:
+    def __init__(self, vim: NvimFacade, components: List[str]=List(), title: str=Optional[None]) -> None:
         StateMachine.__init__(self, title=title)
-        RootMachineBase.__init__(self, vim, plugins)
+        RootMachineBase.__init__(self, vim, components)
 
 
 T = TypeVar('T', bound=Transitions)
@@ -477,10 +477,10 @@ class SubMachine2(Generic[T], ModularMachine2[T], TransitionHelpers):
 
 class UnloopedRootMachine(UnloopedStateMachine, RootMachineBase):
 
-    def __init__(self, vim: NvimFacade, plugins: List[str]=List(), title: Optional[str]=None) -> None:
+    def __init__(self, vim: NvimFacade, components: List[str]=List(), title: Optional[str]=None) -> None:
         debug = vim.vars.p('debug') | False
         UnloopedStateMachine.__init__(self, title=title, debug=debug)
-        RootMachineBase.__init__(self, vim, plugins)
+        RootMachineBase.__init__(self, vim, components)
 
 
 Settings = TypeVar('Settings', bound=PluginSettings)
@@ -496,12 +496,29 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
         components = config.core_components + additional_components
         UnloopedRootMachine.__init__(self, vim, components, title)
 
-    def extra_plugin(self, name: str) -> Either[str, MachineI]:
+    def extra_component(self, name: str) -> Either[List[str], MachineI]:
+        auto = f'{self.title}.components.{name}'
+        return (
+            self.declared_component(name)
+            .accum_error_f(lambda: self.component_from_exports(auto))
+            .accum_error_f(lambda: self.component_from_exports(name))
+            .flat_map(self.inst_auto(name))
+        )
+
+    def declared_component(self, name: str) -> Either[List[str], MachineI]:
         return (
             self.available_components
             .lift(name)
-            .to_either(f'no auto plugin defined for `{name}`')
-            .flat_map(self.inst_auto(name))
+            .to_either(List(f'no auto component defined for `{name}`'))
+        )
+
+    @do
+    def component_from_exports(self, mod: str) -> Either[List[str], MachineI]:
+        exports = yield Either.exports(mod).lmap(List)
+        yield (
+            exports.find(L(Boolean.issubclass)(_, Component))
+            .to_either(f'none of `{mod}.__all__` is a `Component`: {exports}')
+            .lmap(List)
         )
 
     @curried
@@ -511,7 +528,7 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
             if isinstance(plug, type) and issubclass(plug, Transitions) else
             Right(plug(self.vim, name, self))
             if isinstance(plug, type) and issubclass(plug, SubMachine2) else
-            Left(f'invalid tpe for auto plugin: {plug}')
+            Left(List(f'invalid tpe for auto component: {plug}'))
         )
 
     @property
@@ -574,5 +591,4 @@ class Component(SubTransitions):
     pass
 
 __all__ = ('StateMachine', 'PluginStateMachine', 'AsyncIOThread', 'StateMachineBase', 'UnloopedStateMachine',
-           'PluginStateMachine', 'RootMachineBase', 'RootMachine', 'UnloopedRootMachine', 'SubMachine',
-           'SubTransitions', 'Component')
+           'RootMachineBase', 'RootMachine', 'UnloopedRootMachine', 'SubMachine', 'SubTransitions', 'Component')
