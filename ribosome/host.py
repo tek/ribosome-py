@@ -49,7 +49,7 @@ class PluginHost(Host, Logging):
         self._copy_attributes(handler.func, func)
         target = self._request_handlers if spec.sync else self._notification_handlers
         target[method] = func
-        amino_log.debug(f'registered {handler}')
+        amino_log.debug(f'registered {handler} for {file}')
 
 
 def session(Loop: Loop, *args: str, transport_type: str='stdio', **kwargs: str) -> Session:

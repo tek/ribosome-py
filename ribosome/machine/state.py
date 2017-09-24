@@ -354,7 +354,6 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         self.log.debug(desc)
         done = CFuture()
         def run() -> None:
-            self.log.test(f'proc {msg}')
             try:
                 self.send_and_process(msg)
             except Exception as e:
@@ -362,7 +361,6 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
                 done.set_result(False)
             else:
                 done.set_result(True)
-            self.log.test(f'end {msg}')
         threading.Thread(target=run).start()
         return done
 
