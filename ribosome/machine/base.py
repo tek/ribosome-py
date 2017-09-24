@@ -16,7 +16,7 @@ from ribosome.machine.message_base import Message
 from ribosome.logging import print_ribo_log_info
 from ribosome.data import Data
 from ribosome.nvim import NvimIO, NvimFacade
-from ribosome.machine.interface import MachineI
+from ribosome.machine.machine import Machine
 from ribosome.machine.transition import (Handler, TransitionResult, may_handle, Error, Debug, handle, _io_result,
                                          _recover_error, DynHandler)
 from ribosome.machine.message_base import _machine_attr
@@ -41,19 +41,27 @@ def unit_nio(f: Callable[[NvimFacade], None]) -> RunNvimUnitIO:
     return RunNvimUnitIO(NvimIO(f))
 
 
-class MachineBase(Generic[D], MachineI):
+class MachineBase(Generic[D], Machine):
     _data_type = Data
 
-    def __init__(self, parent: Optional[MachineI]=None, title: Optional[str]=None) -> None:
-        self.parent = Maybe.optional(parent)
-        self._title = Maybe.optional(title)
+    def __init__(self, parent: Optional[Machine]=None, name: Optional[str]=None) -> None:
+        self._parent = Maybe.optional(parent)
+        self._name = Maybe.optional(name)
         self.uuid = uuid.uuid4()
         self._reports = List()
         self._min_report_time = 0.1
 
     @property
+    def parent(self) -> Maybe[Machine]:
+        return self._parent
+
+    @property
+    def name(self) -> str:
+        return self._name.o(List.wrap(type(self).__module__.rsplit('.')).reversed.lift(1)) | 'machine'
+
+    @property
     def title(self) -> str:
-        return self._title.o(List.wrap(type(self).__module__.rsplit('.')).reversed.lift(1)) | 'machine'
+        return self.name
 
     @lazy
     def _message_handlers(self):
@@ -91,12 +99,9 @@ class MachineBase(Generic[D], MachineI):
 
     def loop_process(self, data, msg, prio=None):
         def loop(z, m) -> None:
-            self.parent % __.log_message(m, self.title)
+            self.log_message(m, self.title)
             return z.accum(self.loop_process(z.data, m))
         return self.process(data, msg, prio).fold(loop)
-
-    def log_message(self, msg: Message, name: str) -> None:
-        pass
 
     def _resolve_handler(self, msg, prio):
         f = __.handler(msg)
@@ -223,9 +228,6 @@ class MachineBase(Generic[D], MachineI):
     @may_handle(ShowLogInfo)
     def show_log_info(self, data: D, msg: ShowLogInfo) -> Message:
         print_ribo_log_info(self.log.verbose)
-
-    def bubble(self, msg):
-        self.parent.cata(_.bubble, lambda: self.send)(msg)
 
     def _check_time(self, start_time, msg):
         dur = time.time() - start_time

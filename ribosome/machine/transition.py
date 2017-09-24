@@ -15,7 +15,7 @@ from ribosome.machine.message_base import (_message_attr, _machine_attr, Message
 
 from ribosome.record import Record, any_field, list_field, field, bool_field, optional_field
 from ribosome.logging import Logging
-from ribosome.machine.interface import MachineI
+from ribosome.machine.machine import Machine
 from ribosome.data import Data
 from ribosome.machine.transitions import Transitions
 from ribosome.machine.trans import TransAction
@@ -75,7 +75,7 @@ DynTrans = Union[DynResult, Maybe[DynResult], Either[str, DynResult], StateT[Id,
 
 class Handler(Generic[M, D, R], Logging, ToStr):
 
-    def __init__(self, machine: MachineI, name: str, fun: Callable[[MachineI, D, M], R], message: Type[M], prio: float,
+    def __init__(self, machine: Machine, name: str, fun: Callable[[Machine, D, M], R], message: Type[M], prio: float,
                  dyn: bool) -> None:
         self.machine = machine
         self.name = name
@@ -92,7 +92,7 @@ class Handler(Generic[M, D, R], Logging, ToStr):
         return msg, prio, dyn
 
     @staticmethod
-    def create(machine: MachineI, name: str, fun: Callable[[MachineI, D, M], R]) -> 'Handler[M, D, R]':
+    def create(machine: Machine, name: str, fun: Callable[[Machine, D, M], R]) -> 'Handler[M, D, R]':
         msg, prio, dyn = Handler.attrs(fun)
         tpe = CoroHandler if iscoroutinefunction(fun) else DynHandler  # if dyn else AlgHandler
         return tpe(machine, name, fun, msg, prio, dyn)
@@ -120,15 +120,15 @@ class DynHandler(Generic[M, D], Handler[M, D, DynTrans]):
 
 class WrappedHandler(Generic[M, D, T], DynHandler[M, D]):
 
-    def __init__(self, trans_tpe: Type[T], machine: MachineI, name: str, fun: Callable[[MachineI, D, M], DynTrans],
+    def __init__(self, trans_tpe: Type[T], machine: Machine, name: str, fun: Callable[[Machine, D, M], DynTrans],
                  message: Type[M], prio: float, dyn: bool) -> None:
-        def wrapper(mach: MachineI, d: Data, msg: M) -> R:
+        def wrapper(mach: Machine, d: Data, msg: M) -> R:
             trans = trans_tpe(mach, d, msg)
             return fun(trans)
         super().__init__(machine, name, wrapper, message, prio, dyn)
 
     @staticmethod
-    def create(machine: MachineI, name: str, fun: Callable[[MachineI, D, M], R], tpe: Type[T]
+    def create(machine: Machine, name: str, fun: Callable[[Machine, D, M], R], tpe: Type[T]
                ) -> 'Handler[M, D, DynTrans]':
         msg, prio, dyn = Handler.attrs(fun)
         return WrappedHandler(tpe, machine, name, fun, msg, prio, dyn)
@@ -157,7 +157,7 @@ class CoroExecutionHandler(DynHandler):
 
 
 class TransitionResult(Record):
-    machine = optional_field(MachineI)
+    machine = optional_field(Machine)
     data = any_field()
     resend = list_field()
     handled = bool_field(True)

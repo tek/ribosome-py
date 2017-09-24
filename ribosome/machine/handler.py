@@ -19,7 +19,7 @@ from ribosome.machine.message_base import Message, Publish
 from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
                                          TransitionFailed, Coroutine, MachineError, Error)
 from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop
-from ribosome.machine.interface import MachineI
+from ribosome.machine.machine import Machine
 from ribosome.data import Data
 from ribosome.machine.trans import TransAction, Transit, Propagate, Unit, TransFailure
 
@@ -42,7 +42,7 @@ class Handlers(Logging):
         return self.handlers.get(type(msg))
 
 
-M = TypeVar('M', bound=MachineI)
+M = TypeVar('M', bound=Machine)
 D = TypeVar('D', bound=Data)
 Msg = TypeVar('Msg', bound=Message)
 R = TypeVar('R')

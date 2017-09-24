@@ -3,21 +3,25 @@ from amino.lazy import lazy
 
 from ribosome.data import Data
 from ribosome.machine.message_base import Message
-from ribosome.machine.interface import MachineI
+from ribosome.machine.machine import Machine
 from ribosome.nvim import NvimFacade
 
 
-class Transitions:
+class Transitions(Machine):
     State = Map
 
-    def __init__(self, machine: MachineI, data: Data, msg: Message) -> None:
+    def __init__(self, machine: Machine, data: Data, msg: Message) -> None:
         self.machine = machine
         self.data = data
         self.msg = msg
 
     @property
     def name(self):
-        return self.machine.title
+        return self.machine.name
+
+    @property
+    def parent(self) -> Machine:
+        return self.machine
 
     @property
     def log(self):
@@ -40,8 +44,5 @@ class Transitions:
     @property
     def vim(self) -> NvimFacade:
         return self.machine.vim
-
-    def log_message(self, msg: Message, name: str) -> None:
-        return self.machine.log_message(msg, name)
 
 __all__ = ('Transitions',)

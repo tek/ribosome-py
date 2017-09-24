@@ -13,7 +13,7 @@ from ribosome.data import Data
 from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
 from ribosome.machine.message_base import message, Message
-from ribosome.machine.base import MachineI, MachineBase
+from ribosome.machine.base import Machine, MachineBase
 from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle, handle, CoroTransitionResult,
                                          _recover_error, CoroExecutionHandler)
 from ribosome.machine.message_base import json_message
@@ -79,7 +79,7 @@ class AsyncIOThread(threading.Thread, AsyncIOBase):
         self.running.set()
         try:
             self._loop.run_until_complete(self._main(self.init))
-            self.log.debug('event loop finished in {}'.format(self.title))
+            self.log.debug('event loop finished in {}'.format(self.name))
         except Exception:
             self.log.exception('while running state machine')
         self.running.clear()
@@ -87,7 +87,7 @@ class AsyncIOThread(threading.Thread, AsyncIOBase):
 
     def stop(self, shutdown=True):
         if self.is_alive() and self.running.is_set():
-            self.log.debug('stopping machine {}'.format(self.title))
+            self.log.debug('stopping machine {}'.format(self.name))
             if shutdown:
                 self._stop()
             else:
@@ -98,7 +98,7 @@ class AsyncIOThread(threading.Thread, AsyncIOBase):
                     self._loop.close()
                 except Exception as e:
                     if amino.development:
-                        self.log.caught_exception('stopping {}'.format(self.title))
+                        self.log.caught_exception('stopping {}'.format(self.name))
 
     def _stop(self):
         self._done()
@@ -117,13 +117,13 @@ class AsyncIOThread(threading.Thread, AsyncIOBase):
 
 class StateMachineBase(ModularMachine):
 
-    def __init__(self, sub: List[MachineBase]=List(), parent=None, title=None, debug=False) -> None:
+    def __init__(self, sub: List[MachineBase]=List(), parent=None, name=None, debug=False) -> None:
         self.sub = sub
         self.debug = debug
         self.data = None
         self._messages: asyncio.PriorityQueue = None
         self.message_log = List()
-        ModularMachine.__init__(self, parent, title=title)
+        ModularMachine.__init__(self, parent, name=name)
 
     @property
     def init(self) -> Data:
@@ -159,13 +159,13 @@ class StateMachineBase(ModularMachine):
         return Try(eval, expr, None, dict(data=data, components=components))
 
     def _send(self, data, msg: Message):
-        self.log_message(msg, self.title)
+        self.log_message(msg, self.name)
         return (
             Try(self.loop_process, data, msg)
             .value_or(L(TransitionResult.failed)(data, _))
         )
 
-    def log_message(self, msg: Message, name: str) -> None:
+    def append_message_log(self, msg: Message, name: str) -> None:
         self.log.debug('processing {} in {}'.format(msg, name))
         if self.debug:
             self.message_log.append(msg)
@@ -194,7 +194,7 @@ class StateMachineBase(ModularMachine):
     def message_couroutine_alg(self, data: Data, msg: CoroutineAlg):
         async def run_coro_alg() -> None:
             res = await msg.coro
-            trans_desc = blue(f'{self.title}.message_couroutine_alg')
+            trans_desc = blue(f'{self.name}.message_couroutine_alg')
             return Just(AlgResultValidator(trans_desc).validate(res, data))
         return run_coro_alg()
 
@@ -300,7 +300,7 @@ class StateMachineBase(ModularMachine):
 
     def _unhandled_message(self, msg, sent):
         log = self.log.warning if warn_no_handler else self.log.debug
-        log('{}: no handler for {}'.format(self.title, msg))
+        log('{}: no handler for {}'.format(self.name, msg))
         return sent
 
     async def join_messages(self):
@@ -358,7 +358,7 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
 
     def send_thread(self, msg: Message, asy: bool) -> None:
         a = 'a' if asy else ''
-        desc = f'send {msg} {a}sync at {msg.prio} in {self.title}'
+        desc = f'send {msg} {a}sync at {msg.prio} in {self.name}'
         self.log.debug(desc)
         done = CFuture()
         def run() -> None:
@@ -376,13 +376,13 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         try:
             self.send_thread(msg, False).result(timeout)
         except TimeoutError as e:
-            self.log.warn(f'timed out waiting for processing of {msg} in {self.title}')
+            self.log.warn(f'timed out waiting for processing of {msg} in {self.name}')
 
     def send(self, msg: Message) -> CFuture:
         return self.send_thread(msg, True)
 
 
-class PluginStateMachine(MachineI):
+class PluginStateMachine(Machine):
 
     def __init__(self, components: List[str]) -> None:
         self.sub = components.flat_map(self.start_components)
@@ -390,7 +390,7 @@ class PluginStateMachine(MachineI):
     def start_components(self, name: str):
         def report(errs):
             msg = 'invalid {} component module "{}": {}'
-            self.log.error(msg.format(self.title, name, errs))
+            self.log.error(msg.format(self.name, name, errs))
         return (
             (self._find_component(name) // self._inst_component)
             .lmap(List)
@@ -398,11 +398,11 @@ class PluginStateMachine(MachineI):
             .leffect(report)
         )
 
-    def _find_component(self, name: str) -> Either[List[str], MachineI]:
+    def _find_component(self, name: str) -> Either[List[str], Machine]:
         mods = List(
             Either.import_module(name),
-            Either.import_module(f'{self.title}.components.{name}'),
-            Either.import_module(f'{self.title}.plugins.{name}'),
+            Either.import_module(f'{self.name}.components.{name}'),
+            Either.import_module(f'{self.name}.plugins.{name}'),
         )
         # TODO .traverse(_.swap).swap
         errors = mods.filter(_.is_left) / _.value
@@ -415,11 +415,11 @@ class PluginStateMachine(MachineI):
             else Left('module does not define class `Component`')
         )
 
-    def extra_component(self, name: str) -> Either[List[str], MachineI]:
+    def extra_component(self, name: str) -> Either[List[str], Machine]:
         return Left(List('not implemented'))
 
-    def component(self, title: str) -> Maybe[MachineBase]:
-        return self.sub.find(_.title == title)
+    def component(self, name: str) -> Maybe[MachineBase]:
+        return self.sub.find(_.name == name)
 
     def plug_command(self, plug_name: str, cmd_name: str, args: tuple=(), sync=False):
         sender = self.send_sync if sync else self.send
@@ -432,19 +432,19 @@ class PluginStateMachine(MachineI):
 
     @may_handle(PlugCommand)
     def _plug_command(self, data, msg):
-        self.log.debug('sending command {} to component {}'.format(msg.msg, msg.plug.title))
-        self.log_message(msg.msg, self.title)
+        self.log.debug('sending command {} to component {}'.format(msg.msg, msg.plug.name))
+        self.log_message(msg.msg, self.name)
         return msg.plug.process(data, msg.msg)
 
 
 class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
-    def __init__(self, vim: NvimFacade, components: List[str]=List(), title: str=None) -> None:
+    def __init__(self, vim: NvimFacade, components: List[str]=List(), name: str=None) -> None:
         HasNvim.__init__(self, vim)
         PluginStateMachine.__init__(self, components)
 
     @property
-    def title(self):
+    def name(self):
         return 'ribosome'
 
     @handle(RunScratchMachine)
@@ -460,8 +460,8 @@ class RootMachineBase(PluginStateMachine, HasNvim, Logging):
 
 class RootMachine(StateMachine, RootMachineBase):
 
-    def __init__(self, vim: NvimFacade, components: List[str]=List(), title: str=Optional[None]) -> None:
-        StateMachine.__init__(self, title=title)
+    def __init__(self, vim: NvimFacade, components: List[str]=List(), name: str=Optional[None]) -> None:
+        StateMachine.__init__(self, name=name)
         RootMachineBase.__init__(self, vim, components)
 
 
@@ -470,8 +470,8 @@ T = TypeVar('T', bound=Transitions)
 
 class ComponentMachine(Generic[T], ModularMachine2[T], TransitionHelpers):
 
-    def __init__(self, vim: NvimFacade, trans: Type[T], title: Optional[str], parent: Optional[MachineI]=None) -> None:
-        super().__init__(parent, title)
+    def __init__(self, vim: NvimFacade, trans: Type[T], name: Optional[str], parent: Optional[Machine]=None) -> None:
+        super().__init__(parent, name)
         self.vim = vim
         self.trans = trans
 
@@ -485,9 +485,9 @@ class ComponentMachine(Generic[T], ModularMachine2[T], TransitionHelpers):
 
 class UnloopedRootMachine(UnloopedStateMachine, RootMachineBase):
 
-    def __init__(self, vim: NvimFacade, components: List[str]=List(), title: Optional[str]=None) -> None:
+    def __init__(self, vim: NvimFacade, components: List[str]=List(), name: Optional[str]=None) -> None:
         debug = vim.vars.p('debug') | False
-        UnloopedStateMachine.__init__(self, title=title, debug=debug)
+        UnloopedStateMachine.__init__(self, name=name, debug=debug)
         RootMachineBase.__init__(self, vim, components)
 
 
@@ -497,16 +497,16 @@ D = TypeVar('D', bound=AutoData)
 
 class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
 
-    def __init__(self, vim: NvimFacade, config: Config[Settings, D], title: str) -> None:
+    def __init__(self, vim: NvimFacade, config: Config[Settings, D], name: str) -> None:
         self.config = config
         self.available_components = config.components
         additional_components = config.settings.components.value.attempt(vim).join | config.default_components
         components = config.core_components + additional_components
         self.log.debug(f'starting {config} with components {components}')
-        UnloopedRootMachine.__init__(self, vim, components, title)
+        UnloopedRootMachine.__init__(self, vim, components, name)
 
-    def extra_component(self, name: str) -> Either[List[str], MachineI]:
-        auto = f'{self.title}.components.{name}'
+    def extra_component(self, name: str) -> Either[List[str], Machine]:
+        auto = f'{self.name}.components.{name}'
         return (
             self.declared_component(name)
             .accum_error_f(lambda: self.component_from_exports(auto))
@@ -514,7 +514,7 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
             .flat_map(self.inst_auto(name))
         )
 
-    def declared_component(self, name: str) -> Either[List[str], MachineI]:
+    def declared_component(self, name: str) -> Either[List[str], Machine]:
         return (
             self.available_components
             .lift(name)
@@ -522,7 +522,7 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
         )
 
     @do
-    def component_from_exports(self, mod: str) -> Either[List[str], MachineI]:
+    def component_from_exports(self, mod: str) -> Either[List[str], Machine]:
         exports = yield Either.exports(mod).lmap(List)
         yield (
             exports.find(L(Boolean.issubclass)(_, (Component, ComponentMachine)))
@@ -531,7 +531,7 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
         )
 
     @curried
-    def inst_auto(self, name: str, plug: Union[str, Type]) -> Either[str, MachineI]:
+    def inst_auto(self, name: str, plug: Union[str, Type]) -> Either[str, Machine]:
         return (
             Right(ComponentMachine(self.vim, plug, name, self))
             if isinstance(plug, type) and issubclass(plug, Transitions) else
