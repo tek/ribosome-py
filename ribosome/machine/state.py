@@ -516,7 +516,7 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
     def component_from_exports(self, mod: str) -> Either[List[str], MachineI]:
         exports = yield Either.exports(mod).lmap(List)
         yield (
-            exports.find(L(Boolean.issubclass)(_, Component))
+            exports.find(L(Boolean.issubclass)(_, (Component, ComponentMachine)))
             .to_either(f'none of `{mod}.__all__` is a `Component`: {exports}')
             .lmap(List)
         )
