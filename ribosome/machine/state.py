@@ -18,8 +18,8 @@ from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle
                                          _recover_error, CoroExecutionHandler)
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
-from ribosome.machine.messages import Nop, Done, Quit, PlugCommand, Stop, Error, UpdateRecord, UpdateState
-from ribosome.machine.handler import DynHandlerJob
+from ribosome.machine.messages import Nop, Done, Quit, PlugCommand, Stop, Error, UpdateRecord, UpdateState, CoroutineAlg
+from ribosome.machine.handler import DynHandlerJob, AlgResultValidator
 from ribosome.machine.modular import ModularMachine, ModularMachine2
 from ribosome.machine.transitions import Transitions
 from ribosome.machine import trans
@@ -189,6 +189,14 @@ class StateMachineBase(ModularMachine):
     @may_handle(Coroutine)
     def _couroutine(self, data: Data, msg):
         return msg
+
+    @may_handle(CoroutineAlg)
+    def message_couroutine_alg(self, data: Data, msg: CoroutineAlg):
+        async def run_coro_alg() -> None:
+            res = await msg.coro
+            trans_desc = blue(f'{self.title}.message_couroutine_alg')
+            return Just(AlgResultValidator(trans_desc).validate(res, data))
+        return run_coro_alg()
 
     @may_handle(RunMachine)
     def _run_machine(self, data, msg):

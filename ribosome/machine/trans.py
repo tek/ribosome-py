@@ -1,5 +1,5 @@
 import abc
-from typing import Callable, TypeVar, Type, Generic, Coroutine
+from typing import Callable, TypeVar, Type, Generic, Awaitable
 import functools
 
 from amino import Either, List, Lists, IO, Id, L, _, Maybe
@@ -10,7 +10,7 @@ from amino.algebra import AlgebraMeta, Algebra
 
 from ribosome.machine.message_base import Message, default_prio, _machine_attr, _message_attr, _prio_attr, _dyn_attr
 from ribosome.data import Data
-from ribosome.machine.messages import RunIOAlg, Error, Nop, RunNvimIOAlg
+from ribosome.machine.messages import RunIOAlg, Error, Nop, RunNvimIOAlg, CoroutineAlg
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO
 from ribosome.machine.transitions import Transitions
@@ -218,11 +218,15 @@ class TransEffectNvimIO(Generic[R], TransEffect[NvimIO[R]]):
 class TransEffectCoro(TransEffect):
 
     @property
-    def tpe(self) -> Type[Coroutine]:
-        return Coroutine
+    def tpe(self) -> Type[Awaitable]:
+        return Awaitable
 
-    def extract(self, data: IO[R], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
-        ...
+    def extract(self, data: Awaitable, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+        async def coro_map(run: Callable[[R], TransStep]) -> TransStep:
+            res = await data
+            return lift(run(res), in_state)
+        coro = cont(tail, False, coro_map) | data
+        return Lift(Propagate.one(CoroutineAlg(coro).pub))
 
 
 class TransEffectSingleMessage(TransEffect[Message]):
@@ -282,7 +286,7 @@ class Lifter(Logging):
         return (
             res
             if isinstance(res, TransAction) else
-            TransFailure(f'transition did not produce `TransAction`: {{red(res)}}')
+            TransFailure(f'transition did not produce `TransAction`: {red(res)}')
         )
 
 

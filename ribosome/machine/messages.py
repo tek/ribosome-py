@@ -23,6 +23,7 @@ SubProcessSync = message('SubProcessSync', 'job', 'result')
 Warning = message('Warning', 'message')
 Debug = message('Debug', 'message')
 Coroutine = message('Coroutine', 'coro')
+CoroutineAlg = message('CoroutineAlg', 'coro')
 TransitionException = message('TransitionException', 'context', 'exc')
 UpdateRecord = json_message('UpdateRecord', 'tpe', 'name')
 UpdateState = json_message('UpdateState', 'tpe', 'name')
@@ -49,5 +50,5 @@ class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
 
 __all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'RunNvimIO', 'RunNvimUnitIO', 'UnitIO', 'DataIO',
            'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg',
-           'RunNvimIOAlg', 'Error', 'Warning', 'Debug', 'Coroutine', 'TransitionException', 'Info', 'UpdateRecord',
-           'UpdateState', 'Stage1', 'Stage2', 'Stage3', 'Stage4')
+           'RunNvimIOAlg', 'Error', 'Warning', 'Debug', 'Coroutine', 'CoroutineAlg', 'TransitionException', 'Info',
+           'UpdateRecord', 'UpdateState', 'Stage1', 'Stage2', 'Stage3', 'Stage4')
