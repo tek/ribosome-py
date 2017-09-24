@@ -679,6 +679,13 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def cwd(self) -> Either[str, Path]:
         return self.call('getcwd') // L(Try)(Path, _)
 
+    @property
+    def flags(self) -> 'Flags':
+        return Flags(self.vars, False)
+
+    @property
+    def pflags(self) -> 'Flags':
+        return Flags(self.vars, True)
 
 class AsyncVimCallProxy(Generic[A]):
 
