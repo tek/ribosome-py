@@ -41,4 +41,7 @@ class Transitions:
     def vim(self) -> NvimFacade:
         return self.machine.vim
 
+    def log_message(self, msg: Message, name: str) -> None:
+        return self.machine.log_message(msg, name)
+
 __all__ = ('Transitions',)
