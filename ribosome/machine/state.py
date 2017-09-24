@@ -494,6 +494,7 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
         self.available_components = config.components
         additional_components = config.settings.components.value.attempt(vim).join | config.default_components
         components = config.core_components + additional_components
+        self.log.debug(f'starting {config} with components {components}')
         UnloopedRootMachine.__init__(self, vim, components, title)
 
     def extra_component(self, name: str) -> Either[List[str], MachineI]:
