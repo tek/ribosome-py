@@ -5,7 +5,7 @@ from ribosome import NvimFacade
 from ribosome.logging import Logging
 from ribosome.nvim.components import Syntax
 
-from amino import List, Map, _, L, Maybe, IO, __
+from amino import List, Map, _, L, Maybe, IO, __, Nil
 
 
 class UniteMessage(Message, varargs='unite_args'):
@@ -15,14 +15,6 @@ UniteSyntax = message('UniteSyntax', 'source')
 
 
 class UniteEntity(Logging, metaclass=abc.ABCMeta):
-    ''' set up sources and kinds dynamically.
-    The python call API cannot be used, as funcrefs cannot be
-    serialized.
-    The callback functions must be called once so that exists()
-    can see them, otherwise Unite refuses to work.
-    They must be called a/sync according to their definition,
-    otherwise it will silently deadlock!
-    '''
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -35,20 +27,25 @@ class UniteEntity(Logging, metaclass=abc.ABCMeta):
     def data(self):
         ...
 
-    @property
-    def _func_defs_sync(self):
-        return List()
+    @abc.abstractproperty
+    def _func_defs_sync(self) -> List[str]:
+        ...
 
-    @property
-    def _func_defs_async(self):
-        return List()
+    @abc.abstractproperty
+    def _func_defs_async(self) -> List[str]:
+        ...
 
-    def _force_function_defs(self, vim):
+    def _force_function_defs(self, vim: NvimFacade) -> None:
         force = lambda c, n: c('silent call {}()'.format(n))
         self._func_defs_sync.foreach(L(force)(vim.cmd_sync, _))
         self._func_defs_async.foreach(L(force)(vim.cmd, _))
 
-    def define(self, vim: NvimFacade):
+    def define(self, vim: NvimFacade) -> None:
+        ''' set up sources and kinds dynamically.
+        The nvim-python call API cannot be used, as funcrefs cannot be serialized.
+        The callback functions must be called once so that exists() can see them, otherwise Unite refuses to work.
+        They must be called a/sync according to their definition, otherwise it will silently deadlock!
+        '''
         self._force_function_defs(vim)
         vim.cmd('call unite#define_{}({})'.format(self.tpe, self.data))
 
@@ -84,6 +81,10 @@ class UniteSource(UniteEntity):
     @property
     def _func_defs_sync(self):
         return List(self.source) + self.syntax.to_list
+
+    @property
+    def _func_defs_async(self):
+        return Nil
 
     @property
     def data(self):
@@ -124,6 +125,10 @@ class UniteKind(UniteEntity):
         super().__init__(name)
         self.actions = actions / self._defaults.merge
         self.default = actions.head / __['name'] | 'none'
+
+    @property
+    def _func_defs_sync(self):
+        return Nil
 
     @property
     def _func_defs_async(self):
