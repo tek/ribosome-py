@@ -542,7 +542,7 @@ class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
 
     @property
     def init(self) -> D:
-        return self.config.state_type(config=self.config, vim_facade=Just(self.vim))
+        return self.config.state(self.vim)
 
 
 class SubMachine(ModularMachine, TransitionHelpers):

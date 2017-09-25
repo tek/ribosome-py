@@ -2,11 +2,11 @@ import abc
 import inspect
 from typing import Callable, Type, TypeVar, Generic, Iterable, cast, Union, Any, Optional
 
-from amino import List, Either, Lists, Map, _, L, __, Nil, Path, Right, Try, Nil
+from amino import List, Either, Lists, Map, _, L, __, Path, Right, Try, Nil, Just
 from amino.func import flip
 from amino.util.string import ToStr
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.nvim.components import NvimComponent
 from ribosome.logging import Logging
 from ribosome.data import Data
@@ -235,6 +235,7 @@ class Config(Generic[Settings, S], ToStr):
             prefix: Optional[str]=None,
             components: Map[str, Union[str, Type[T]]]=Map(),
             state_type: Optional[Type[S]]=None,
+            state_ctor: Optional[Callable[['Config', NvimFacade], S]]=None,
             settings: Optional[Settings]=None,
             request_handlers: List[RequestHandler]=Nil,
             core_components: List[str]=Nil,
@@ -244,6 +245,7 @@ class Config(Generic[Settings, S], ToStr):
         self.prefix = prefix or name
         self.components = components
         self.state_type = state_type or AutoData
+        self.state_ctor = state_ctor or (lambda c, v: state_type(config=c, vim_facade=Just(v)))
         self.settings = settings or PluginSettings()
         self.request_handlers = RequestHandlers.cons(*request_handlers)
         self.core_components = core_components
@@ -251,6 +253,9 @@ class Config(Generic[Settings, S], ToStr):
 
     def _arg_desc(self) -> List[str]:
         return List(str(self.components), str(self.settings), str(self.request_handlers))
+
+    def state(self, vim: NvimFacade) -> S:
+        return self.state_ctor(self, vim)
 
 
 class AutoData(Data):
