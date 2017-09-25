@@ -148,8 +148,7 @@ class StateMachineBase(ModularMachine):
         return self.await_state(wait)
 
     def await_state(self, wait=None):
-        (asyncio.run_coroutine_threadsafe(self.join_messages(), self._loop)
-         .result(Maybe(wait) | short_timeout))
+        asyncio.run_coroutine_threadsafe(self.join_messages(), self._loop).result(Maybe(wait) | short_timeout)
         return self.data
 
     def eval_expr(self, expr: str, pre: Callable=lambda a, b: (a, b)):
@@ -377,6 +376,7 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
             self.send_thread(msg, False).result(timeout)
         except TimeoutError as e:
             self.log.warn(f'timed out waiting for processing of {msg} in {self.name}')
+        return self.data
 
     def send(self, msg: Message) -> CFuture:
         return self.send_thread(msg, True)
