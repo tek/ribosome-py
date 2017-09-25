@@ -299,7 +299,7 @@ class StateMachineBase(ModularMachine):
 
     def _unhandled_message(self, msg, sent):
         log = self.log.warning if warn_no_handler else self.log.debug
-        log('{}: no handler for {}'.format(self.name, msg))
+        log(f'no handler for {msg}')
         return sent
 
     async def join_messages(self):
