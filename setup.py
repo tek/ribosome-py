@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version_parts = (11, 2, 11)
+version_parts = (11, 2, 12)
 version = '.'.join(map(str, version_parts))
 
 setup(
