@@ -18,9 +18,9 @@ Quit = message('Quit')
 
 class ScratchMachine(SubMachine, HasNvim, metaclass=abc.ABCMeta):
 
-    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer, parent=None, title=None) -> None:
+    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer, parent=None, name=None) -> None:
         self.scratch = scratch
-        SubMachine.__init__(self, parent, title=title)
+        SubMachine.__init__(self, parent, name=name)
         HasNvim.__init__(self, vim)
         self._create_mappings()
         self._create_autocmds()
