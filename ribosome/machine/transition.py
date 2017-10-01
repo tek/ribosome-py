@@ -169,7 +169,7 @@ class TransitionResult(Record):
         return StrictTransitionResult(data=data, **kw)
 
     @staticmethod
-    def failed(data, error, **kw):
+    def failed(data: D, error: Union[Exception, str], **kw: Any) -> 'TransitionResult':
         return TransitionResult.unhandled(data, failure=True, error=Just(error), **kw)
 
     @staticmethod
@@ -188,12 +188,16 @@ class TransitionResult(Record):
             return self.accum(StrictTransitionResult(
                 data=other.data,
                 pub=other.pub,
-                handled=other.handled or self.handled
+                handled=other.handled or self.handled,
+                failure=other.failure or self.failure,
+                error=other.error.o(self.error),
             ))
         else:
             return other.set(
                 pub=self.pub + other.pub,
-                handled=other.handled or self.handled
+                handled=other.handled or self.handled,
+                failure=other.failure or self.failure,
+                error=other.error.o(self.error),
             )
 
     @property

@@ -1,0 +1,44 @@
+from typing import TypeVar
+
+from lenses import Lens
+
+from amino.do import tdo
+from amino import IO, List, Path
+
+from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIOState
+from ribosome.record import decode_json, encode_json
+from ribosome.settings import AutoData
+
+A = TypeVar('A')
+D = TypeVar('D', bound=AutoData)
+
+
+@tdo(NvimIOState[D, Path])
+def history_file(name: str) -> Generator:
+    settings = yield NvimIOState.inspect(a -> a.settings)
+    dir = yield NvimIOState.lift(settings.state_dir.value_or_default)
+    yield NvimIOState.lift(NvimIO.from_io(IO.delay(dir.mkdir, parents=True, exist_ok=True)))
+    yield NvimIOState.pure(dir / f'{name}.json')
+
+
+@tdo(NvimIOState[D, None])
+def load_json_state(name: str, l: Lens) -> Generator:
+    file = yield history_file(name)
+    exists = yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.exists)))
+    if exists:
+        json = yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.read_text)))
+        \data = yield NvimIOState.lift(NvimIO.from_either(decode_json(json)))
+        yield NvimIOState.modify(a -> l.bind(a).set(\data))
+    else:
+        yield NvimIOState.pure(None)
+
+@tdo(NvimIOState[D, None])
+def store_json_state(name: str, \data: D -> A) -> Generator:
+    file = yield history_file(name)
+    payload = yield NvimIOState.inspect(\data)
+    json = yield NvimIOState.lift(NvimIO.from_either(encode_json(payload)))
+    yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.write_text, json)))
+    yield NvimIOState.pure(None)
+
+__all__ = ('load_json_state', 'store_json_state')

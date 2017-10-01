@@ -13,6 +13,7 @@ RunNvimUnitIO = message('RunNvimUnitIO', 'io')
 RunIO = message('RunIO', 'io', opt_fields=(('msg', Nothing),))
 RunIOAlg = message('RunIOAlg', 'io', opt_fields=(('msg', Nothing),))
 RunNvimIOAlg = message('RunNvimIOAlg', 'io')
+RunNvimIOStateAlg = message('RunNvimIOStateAlg', 'io_f')
 UnitIO = message('UnitIO', 'io', opt_fields=(('msg', Nothing),))
 DataIO = message('DataIO', 'cons', opt_fields=(('msg', Nothing),))
 Info = message('Info', 'message')
@@ -49,6 +50,6 @@ class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
         return self.main
 
 __all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'RunNvimIO', 'RunNvimUnitIO', 'UnitIO', 'DataIO',
-           'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg',
-           'RunNvimIOAlg', 'Error', 'Warning', 'Debug', 'Coroutine', 'CoroutineAlg', 'TransitionException', 'Info',
+           'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg', 'RunNvimIOAlg',
+           'RunNvimIOStateAlg', 'Error', 'Warning', 'Debug', 'Coroutine', 'CoroutineAlg', 'TransitionException', 'Info',
            'UpdateRecord', 'UpdateState', 'Stage1', 'Stage2', 'Stage3', 'Stage4')

@@ -3,12 +3,14 @@ from typing import TypeVar, Callable, Any, Generic
 from amino.tc.base import ImplicitInstances, F
 from amino.lazy import lazy
 from amino.tc.monad import Monad
-from amino import Either, Right, Left, __
+from amino import Either, Right, Left, __, IO
+from amino.state import tcs, StateT
 
 from ribosome.nvim.components import NvimComponent
 
 A = TypeVar('A')
 B = TypeVar('B')
+S = TypeVar('S')
 
 
 class NvimIOInstances(ImplicitInstances):
@@ -24,6 +26,10 @@ class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_c
     @staticmethod
     def wrap_either(f: Callable[[NvimComponent], A]) -> 'NvimIO[A]':
         return NvimIO(lambda a: f(a).get_or_raise)
+
+    @staticmethod
+    def from_either(e: Either[str, A]) -> 'NvimIO[A]':
+        return NvimIO.wrap_either(lambda v: e)
 
     @staticmethod
     def cmd_sync(cmdline: str, verbose=False) -> 'NvimIO[str]':
@@ -50,6 +56,10 @@ class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_c
         def fail() -> A:
             raise Exception(msg)
         return NvimIO(lambda v: fail())
+
+    @staticmethod
+    def from_io(io: IO[A]) -> 'NvimIO[A]':
+        return NvimIO(lambda a: io.attempt.get_or_raise)
 
     def __init__(self, run: Callable[[NvimComponent], A]) -> None:
         self.run = run
@@ -84,4 +94,10 @@ class NvimIOMonad(Monad[NvimIO]):
     def map(self, fa: NvimIO[A], f: Callable[[A], B]) -> NvimIO[B]:
         return NvimIO(lambda a: f(fa.run(a)))
 
-__all__ = ('NvimIO',)
+
+class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
+    pass
+
+tcs(NvimIO, NvimIOState)  # type: ignore
+
+__all__ = ('NvimIO', 'NvimIOState')

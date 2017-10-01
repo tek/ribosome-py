@@ -1,6 +1,6 @@
 import abc
 import time
-from typing import Any, Sequence, TypeVar, Generic, Type, Tuple
+from typing import Any, Sequence, TypeVar, Generic, Type, Tuple, Union
 import asyncio
 
 import amino
@@ -18,10 +18,12 @@ from ribosome.logging import Logging
 from ribosome.machine.message_base import Message, Publish
 from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
                                          TransitionFailed, Coroutine, MachineError, Error)
-from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop
+from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop, RunNvimIOAlg, RunNvimIOStateAlg
 from ribosome.machine.machine import Machine
 from ribosome.data import Data
 from ribosome.machine.trans import TransAction, Transit, Propagate, Unit, TransFailure
+from ribosome.nvim.io import NvimIOState
+from ribosome.nvim import NvimIO
 
 
 def is_seq(a):
@@ -54,9 +56,12 @@ def create_result(data: D, msgs: List[Message]) -> TransitionResult:
     return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)
 
 
-def create_failure(data: D, desc: str, error: str) -> TransitionResult:
-    msg = f'{desc}: {error}'
-    return TransitionResult.failed(data, msg)
+def create_failure(data: D, desc: str, error: Union[str, Exception]) -> TransitionResult:
+    return (
+        TransitionResult.failed(data, error)
+        if isinstance(error, Exception) else
+        TransitionResult.failed(data, f'{desc}: {error}')
+    )
 
 
 class HandlerJob(Generic[M, D], Logging, ToStr):
@@ -200,6 +205,12 @@ class UnpackEitherState(Generic[D], UnpackTransState[EitherState[D, List[Message
         return a.run(data)
 
 
+class UnpackNvimIOState(Generic[D], UnpackTransState[NvimIOState[D, List[Message]]], tpe=NvimIOState):
+
+    def unpack(self, a: NvimIOState[D, List[Message]], data: D) -> Either[Message, Tuple[D, List[Message]]]:
+        return Right((data, Propagate.one(RunNvimIOStateAlg(NvimIO(lambda v: lambda d: a.run(d).attempt(v))))))
+
+
 class AlgResultValidator(Logging):
 
     def __init__(self, desc: str) -> None:
@@ -209,7 +220,7 @@ class AlgResultValidator(Logging):
     def validate(self) -> TransitionResult:
         return dispatch_alg(self, TransAction, 'validate_')
 
-    def failure(self, data: D, error: str) -> TransitionResult:
+    def failure(self, data: D, error: Union[str, Exception]) -> TransitionResult:
         return create_failure(data, self.desc, error)
 
     def validate_transit(self, action: Transit, data: D) -> TransitionResult:

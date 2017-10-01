@@ -10,7 +10,7 @@ from lenses import Lens
 
 from ribosome.logging import Logging
 from ribosome.data import Data
-from ribosome.nvim import HasNvim, ScratchBuilder
+from ribosome.nvim import HasNvim, ScratchBuilder, NvimIO
 from ribosome import NvimFacade
 from ribosome.machine.message_base import message, Message
 from ribosome.machine.base import Machine, MachineBase
@@ -29,6 +29,7 @@ import amino
 from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried, Boolean
 from amino.util.string import red, blue
 from amino.state import State
+from amino.do import tdo
 
 Callback = message('Callback', 'func')
 Envelope = message('Envelope', 'message', 'to')

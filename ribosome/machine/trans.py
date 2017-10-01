@@ -14,6 +14,7 @@ from ribosome.machine.messages import RunIOAlg, Error, Nop, RunNvimIOAlg, Corout
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO
 from ribosome.machine.transitions import Transitions
+from ribosome.nvim.io import NvimIOState
 
 M = TypeVar('M', bound=Transitions)
 D = TypeVar('D', bound=Data)
@@ -164,30 +165,13 @@ class TransEffectStateT(Generic[G, D, R], TransEffect[StateT[G, D, R]]):
             result.data
         )
 
-
-class TransEffectIdState(Generic[D, R], TransEffectStateT[Id, D, R]):
-
     @property
-    def tpe(self) -> Type[IdState[D, R]]:
-        return IdState
+    def tpe(self) -> Type[StateT[G, D, R]]:
+        return StateT
 
-    def extract(self, data: IdState, tail: List[TransEffect], in_state: bool) -> IdState:
+    def extract(self, data: StateT[G, D, R], tail: List[TransEffect], in_state: bool) -> TransStep:
         return (
-            TransEffectError('cannot nest `State` in transition result')
-            if in_state else
-            Strict(cont(tail, True, lambda run: data.map(lambda inner: self.check(run(inner)))) | data)
-        )
-
-
-class TransEffectEitherState(Generic[D, R], TransEffectStateT[Either, D, R]):
-
-    @property
-    def tpe(self) -> Type[EitherState[D, R]]:
-        return EitherState
-
-    def extract(self, data: EitherState[D, R], tail: List[TransEffect], in_state: bool) -> IdState:
-        return (
-            TransEffectError('cannot nest `State` in transition result')
+            TransEffectError('cannot nest `StateT` in transition result')
             if in_state else
             Strict(cont(tail, True, lambda run: data.map(lambda inner: self.check(run(inner)))) | data)
         )
@@ -261,8 +245,7 @@ class TransEffectUnit(TransEffect[None]):
 
 m: TransEffect = TransEffectMaybe()
 e: TransEffect = TransEffectEither()
-st: TransEffect = TransEffectIdState()
-est: TransEffect = TransEffectEitherState()
+st: TransEffect = TransEffectStateT()
 io: TransEffect = TransEffectIO()
 nio: TransEffect = TransEffectNvimIO()
 coro: TransEffect = TransEffectCoro()

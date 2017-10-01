@@ -7,10 +7,11 @@ import asyncio
 import toolz
 
 from amino import Maybe, _, List, Map, Empty, L, __, Just, Either, Lists, Left, Right, IO
-from amino.util.string import camelcaseify
+from amino.util.string import camelcaseify, ToStr
 from amino.io import IO
 from amino.lazy import lazy
 from amino.func import flip
+from amino.state import EitherState
 
 from ribosome.machine.message_base import Message
 from ribosome.logging import print_ribo_log_info
@@ -24,10 +25,10 @@ from ribosome.request.command import StateCommand
 from ribosome.process import NvimProcessExecutor
 from ribosome.machine.messages import (RunNvimIO, RunIO, UnitIO, RunCorosParallel, SubProcessSync, RunIOsParallel,
                                        ShowLogInfo, Nop, RunIOAlg, TransitionException, Info, RunNvimIOAlg, DataIO,
-                                       RunNvimUnitIO)
+                                       RunNvimUnitIO, RunNvimIOStateAlg)
 from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
 from ribosome.machine import trans
-from ribosome.machine.trans import Propagate
+from ribosome.machine.trans import Propagate, Strict, Transit
 
 A = TypeVar('A')
 D = TypeVar('D', bound=Data)
@@ -41,7 +42,7 @@ def unit_nio(f: Callable[[NvimFacade], None]) -> RunNvimUnitIO:
     return RunNvimUnitIO(NvimIO(f))
 
 
-class MachineBase(Generic[D], Machine):
+class MachineBase(Generic[D], Machine, ToStr):
     _data_type = Data
 
     def __init__(self, parent: Optional[Machine]=None, name: Optional[str]=None) -> None:
@@ -50,6 +51,9 @@ class MachineBase(Generic[D], Machine):
         self.uuid = uuid.uuid4()
         self._reports = List()
         self._min_report_time = 0.1
+
+    def _arg_desc(self) -> List[str]:
+        return List(self.name)
 
     @property
     def parent(self) -> Maybe[Machine]:
@@ -152,6 +156,10 @@ class MachineBase(Generic[D], Machine):
     @trans.relay(RunNvimIOAlg)
     def message_run_nvim_io_alg(self, data: D, msg: RunNvimIOAlg) -> Either[str, List[Message]]:
         return Propagate.from_either(self._run_nio(msg.io))
+
+    @trans.relay(RunNvimIOStateAlg)
+    def message_run_nvim_io_state_alg(self, data: D, msg: RunNvimIOAlg) -> Either[str, List[Message]]:
+        return Transit(EitherState.apply(self._run_nio(msg.io_f).join))
 
     def _run_io(self, io: IO[A]) -> Either[str, List[Message]]:
         result = io.attempt

@@ -2,6 +2,7 @@ import abc
 import inspect
 from typing import Callable, Type, TypeVar, Generic, Iterable, cast, Union, Any, Optional
 
+from amino.options import env_xdg_data_dir
 from amino import List, Either, Lists, Map, _, L, __, Path, Right, Try, Nil, Just
 from amino.func import flip
 from amino.util.string import ToStr
@@ -11,7 +12,6 @@ from ribosome.nvim.components import NvimComponent
 from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.machine.message_base import Message
-from ribosome.machine.transitions import Transitions
 from ribosome.request.command import msg_command, json_msg_command
 from ribosome.request.function import msg_function
 from ribosome.request.autocmd import msg_autocmd
@@ -67,10 +67,17 @@ def setting_ctor(tpe: Type[A], ctor: Callable[[A], B]) -> Callable[[str, str, st
     return setting
 
 
+state_dir_help_default = '''This directory is used to persist the plugin's current state.'''
+state_dir_base_default = env_xdg_data_dir.value / Path | (Path.home() / '.local' / 'share')
+
+
 class PluginSettings(ToStr, Logging):
 
-    def __init__(self) -> None:
+    def __init__(self, name: str, state_dir_help: str=state_dir_help_default) -> None:
+        self.name = name
         self.components = list_setting('components', 'names or paths of active components', components_help, True, Nil)
+        self.state_dir = path_setting('state_dir', 'state persistence directory', state_dir_help, True,
+                                      state_dir_base_default / self.name)
 
     def all(self) -> Map[str, PluginSetting]:
         settings = inspect.getmembers(self, L(isinstance)(_, PluginSetting))
@@ -224,7 +231,6 @@ class RequestHandlers(ToStr):
 
 Settings = TypeVar('Settings', bound=PluginSettings)
 S = TypeVar('S', bound='AutoData')
-T = TypeVar('T', bound=Transitions)
 
 
 class Config(Generic[Settings, S], ToStr):
@@ -233,7 +239,7 @@ class Config(Generic[Settings, S], ToStr):
             self,
             name: str,
             prefix: Optional[str]=None,
-            components: Map[str, Union[str, Type[T]]]=Map(),
+            components: Map[str, Union[str, type]]=Map(),
             state_type: Optional[Type[S]]=None,
             state_ctor: Optional[Callable[['Config', NvimFacade], S]]=None,
             settings: Optional[Settings]=None,
@@ -245,7 +251,7 @@ class Config(Generic[Settings, S], ToStr):
         self.prefix = prefix or name
         self.components = components
         self.state_type = state_type or AutoData
-        self.state_ctor = state_ctor or (lambda c, v: state_type(config=c, vim_facade=Just(v)))
+        self.state_ctor = state_ctor or (lambda c, v: self.state_type(config=c, vim_facade=Just(v)))
         self.settings = settings or PluginSettings()
         self.request_handlers = RequestHandlers.cons(*request_handlers)
         self.core_components = core_components
