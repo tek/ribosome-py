@@ -135,7 +135,7 @@ class StateMachineBase(ModularMachine):
         self.wait_for_running()
 
     def _stop(self):
-        self.send(Stop())
+        self.send_sync(Stop())
 
     def _publish(self, msg):
         return self._messages.put(msg)
