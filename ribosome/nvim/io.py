@@ -96,7 +96,10 @@ class NvimIOMonad(Monad[NvimIO]):
 
 
 class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
-    pass
+
+    @staticmethod
+    def io(f: Callable[[NvimComponent], A]) -> 'NvimIOState[S, A]':
+        return NvimIOState.lift(NvimIO(f))
 
 tcs(NvimIO, NvimIOState)  # type: ignore
 
