@@ -20,7 +20,7 @@ Msg4 = message('Msg4')
 Msg5 = message('Msg5')
 
 
-class Env(Data):
+class SpecEnv(Data):
     vim = field(AsyncVimProxy)
 
 
@@ -31,7 +31,7 @@ class HTrans(SubTransitions, HasNvim, Logging):
         HasNvim.__init__(self, machine.vim)
 
     @trans.one(Msg, trans.e, trans.st, trans.io)
-    def msg(self) -> Either[str, StateT[Id, Env, IO[Msg2]]]:
+    def msg(self) -> Either[str, StateT[Id, SpecEnv, IO[Msg2]]]:
         return Right(IdState.pure(IO.pure(Msg2())))
 
     @trans.one(Msg2, trans.e)
@@ -39,16 +39,16 @@ class HTrans(SubTransitions, HasNvim, Logging):
         return Left('nothing')
 
     @trans.unit(Msg3, trans.st)
-    def unit(self) -> IdState[Env, Msg]:
+    def unit(self) -> IdState[SpecEnv, Msg]:
         self.log.info('unit')
         return IdState.set(1)
 
     @trans.one(Msg4, trans.est)
-    def est(self) -> EitherState[Env, Msg]:
+    def est(self) -> EitherState[SpecEnv, Msg]:
         return EitherState.pure(Msg5())
 
     @trans.one(Msg5, trans.est)
-    def est_fail(self) -> EitherState[Env, Msg]:
+    def est_fail(self) -> EitherState[SpecEnv, Msg]:
         return EitherState(Left('est'))
 
 
@@ -61,7 +61,7 @@ class Plugin(SubMachine, HasNvim, Logging):
 
 
 class Mach(UnloopedRootMachine):
-    _data_type = Env
+    _data_type = SpecEnv
 
     def __init__(self, vim: NvimFacade, **kw) -> None:
         plug = 'integration._support.handler'
@@ -73,7 +73,7 @@ class Mach(UnloopedRootMachine):
 
     @property
     def init(self):
-        return Env(vim=self.vim)
+        return SpecEnv(vim=self.vim)
 
 
 class HandlerSpecPlugin(NvimStatePlugin, Logging, pname='handler'):

@@ -16,7 +16,7 @@ Msg2 = message('Msg2')
 val = 71
 
 
-class Core(SubTransitions):
+class SpecCore(SubTransitions):
 
     @trans.unit(Stage1)
     def stage_1(self) -> None:
@@ -33,7 +33,7 @@ class Core(SubTransitions):
 
 auto_config = Config(
     name='plug',
-    plugins=Map(core=Core),
+    plugins=Map(core=SpecCore),
     request_handlers=List(
         RequestHandler.msg_cmd(Msg1)('msg1', prefix=Plain(), sync=True),
         RequestHandler.msg_autocmd(Msg2)('vim_resized', prefix=Plain())

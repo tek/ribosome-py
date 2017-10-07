@@ -25,7 +25,7 @@ from ribosome.test.fixtures import rplugin_template
 from ribosome.rpc import rpc_handlers, RpcHandlerSpec
 from ribosome.machine.message_base import Message
 from ribosome.record import decode_json
-from ribosome.settings import PluginSettings, Config
+from ribosome.settings import PluginSettings
 from ribosome.machine.state import AutoData
 
 A = TypeVar('A', bound=NvimPlugin)
