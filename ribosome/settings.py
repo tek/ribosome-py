@@ -235,6 +235,10 @@ S = TypeVar('S', bound='AutoData')
 
 class Config(Generic[Settings, S], ToStr):
 
+    @staticmethod
+    def from_opt(data: Map) -> 'Config':
+        return Config(data.lift('name') | 'no name in json', data.lift('prefix') | None)
+
     def __init__(
             self,
             name: str,
@@ -262,6 +266,10 @@ class Config(Generic[Settings, S], ToStr):
 
     def state(self, vim: NvimFacade) -> S:
         return self.state_ctor(self, vim)
+
+    @property
+    def json_repr(self) -> dict:
+        return dict(__type__='ribosome.settings.Config', name=self.name, prefix=self.prefix)
 
 
 class AutoData(Data):
