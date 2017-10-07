@@ -252,7 +252,7 @@ class Config(Generic[Settings, S], ToStr):
         self.components = components
         self.state_type = state_type or AutoData
         self.state_ctor = state_ctor or (lambda c, v: self.state_type(config=c, vim_facade=Just(v)))
-        self.settings = settings or PluginSettings()
+        self.settings = settings or PluginSettings(name=name)
         self.request_handlers = RequestHandlers.cons(*request_handlers)
         self.core_components = core_components
         self.default_components = default_components
