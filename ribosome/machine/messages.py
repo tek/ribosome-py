@@ -21,6 +21,8 @@ ShowLogInfo = message('ShowLogInfo')
 RunIOsParallel = message('RunIOsParallel', 'ios')
 RunCorosParallel = message('RunCorosParallel', 'coros')
 SubProcessSync = message('SubProcessSync', 'job', 'result')
+SubProcessAsync = message('SubProcessAsync', 'job', 'result')
+Fork = message('Fork', 'callback')
 Warning = message('Warning', 'message')
 Debug = message('Debug', 'message')
 Coroutine = message('Coroutine', 'coro')
@@ -49,7 +51,7 @@ class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
     def short(self) -> str:
         return self.main
 
-__all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'RunNvimIO', 'RunNvimUnitIO', 'UnitIO', 'DataIO',
-           'ShowLogInfo', 'RunIOsParallel', 'RunCorosParallel', 'SubProcessSync', 'RunIO', 'RunIOAlg', 'RunNvimIOAlg',
-           'RunNvimIOStateAlg', 'Error', 'Warning', 'Debug', 'Coroutine', 'CoroutineAlg', 'TransitionException', 'Info',
-           'UpdateRecord', 'UpdateState', 'Stage1', 'Stage2', 'Stage3', 'Stage4')
+__all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'RunNvimIO', 'RunNvimUnitIO', 'RunIO', 'RunIOAlg',
+           'RunNvimIOAlg', 'RunNvimIOStateAlg', 'UnitIO', 'DataIO', 'Info', 'ShowLogInfo', 'RunIOsParallel',
+           'RunCorosParallel', 'SubProcessSync', 'SubProcessAsync', 'Fork', 'Error', 'Warning', 'Debug', 'Coroutine',
+           'CoroutineAlg', 'TransitionException', 'UpdateRecord', 'UpdateState', 'Stage1', 'Stage2', 'Stage3', 'Stage4')

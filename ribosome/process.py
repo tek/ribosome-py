@@ -2,7 +2,7 @@ import abc
 from pathlib import Path
 import shutil
 from contextlib import contextmanager
-from typing import Tuple
+from typing import Tuple, Awaitable, Any
 
 import asyncio
 from asyncio.subprocess import PIPE
@@ -58,13 +58,18 @@ class Job(Record):
     def stdin(self):
         return self.pipe_in.map(__.encode()) | None
 
-    def finish(self, f):
+    def finish(self, f: Future) -> None:
         code, out, err = f.result()
+        self.finish_strict(code, out, err)
+
+    def finish_strict(self, code: int, out: str, err: str) -> None:
         self.status.set_result(Result(self, code == 0, out, err))
 
+    def finish_success(self, out: str) -> None:
+        self.finish_strict(0, out, '')
+
     def cancel(self, reason: str):
-        self.status.set_result(
-            Result(self, False, '', 'canceled: {}'.format(reason)))
+        self.status.set_result(Result(self, False, '', 'canceled: {}'.format(reason)))
 
     @property
     def valid(self):
@@ -117,11 +122,11 @@ class ProcessExecutor(Logging, abc.ABC):
     def __init__(self, loop=None, main_loop_ctx=_dummy_ctx) -> None:
         self.loop = loop or asyncio.get_event_loop()
         self.main_loop_ctx = main_loop_ctx
-        self.current = Map()  # type: Map[Any, Job]
+        self.current: Map[Any, Job] = Map()
 
-    async def process(self, job: Job):
+    def process(self, job: Job) -> Awaitable:
         self.log.debug(f'creating subprocess for {job}')
-        return await asyncio.create_subprocess_exec(
+        return asyncio.create_subprocess_exec(
             job.exe,
             *job.args,
             stdin=PIPE,
@@ -144,12 +149,11 @@ class ProcessExecutor(Logging, abc.ABC):
             if out is None or err is None:
                 return error('executing {} failed'.format(job))
             else:
-                msg = '{} executed successfully ({}, {})'.format(job, out, err)
-                self.log.debug(msg)
+                self.log.debug(f'{job} executed successfully ({out}, {err})')
                 return proc.returncode, out.decode(), err.decode()
         except Exception as e:
-            self.log.exception('{} failed with {}'.format(job, repr(e)))
-            return error('exception: {}'.format(e))
+            self.log.exception(f'{job} failed with {e!r}')
+            return error(f'exception: {e}')
 
     def run(self, job: Job) -> Future[Result]:
         ''' return values of execute are set as result of the task

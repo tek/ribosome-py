@@ -5,12 +5,14 @@ import threading
 import asyncio
 from contextlib import contextmanager
 from concurrent.futures import Future as CFuture, TimeoutError
+import subprocess
+from subprocess import PIPE
 
 from lenses import Lens
 
 from ribosome.logging import Logging
 from ribosome.data import Data
-from ribosome.nvim import HasNvim, ScratchBuilder, NvimIO
+from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
 from ribosome.machine.message_base import message, Message
 from ribosome.machine.base import Machine, MachineBase
@@ -18,7 +20,8 @@ from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle
                                          _recover_error, CoroExecutionHandler)
 from ribosome.machine.message_base import json_message
 from ribosome.machine.helpers import TransitionHelpers
-from ribosome.machine.messages import Nop, Done, Quit, PlugCommand, Stop, Error, UpdateRecord, UpdateState, CoroutineAlg
+from ribosome.machine.messages import (Nop, Done, Quit, PlugCommand, Stop, Error, UpdateRecord, UpdateState,
+                                       CoroutineAlg, SubProcessAsync, Fork)
 from ribosome.machine.handler import DynHandlerJob, AlgResultValidator
 from ribosome.machine.modular import ModularMachine, ModularMachine2
 from ribosome.machine.transitions import Transitions
@@ -29,7 +32,6 @@ import amino
 from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried, Boolean
 from amino.util.string import red, blue
 from amino.state import State
-from amino.do import tdo
 
 Callback = message('Callback', 'func')
 Envelope = message('Envelope', 'message', 'to')
@@ -198,6 +200,30 @@ class StateMachineBase(ModularMachine):
             return Just(AlgResultValidator(trans_desc).validate(res, data))
         return run_coro_alg()
 
+    @trans.one(SubProcessAsync)
+    def message_sub_process_async(self, data: Data, msg: SubProcessAsync) -> None:
+        def subproc_async() -> Message:
+            job = msg.job
+            proc = subprocess.run(
+                executable=job.exe,
+                args=job.args,
+                stdin=PIPE,
+                stdout=PIPE,
+                stderr=PIPE,
+                cwd=str(job.cwd),
+                **job.kw,
+            )
+            job.finish_strict(proc.returncode, proc.stdout or '', proc.stderr or '')
+            v = msg.result(job.result)
+            self.log.test(v)
+        return Fork(subproc_async)
+
+    @trans.unit(Fork)
+    def message_fork(self, data: Data, msg: Fork) -> None:
+        def dispatch() -> None:
+            msg.callback() % self._messages.put_nowait
+        threading.Thread(target=dispatch).start()
+
     @may_handle(RunMachine)
     def _run_machine(self, data, msg):
         self.sub = self.sub.cat(msg.machine)
@@ -354,7 +380,10 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         if self._messages is not None:
             self._messages.put_nowait(msg)
             if not self._loop.is_running():
-                self._loop.run_until_complete(self._process_messages())
+                try:
+                    self._loop.run_until_complete(self._process_messages())
+                except Exception as e:
+                    pass
 
     def send_thread(self, msg: Message, asy: bool) -> None:
         a = 'a' if asy else ''

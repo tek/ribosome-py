@@ -8,7 +8,6 @@ import toolz
 
 from amino import Maybe, _, List, Map, Empty, L, __, Just, Either, Lists, Left, Right, IO
 from amino.util.string import camelcaseify, ToStr
-from amino.io import IO
 from amino.lazy import lazy
 from amino.func import flip
 from amino.state import EitherState
@@ -28,7 +27,7 @@ from ribosome.machine.messages import (RunNvimIO, RunIO, UnitIO, RunCorosParalle
                                        RunNvimUnitIO, RunNvimIOStateAlg)
 from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
 from ribosome.machine import trans
-from ribosome.machine.trans import Propagate, Strict, Transit
+from ribosome.machine.trans import Propagate, Transit
 
 A = TypeVar('A')
 D = TypeVar('D', bound=Data)
