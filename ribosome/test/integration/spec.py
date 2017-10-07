@@ -24,7 +24,7 @@ from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
 from ribosome.rpc import rpc_handlers, RpcHandlerSpec
 from ribosome.machine.message_base import Message
-from ribosome.record import decode_json
+from ribosome.record import decode_json, JsonError
 from ribosome.settings import PluginSettings
 from ribosome.machine.state import AutoData
 
@@ -206,6 +206,17 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def message_log(self) -> Either[str, List[Message]]:
         return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
 
+    @property
+    def state(self) -> Any:
+        def error(err: JsonError) -> None:
+            self.log.error(f'{err.desc}: {err.data}')
+            raise err.error
+        return self.vim.call(f'{self.plugin_prefix}State').flat_map(decode_json).value_or(error)
+
+    @abc.abstractproperty
+    def plugin_prefix(self) -> str:
+        ...
+
 
 def main_looped(fun):
     @wraps(fun)
@@ -327,10 +338,6 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
     @property
     def plugin_prefix(self) -> str:
         return camelcase(self.plugin_class.get_or_raise.prefix)
-
-    @property
-    def state(self) -> Any:
-        return self.vim.call(f'{self.plugin_prefix}State').flat_map(decode_json).get_or_raise
 
     @property
     def rplugin_path(self) -> Either[str, Path]:
