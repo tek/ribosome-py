@@ -221,7 +221,10 @@ class StateMachineBase(ModularMachine):
     @trans.unit(Fork)
     def message_fork(self, data: Data, msg: Fork) -> None:
         def dispatch() -> None:
-            msg.callback() % self._messages.put_nowait
+            try:
+                msg.callback() % self._messages.put_nowait
+            except Exception as e:
+                self.log.caught_exception('running forked function {msg.callback}', e)
         threading.Thread(target=dispatch).start()
 
     @may_handle(RunMachine)
