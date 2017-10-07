@@ -374,8 +374,18 @@ class EncodeJson(json.JSONEncoder):
         )
 
 
-def json_err(task, data, err):
-    return 'error {}coding json: {}\ndata: {}'.format(task, err, data)
+class JsonError(Record):
+    desc = str_field()
+    data = any_field()
+    error = field(Exception)
+
+    @property
+    def _str_extra(self) -> List[Any]:
+        return List(self.desc, self.data, self.error)
+
+
+def json_err(task: str, data: str, err: Exception) -> JsonError:
+    return JsonError(desc=f'error {task}coding json', data=data, error=err)
 
 
 def _encode_json(data):
