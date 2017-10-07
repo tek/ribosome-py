@@ -121,11 +121,11 @@ def start_cls(cls: str) -> int:
 
 def start_config_stage_1(cls: Either[str, Type[NP]], config: Config) -> int:
     sup = cls | Val(AutoPlugin)
-    amino_log.debug(f'starting plugin from {config} with superclass {sup}')
     debug = options.development.exists
     class Plug(sup, config=config, pname=config.name, prefix=config.prefix, debug=debug):
         def __init__(self, vim: Nvim) -> None:
             super().__init__(vim, config)
+    amino_log.debug(f'starting plugin from {config} with superclass {sup}, debug: {debug}')
     return start_host((config.name, Plug), True)
 
 

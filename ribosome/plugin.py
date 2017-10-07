@@ -127,7 +127,7 @@ class NvimStatePlugin(NvimPlugin, metaclass=NvimStatePluginMeta):
         return self.state().message_log // encode_json
 
     def state_data(self) -> str:
-        return self.state().data.json | '{}'
+        return self.state().data.json.value_or(lambda a: f'could not serialize state: {a}')
 
     def plug_command(self, plug_name: str, cmd_name: str, *args: str) -> None:
         self.state().plug_command(plug_name, cmd_name, args)

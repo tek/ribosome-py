@@ -167,6 +167,9 @@ class StateMachineBase(ModularMachine):
             .value_or(L(TransitionResult.failed)(data, _))
         )
 
+    def log_message(self, msg: Message, name: str) -> None:
+        self.append_message_log(msg, name)
+
     def append_message_log(self, msg: Message, name: str) -> None:
         self.log.debug('processing {} in {}'.format(msg, name))
         if self.debug:
@@ -224,7 +227,7 @@ class StateMachineBase(ModularMachine):
             try:
                 msg.callback() % self._messages.put_nowait
             except Exception as e:
-                self.log.caught_exception('running forked function {msg.callback}', e)
+                self.log.caught_exception(f'running forked function {msg.callback}', e)
         threading.Thread(target=dispatch).start()
 
     @may_handle(RunMachine)
