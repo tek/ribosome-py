@@ -208,15 +208,16 @@ class StateMachineBase(ModularMachine):
         def subproc_async() -> Message:
             job = msg.job
             proc = subprocess.run(
-                executable=job.exe,
-                args=job.args,
+                args=job.args.cons(job.exe),
                 stdin=PIPE,
                 stdout=PIPE,
                 stderr=PIPE,
                 cwd=str(job.cwd),
                 **job.kw,
             )
-            return Nil
+            self.log.debug(f'finished async subproc with {proc}')
+            result = job.result_strict(proc.returncode, proc.stdout or '', proc.stderr or '')
+            return msg.result(result)
         return Fork(subproc_async)
 
     @trans.unit(Fork)
