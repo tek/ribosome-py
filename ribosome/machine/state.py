@@ -361,6 +361,7 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         AsyncIOBase.__init__(self)
 
     def start(self) -> None:
+        self.log.debug(f'starting event loop in {self}')
         self.data = self.init
         self._init_asyncio()
 
@@ -389,7 +390,9 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
                 try:
                     self._loop.run_until_complete(self._process_messages())
                 except Exception as e:
-                    pass
+                    self.log.caught_exception('submitting `_process_messages` coro to loop')
+        else:
+            self.log.debug(f'tried to send {msg} while `_messages` was None')
 
     def send_thread(self, msg: Message, asy: bool) -> None:
         a = 'a' if asy else ''
