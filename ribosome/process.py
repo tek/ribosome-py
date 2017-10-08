@@ -63,7 +63,10 @@ class Job(Record):
         self.finish_strict(code, out, err)
 
     def finish_strict(self, code: int, out: str, err: str) -> None:
-        self.status.set_result(Result(self, code == 0, out, err))
+        self.status.set_result(self.result_strict(code, out, err))
+
+    def result_strict(self, code: int, out: str, err: str) -> None:
+        return Result(self, code == 0, out, err)
 
     def finish_success(self, out: str) -> None:
         self.finish_strict(0, out, '')

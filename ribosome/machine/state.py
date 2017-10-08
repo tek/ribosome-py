@@ -29,7 +29,7 @@ from ribosome.machine import trans
 from ribosome.settings import PluginSettings, Config, AutoData
 
 import amino
-from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried, Boolean
+from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried, Boolean, Nil
 from amino.util.string import red, blue
 from amino.state import State
 
@@ -216,9 +216,7 @@ class StateMachineBase(ModularMachine):
                 cwd=str(job.cwd),
                 **job.kw,
             )
-            job.finish_strict(proc.returncode, proc.stdout or '', proc.stderr or '')
-            v = msg.result(job.result)
-            self.log.test(v)
+            return Nil
         return Fork(subproc_async)
 
     @trans.unit(Fork)
@@ -390,7 +388,7 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
                 try:
                     self._loop.run_until_complete(self._process_messages())
                 except Exception as e:
-                    self.log.caught_exception('submitting `_process_messages` coro to loop')
+                    self.log.caught_exception('submitting `_process_messages` coro to loop', e)
         else:
             self.log.debug(f'tried to send {msg} while `_messages` was None')
 
