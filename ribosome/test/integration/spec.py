@@ -371,10 +371,6 @@ class AutoPluginIntegrationSpec(Generic[Settings, Data], VimIntegrationSpec):
     def module(self) -> str:
         ...
 
-    @abc.abstractmethod
-    def config_name(self) -> str:
-        ...
-
     @property
     def plugin_name(self) -> str:
         return camelcase(self._prefix)
@@ -392,7 +388,7 @@ class AutoPluginIntegrationSpec(Generic[Settings, Data], VimIntegrationSpec):
         stderr_handler_name = 'RibosomeJobStderr'
         stderr_handler_body = '''echo 'error starting rpc job on channel ' . a:id . ': ' . string(a:data)'''
         self.vim.define_function(stderr_handler_name, List('id', 'data', 'event'), stderr_handler_body)
-        cmd = f'from ribosome.host import start_config; start_config({self.module()!r}, {self.config_name()!r})'
+        cmd = f'from ribosome.host import start_module; start_module({self.module()!r})'
         (
             self.vim
             .call('jobstart', ['python3', '-c', cmd], dict(rpc=True, on_stderr=stderr_handler_name))

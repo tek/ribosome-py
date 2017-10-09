@@ -1,4 +1,3 @@
-import inspect
 import functools
 from typing import TypeVar, Type, Callable, Tuple, Generator, Any
 from types import ModuleType
@@ -10,10 +9,11 @@ from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 from neovim.msgpack_rpc.event_loop.asyncio import AsyncioEventLoop
 from neovim.msgpack_rpc.event_loop.uv import UvEventLoop
 
-from amino import Either, _, L, do, Path, Maybe, Lists, Right, Try, amino_log, Logger, curried
+from amino import Either, _, L, Maybe, Lists, amino_log, Logger, __, Path
 from amino.either import ImportFailure
 from amino.func import Val
 from amino.logging import amino_root_file_logging
+from amino.do import tdo
 
 from ribosome.nvim import NvimFacade
 from ribosome.logging import ribo_log, Logging
@@ -25,6 +25,9 @@ from ribosome import options
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)
 D = TypeVar('D')
+AS = TypeVar('AS')
+A = TypeVar('A', bound=AS)
+C = TypeVar('C', bound=Config)
 
 
 class PluginHost(Host, Logging):
@@ -62,32 +65,35 @@ def host(loop: Loop) -> PluginHost:
     return PluginHost(nvim)
 
 
-def start_host(data: Tuple[str, Type[NP]], uv_loop: bool) -> int:
+def start_host(prefix: str, tpe: Type[NP], uv_loop: bool) -> int:
     Loop = UvEventLoop if uv_loop else AsyncioEventLoop
-    host(Loop).start(data)
+    host(Loop).start((prefix, tpe))
     return 0
 
 
-@do
-def cls_from_file(file: str, mod: ModuleType) -> Generator[Either[str, Tuple[str, Type[NP]]], Any, None]:
-    all = yield Maybe.getattr(mod, '__all__').to_either(f'file `{file}` does not define `__all__`')
-    name = yield Lists.wrap(all).head.to_either(f'`{mod}.__all__` is empty')
-    tpe = yield Maybe.getattr(mod, name).to_either(f'{mod}.{name} does not exist')
-    yield Right((file, tpe))
+@tdo(Either[str, A])
+def instance_from_module(mod: ModuleType, pred: Callable[[Any], bool], desc: str) -> Generator:
+    all = yield Maybe.getattr(mod, '__all__').to_either(f'module `{mod.__name__}` does not define `__all__`')
+    yield (
+        Lists.wrap(all)
+        .flat_map(L(Maybe.getattr)(mod, _))
+        .find(pred)
+        .to_either(f'no {desc} in ``{mod.__name__}.__all__`')
+    )
 
 
-@do
-def cls_from_path(path: str) -> Generator[Either[str, Tuple[str, Type[NP]]], Any, None]:
-    tpe = yield Either.import_path(path)
-    file = yield Try(inspect.getfile, tpe)
-    yield Right((file, tpe))
+def cls_from_module(mod: ModuleType, tpe: Type[AS]) -> Either[str, Type[A]]:
+    pred = lambda a: isinstance(a, type) and issubclass(a, tpe)
+    return instance_from_module(mod, pred, f'subclass of `{tpe}`')
 
 
-@do
-def cls_from_module(path: str) -> Generator[Either[str, Tuple[str, Type[NP]]], Any, None]:
-    mod = yield Either.import_module(path)
-    file = mod.__file__
-    yield cls_from_file(file, mod)
+def plugin_cls_from_module(mod: ModuleType) -> Either[str, Type[NP]]:
+    return cls_from_module(mod, NvimPlugin)
+
+
+def config_from_module(mod: ModuleType) -> Either[str, Type[C]]:
+    pred = lambda a: isinstance(a, Config)
+    return instance_from_module(mod, pred, 'instance of `Config`')
 
 
 log_initialized = False
@@ -101,77 +107,59 @@ def nvim_log() -> Logger:
     return ribo_log
 
 
-def start(desc: str, target: str, cls: Callable[[str], Either[str, Tuple[str, Type[NP]]]]) -> int:
-    def error(msg: str) -> None:
-        err = f'invalid rplugin {desc} `{target}`: {msg}'
-        amino_log.error(err)
-        nvim_log().error(err)
-    try:
-        amino_log.debug(f'starting rplugin {desc} `{target}`')
-        cls(target).map(L(start_host)(_, True)).leffect(error)
-        return 0
-    except Exception as e:
-        nvim_log().caught_exception_error(f'starting host with {desc} `{target}`', e)
-        return 1
-
-
-def start_cls(cls: str) -> int:
-    return start('class', cls, cls_from_path)
-
-
-def start_config_stage_1(cls: Either[str, Type[NP]], config: Config) -> int:
+def start_config_stage_2(cls: Either[str, Type[NP]], config: Config) -> int:
     sup = cls | Val(AutoPlugin)
     debug = options.development.exists
     class Plug(sup, config=config, pname=config.name, prefix=config.prefix, debug=debug):
         def __init__(self, vim: Nvim) -> None:
             super().__init__(vim, config)
     amino_log.debug(f'starting plugin from {config} with superclass {sup}, debug: {debug}')
-    return start_host((config.name, Plug), True)
+    return start_host(config.name, Plug, True)
+
+
+def error(msg: str) -> int:
+    amino_log.error(msg)
+    nvim_log().error(msg)
+    return 1
+
+
+def import_error(e: ImportFailure, desc: str) -> int:
+    return error(e.expand.join_lines)
+
+
+def exception(e: Exception, desc: str) -> int:
+    f = __.caught_exception_error(f'starting host from {desc}', e)
+    f(amino_log)
+    f(nvim_log())
+    return 1
+
+
+def start_config_stage_1(mod: ModuleType) -> int:
+    plugin_cls = plugin_cls_from_module(mod)
+    return config_from_module(mod).cata(error, L(start_config_stage_2)(plugin_cls, _))
 
 
 def setup_log() -> None:
     amino_root_file_logging()
 
 
-def start_config(mod: str, name: str) -> int:
-    setup_log()
-    def error(msg: ImportFailure) -> int:
-        s = str(msg)
-        amino_log.error(s)
-        nvim_log().error(s)
-        return 1
-    def relay(config: Config) -> int:
-        cls = cls_from_module(mod) / _[1]
-        return start_config_stage_1(cls, config)
+def start_from(source: str, importer: Callable[[str], Either[ImportFailure, ModuleType]], desc: str) -> int:
     try:
-        return Either.import_name(mod, name).cata(error, relay)
+        setup_log()
+        amino_log.debug(f'start_{desc}: {source}')
+        return importer(source).cata(L(import_error)(_, source), start_config_stage_1)
     except Exception as e:
-        amino_log.caught_exception_error(f'starting host from config', e)
-        nvim_log().caught_exception_error(f'starting host from config', e)
-        return 1
+        return exception(e, source)
 
 
-def start_file(file: str) -> int:
-    def read_config(mod: ModuleType) -> Maybe[Config]:
-        return Maybe.getattr(mod, 'config')
-    setup_log()
-    def analyze_mod(mod: ModuleType) -> int:
-        cls = cls_from_file(file, mod) / _[1]
-        amino_log.debug(f'analyze_mod: {mod} / {cls}')
-        return (
-            read_config(mod)
-            .cata(
-                curried(start_config_stage_1)(cls),
-                (lambda: start('file', file, L(cls_from_file)(_, mod)))
-            )
-        )
-    def error(e: ImportFailure) -> None:
-        amino_log.error(f'failed to import {file}: {e.expand.join_lines}')
-    try:
-        amino_log.debug(f'start_file: {file}')
-        return Either.import_file(Path(file)).leffect(error) / analyze_mod | 1
-    except Exception as e:
-        nvim_log().caught_exception_error(f'starting host from file', e)
-        return 1
+def start_module(mod: str) -> int:
+    return start_from(mod, Either.import_module, 'module')
 
-__all__ = ('start_host', 'start_file', 'start_cls')
+
+def start_file(path: str) -> int:
+    p = Path(path)
+    file = p / '__init__.py' if p.is_dir() else p
+    return start_from(str(file), Either.import_file, 'file')
+
+
+__all__ = ('start_host', 'start_module', 'start_file')

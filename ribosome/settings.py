@@ -5,7 +5,7 @@ from typing import Callable, Type, TypeVar, Generic, Iterable, cast, Union, Any,
 from amino.options import env_xdg_data_dir
 from amino import List, Either, Lists, Map, _, L, __, Path, Right, Try, Nil, Just
 from amino.func import flip
-from amino.util.string import ToStr
+from amino.util.string import ToStr, snake_case
 
 from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.nvim.components import NvimComponent
@@ -117,6 +117,10 @@ class RequestDispatcher(ToStr):
     def args(self) -> List[Any]:
         ...
 
+    @abc.abstractproperty
+    def name(self) -> str:
+        ...
+
 
 class MsgDispatcher(Generic[M], RequestDispatcher):
 
@@ -129,6 +133,10 @@ class MsgDispatcher(Generic[M], RequestDispatcher):
     @property
     def args(self) -> List[Any]:
         return List(self.msg)
+
+    @property
+    def name(self) -> str:
+        return snake_case(self.msg.__name__)
 
 
 class MsgCmd(Generic[M], MsgDispatcher[M]):
@@ -212,8 +220,9 @@ class RequestHandlerBuilder:
     def __init__(self, dispatcher: RequestDispatcher) -> None:
         self.dispatcher = dispatcher
 
-    def __call__(self, name: str, prefix: PrefixStyle=Short(), **options: Any) -> RequestHandler:
-        return RequestHandler(self.dispatcher, name, prefix, Map(options))
+    def __call__(self, name: str=None, prefix: PrefixStyle=Short(), **options: Any) -> RequestHandler:
+        name1 = name or self.dispatcher.name
+        return RequestHandler(self.dispatcher, name1, prefix, Map(options))
 
 
 class RequestHandlers(ToStr):
