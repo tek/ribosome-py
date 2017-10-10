@@ -21,6 +21,7 @@ from ribosome.rpc import rpc_handler_functions, RpcHandlerFunction, define_handl
 from ribosome import NvimPlugin, AutoPlugin
 from ribosome.settings import Config
 from ribosome import options
+from ribosome.plugin import plugin_class_from_config
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)
@@ -110,11 +111,8 @@ def nvim_log() -> Logger:
 def start_config_stage_2(cls: Either[str, Type[NP]], config: Config) -> int:
     sup = cls | Val(AutoPlugin)
     debug = options.development.exists
-    class Plug(sup, config=config, pname=config.name, prefix=config.prefix, debug=debug):
-        def __init__(self, vim: Nvim) -> None:
-            super().__init__(vim, config)
     amino_log.debug(f'starting plugin from {config} with superclass {sup}, debug: {debug}')
-    return start_host(config.name, Plug, True)
+    return start_host(config.name, plugin_class_from_config(config, sup, debug), True)
 
 
 def error(msg: str) -> int:

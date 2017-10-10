@@ -4,6 +4,7 @@ import typing
 from typing import Union, Any, Callable, Type, Optional, TypeVar, Generic, GenericMeta
 
 import neovim
+from neovim.api import Nvim
 
 from amino import List
 
@@ -262,5 +263,12 @@ def setup_auto_plugin(cls: Type[AutoPlugin], config: Config[Settings, D]) -> Non
             help.handler
         )
         helper(handler.name, dispatcher.decorator(), lambda: None, *dispatcher.args, **handler.options)
+
+
+def plugin_class_from_config(config: Config, parent: Type[AP], debug=bool) -> Type[AP]:
+    class Plug(parent, config=config, pname=config.name, prefix=config.prefix, debug=debug):
+        def __init__(self, vim: Nvim) -> None:
+            super().__init__(vim, config)
+    return Plug
 
 __all__ = ('NvimPlugin', 'NvimStatePlugin')
