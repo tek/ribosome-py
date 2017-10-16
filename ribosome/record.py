@@ -118,8 +118,7 @@ class OptionalFactory:
 
 
 def optional_field(tpe=None, factory=None, initial=Empty(), **kw: Any) -> pyrsistent.field:
-    return any_field(initial=initial, factory=OptionalFactory(factory, tpe),
-                     invariant=OptionalInvariant(tpe), **kw)
+    return any_field(initial=initial, factory=OptionalFactory(factory, tpe), invariant=OptionalInvariant(tpe), **kw)
 
 
 def bool_field(initial=False, **kw: Any) -> pyrsistent.field:
