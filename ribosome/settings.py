@@ -98,6 +98,7 @@ The entries of this setting can either be names of the builtin components or arb
 custom components.
 '''
 str_setting = setting_ctor(str, lambda a: Right(a))
+float_setting = setting_ctor(float, lambda a: Right(a))
 list_setting = setting_ctor(list, cast(Callable[[Iterable[A]], Either[str, List[B]]], (lambda a: Right(Lists.wrap(a)))))
 path_setting = setting_ctor(str, (lambda a: Try(Path, a)))
 path_list_setting = setting_ctor(list, path_list)
@@ -292,5 +293,6 @@ class AutoData(Data):
     def settings(self) -> Settings:
         return self.config.settings
 
-__all__ = ('PluginSetting', 'setting_ctor', 'PluginSettings', 'str_setting', 'list_setting', 'Config',
-           'RequestHandlers', 'RequestHandler')
+__all__ = ('PluginSetting', 'setting_ctor', 'PluginSettings', 'str_setting', 'list_setting', 'float_setting',
+           'path_setting', 'path_list_setting', 'map_setting', 'path_map_setting', 'RequestHandler', 'RequestHandlers',
+           'Config')
