@@ -79,7 +79,7 @@ def instance_from_module(mod: ModuleType, pred: Callable[[Any], bool], desc: str
         Lists.wrap(all)
         .flat_map(L(Maybe.getattr)(mod, _))
         .find(pred)
-        .to_either(f'no {desc} in ``{mod.__name__}.__all__`')
+        .to_either(f'no {desc} in `{mod.__name__}.__all__`')
     )
 
 

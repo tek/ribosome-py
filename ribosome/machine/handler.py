@@ -4,7 +4,7 @@ from typing import Any, Sequence, TypeVar, Generic, Type, Tuple, Union
 import asyncio
 
 import amino
-from amino import Maybe, _, List, Map, Just, Either, L, __, Right
+from amino import Maybe, _, List, Map, Just, Either, L, __, Right, Nil
 from amino.io import IO
 from amino.state import StateT, EvalState, MaybeState, EitherState, IdState
 from amino.tc.optional import Optional
@@ -18,7 +18,7 @@ from ribosome.logging import Logging
 from ribosome.machine.message_base import Message, Publish
 from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
                                          TransitionFailed, Coroutine, MachineError, Error)
-from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop, RunNvimIOAlg, RunNvimIOStateAlg
+from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop, RunNvimIOStateAlg
 from ribosome.machine.machine import Machine
 from ribosome.data import Data
 from ribosome.machine.trans import TransAction, Transit, Propagate, Unit, TransFailure
@@ -197,6 +197,12 @@ class UnpackIdState(Generic[D], UnpackTransState[IdState[D, List[Message]]], tpe
 
     def unpack(self, a: IdState[D, List[Message]], data: D) -> Either[Message, Tuple[D, List[Message]]]:
         return Right(a.run(data).value)
+
+
+class UnpackMaybeState(Generic[D], UnpackTransState[MaybeState[D, List[Message]]], tpe=MaybeState):
+
+    def unpack(self, a: MaybeState[D, List[Message]], data: D) -> Either[Message, Tuple[D, List[Message]]]:
+        return Right(a.run(data) | (data, Nil))
 
 
 class UnpackEitherState(Generic[D], UnpackTransState[EitherState[D, List[Message]]], tpe=EitherState):
