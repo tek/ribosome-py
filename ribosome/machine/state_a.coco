@@ -3,11 +3,11 @@ from typing import TypeVar
 from lenses import Lens
 
 from amino.do import tdo
-from amino import IO, List, Path
+from amino import IO, List, Path, Left
+from amino.json import decode_json, dump_json
 
 from ribosome.nvim import NvimIO
 from ribosome.nvim.io import NvimIOState
-from ribosome.record import decode_json, encode_json
 from ribosome.settings import AutoData
 
 A = TypeVar('A')
@@ -23,21 +23,24 @@ def state_file(name: str) -> Generator:
 
 
 @tdo(NvimIOState[D, None])
-def load_json_state(name: str, l: Lens) -> Generator:
+def load_json_data(name: str) -> Generator:
     file = yield state_file(name)
     exists = yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.exists)))
     if exists:
         json = yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.read_text)))
-        \data = yield NvimIOState.lift(NvimIO.from_either(decode_json(json)))
-        yield NvimIOState.modify(a -> l.bind(a).set(\data))
+        yield NvimIOState.pure(decode_json(json))
     else:
-        yield NvimIOState.pure(None)
+        yield NvimIOState.pure(Left(f'state file {file} does not exist'))
+
+
+def load_json_state(name: str, l: Lens) -> NvimIOState[D, None]:
+    return load_json_data(name).cata(a -> NvimIOState.pure(None), d -> NvimIOState.modify(a -> l.bind(a).set(d)))
 
 
 @tdo(NvimIOState[D, None])
 def store_json_data(name: str, \data: A) -> Generator:
     file = yield state_file(name)
-    json = yield NvimIOState.lift(NvimIO.from_either(encode_json(\data)))
+    json = yield NvimIOState.lift(NvimIO.from_either(dump_json(\data)))
     yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.write_text, json)))
     yield NvimIOState.pure(None)
 
