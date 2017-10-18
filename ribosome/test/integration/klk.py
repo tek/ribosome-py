@@ -93,7 +93,7 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
         return later(kf(lambda: self.buffer.name) == name)
 
     def _buffer_count(self, count: int) -> Expectation:
-        return later(kf(lambda: self.vim.buffers).must(have_length(1)))
+        return later(kf(lambda: self.vim.buffers).must(have_length(count)))
 
     def _window_height(self, height: int) -> Expectation:
         return later(kf(lambda: self.vim.window.height).must(contain(height)))
