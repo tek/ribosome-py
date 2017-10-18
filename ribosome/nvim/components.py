@@ -795,7 +795,7 @@ class OptVar(Logging, abc.ABC):
             if isinstance(v, tpe):
                 return Right(v)
             else:
-                msg = 'invalid type {} for {} {} (wanted {})'.format(type(v), self._desc, v, tpe)
+                msg = f'invalid type {type(v)} for {self._desc} {v} (wanted {tpe})'
                 self.log.error(msg)
                 return Left(msg)
         return value.flat_map(check)
