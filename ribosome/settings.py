@@ -3,7 +3,7 @@ import inspect
 from typing import Callable, Type, TypeVar, Generic, Iterable, cast, Union, Any, Optional
 
 from amino.options import env_xdg_data_dir
-from amino import List, Either, Lists, Map, _, L, __, Path, Right, Try, Nil, Just
+from amino import List, Either, Lists, Map, _, L, __, Path, Right, Try, Nil, Just, Boolean
 from amino.func import flip
 from amino.util.string import ToStr, snake_case
 
@@ -104,6 +104,7 @@ path_setting = setting_ctor(str, (lambda a: Try(Path, a)))
 path_list_setting = setting_ctor(list, path_list)
 map_setting = setting_ctor(dict, lambda a: Right(Map(a)))
 path_map_setting = setting_ctor(dict, lambda a: Try(Map, a).valmap(lambda b: Path(b).expanduser()))
+bool_setting = setting_ctor(int, lambda a: Right(Boolean(a)))
 
 M = TypeVar('M', bound=Message)
 
