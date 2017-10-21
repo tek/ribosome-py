@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0xa409e1e6
+# __coconut_hash__ = 0xf68affd7
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -16,56 +16,56 @@ _coconut_sys.path.remove(_coconut_file_path)
 
 # Compiled Coconut: -----------------------------------------------------------
 
-from typing import TypeVar  # line 1
+from typing import TypeVar
 
-from lenses import Lens  # line 3
+from lenses import Lens
 
-from amino.do import tdo  # line 5
-from amino import IO  # line 6
-from amino import List  # line 6
-from amino import Path  # line 6
+from amino.do import tdo
+from amino import IO
+from amino import List
+from amino import Path
 
-from ribosome.nvim import NvimIO  # line 8
-from ribosome.nvim.io import NvimIOState  # line 9
-from ribosome.record import decode_json  # line 10
-from ribosome.record import encode_json  # line 10
-from ribosome.settings import AutoData  # line 11
+from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIOState
+from ribosome.record import decode_json
+from ribosome.record import encode_json
+from ribosome.settings import AutoData
 
-A = TypeVar('A')  # line 13
-D = TypeVar('D', bound=AutoData)  # line 14
-
-
-@tdo(NvimIOState[D, Path])  # line 17
-def state_file(name: 'str') -> 'Generator':  # line 18
-    settings = yield NvimIOState.inspect(lambda a: a.settings)  # line 19
-    dir = yield NvimIOState.lift(settings.state_dir.value_or_default)  # line 20
-    yield NvimIOState.lift(NvimIO.from_io(IO.delay(dir.mkdir, parents=True, exist_ok=True)))  # line 21
-    yield NvimIOState.pure(dir / f'{name}.json')  # line 22
+A = TypeVar('A')
+D = TypeVar('D', bound=AutoData)
 
 
-@tdo(NvimIOState[D, None])  # line 25
-def load_json_state(name: 'str', l: 'Lens') -> 'Generator':  # line 26
-    file = yield state_file(name)  # line 27
-    exists = yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.exists)))  # line 28
-    if exists:  # line 29
-        json = yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.read_text)))  # line 30
-        data = yield NvimIOState.lift(NvimIO.from_either(decode_json(json)))  # line 31
-        yield NvimIOState.modify(lambda a: l.bind(a).set(data))  # line 32
-    else:  # line 33
-        yield NvimIOState.pure(None)  # line 34
+@tdo(NvimIOState[D, Path])
+def state_file(name: 'str') -> 'Generator':
+    settings = yield NvimIOState.inspect(lambda a: a.settings)
+    dir = yield NvimIOState.lift(settings.project_state_dir.value_or_default)
+    yield NvimIOState.lift(NvimIO.from_io(IO.delay(dir.mkdir, parents=True, exist_ok=True)))
+    yield NvimIOState.pure(dir / f'{name}.json')
 
 
-@tdo(NvimIOState[D, None])  # line 37
-def store_json_data(name: 'str', data: 'A') -> 'Generator':  # line 38
-    file = yield state_file(name)  # line 39
-    json = yield NvimIOState.lift(NvimIO.from_either(encode_json(data)))  # line 40
-    yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.write_text, json)))  # line 41
-    yield NvimIOState.pure(None)  # line 42
+@tdo(NvimIOState[D, None])
+def load_json_state(name: 'str', l: 'Lens') -> 'Generator':
+    file = yield state_file(name)
+    exists = yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.exists)))
+    if exists:
+        json = yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.read_text)))
+        data = yield NvimIOState.lift(NvimIO.from_either(decode_json(json)))
+        yield NvimIOState.modify(lambda a: l.bind(a).set(data))
+    else:
+        yield NvimIOState.pure(None)
 
 
-@tdo(NvimIOState[D, None])  # line 45
-def store_json_state(name: 'str', data: '_coconut.typing.Callable[[D], A]') -> 'Generator':  # line 46
-    payload = yield NvimIOState.inspect(data)  # line 47
-    yield store_json_data(name, payload)  # line 48
+@tdo(NvimIOState[D, None])
+def store_json_data(name: 'str', data: 'A') -> 'Generator':
+    file = yield state_file(name)
+    json = yield NvimIOState.lift(NvimIO.from_either(encode_json(data)))
+    yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.write_text, json)))
+    yield NvimIOState.pure(None)
 
-__all__ = ('load_json_state', 'store_json_data', 'store_json_state')  # line 50
+
+@tdo(NvimIOState[D, None])
+def store_json_state(name: 'str', data: '_coconut.typing.Callable[[D], A]') -> 'Generator':
+    payload = yield NvimIOState.inspect(data)
+    yield store_json_data(name, payload)
+
+__all__ = ('load_json_state', 'store_json_data', 'store_json_state')

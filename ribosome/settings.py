@@ -1,11 +1,12 @@
 import abc
 import inspect
-from typing import Callable, Type, TypeVar, Generic, Iterable, cast, Union, Any, Optional
+from typing import Callable, Type, TypeVar, Generic, Iterable, cast, Union, Any, Optional, Generator
 
 from amino.options import env_xdg_data_dir
-from amino import List, Either, Lists, Map, _, L, __, Path, Right, Try, Nil, Just, Boolean
+from amino import List, Either, Lists, Map, _, L, __, Path, Right, Try, Nil, Just, Boolean, Left, Eval
 from amino.func import flip
 from amino.util.string import ToStr, snake_case
+from amino.do import tdo
 
 from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.nvim.components import NvimComponent
@@ -22,7 +23,26 @@ A = TypeVar('A', contravariant=True)
 B = TypeVar('B')
 
 
-class PluginSetting(Generic[A, B], ToStr):
+class PluginSetting(Generic[B], Logging, ToStr):
+
+    @abc.abstractproperty
+    def value(self) -> NvimIO[Either[str, B]]:
+        ...
+
+    @abc.abstractproperty
+    def default_e(self) -> Either[str, B]:
+        ...
+
+    @property
+    def value_or_default(self) -> NvimIO[B]:
+        @tdo(NvimIO[B])
+        def run() -> Generator:
+            value = yield self.value
+            yield NvimIO.from_either(value.o(self.default_e))
+        return run()
+
+
+class StrictSetting(Generic[A, B], PluginSetting[B]):
 
     def __init__(
             self,
@@ -43,32 +63,73 @@ class PluginSetting(Generic[A, B], ToStr):
         self.default = default
 
     @property
-    def value(self) -> NvimIO[Either[str, A]]:
-        def read(v: NvimComponent) -> Either[str, A]:
+    def value(self) -> NvimIO[Either[str, B]]:
+        @tdo(Either[str, B])
+        def read(v: NvimComponent) -> Generator:
             vars = v.vars
             getter = vars.p if self.prefix else vars
-            return vars.typed(self.tpe, getter(self.name)) // self.ctor
+            raw = yield vars.typed(self.tpe, getter(self.name))
+            yield self.ctor(raw)
         return NvimIO(read)
 
-    @property
-    def value_or_default(self) -> NvimIO[A]:
-        return self.value / __.get_or_else(self.default)
-
-    def value_or(self, default: A) -> NvimIO[A]:
+    def value_or(self, default: B) -> NvimIO[B]:
         return self.value / __.get_or_else(default)
+
+    @property
+    def default_e(self) -> Either[str, B]:
+        return Right(self.default)
 
     def _arg_desc(self) -> List[str]:
         return List(self.name, str(self.prefix), str(self.tpe))
 
 
-def setting_ctor(tpe: Type[A], ctor: Callable[[A], B]) -> Callable[[str, str, str, bool, B], PluginSetting[A, B]]:
-    def setting(name: str, desc: str, help: str, prefix: bool, default: B) -> PluginSetting[A, B]:
-        return PluginSetting(name, desc, help, prefix, tpe, ctor, default)
+class FSetting(Generic[B], PluginSetting[B]):
+
+    def __init__(
+            self,
+            name: str,
+            f: Eval[NvimIO[Either[str, B]]],
+            default: Either[str, B]=Left('no default specified')
+    ) -> None:
+        self.name = name
+        self.f = f
+        self.default = default
+
+    def _arg_desc(self) -> List[str]:
+        return List(self.name)
+
+    @property
+    def value(self) -> NvimIO[Either[str, B]]:
+        return self.f.value
+
+    @property
+    def default_e(self) -> Either[str, B]:
+        return self.default
+
+
+def setting_ctor(tpe: Type[A], ctor: Callable[[A], B]) -> Callable[[str, str, str, bool, B], PluginSetting[B]]:
+    def setting(name: str, desc: str, help: str, prefix: bool, default: B) -> PluginSetting[B]:
+        return StrictSetting(name, desc, help, prefix, tpe, ctor, default)
     return setting
 
 
 state_dir_help_default = '''This directory is used to persist the plugin's current state.'''
 state_dir_base_default = env_xdg_data_dir.value / Path | (Path.home() / '.local' / 'share')
+
+
+@tdo(Either[str, str])
+def project_name_from_path() -> Generator:
+    cwd = yield Try(Path.cwd)
+    name = cwd.name
+    yield Right(name) if name else Left('cwd broken')
+
+
+@tdo(NvimIO[Either[str, Path]])
+def state_dir_with_name(state_dir: PluginSetting[Path]) -> Generator:
+    base = yield state_dir.value_or_default
+    proteome_name = yield NvimIO(__.vars('proteome_main_name'))
+    path = proteome_name.o(project_name_from_path) / (lambda a: base / a)
+    yield NvimIO.pure(path)
 
 
 class PluginSettings(ToStr, Logging):
@@ -78,6 +139,7 @@ class PluginSettings(ToStr, Logging):
         self.components = list_setting('components', 'names or paths of active components', components_help, True, Nil)
         self.state_dir = path_setting('state_dir', 'state persistence directory', state_dir_help, True,
                                       state_dir_base_default / self.name)
+        self.project_state_dir = FSetting('project_state_dir', Eval.always(lambda: state_dir_with_name(self.state_dir)))
 
     def all(self) -> Map[str, PluginSetting]:
         settings = inspect.getmembers(self, L(isinstance)(_, PluginSetting))

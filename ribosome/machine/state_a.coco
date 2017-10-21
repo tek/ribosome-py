@@ -17,7 +17,7 @@ D = TypeVar('D', bound=AutoData)
 @tdo(NvimIOState[D, Path])
 def state_file(name: str) -> Generator:
     settings = yield NvimIOState.inspect(a -> a.settings)
-    dir = yield NvimIOState.lift(settings.state_dir.value_or_default)
+    dir = yield NvimIOState.lift(settings.project_state_dir.value_or_default)
     yield NvimIOState.lift(NvimIO.from_io(IO.delay(dir.mkdir, parents=True, exist_ok=True)))
     yield NvimIOState.pure(dir / f'{name}.json')
 
