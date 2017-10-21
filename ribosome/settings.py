@@ -132,7 +132,7 @@ def state_dir_with_name(state_dir: PluginSetting[Path], proteome_name: PluginSet
                         session_name: PluginSetting[str]) -> Generator:
     base = yield state_dir.value_or_default
     pro_name = yield proteome_name.value
-    sess_name = session_name.value
+    sess_name = yield session_name.value
     path = pro_name.o(sess_name).o(project_name_from_path) / (lambda a: base / a)
     yield NvimIO.pure(path)
 
