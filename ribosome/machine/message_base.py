@@ -2,11 +2,11 @@ import abc
 import functools
 import time
 import inspect
-from uuid import UUID
 from typing import Optional, Any, TypeVar, Type, Callable, Generic
+from types import FunctionType, SimpleNamespace
 
 from amino import Map, List, Empty, Just, __, L, Maybe, _, Lists, Nothing
-from amino.dat import Dat
+from amino.dat import Dat, DatMeta
 
 from ribosome.record import any_field, dfield, list_field, field, RecordMeta, Record, bool_field
 
@@ -51,7 +51,7 @@ def _update_field_metadata(inst, fields, opt_fields, varargs):
         else Just(inst._field_count_min + len(opt_fields)))
 
 
-class MessageMeta(RecordMeta, abc.ABCMeta):
+class PMessageMeta(RecordMeta, abc.ABCMeta):
 
     def __new__(cls, name, bases, namespace, fields=[], opt_fields=[], varargs=None, skip_fields=False, **kw):
         ''' create a subclass of PRecord
@@ -78,7 +78,7 @@ A = TypeVar('A', bound='Message')
 
 
 @functools.total_ordering
-class PMessage(Record, metaclass=MessageMeta, skip_fields=True):
+class PMessage(Record, metaclass=PMessageMeta, skip_fields=True):
     ''' Interface between vim commands and state.
     Provides a constructor that allows specification of fields via positional arguments.
     '''
@@ -127,15 +127,15 @@ def message_definition_module() -> Optional[str]:
     return inspect.currentframe().f_back.f_back.f_globals['__name__']
 
 
-def message(name: str, *fields: str, mod: str=None, **kw: Any) -> Type[M]:
+def pmessage(name: str, *fields: str, mod: str=None, **kw: Any) -> Type[M]:
     module = mod or message_definition_module()
-    return MessageMeta(name, (PMessage,), dict(__module__=module), fields=fields, **kw)
+    return PMessageMeta(name, (PMessage,), dict(__module__=module), fields=fields, **kw)
 
 
-def json_message(name, *fields, mod=None, **kw):
+def json_pmessage(name, *fields, mod=None, **kw):
     opt = (('options', Map()),)
     module = mod or message_definition_module()
-    return message(name, *fields, opt_fields=opt, mod=module, **kw)
+    return pmessage(name, *fields, opt_fields=opt, mod=module, **kw)
 
 
 class Publish(PMessage, fields=('message',)):
@@ -159,6 +159,36 @@ class Message(Generic[A], Dat[A]):
 
     def to(self, target: str) -> 'Envelope[A]':
         return self.envelope.copy(recipient=Just(target))
+
+
+def message_init(fields: Map[str, Type], glob: dict) -> FunctionType:
+    name = 'message_init__'
+    params = fields.map2(lambda n, t: f'{n}: {t.__name__}')
+    assign = fields.k.map(lambda a: f'self.{a} = {a}')
+    code = f'''\
+def __init__(self, {params.join_comma}) -> None:
+    {assign.join_lines}
+globals()['{name}'] = __init__
+    '''
+    exec(code, glob)
+    init = glob[name]
+    del glob[name]
+    return init
+
+
+class MsgMeta(DatMeta):
+
+    @classmethod
+    def __prepare__(cls, name: str, bases: tuple, glob: dict=None, **kw: Any) -> dict:
+        globs = glob or inspect.currentframe().f_back.f_globals
+        return dict(__init__=message_init(Map(kw), globs)) if kw else dict()
+
+    def __new__(cls, name: str, bases: tuple, namespace: SimpleNamespace, **kw: Any) -> type:
+        return super().__new__(cls, name, bases, namespace)
+
+
+class Msg(Generic[A], Message[A], metaclass=MsgMeta):
+    pass
 
 
 @functools.total_ordering
@@ -207,4 +237,4 @@ Messages.register(Message)
 Messages.register(PMessage)
 Messages.register(Envelope)
 
-__all__ = ('message', 'PMessage', 'json_message', 'Publish')
+__all__ = ('pmessage', 'PMessage', 'json_pmessage', 'Publish')

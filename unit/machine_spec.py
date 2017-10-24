@@ -1,6 +1,6 @@
 from concurrent.futures import Future
 
-from ribosome.machine import may_handle, message, ModularMachine, Transitions
+from ribosome.machine import may_handle, pmessage, ModularMachine, Transitions
 from ribosome import StateMachine
 from ribosome.machine.base import MachineBase
 
@@ -9,11 +9,11 @@ from kallikrein.matchers.maybe import be_just
 
 from amino import List, Map
 
-M1 = message('M1')
-M2 = message('M2')
-M3 = message('M3')
-M4 = message('M4')
-M5 = message('M5', 'res')
+M1 = pmessage('M1')
+M2 = pmessage('M2')
+M3 = pmessage('M3')
+M4 = pmessage('M4')
+M5 = pmessage('M5', 'res')
 
 
 class _A(MachineBase):

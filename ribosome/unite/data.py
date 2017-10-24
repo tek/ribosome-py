@@ -1,6 +1,6 @@
 import abc
 
-from ribosome.machine.message_base import Message, message
+from ribosome.machine.message_base import Message, pmessage
 from ribosome import NvimFacade
 from ribosome.logging import Logging
 from ribosome.nvim.components import Syntax
@@ -11,7 +11,7 @@ from amino import List, Map, _, L, Maybe, IO, __, Nil
 class UniteMessage(Message, varargs='unite_args'):
     pass
 
-UniteSyntax = message('UniteSyntax', 'source')
+UniteSyntax = pmessage('UniteSyntax', 'source')
 
 
 class UniteEntity(Logging, metaclass=abc.ABCMeta):

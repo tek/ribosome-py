@@ -1,18 +1,18 @@
 from kallikrein import k, Expectation
 
-from ribosome.machine.message_base import message, json_message
+from ribosome.machine.message_base import pmessage, json_pmessage
 
 
-Mess = message('Mess')
-JMess = json_message('JMess')
+Mess = pmessage('Mess')
+JMess = json_pmessage('JMess')
 
 
 class MessageSpec:
     '''
-    test $test
+    json repr of messages $json_repr
     '''
 
-    def test(self) -> Expectation:
+    def json_repr(self) -> Expectation:
         mod = self.__module__
         return (
             (k(Mess().json_repr['__type__']) == f'{mod}.Mess') &

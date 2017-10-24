@@ -2,7 +2,7 @@ import re
 import abc
 from typing import Callable
 
-from ribosome.machine.message_base import message
+from ribosome.machine.message_base import pmessage
 from ribosome.nvim import HasNvim, NvimFacade, ScratchBuffer
 from ribosome.machine.state import KillMachine, SubMachine
 from ribosome.machine.base import UnitIO
@@ -12,8 +12,8 @@ from amino import Map, Boolean, __, Empty
 from amino.io import IO
 from amino.lazy import lazy
 
-Mapping = message('Mapping', 'uuid', 'keyseq')
-Quit = message('Quit')
+Mapping = pmessage('Mapping', 'uuid', 'keyseq')
+Quit = pmessage('Quit')
 
 
 class ScratchMachine(SubMachine, HasNvim, metaclass=abc.ABCMeta):

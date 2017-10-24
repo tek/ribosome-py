@@ -3,7 +3,7 @@ from kallikrein import Expectation
 from amino import Map, __, List
 
 from ribosome.plugin import Config, PluginSettings
-from ribosome.machine.message_base import message
+from ribosome.machine.message_base import pmessage
 from ribosome.machine.state import SubTransitions
 from ribosome.machine import trans
 from ribosome.machine.messages import Stage1
@@ -11,8 +11,8 @@ from ribosome.settings import RequestHandler, Plain, AutoData
 from ribosome.nvim import NvimIO
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 
-Msg1 = message('Msg1')
-Msg2 = message('Msg2')
+Msg1 = pmessage('Msg1')
+Msg2 = pmessage('Msg2')
 val = 71
 
 

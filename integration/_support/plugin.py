@@ -16,19 +16,19 @@ from ribosome.nvim import NvimFacade, ScratchBuffer
 from ribosome.data import Data
 from ribosome.record import int_field
 from ribosome.machine.base import RunCorosParallel, RunIOsParallel, MachineBase
-from ribosome.machine.message_base import message, Message
+from ribosome.machine.message_base import pmessage, Message
 from ribosome.machine.messages import Nop
 
 
-Msg = message('Msg', 'text')
-Err = message('Err')
-Scratch = message('Scratch')
-ScratchTest = message('ScratchTest')
-ScratchCheck = message('ScratchCheck')
-St = message('St')
-Print = message('Print', 'msg')
-RunParallel = message('RunParallel')
-RunParallelIOs = message('RunParallelIOs')
+Msg = pmessage('Msg', 'text')
+Err = pmessage('Err')
+Scratch = pmessage('Scratch')
+ScratchTest = pmessage('ScratchTest')
+ScratchCheck = pmessage('ScratchCheck')
+St = pmessage('St')
+Print = pmessage('Print', 'msg')
+RunParallel = pmessage('RunParallel')
+RunParallelIOs = pmessage('RunParallelIOs')
 
 
 class TData(Data):

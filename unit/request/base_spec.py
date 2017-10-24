@@ -5,10 +5,10 @@ from kallikrein.matchers import equal
 from kallikrein.matchers.maybe import be_just
 
 from ribosome.request.base import RequestHandler, MessageRequestHandler, JsonMessageRequestHandler
-from ribosome.machine.message_base import message
+from ribosome.machine.message_base import pmessage
 
-BasicMessage = message('BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
-JsonMessage = message('JsonMessage', 'a', 'b')
+BasicMessage = pmessage('BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
+JsonMessage = pmessage('JsonMessage', 'a', 'b')
 
 
 class RH(RequestHandler):
@@ -39,7 +39,7 @@ class RequestHandlerSpec:
     six parameters $six
     varargs $var
     message request handler $message
-    json message request handler $json_message
+    json message request handler $json_pmessage
     '''
 
     def name(self) -> Expectation:
@@ -188,7 +188,7 @@ class RequestHandlerSpec:
             k(c.check_length(['a', 'b', 'c', 'd', 'e'])).false
         )
 
-    def json_message(self) -> Expectation:
+    def json_pmessage(self) -> Expectation:
         def cmd_name():
             pass
         c = JsonMessageRH(cmd_name, JsonMessage)

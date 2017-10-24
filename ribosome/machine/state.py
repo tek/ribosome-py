@@ -14,11 +14,11 @@ from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
-from ribosome.machine.message_base import message, Message, Envelope, ToMachine
+from ribosome.machine.message_base import pmessage, Message, Envelope, ToMachine
 from ribosome.machine.base import Machine, MachineBase
 from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle, handle, CoroTransitionResult,
                                          _recover_error, CoroExecutionHandler)
-from ribosome.machine.message_base import json_message
+from ribosome.machine.message_base import json_pmessage
 from ribosome.machine.helpers import TransitionHelpers
 from ribosome.machine.messages import (Nop, Done, Quit, PlugCommand, Stop, Error, UpdateRecord, UpdateState,
                                        CoroutineAlg, SubProcessAsync, Fork)
@@ -33,13 +33,13 @@ from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, 
 from amino.util.string import red, blue
 from amino.state import State
 
-Callback = message('Callback', 'func')
-EnvelopeOld = message('EnvelopeOld', 'message', 'to')
-RunMachine = json_message('RunMachine', 'machine')
-KillMachine = message('KillMachine', 'uuid')
-RunScratchMachine = json_message('RunScratchMachine', 'machine')
-Init = message('Init')
-IfUnhandled = message('IfUnhandled', 'msg', 'unhandled')
+Callback = pmessage('Callback', 'func')
+EnvelopeOld = pmessage('EnvelopeOld', 'message', 'to')
+RunMachine = json_pmessage('RunMachine', 'machine')
+KillMachine = pmessage('KillMachine', 'uuid')
+RunScratchMachine = json_pmessage('RunScratchMachine', 'machine')
+Init = pmessage('Init')
+IfUnhandled = pmessage('IfUnhandled', 'msg', 'unhandled')
 
 short_timeout = 3
 medium_timeout = 3

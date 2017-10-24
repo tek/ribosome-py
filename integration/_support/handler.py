@@ -4,7 +4,7 @@ from ribosome import NvimStatePlugin, msg_command
 from amino import List, Right, Left, Either, Id, IO
 from amino.state import IdState, StateT, EitherState
 from ribosome.logging import Logging
-from ribosome.machine.message_base import message
+from ribosome.machine.message_base import pmessage
 from ribosome.machine.state import UnloopedRootMachine, SubTransitions, Component, ComponentMachine
 from ribosome.nvim import NvimFacade, HasNvim, AsyncVimProxy
 from ribosome.data import Data
@@ -12,11 +12,11 @@ from ribosome.record import field
 from ribosome.machine import trans
 from ribosome.machine.machine import Machine
 
-Msg = message('Msg')
-Msg2 = message('Msg2')
-Msg3 = message('Msg3')
-Msg4 = message('Msg4')
-Msg5 = message('Msg5')
+Msg = pmessage('Msg')
+Msg2 = pmessage('Msg2')
+Msg3 = pmessage('Msg3')
+Msg4 = pmessage('Msg4')
+Msg5 = pmessage('Msg5')
 
 
 class SpecEnv(Data):
