@@ -16,6 +16,7 @@ from amino.test import fixture_path, temp_dir, temp_file
 from amino.test.path import base_dir, pkg_dir
 from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase
 from amino.util.string import camelcase
+from amino.json import dump_json
 
 import ribosome
 from ribosome.logging import Logging
@@ -24,7 +25,7 @@ from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
 from ribosome.rpc import rpc_handlers, RpcHandlerSpec
 from ribosome.machine.message_base import Message
-from ribosome.record import decode_json, JsonError
+from ribosome.record import decode_json_compat, JsonError, encode_json_compat
 from ribosome.settings import PluginSettings
 from ribosome.machine.state import AutoData
 
@@ -204,7 +205,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return self.vim.buffer.content
 
     def message_log(self) -> Either[str, List[Message]]:
-        return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
+        return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json_compat, Either)
 
     @property
     def state(self) -> Any:
@@ -359,6 +360,7 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
 
 Settings = TypeVar('Settings', bound=PluginSettings)
 Data = TypeVar('Data', bound=AutoData)
+M = TypeVar('M', bound=Message)
 
 
 class AutoPluginIntegrationSpec(Generic[Settings, Data], VimIntegrationSpec):
@@ -370,6 +372,10 @@ class AutoPluginIntegrationSpec(Generic[Settings, Data], VimIntegrationSpec):
     @abc.abstractmethod
     def module(self) -> str:
         ...
+
+    @property
+    def _prefix(self) -> str:
+        return self.plugin_prefix
 
     @property
     def plugin_name(self) -> str:
@@ -394,6 +400,12 @@ class AutoPluginIntegrationSpec(Generic[Settings, Data], VimIntegrationSpec):
             .call('jobstart', ['python3', '-c', cmd], dict(rpc=True, on_stderr=stderr_handler_name))
             .get_or_raise
         )
+
+    def send_json(self, data: str) -> None:
+        self.vim.call(f'{self.plugin_name}Send', data)
+
+    def send(self, msg: M) -> None:
+        self.send_json(dump_json(msg).o(encode_json_compat(msg)).get_or_raise)
 
 
 __all__ = ('VimIntegrationSpec', 'ExternalIntegrationSpec', 'PluginIntegrationSpec')

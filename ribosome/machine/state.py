@@ -14,7 +14,7 @@ from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
-from ribosome.machine.message_base import message, Message
+from ribosome.machine.message_base import message, Message, Envelope, ToMachine
 from ribosome.machine.base import Machine, MachineBase
 from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle, handle, CoroTransitionResult,
                                          _recover_error, CoroExecutionHandler)
@@ -29,12 +29,12 @@ from ribosome.machine import trans
 from ribosome.settings import PluginSettings, Config, AutoData
 
 import amino
-from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried, Boolean, Nil
+from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried, Boolean
 from amino.util.string import red, blue
 from amino.state import State
 
 Callback = message('Callback', 'func')
-Envelope = message('Envelope', 'message', 'to')
+EnvelopeOld = message('EnvelopeOld', 'message', 'to')
 RunMachine = json_message('RunMachine', 'machine')
 KillMachine = message('KillMachine', 'uuid')
 RunScratchMachine = json_message('RunScratchMachine', 'machine')
@@ -118,7 +118,11 @@ class AsyncIOThread(threading.Thread, AsyncIOBase):
         pass
 
 
-class StateMachineBase(ModularMachine):
+A = TypeVar('A')
+D = TypeVar('D', bound=AutoData)
+
+
+class StateMachineBase(Generic[D], ModularMachine):
 
     def __init__(self, sub: List[MachineBase]=List(), parent=None, name=None, debug=False) -> None:
         self.sub = sub
@@ -230,18 +234,22 @@ class StateMachineBase(ModularMachine):
         threading.Thread(target=dispatch).start()
 
     @may_handle(RunMachine)
-    def _run_machine(self, data, msg):
+    def message_run_machine(self, data, msg):
         self.sub = self.sub.cat(msg.machine)
         init = msg.options.get('init') | Init()
-        return Envelope(init, msg.machine.uuid)
+        return EnvelopeOld(init, msg.machine.uuid)
 
     @may_handle(KillMachine)
-    def _kill_machine(self, data, msg):
+    def message_kill_machine(self, data, msg):
         self.sub = self.sub.filter_not(_.uuid == msg.uuid)
 
-    @handle(Envelope)
+    @handle(EnvelopeOld)
     def message_envelope(self, data, msg):
         return self.sub.find(_.uuid == msg.to) / __.loop_process(data, msg.message)
+
+    @handle(ToMachine)
+    def message_to_machine(self, data: D, msg: ToMachine[A]) -> Maybe:
+        return self.sub.find(_.name == msg.target) / __.loop_process(data, msg.message)
 
     @may_handle(IfUnhandled)
     def if_unhandled(self, data, msg):
@@ -273,7 +281,8 @@ class StateMachineBase(ModularMachine):
         self.data = await self._process_one_message(self.data)
 
     async def _process_one_message(self, data):
-        msg = await self._messages.get()
+        raw = await self._messages.get()
+        msg = raw.delivery if isinstance(raw, Envelope) else raw
         sent = self._send(data, msg)
         result = (
             self._failed_transition(msg, sent)
@@ -530,7 +539,6 @@ class UnloopedRootMachine(UnloopedStateMachine, RootMachineBase):
 
 
 Settings = TypeVar('Settings', bound=PluginSettings)
-D = TypeVar('D', bound=AutoData)
 
 
 class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):

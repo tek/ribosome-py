@@ -5,8 +5,7 @@ from kallikrein.matchers import contain
 from amino import Right, Either
 from amino.test import temp_dir
 
-from ribosome import NvimPlugin
-from ribosome.request import function
+from ribosome import NvimPlugin, function
 
 from integration._support.base import IntegrationSpecBase
 
@@ -24,6 +23,10 @@ class DefaultHandlerSpec(IntegrationSpecBase):
     '''
     append a directory to the plugin's `sys.path` $append_path
     '''
+
+    @property
+    def _prefix(self) -> str:
+        return 'DH'
 
     @property
     def plugin_class(self) -> Either[str, type]:

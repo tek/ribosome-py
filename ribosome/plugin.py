@@ -17,7 +17,7 @@ from ribosome.request.function import msg_function, function
 from ribosome.machine.base import ShowLogInfo
 from ribosome.machine.scratch import Mapping
 from ribosome.rpc import rpc_handlers_json
-from ribosome.record import encode_json
+from ribosome.record import encode_json_compat, decode_json_compat
 from ribosome.machine.messages import UpdateState, Stage1, Stage2, Stage3, Stage4, Quit
 from ribosome.machine.state import AutoRootMachine, AutoData, RootMachineBase
 from ribosome.settings import Config, PluginSettings, Full, Short
@@ -96,6 +96,9 @@ class NvimPlugin(NvimPluginBase, metaclass=NvimPluginMeta):
         ribosome.nvim.components.shutdown = True
         self.quit()
 
+    def send_message(self, data: str) -> None:
+        return decode_json_compat(data) / self.root.send
+
 
 NSP = TypeVar('NSP', bound='NvimStatePlugin')
 NSPM = TypeVar('NSPM', bound='NvimStatePluginMeta')
@@ -125,7 +128,7 @@ class NvimStatePlugin(NvimPlugin, metaclass=NvimStatePluginMeta):
         ...
 
     def message_log(self) -> List[Message]:
-        return self.state().message_log // encode_json
+        return self.state().message_log // encode_json_compat
 
     def state_data(self) -> str:
         return self.state().data.json.value_or(lambda a: f'could not serialize state: {a}')
@@ -240,6 +243,7 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     help.name_handler('rpc_handlers', function, cls.rpc_handlers, sync=True)
     help.name_handler('append_python_path', function, cls.append_python_path)
     help.name_handler('show_python_path', function, cls.show_python_path)
+    help.name_handler('send', function, cls.send_message)
 
 
 def setup_state_plugin(cls: Type[NSP], name: str, prefix: str, debug: bool) -> None:

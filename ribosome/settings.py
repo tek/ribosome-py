@@ -116,7 +116,7 @@ def setting_ctor(tpe: Type[A], ctor: Callable[[A], B]) -> Callable[[str, str, st
 
 state_dir_help_default = '''This directory is used to persist the plugin's current state.'''
 state_dir_base_default = env_xdg_data_dir.value / Path | (Path.home() / '.local' / 'share')
-proteome_name_help = 'If proteome is installed, the session name is obtained from the main project name.'
+proteome_name_help = 'If **proteome** is installed, the session name is obtained from the main project name.'
 session_name_help = 'A custom session name for the state dir can be specified.'
 
 

@@ -1,7 +1,7 @@
 from amino import Nothing
 from amino.logging import LogError
 
-from ribosome.machine.message_base import message, Message, json_message
+from ribosome.machine.message_base import message, json_message, PMessage, Message
 
 Nop = message('Nop')
 Stop = message('Stop')
@@ -36,7 +36,11 @@ Stage3 = message('Stage3')
 Stage4 = message('Stage4')
 
 
-class Error(Message, LogError, fields=('main',), opt_fields=(('prefix', ''),)):
+class Error(Message['Error'], LogError):
+
+    def __init__(self, main, prefix='') -> None:
+        self.main = main
+        self.prefix = prefix
 
     @property
     def message(self) -> str:

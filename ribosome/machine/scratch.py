@@ -33,11 +33,11 @@ class ScratchMachine(SubMachine, HasNvim, metaclass=abc.ABCMeta):
     def mappings(self) -> Map[str, Callable]:
         ...
 
-    @lazy
+    @property
     def _quit_seq(self):
         return '%%quit%%'
 
-    @lazy
+    @property
     def _internal_mappings(self):
         return Map({
             self._quit_seq: Quit,

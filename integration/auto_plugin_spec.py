@@ -33,7 +33,7 @@ class SpecCore(SubTransitions):
 
 auto_config = Config(
     name='plug',
-    plugins=Map(core=SpecCore),
+    components=Map(core=SpecCore),
     request_handlers=List(
         RequestHandler.msg_cmd(Msg1)('msg1', prefix=Plain(), sync=True),
         RequestHandler.msg_autocmd(Msg2)('vim_resized', prefix=Plain())
@@ -47,14 +47,11 @@ class AutoPluginSpec(AutoPluginIntegrationKlkSpec[PluginSettings, AutoData]):
     '''
 
     @property
-    def _prefix(self) -> str:
+    def plugin_prefix(self) -> str:
         return 'plug'
 
     def module(self) -> str:
         return __name__
-
-    def config_name(self) -> str:
-        return 'auto_config'
 
     def _pre_start(self) -> None:
         super()._pre_start()
@@ -66,4 +63,4 @@ class AutoPluginSpec(AutoPluginIntegrationKlkSpec[PluginSettings, AutoData]):
         self.vim.doautocmd('VimResized')
         return self.var_becomes('msg_cmd_success', val) & self.var_becomes('autocmd_success', val)
 
-__all__ = ('AutoPluginSpec',)
+__all__ = ('AutoPluginSpec', 'auto_config')

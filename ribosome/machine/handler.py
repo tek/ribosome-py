@@ -15,7 +15,7 @@ from amino.tc.base import TypeClass
 from amino.func import flip
 
 from ribosome.logging import Logging
-from ribosome.machine.message_base import Message, Publish
+from ribosome.machine.message_base import Message, Publish, Envelope, Messages
 from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
                                          TransitionFailed, Coroutine, MachineError, Error)
 from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop, RunNvimIOStateAlg
@@ -51,8 +51,9 @@ R = TypeVar('R')
 
 
 def create_result(data: D, msgs: List[Message]) -> TransitionResult:
-    pub, resend = msgs.split_type(Publish)
-    pub_msgs = pub.map(_.message)
+    publ, resend = msgs.split_type((Publish, Envelope))
+    env, pub = publ.split_type(Envelope)
+    pub_msgs = env + pub.map(_.message)
     return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)
 
 
@@ -132,7 +133,7 @@ class DynHandlerJob(HandlerJob):
             result = res0
         datas, rest = List.wrap(result).split_type(self.data_type)
         trans = rest / self.transform_result
-        msgs, rest = trans.split_type(Message)
+        msgs, rest = trans.split_type(Messages)
         if rest:
             tpl = 'invalid transition result parts for {} in {}: {}'
             msg = tpl.format(self.msg, self.machine.title, rest)

@@ -16,6 +16,10 @@ class HandlerSpec(IntegrationSpecBase):
     '''
 
     @property
+    def _prefix(self) -> str:
+        return 'Handler'
+
+    @property
     def plugin_class(self) -> Either[str, type]:
         return Right(HandlerSpecPlugin)
 
@@ -30,7 +34,7 @@ class HandlerSpec(IntegrationSpecBase):
         return self._log_line(-1, be_just(end_with('unit')))
 
     def est(self) -> Expectation:
-        self.vim.cmd('HandlerStage1')
+        self.vim.cmd_sync('HandlerStage1')
         self.vim.cmd_sync('Est')
         return self._log_line(-1, be_just(end_with(': est')))
 

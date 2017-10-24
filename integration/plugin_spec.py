@@ -5,8 +5,9 @@ from kallikrein.matchers.either import be_right
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.end_with import end_with
 
+from ribosome.test.integration.klk import PluginIntegrationKlkSpec
+
 from integration._support.plugin import TestPluginLooped, TestPlugin, TestPluginUnlooped
-from integration._support.base import IntegrationSpecBase
 
 specs = '''\
 plugin with {}
@@ -17,7 +18,7 @@ execute IOs in parallel $ios_parallel
 '''
 
 
-class _PluginSpecBase(IntegrationSpecBase):
+class _PluginSpecBase(PluginIntegrationKlkSpec):
 
     def _last_output(self, content):
         return self._log_line(-1, be_just(end_with(content)))
@@ -25,7 +26,7 @@ class _PluginSpecBase(IntegrationSpecBase):
     def _startup(self) -> Expectation:
         i = 99932
         fun_text = 'message function test'
-        self.vim.cmd_sync('Go')
+        self.vim.cmd_once_defined('Go')
         val = TestPlugin.test_value.format(i)
         unsafe_k(self.vim.call('Value', i)).must(be_right(val))
         self._last_output(TestPlugin.test_go)
@@ -49,6 +50,7 @@ class _PluginSpecBase(IntegrationSpecBase):
         self._last_output(TestPlugin.test_scratch)
         self.vim.window.close()
         self._window_count(1)
+        self._wait(.5)
         self.vim.cmd_sync('CheckScratch')
         return self._last_output('0')
 
@@ -71,6 +73,10 @@ class LoopedPluginSpec(_PluginSpecBase):
     __doc__ = specs.format('permanent main loop thread')
 
     @property
+    def _prefix(self) -> str:
+        return 'Plug'
+
+    @property
     def plugin_class(self) -> Either[str, type]:
         return Right(TestPluginLooped)
 
@@ -89,6 +95,10 @@ class LoopedPluginSpec(_PluginSpecBase):
 
 class UnloopedPluginSpec(_PluginSpecBase):
     __doc__ = specs.format('on-demand main loop')
+
+    @property
+    def _prefix(self) -> str:
+        return 'Plug'
 
     @property
     def plugin_class(self) -> Either[str, type]:

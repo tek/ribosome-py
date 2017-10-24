@@ -3,21 +3,21 @@ import time
 
 import neovim
 
-from ribosome import command, NvimStatePlugin
+from ribosome import command, NvimStatePlugin, msg_function, msg_command, function
 
 from amino.lazy import lazy
 from amino import Left, L, _, Map, List, Just, Lists, IO
 from amino.state import EvalState
 from ribosome.logging import Logging
-from ribosome.request import function, msg_function, msg_command
-from ribosome.machine import message, may_handle, handle, MachineBase, Message, Nop
 from ribosome.machine.state import UnloopedRootMachine, RunScratchMachine, RootMachine
-from ribosome.machine.transition import Fatal, may_fallback
+from ribosome.machine.transition import Fatal, may_fallback, may_handle, handle
 from ribosome.machine.scratch import ScratchMachine, Mapping
 from ribosome.nvim import NvimFacade, ScratchBuffer
 from ribosome.data import Data
 from ribosome.record import int_field
-from ribosome.machine.base import RunCorosParallel, RunIOsParallel
+from ribosome.machine.base import RunCorosParallel, RunIOsParallel, MachineBase
+from ribosome.machine.message_base import message, Message
+from ribosome.machine.messages import Nop
 
 
 Msg = message('Msg', 'text')
@@ -96,9 +96,8 @@ class MachUnlooped(Mach, UnloopedRootMachine):
 
 class ScratchM(ScratchMachine):
 
-    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer,
-                 parent: MachineBase) -> None:
-        super().__init__(vim, scratch, parent=parent, title='scratch')
+    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer, parent: MachineBase) -> None:
+        super().__init__(vim, scratch, parent=parent, name='scratch')
 
     @property
     def prefix(self):
@@ -175,21 +174,25 @@ class TestPlugin(NvimStatePlugin, Logging):
 
 class TestPluginLooped(TestPlugin):
 
-    @lazy
-    def _state(self) -> MachLooped:
-        return MachLooped(self.vim.proxy, title='spec')
+    def __init__(self, vim) -> None:
+        super().__init__(vim)
+        self._state = None
 
     def state(self) -> MachLooped:
+        if self._state is None:
+            self._state = MachLooped(self.vim.proxy, name='spec')
         return self._state
 
 
 class TestPluginUnlooped(TestPlugin):
 
-    @lazy
-    def _state(self) -> MachUnlooped:
-        return MachUnlooped(self.vim.proxy, title='spec')
+    def __init__(self, vim) -> None:
+        super().__init__(vim)
+        self._state = None
 
-    def state(self) -> MachUnlooped:
+    def state(self) -> MachLooped:
+        if self._state is None:
+            self._state = MachUnlooped(self.vim.proxy, name='spec')
         return self._state
 
 __all__ = ('TestPlugin',)

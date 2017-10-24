@@ -2,9 +2,11 @@ import abc
 import functools
 import time
 import inspect
-from typing import Optional, Any, TypeVar, Type, Callable
+from uuid import UUID
+from typing import Optional, Any, TypeVar, Type, Callable, Generic
 
-from amino import Map, List, Empty, Just, __, L, Maybe, _, Lists
+from amino import Map, List, Empty, Just, __, L, Maybe, _, Lists, Nothing
+from amino.dat import Dat
 
 from ribosome.record import any_field, dfield, list_field, field, RecordMeta, Record, bool_field
 
@@ -57,8 +59,8 @@ class MessageMeta(RecordMeta, abc.ABCMeta):
         **opt_fields** is a list of (string, default) used as fields with initial values
         the order of the names is preserved in **_field_order**.
         **varargs** is an optional field name where unmatched args are stored.
-        **skip_fields** indicates that the current class is a base class (like Message). If those classes were processed
-        here, all their subclasses would share the metadata, and get all fields set by other subclasses.
+        **skip_fields** indicates that the current class is a base class (like PMessage). If those classes were
+        processed here, all their subclasses would share the metadata, and get all fields set by other subclasses.
         **_field_count_min** and **_field_count_max** are used by `MessageCommand`
         '''
         ns = Map() if skip_fields else _field_namespace(fields, opt_fields, varargs)
@@ -71,11 +73,12 @@ class MessageMeta(RecordMeta, abc.ABCMeta):
     def __init__(cls, name, bases, namespace, **kw):
         super().__init__(name, bases, namespace)
 
-M = TypeVar('M', bound='Message')
+M = TypeVar('M', bound='PMessage')
+A = TypeVar('A', bound='Message')
 
 
 @functools.total_ordering
-class Message(Record, metaclass=MessageMeta, skip_fields=True):
+class PMessage(Record, metaclass=MessageMeta, skip_fields=True):
     ''' Interface between vim commands and state.
     Provides a constructor that allows specification of fields via positional arguments.
     '''
@@ -96,7 +99,7 @@ class Message(Record, metaclass=MessageMeta, skip_fields=True):
         pass
 
     @classmethod
-    def from_msg(cls: Type[M], other: 'Message') -> Callable[..., M]:
+    def from_msg(cls: Type[M], other: 'PMessage') -> Callable[..., M]:
         return lambda *a, **kw: cls(*a, bang=other.bang, range=other.range, **kw)
 
     @property
@@ -104,7 +107,7 @@ class Message(Record, metaclass=MessageMeta, skip_fields=True):
         return Publish(self)
 
     def __lt__(self, other):
-        if isinstance(other, Message):
+        if isinstance(other, PMessage):
             if self.prio == other.prio:
                 return self.time < self.time
             else:
@@ -126,7 +129,7 @@ def message_definition_module() -> Optional[str]:
 
 def message(name: str, *fields: str, mod: str=None, **kw: Any) -> Type[M]:
     module = mod or message_definition_module()
-    return MessageMeta(name, (Message,), dict(__module__=module), fields=fields, **kw)
+    return MessageMeta(name, (PMessage,), dict(__module__=module), fields=fields, **kw)
 
 
 def json_message(name, *fields, mod=None, **kw):
@@ -135,9 +138,73 @@ def json_message(name, *fields, mod=None, **kw):
     return message(name, *fields, opt_fields=opt, mod=module, **kw)
 
 
-class Publish(Message, fields=('message',)):
+class Publish(PMessage, fields=('message',)):
 
     def __str__(self):
         return 'Publish({})'.format(str(self.message))
 
-__all__ = ('message', 'Message', 'json_message', 'Publish')
+
+class Message(Generic[A], Dat[A]):
+
+    def at(self, prio: float) -> 'Envelope[A]':
+        return Envelope(self, time.time(), prio, Nothing)
+
+    @property
+    def envelope(self) -> 'Envelope[A]':
+        return self.at(0.5)
+
+    @property
+    def pub(self) -> 'Envelope[A]':
+        return self.envelope
+
+    def to(self, target: str) -> 'Envelope[A]':
+        return self.envelope.copy(recipient=Just(target))
+
+
+@functools.total_ordering
+class Envelope(Generic[A], Dat['Envelope[A]']):
+
+    def __init__(self, message: Message[A], time: float, prio: float, recipient: Maybe[str]) -> None:
+        self.message = message
+        self.time = time
+        self.prio = prio
+        self.recipient = recipient
+
+    def at(self, prio: float) -> 'Envelope[A]':
+        return self.copy(prio=prio)
+
+    def __lt__(self, other):
+        return (
+            not isinstance(other, Envelope) or
+            (
+                self.time < self.time
+                if self.prio == other.prio else
+                self.prio < other.prio
+            )
+        )
+
+    @property
+    def delivery(self) -> Message:
+        return self.recipient / L(ToMachine)(self, _) | self.message
+
+
+class ToMachine(Generic[A], Dat['ToMachine[A]']):
+
+    def __init__(self, envelope: Envelope[A], target: str) -> None:
+        self.envelope = envelope
+        self.target = target
+
+    @property
+    def message(self) -> Message[A]:
+        return self.envelope.message
+
+
+class Messages(abc.ABC):
+    pass
+
+
+Messages.register(Message)
+Messages.register(PMessage)
+Messages.register(Envelope)
+
+__all__ = ('message', 'PMessage', 'json_message', 'Publish')

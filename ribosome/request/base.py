@@ -4,7 +4,7 @@ import inspect
 from numbers import Number
 from typing import Callable, Any, Tuple, Union, Generic, TypeVar, Type
 
-from amino import List, Maybe, Right, Left, may, _, Just, Map, Try, Either
+from amino import List, Maybe, may, _, Just, Map, Try
 from amino.util.string import camelcaseify
 
 import ribosome
@@ -174,7 +174,8 @@ class MessageRequestHandler(Generic[M], RequestHandler):
     def _call_fun(self, obj, *args, **kw):
         if isinstance(obj, ribosome.NvimStatePlugin):
             try:
-                msg = self._message(*args, **kw)
+                raw = self._message(*args, **kw)
+                msg = raw.envelope if isinstance(raw, Message) else raw
             except Exception as e:
                 name = self._message.__name__
                 self.log.error(f'bad args to {name}: {e}')

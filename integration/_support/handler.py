@@ -1,17 +1,16 @@
-from ribosome import NvimStatePlugin
+from typing import Optional
+from ribosome import NvimStatePlugin, msg_command
 
-from amino.lazy import lazy
 from amino import List, Right, Left, Either, Id, IO
 from amino.state import IdState, StateT, EitherState
 from ribosome.logging import Logging
-from ribosome.request import msg_command
 from ribosome.machine.message_base import message
-from ribosome.machine.state import UnloopedRootMachine, SubMachine, SubTransitions
+from ribosome.machine.state import UnloopedRootMachine, SubTransitions, Component, ComponentMachine
 from ribosome.nvim import NvimFacade, HasNvim, AsyncVimProxy
 from ribosome.data import Data
 from ribosome.record import field
-from ribosome.machine.base import MachineBase
 from ribosome.machine import trans
+from ribosome.machine.machine import Machine
 
 Msg = message('Msg')
 Msg2 = message('Msg2')
@@ -24,11 +23,7 @@ class SpecEnv(Data):
     vim = field(AsyncVimProxy)
 
 
-class HTrans(SubTransitions, HasNvim, Logging):
-
-    def __init__(self, machine, *a, **kw) -> None:
-        SubTransitions.__init__(self, machine, *a, **kw)
-        HasNvim.__init__(self, machine.vim)
+class HTrans(Component, Logging):
 
     @trans.one(Msg, trans.e, trans.st, trans.io)
     def msg(self) -> Either[str, StateT[Id, SpecEnv, IO[Msg2]]]:
@@ -43,21 +38,19 @@ class HTrans(SubTransitions, HasNvim, Logging):
         self.log.info('unit')
         return IdState.set(1)
 
-    @trans.one(Msg4, trans.est)
-    def est(self) -> EitherState[SpecEnv, Msg]:
+    @trans.one(Msg4, trans.st)
+    def st(self) -> EitherState[SpecEnv, Msg]:
         return EitherState.pure(Msg5())
 
-    @trans.one(Msg5, trans.est)
+    @trans.one(Msg5, trans.st)
     def est_fail(self) -> EitherState[SpecEnv, Msg]:
         return EitherState(Left('est'))
 
 
-class Plugin(SubMachine, HasNvim, Logging):
-    Transitions = HTrans
+class Component(ComponentMachine):
 
-    def __init__(self, vim: NvimFacade, parent=None, title=None) -> None:
-        MachineBase.__init__(self, parent, title=title)
-        HasNvim.__init__(self, vim)
+    def __init__(self, vim: NvimFacade, parent: Optional[Machine]=None) -> None:
+        super().__init__(vim, HTrans, 'handler', parent)
 
 
 class Mach(UnloopedRootMachine):
@@ -68,21 +61,19 @@ class Mach(UnloopedRootMachine):
         UnloopedRootMachine.__init__(self, vim, List(plug), **kw)
 
     @property
-    def title(self):
-        return 'mach'
-
-    @property
     def init(self):
         return SpecEnv(vim=self.vim)
 
 
-class HandlerSpecPlugin(NvimStatePlugin, Logging, pname='handler'):
+class HandlerSpecPlugin(NvimStatePlugin, Logging, pname='handler', prefix='han'):
 
-    @lazy
-    def _state(self) -> Mach:
-        return Mach(self.vim.proxy, title='handler')
+    def __init__(self, *a, **kw) -> None:
+        super().__init__(*a, **kw)
+        self._state = None
 
     def state(self) -> Mach:
+        if self._state is None:
+            self._state = Mach(self.vim.proxy, name='handler')
         return self._state
 
     def stage_1(self) -> None:

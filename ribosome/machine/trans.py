@@ -3,22 +3,22 @@ from typing import Callable, TypeVar, Type, Generic, Awaitable
 import functools
 
 from amino import Either, List, Lists, IO, Id, L, _, Maybe
-from amino.state import IdState, StateT, EitherState
+from amino.state import StateT
 from amino.util.string import red, green, ToStr
 from amino.dispatch import dispatch_alg
 from amino.algebra import AlgebraMeta, Algebra
 
-from ribosome.machine.message_base import Message, default_prio, _machine_attr, _message_attr, _prio_attr, _dyn_attr
+from ribosome.machine.message_base import (PMessage, default_prio, _machine_attr, _message_attr, _prio_attr, _dyn_attr,
+                                           Messages)
 from ribosome.data import Data
 from ribosome.machine.messages import RunIOAlg, Error, Nop, RunNvimIOAlg, CoroutineAlg
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO
 from ribosome.machine.transitions import Transitions
-from ribosome.nvim.io import NvimIOState
 
 M = TypeVar('M', bound=Transitions)
 D = TypeVar('D', bound=Data)
-Msg = TypeVar('Msg', bound=Message)
+Msg = TypeVar('Msg', bound=PMessage)
 R = TypeVar('R')
 N = TypeVar('N')
 O = TypeVar('O')
@@ -27,7 +27,7 @@ G = TypeVar('G')
 
 class TransAction(Algebra, base=True):
 
-    def __init__(self, messages: List[Message]) -> None:
+    def __init__(self, messages: List[PMessage]) -> None:
         self.messages = messages
 
 
@@ -44,11 +44,11 @@ class Transit(Generic[D], TransAction):
 class Propagate(TransAction):
 
     @staticmethod
-    def one(msg: Message) -> TransAction:
+    def one(msg: PMessage) -> TransAction:
         return Propagate(List(msg))
 
     @staticmethod
-    def maybe(msg: Maybe[Message]) -> TransAction:
+    def maybe(msg: Maybe[PMessage]) -> TransAction:
         return Propagate(msg.to_list)
 
     @staticmethod
@@ -117,10 +117,13 @@ class TransEffect(Generic[R], abc.ABC, Logging):
     def extract(self, data: R, tail: List['TransEffect'], in_state: bool) -> TransStep:
         ...
 
+    def typecheck(self, data: R) -> bool:
+        return isinstance(data, self.tpe)
+
     def run(self, data: R, tail: List['TransEffect'], in_state: bool) -> TransStep:
         return (
             self.extract(data, tail, in_state)
-            if isinstance(data, self.tpe) else
+            if self.typecheck(data) else
             TransEffectError(f'result {red(data)} does not have type {green(self.tpe.__qualname__)}')
         )
 
@@ -213,33 +216,36 @@ class TransEffectCoro(TransEffect):
         return Lift(Propagate.one(CoroutineAlg(coro).pub))
 
 
-class TransEffectSingleMessage(TransEffect[Message]):
+class TransEffectSingleMessage(TransEffect[PMessage]):
 
     @property
-    def tpe(self) -> Type[Message]:
-        return Message
+    def tpe(self) -> Type[PMessage]:
+        return Messages
 
-    def extract(self, data: Message, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
-        return Lift(Propagate.one(data)) if tail.empty else TransEffectError('cannot apply trans effects to Message')
+    def extract(self, data: PMessage, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+        return Lift(Propagate.one(data)) if tail.empty else TransEffectError('cannot apply trans effects to PMessage')
 
 
-class TransEffectMessages(TransEffect[List[Message]]):
+class TransEffectMessages(TransEffect[List[PMessage]]):
 
     @property
-    def tpe(self) -> Type[List[Message]]:
+    def tpe(self) -> Type[List[PMessage]]:
         return List
 
-    def extract(self, data: List[Message], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+    def typecheck(self, data: List[PMessage]) -> bool:
+        return super().typecheck(data) and data.forall(lambda a: isinstance(a, Messages))
+
+    def extract(self, data: List[PMessage], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
         return Lift(Propagate(data)) if tail.empty else TransEffectError('cannot apply trans effects to Messages')
 
 
 class TransEffectUnit(TransEffect[None]):
 
     @property
-    def tpe(self) -> Type[Message]:
+    def tpe(self) -> Type[PMessage]:
         return type(None)
 
-    def extract(self, data: Message, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+    def extract(self, data: PMessage, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
         return Lift(Unit()) if tail.empty else TransEffectError('cannot apply trans effects to unit')
 
 

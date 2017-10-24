@@ -1,7 +1,7 @@
 import abc
 import uuid
 import json
-from typing import Callable, Union, Pattern, Tuple, TypeVar, Any, Type
+from typing import Callable, Union, Pattern, Tuple, TypeVar, Any, Type, cast
 
 import pyrsistent
 
@@ -15,6 +15,7 @@ from amino.lazy_list import LazyList
 from amino.tc.optional import Optional
 from amino.tc.foldable import Foldable
 from amino.util.string import ToStr
+from amino.json import dump_json, decode_json as decode_json_a
 
 from ribosome.logging import Logging
 
@@ -406,6 +407,14 @@ def encode_json(data):
 def decode_json(data):
     return _code_json(data, _decode_json, 'de')
 
+
+def encode_json_compat(data: A) -> Either[str, str]:
+    return dump_json(data).o(encode_json(data))
+
+
+def decode_json_compat(data: str) -> Either[str, A]:
+    return cast(A, decode_json_a(data).o(decode_json(data)))
+
 __all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field', 'bool_field', 'any_field', 'encode_json',
            'decode_json', 'int_field', 'uuid_field', 'map_field', 'either_field', 'str_field', 'float_field',
-           'decode_json_record')
+           'decode_json_record', 'encode_json_compat', 'decode_json_compat')
