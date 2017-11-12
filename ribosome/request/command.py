@@ -2,10 +2,11 @@ import functools
 
 import neovim
 
-from ribosome.request.base import RequestHandler, MessageRequestHandler, JsonMessageRequestHandler
+from ribosome.request.base import RequestHandler1, MessageRequestHandler, JsonMessageRequestHandler
+from ribosome.request.handler import MsgCmd, RequestDispatcher
 
 
-class Command(RequestHandler):
+class Command(RequestHandler1):
 
     @property
     def desc(self):
@@ -13,15 +14,22 @@ class Command(RequestHandler):
 
     @property
     def neovim_cmd(self):
-        @neovim.command(self.name, nargs=self.nargs, **self.kw)
+        @neovim.command(self.vim_name, nargs=self.nargs, **self.kw)
         @functools.wraps(self._fun)
         def neovim_cmd_wrapper(obj, *rpc_args):
             return self.dispatch(obj, rpc_args)
         return neovim_cmd_wrapper
 
+    @property
+    def dispatcher(self) -> RequestDispatcher:
+        return Cmd(self._fun)
+
 
 class MessageCommand(Command, MessageRequestHandler):
-    pass
+
+    @property
+    def dispatcher(self) -> RequestDispatcher:
+        return MsgCmd(self.msg)
 
 
 class JsonMessageCommand(Command, JsonMessageRequestHandler):

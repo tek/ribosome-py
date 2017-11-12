@@ -1,25 +1,25 @@
 import time
 import uuid
 import inspect
-from typing import Callable, TypeVar, Type, Any, Generic, Optional
+from typing import Callable, TypeVar, Type, Any, Generic, Generator
 import asyncio
 
 import toolz
 
-from amino import Maybe, _, List, Map, Empty, L, __, Just, Either, Lists, Left, Right, IO
+from amino import Maybe, _, List, Map, Empty, L, __, Just, Either, Lists, Left, Right, IO, Nothing, Boolean, _
 from amino.util.string import camelcaseify, ToStr
 from amino.lazy import lazy
 from amino.func import flip
-from amino.state import EitherState
+from amino.state import EitherState, EvalState
+from amino.do import tdo
 
 from ribosome.machine.message_base import Message
-from ribosome.logging import print_ribo_log_info
+from ribosome.logging import print_ribo_log_info, ribo_log
 from ribosome.data import Data
 from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.machine.machine import Machine
 from ribosome.machine.transition import (Handler, TransitionResult, may_handle, Error, Debug, handle, _io_result,
-                                         _recover_error, DynHandler)
-from ribosome.machine.message_base import _machine_attr
+                                         _recover_error, DynHandler, TransitionLog)
 from ribosome.request.command import StateCommand
 from ribosome.process import NvimProcessExecutor
 from ribosome.machine.messages import (RunNvimIO, RunIO, UnitIO, RunCorosParallel, SubProcessSync, RunIOsParallel,
@@ -31,6 +31,7 @@ from ribosome.machine.trans import Propagate, Transit
 
 A = TypeVar('A')
 D = TypeVar('D', bound=Data)
+TransState = EvalState[TransitionLog, TransitionResult]
 
 
 def nio(f: Callable[[NvimFacade], Any]) -> RunNvimIO:
@@ -41,12 +42,23 @@ def unit_nio(f: Callable[[NvimFacade], None]) -> RunNvimUnitIO:
     return RunNvimUnitIO(NvimIO(f))
 
 
+def handlers(cls: Type['MachineBase']) -> List[Handler]:
+    return Lists.wrap(inspect.getmembers(cls, Boolean.is_a(Handler))) / _[1]
+
+
+def message_handlers(handlers: List[Handler]) -> Map[float, Handlers]:
+    def create(prio, h):
+        h = List.wrap(h).apzip(_.message).map2(flip)
+        return prio, Handlers(prio, Map(h))
+    return Map(toolz.groupby(_.prio, handlers)).map(create)
+
+
 class MachineBase(Generic[D], Machine, ToStr):
     _data_type = Data
 
-    def __init__(self, parent: Optional[Machine]=None, name: Optional[str]=None) -> None:
-        self._parent = Maybe.optional(parent)
-        self._name = Maybe.optional(name)
+    def __init__(self, name: str, parent: Maybe[Machine]=Nothing) -> None:
+        self._name = name
+        self._parent = parent
         self.uuid = uuid.uuid4()
         self._reports = List()
         self._min_report_time = 0.1
@@ -55,12 +67,12 @@ class MachineBase(Generic[D], Machine, ToStr):
         return List(self.name)
 
     @property
-    def parent(self) -> Maybe[Machine]:
-        return self._parent
+    def name(self) -> str:
+        return self._name
 
     @property
-    def name(self) -> str:
-        return self._name.o(List.wrap(type(self).__module__.rsplit('.')).reversed.lift(1)) | 'machine'
+    def parent(self) -> Maybe[Machine]:
+        return self._parent
 
     @property
     def title(self) -> str:
@@ -68,54 +80,62 @@ class MachineBase(Generic[D], Machine, ToStr):
 
     @lazy
     def _message_handlers(self):
-        def create(prio, h):
-            h = List.wrap(h).apzip(_.message).map2(flip)
-            return prio, Handlers(prio, Map(h))
-        return Map(toolz.groupby(_.prio, self._handlers)).map(create)
-
-    @property
-    def _handlers(self):
-        methods = inspect.getmembers(type(self), lambda a: hasattr(a, _machine_attr))
-        return List.wrap(methods).map2(L(Handler.create)(self, _, _))
+        return message_handlers(handlers(type(self)))
 
     @property
     def _default_handler(self):
-        return DynHandler(self, 'unhandled', type(self).unhandled, None, 0, True)
+        return DynHandler(self, 'internal', type(self).internal, None, 0, True)
 
     @property
-    def prios(self):
+    def prios(self) -> List[float]:
         return self._message_handlers.k
 
     def handler_job_type(self, handler: Handler) -> Type[HandlerJob]:
         return DynHandlerJob if handler.dyn else AlgHandlerJob
 
-    def process(self, data: D, msg, prio=None) -> TransitionResult:
+    def process(self, data: D, msg: Message, prio: float=None) -> TransState:
         self.prepare(msg)
-        handler = self._resolve_handler(msg, prio)
-        job = self.handler_job_type(handler)(self, data, msg, handler, self._data_type)
-        result = job.run()
-        self._check_time(job.start_time, msg)
-        return result
+        def execute(handler: Callable) -> TransitionResult:
+            self.log.debug(f'handling {msg} in {self.name}')
+            job = HandlerJob.from_handler(handler.name, handler, data, msg)
+            result = job.run(self)
+            self._check_time(job.start_time, msg)
+            return EvalState.pure(result)
+        return self._resolve_handler(msg, prio) / execute | (lambda: self.internal(data, msg))
 
     def prepare(self, msg):
         pass
 
-    def loop_process(self, data, msg, prio=None):
-        def loop(z, m) -> None:
-            self.log_message(m, self.title)
-            return z.accum(self.loop_process(z.data, m))
-        return self.process(data, msg, prio).fold(loop)
+    def loop_process(self, data: D, msg: Message, prio: float=None) -> TransState:
+        @tdo(TransState)
+        def loop(current: TransitionResult, m: Message, prio: float=None) -> Generator:
+            result = yield self.process(current.data, m, prio)
+            log = yield EvalState.get()
+            resend = result.resend
+            next = current.accum(result)
+            new_log, next_msg = log.resend(resend).pop
+            yield EvalState.set(new_log)
+            yield next_msg / L(loop)(next, _) | EvalState.pure(next)
+        return loop(TransitionResult.empty(data), msg, prio)
 
-    def _resolve_handler(self, msg, prio):
+    @tdo(TransState)
+    def process_message(self, data: D, msg: Message, prio: float=None) -> Generator:
+        yield EvalState.modify(__.log(msg))
+        yield self.loop_process(data, msg, prio)
+
+    def _resolve_handler(self, msg: Message, prio: float) -> Maybe[Callable]:
         f = __.handler(msg)
         return (
             self._message_handlers.v.find_map(f)
             if prio is None else
             (self._message_handlers.get(prio) // f)
-        ) | (lambda: self._default_handler)
+        )
 
-    def unhandled(self, data: D, msg: Message):
-        return Just(TransitionResult.unhandled(data))
+    def internal(self, data: D, msg: Message) -> TransState:
+        return self.unhandled(data, msg)
+
+    def unhandled(self, data: D, msg: Message) -> TransState:
+        return EvalState.pure(TransitionResult.unhandled(data))
 
     def _command_by_message_name(self, name: str):
         msg_name = camelcaseify(name)

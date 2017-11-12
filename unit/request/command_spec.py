@@ -1,4 +1,4 @@
-from ribosome.request import command
+from ribosome import command
 
 from kallikrein import kf
 from kallikrein.matchers.end_with import end_with

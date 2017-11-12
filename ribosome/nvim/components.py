@@ -26,6 +26,7 @@ from amino.util.fun import format_funcall
 from amino.lazy import lazy
 from amino.io import IOException
 from amino.util.numeric import parse_int
+from amino.dat import Dat
 
 import ribosome
 from ribosome.logging import Logging
@@ -427,6 +428,10 @@ class Buffer(HasWindow):
     def line_count(self):
         return self.content.length
 
+    @property
+    def loaded(self) -> Boolean:
+        return self.target.valid
+
 
 class Window(HasTab, HasBuffers):
 
@@ -506,6 +511,15 @@ class Tab(HasWindows):
         self.cmd('tabclose')
 
 
+class CallError(Dat['CallError']):
+
+    def __init__(self, msg: str, header: str, error: Union[Exception, str], funcall: str) -> None:
+        self.msg = msg
+        self.header = header
+        self.error = error
+        self.funcall = funcall
+
+
 class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
     @staticmethod
@@ -572,18 +586,30 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def call(self, name: str, *args: Any, sync=True, **kw: Any) -> Either[str, A]:
         return (
             self._call(name, *args, sync=sync, **kw)
-            .leffect(L(self._call_error)(name, args, kw, _, sync))
-            .lmap(lambda a: 'vim call `{}` failed: {}'.format(format_funcall(name, args, kw), a))
+            .lmap(L(self._call_error)(name, args, kw, _, sync))
+            .leffect(self._log_call_error)
+            .lmap(lambda a: 'vim call `{}` failed: {}'.format(a.funcall, a.msg))
         )
 
-    def _call_error(self, name: str, args: tuple, kw: dict, err: Exception, sync: bool) -> None:
+    def _call_error(self, name: str, args: tuple, kw: dict, err: Exception, sync: bool) -> CallError:
         a = '' if sync else 'a'
-        header = f'calling {a}sync nvim function `{format_funcall(name, args, kw)}`'
+        funcall = format_funcall(name, args, kw)
+        header = f'calling {a}sync nvim function `{funcall}`'
         thread_error = str(err) == "'NoneType' object has no attribute 'switch'"
-        msg = 'thread scheduling error' if isinstance(err, Exception) and thread_error else str(err)
-        if isinstance(err, Exception) and amino.development:
-            self.log.caught_exception(header, err)
-        self.log.error(f'{header}: {msg}')
+        undefined = not self.function_exists(name)
+        msg = (
+            'thread scheduling error'
+            if isinstance(err, Exception) and thread_error else
+            '''function doesn't exist'''
+            if undefined else
+            str(err)
+        )
+        return CallError(msg, header, err, funcall)
+
+    def _log_call_error(self, error: CallError) -> None:
+        if isinstance(error.error, Exception) and amino.development:
+            self.log.caught_exception(error.header, error.error)
+        self.log.error(f'{error.header}: {error.msg}')
 
     def eval(self, expr):
         return self.vim.eval(expr)
@@ -629,14 +655,22 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         return NvimCmd(self, 'write!')
 
     @property
-    def messages(self):
+    def messages(self) -> List[str]:
         return self.cmd_output('messages')
+
+    @property
+    def commands(self) -> List[str]:
+        return self.cmd_output('command')
+
+    @property
+    def commands_s(self) -> str:
+        return self.commands.join_lines
 
     def import_pvar_path(self, name: str) -> Maybe[A]:
         return self.buffer.vars.p(name).o(lambda: self.vars.p(name)).flat_map(Either.import_path)
 
     def function_exists(self, name: str) -> Boolean:
-        return self.call('exists', f'*{name}').true
+        return self._call('exists', f'*{name}').true
 
     def command_exists(self, name: str) -> Boolean:
         return self.call('exists', f':{name}').contains(2)
@@ -686,6 +720,7 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     @property
     def pflags(self) -> 'Flags':
         return Flags(self.vars, True)
+
 
 class AsyncVimCallProxy(Generic[A]):
 

@@ -20,7 +20,7 @@ from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationS
                                             PluginIntegrationSpec, AutoPluginIntegrationSpec)
 from ribosome.nvim.components import Buffer
 from ribosome.machine.message_base import Message
-from ribosome.settings import PluginSettings
+from ribosome.config import PluginSettings
 from ribosome.machine.state import AutoData
 
 

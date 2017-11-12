@@ -1,24 +1,25 @@
 import abc
 import functools
-from typing import Callable, TypeVar, Any, Generic, Type, Tuple, Union
+from typing import Callable, TypeVar, Any, Generic, Type, Tuple, Union, Generator
 from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
-from amino import Maybe, may, Either, Just, Left, I, List, Nothing, _, __, Id
+from amino import Maybe, may, Either, Just, Left, I, List, Nothing, _, __, Id, Nil
 from amino.io import IOException
 from amino.util.exception import format_exception
 from amino.state import StateT
 from amino.util.string import ToStr
+from amino.dat import Dat, DatMeta
+from amino.do import tdo
 
 from ribosome.machine.message_base import (_message_attr, _machine_attr, Message, default_prio, _prio_attr,
                                            fallback_prio, override_prio, _dyn_attr)
 
-from ribosome.record import Record, any_field, list_field, field, bool_field, optional_field
-from ribosome.logging import Logging
+from ribosome.record import Record, any_field, list_field, field, bool_field, optional_field, maybe_field
+from ribosome.logging import Logging, ribo_log
 from ribosome.machine.machine import Machine
 from ribosome.data import Data
 from ribosome.machine.transitions import Transitions
-from ribosome.machine.trans import TransAction
 from ribosome.machine.messages import Error, Debug, Coroutine
 
 A = TypeVar('A')
@@ -68,16 +69,14 @@ D = TypeVar('D', bound=Data)
 M = TypeVar('M', bound=Message)
 R = TypeVar('R')
 T = TypeVar('T', bound=Transitions)
-Msg = TypeVar('Msg', bound=Message)
+Mes = TypeVar('Mes', bound=Message)
 DynResult = Union[Message, List[Message]]
 DynTrans = Union[DynResult, Maybe[DynResult], Either[str, DynResult], StateT[Id, Data, DynResult]]
 
 
 class Handler(Generic[M, D, R], Logging, ToStr):
 
-    def __init__(self, machine: Machine, name: str, fun: Callable[[Machine, D, M], R], message: Type[M], prio: float,
-                 dyn: bool) -> None:
-        self.machine = machine
+    def __init__(self, name: str, fun: Callable[[Machine, D, M], R], message: Type[M], prio: float, dyn: bool) -> None:
         self.name = name
         self.message = message
         self.fun = fun
@@ -85,24 +84,25 @@ class Handler(Generic[M, D, R], Logging, ToStr):
         self.dyn = dyn
 
     @staticmethod
-    def attrs(fun) -> Tuple[Type[M], float, bool]:
+    def attrs(fun: Callable) -> Tuple[str, Type[M], float, bool]:
+        name = fun.__name__
         msg = getattr(fun, _message_attr)
         prio = getattr(fun, _prio_attr, default_prio)
         dyn = getattr(fun, _dyn_attr)
-        return msg, prio, dyn
+        return name, msg, prio, dyn
 
     @staticmethod
-    def create(machine: Machine, name: str, fun: Callable[[Machine, D, M], R]) -> 'Handler[M, D, R]':
-        msg, prio, dyn = Handler.attrs(fun)
+    def create(fun: Callable[[Machine, D, M], R]) -> 'Handler[M, D, R]':
+        name, msg, prio, dyn = Handler.attrs(fun)
         tpe = CoroHandler if iscoroutinefunction(fun) else DynHandler  # if dyn else AlgHandler
-        return tpe(machine, name, fun, msg, prio, dyn)
+        return tpe(name, fun, msg, prio, dyn)
 
     @abc.abstractmethod
-    def execute(self, data: D, msg: Msg) -> R:
+    def execute(self, machine: Machine, data: D, msg: Mes) -> R:
         ...
 
     @abc.abstractmethod
-    def run(self, data: D, msg: Msg) -> R:
+    def run(self, machine: Machine, data: D, msg: Mes) -> R:
         ...
 
     def _arg_desc(self) -> List[str]:
@@ -111,36 +111,11 @@ class Handler(Generic[M, D, R], Logging, ToStr):
 
 class DynHandler(Generic[M, D], Handler[M, D, DynTrans]):
 
-    def run(self, data, msg) -> DynTrans:
-        return _recover_error(self, self.execute(data, msg))
+    def run(self, machine: Machine, data, msg) -> DynTrans:
+        return _recover_error(self, self.execute(machine, data, msg))
 
-    def execute(self, data, msg) -> DynTrans:
-        return self.fun(self.machine, data, msg)
-
-
-class WrappedHandler(Generic[M, D, T], DynHandler[M, D]):
-
-    def __init__(self, trans_tpe: Type[T], machine: Machine, name: str, fun: Callable[[Machine, D, M], DynTrans],
-                 message: Type[M], prio: float, dyn: bool) -> None:
-        def wrapper(mach: Machine, d: Data, msg: M) -> R:
-            trans = trans_tpe(mach, d, msg)
-            return fun(trans)
-        super().__init__(machine, name, wrapper, message, prio, dyn)
-
-    @staticmethod
-    def create(machine: Machine, name: str, fun: Callable[[Machine, D, M], R], tpe: Type[T]
-               ) -> 'Handler[M, D, DynTrans]':
-        msg, prio, dyn = Handler.attrs(fun)
-        return WrappedHandler(tpe, machine, name, fun, msg, prio, dyn)
-
-
-class AlgHandler(Generic[M, D], Handler[M, D, TransAction]):
-
-    def run(self, data: D, msg: Msg) -> TransAction:
-        ...
-
-    def execute(self, data: D, msg: Msg) -> TransAction:
-        return self.fun(self.machine, data, msg)
+    def execute(self, machine: Machine, data, msg) -> DynTrans:
+        return self.fun(machine, data, msg)
 
 
 class CoroHandler(Handler):
@@ -163,6 +138,7 @@ class TransitionResult(Record):
     handled = bool_field(True)
     failure = bool_field(False)
     error = optional_field()
+    output = maybe_field(object)
 
     @staticmethod
     def empty(data, **kw):
@@ -178,7 +154,7 @@ class TransitionResult(Record):
 
     @property
     def _str_extra(self):
-        return List(self.handled) + self.error.to_list + self.resend
+        return List(self.handled.cata('handled', 'unhandled')) + self.error.to_list + self.resend
 
     def fold(self, f):
         return self
@@ -242,13 +218,41 @@ class CoroTransitionResult(TransitionResult, Logging):
         return [self.coro]
 
 
+class TransitionLogMeta(DatMeta):
+
+    @property
+    def empty(self) -> 'TransitionLog':
+        return TransitionLog(Nil, Nil)
+
+
+class TransitionLog(Dat['TransitionLog'], metaclass=TransitionLogMeta):
+
+    def __init__(self, message_log: List[Message], message_resend: List[Message]) -> None:
+        self.message_log = message_log
+        self.message_resend = message_resend
+
+    def log(self, m: Message) -> 'TransitionLog':
+        return self.append1.message_log(m)
+
+    def resend(self, ms: List[Message]) -> 'TransitionLog':
+        return self.append.message_resend(ms)
+
+    @property
+    def pop(self) -> Generator:
+        @tdo(Maybe[Tuple['TransitionLog', Maybe[Message]]])
+        def pop1() -> Generator:
+            head, tail = yield self.message_resend.detach_head
+            yield Just((self.copy(message_resend=tail).log(head), Just(head)))
+        return pop1() | (self, Nothing)
+
+
 def handle(msg: type, prio=default_prio):
     def add_handler(func: Callable[..., Maybe[A]]):
         setattr(func, _machine_attr, True)
         setattr(func, _message_attr, msg)
         setattr(func, _prio_attr, prio)
         setattr(func, _dyn_attr, True)
-        return func
+        return Handler.create(func)
     return add_handler
 
 
@@ -295,4 +299,4 @@ class TransitionFailed(MachineError):
     pass
 
 __all__ = ('Handler', 'CoroHandler', 'TransitionResult', 'StrictTransitionResult', 'CoroTransitionResult', 'handle',
-           'may_handle', 'either_msg', 'either_handle', 'MachineError', 'TransitionFailed')
+           'may_handle', 'either_msg', 'either_handle', 'MachineError', 'TransitionFailed', 'TransitionLog')

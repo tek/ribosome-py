@@ -20,7 +20,7 @@ from ribosome.machine.message_base import pmessage, Message
 from ribosome.machine.messages import Nop
 
 
-Msg = pmessage('Msg', 'text')
+Msg1 = pmessage('Msg1', 'text')
 Err = pmessage('Err')
 Scratch = pmessage('Scratch')
 ScratchTest = pmessage('ScratchTest')
@@ -41,7 +41,7 @@ class TData(Data):
 
 class Mach(Logging):
 
-    @may_handle(Msg)
+    @may_handle(Msg1)
     def mess(self, data, msg):
         self.log.info(msg.text)
         return data.set(v=3)
@@ -135,7 +135,7 @@ class TestPlugin(NvimStatePlugin, Logging):
     def fun(self, value):
         return self.test_fun.format(value)
 
-    @msg_function(Msg, sync=True)
+    @msg_function(Msg1, sync=True)
     def msg_fun(self):
         pass
 

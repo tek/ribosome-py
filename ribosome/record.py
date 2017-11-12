@@ -347,7 +347,7 @@ def _decode_json_obj(obj):
     m = Map(obj)
     return (
         m.get('__type__') /
-        L(Either.import_path)(_).get_or_raise.from_opt(m) |
+        L(Either.import_path)(_).get_or_raise().from_opt(m) |
         m
     )
 
@@ -413,7 +413,7 @@ def encode_json_compat(data: A) -> Either[str, str]:
 
 
 def decode_json_compat(data: str) -> Either[str, A]:
-    return cast(A, decode_json_a(data).o(decode_json(data)))
+    return cast(A, decode_json_a(data).lmap(List).accum_error_f(lambda: decode_json(data).lmap(List)))
 
 __all__ = ('Record', 'field', 'list_field', 'dfield', 'maybe_field', 'bool_field', 'any_field', 'encode_json',
            'decode_json', 'int_field', 'uuid_field', 'map_field', 'either_field', 'str_field', 'float_field',

@@ -1,14 +1,17 @@
+from typing import Any
+
 from kallikrein import Expectation, k
 from kallikrein.matchers.either import be_right
 
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 
 from amino import Map, List, __
-from ribosome.settings import Config, RequestHandler
+from ribosome.config import Config, RequestHandler
 from ribosome.machine.message_base import Message
 from ribosome.machine.messages import Stage1
 from ribosome.machine import trans
-from ribosome.machine.state import Component
+from ribosome.machine.sub import Component
+from ribosome.logging import ribo_log
 
 
 class Pub(Message['Pub']):
@@ -61,17 +64,13 @@ class P(Component):
     def stage_1(self) -> None:
         pass
 
-    @trans.one(Pub)
-    def pub(self) -> Message:
-        return P1().pub
-
     @trans.one(Target)
     def target(self) -> Message:
         return T1().to('q')
 
     @trans.one(T1)
     def t1(self) -> Message:
-        return T2()
+        return T2().pub
 
     @trans.multi(Seq)
     def seq(self) -> List[Message]:
@@ -82,22 +81,27 @@ class Q(Component):
 
     @trans.one(P1)
     def p1(self) -> Message:
-        return P2()
+        return P2().pub
 
     @trans.one(T1)
     def t1(self) -> Message:
-        return T3()
+        return T3().pub
 
     @trans.one(S2)
     def s1(self) -> Message:
         return S3().at(0.6)
 
 
+@trans.one(Pub)
+def pub(machine: Any, msg: Pub, args: Any) -> Message:
+    return P1().pub
+
+
 config = Config(
     name='envl',
     components=Map(p=P, q=Q),
     request_handlers=List(
-        RequestHandler.msg_cmd(Pub)('pub'),
+        RequestHandler.trans_cmd(pub)('pub'),
         RequestHandler.msg_cmd(Target)('target'),
         RequestHandler.msg_cmd(Seq)('Seq'),
     ),
@@ -122,6 +126,7 @@ class EnvelopeSpec(AutoPluginIntegrationKlkSpec):
     def publish(self) -> Expectation:
         self.vim.cmd_once_defined('EnvlStage1')
         self.cmd_sync('EnvlPub')
+        self.seen_message(P1)
         return self.seen_message(P2)
 
     def target(self) -> Expectation:

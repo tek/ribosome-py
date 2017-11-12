@@ -1,45 +1,29 @@
-import time
-from typing import Callable, Awaitable, Generator, Any, Union, TypeVar, Generic, Type, Optional
+from typing import Callable, TypeVar, Generic, Generator
 import abc
 import threading
 import asyncio
 from contextlib import contextmanager
 from concurrent.futures import Future as CFuture, TimeoutError
-import subprocess
-from subprocess import PIPE
-
-from lenses import Lens
 
 from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
-from ribosome.machine.message_base import pmessage, Message, Envelope, ToMachine
-from ribosome.machine.base import Machine, MachineBase
-from ribosome.machine.transition import (TransitionResult, Coroutine, may_handle, handle, CoroTransitionResult,
-                                         _recover_error, CoroExecutionHandler)
-from ribosome.machine.message_base import json_pmessage
-from ribosome.machine.helpers import TransitionHelpers
-from ribosome.machine.messages import (Nop, Done, Quit, PlugCommand, Stop, Error, UpdateRecord, UpdateState,
-                                       CoroutineAlg, SubProcessAsync, Fork)
-from ribosome.machine.handler import DynHandlerJob, AlgResultValidator
-from ribosome.machine.modular import ModularMachine, ModularMachine2
-from ribosome.machine.transitions import Transitions
-from ribosome.machine import trans
-from ribosome.settings import PluginSettings, Config, AutoData
+from ribosome.machine.message_base import Message, Envelope
+from ribosome.machine.base import Machine, MachineBase, TransState
+from ribosome.machine.transition import (TransitionResult, may_handle, handle, CoroTransitionResult, _recover_error,
+                                         CoroExecutionHandler, TransitionLog)
+from ribosome.machine.messages import Nop, PlugCommand, Stop, Error
+from ribosome.machine.handler import DynHandlerJob
+from ribosome.machine.modular import ModularMachine
+from ribosome.machine.internal import RunScratchMachine, RunMachine
+from ribosome.config import AutoData
 
 import amino
-from amino import Maybe, Map, Try, _, L, __, Just, Either, List, Left, Nothing, do, Lists, Right, curried, Boolean
+from amino import Maybe, Map, Try, _, L, List, Nothing, Lists, Nil
 from amino.util.string import red, blue
-from amino.state import State
-
-Callback = pmessage('Callback', 'func')
-EnvelopeOld = pmessage('EnvelopeOld', 'message', 'to')
-RunMachine = json_pmessage('RunMachine', 'machine')
-KillMachine = pmessage('KillMachine', 'uuid')
-RunScratchMachine = json_pmessage('RunScratchMachine', 'machine')
-Init = pmessage('Init')
-IfUnhandled = pmessage('IfUnhandled', 'msg', 'unhandled')
+from amino.state import EvalState
+from amino.do import tdo
 
 short_timeout = 3
 medium_timeout = 3
@@ -65,76 +49,18 @@ class AsyncIOBase(Logging, abc.ABC):
         ...
 
 
-class AsyncIOThread(threading.Thread, AsyncIOBase):
-
-    def __init__(self) -> None:
-        threading.Thread.__init__(self)
-        AsyncIOBase.__init__(self)
-        self.done = threading.Event()
-        self.quit_now = threading.Event()
-        self.running = threading.Event()
-
-    def run(self):
-        self._init_asyncio()
-        asyncio.set_event_loop(self._loop)
-        self.quit_now.clear()
-        self.done.clear()
-        self.running.set()
-        try:
-            self._loop.run_until_complete(self._main(self.init))
-            self.log.debug('event loop finished in {}'.format(self.name))
-        except Exception:
-            self.log.exception('while running state machine')
-        self.running.clear()
-        self.done.set()
-
-    def stop(self, shutdown=True):
-        if self.is_alive() and self.running.is_set():
-            self.log.debug('stopping machine {}'.format(self.name))
-            if shutdown:
-                self._stop()
-            else:
-                self._done()
-            self.send(Nop())
-            if self.done.wait(long_timeout):
-                try:
-                    self._loop.close()
-                except Exception as e:
-                    if amino.development:
-                        self.log.caught_exception('stopping {}'.format(self.name))
-
-    def _stop(self):
-        self._done()
-
-    def _done(self):
-        self.quit_now.set()
-
-    @abc.abstractmethod
-    async def _main(self, initial):
-        ...
-
-    @property
-    def init(self):
-        pass
-
-
-A = TypeVar('A')
 D = TypeVar('D', bound=AutoData)
 
 
 class StateMachineBase(Generic[D], ModularMachine):
 
-    def __init__(self, sub: List[MachineBase]=List(), parent=None, name=None, debug=False) -> None:
+    def __init__(self, name: str, sub: List[Machine], parent: Maybe[Machine]=Nothing, debug: bool=False
+                 ) -> None:
         self.sub = sub
         self.debug = debug
-        self.data = None
         self._messages: asyncio.PriorityQueue = None
         self.message_log = List()
-        ModularMachine.__init__(self, parent, name=name)
-
-    @property
-    def init(self) -> Data:
-        return self._data_type()
+        ModularMachine.__init__(self, name, parent)
 
     def start_wait(self):
         self.start()
@@ -164,10 +90,11 @@ class StateMachineBase(Generic[D], ModularMachine):
         data, components = pre(self.data, sub_map)
         return Try(eval, expr, None, dict(data=data, components=components))
 
-    def _send(self, data, msg: Message):
+    def _send(self, data, msg: Message) -> TransitionResult:
         self.log_message(msg, self.name)
+        result = self.loop_process(data, msg).run(TransitionLog(List(msg), Nil))
         return (
-            Try(self.loop_process, data, msg)
+            Try(result.evaluate)
             .value_or(L(TransitionResult.failed)(data, _))
         )
 
@@ -179,95 +106,24 @@ class StateMachineBase(Generic[D], ModularMachine):
         if self.debug:
             self.message_log.append(msg)
 
-    @may_handle(Nop)
-    def _nop(self, data: Data, msg):
-        pass
-
-    @may_handle(Stop)
-    def _stop_msg(self, data: Data, msg):
-        return Quit(), Done().pub.at(1)
-
-    @may_handle(Done)
-    def _done_msg(self, data: Data, msg):
-        self._done()
-
-    @may_handle(Callback)
-    def message_callback(self, data: Data, msg):
-        return msg.func(data)
-
-    @may_handle(Coroutine)
-    def _couroutine(self, data: Data, msg):
-        return msg
-
-    @may_handle(CoroutineAlg)
-    def message_couroutine_alg(self, data: Data, msg: CoroutineAlg):
-        async def run_coro_alg() -> None:
-            res = await msg.coro
-            trans_desc = blue(f'{self.name}.message_couroutine_alg')
-            return Just(AlgResultValidator(trans_desc).validate(res, data))
-        return run_coro_alg()
-
-    @trans.one(SubProcessAsync)
-    def message_sub_process_async(self, data: Data, msg: SubProcessAsync) -> None:
-        def subproc_async() -> Message:
-            job = msg.job
-            proc = subprocess.run(
-                args=job.args.cons(job.exe),
-                stdin=PIPE,
-                stdout=PIPE,
-                stderr=PIPE,
-                cwd=str(job.cwd),
-                **job.kw,
-            )
-            self.log.debug(f'finished async subproc with {proc}')
-            result = job.result_strict(proc.returncode, proc.stdout or '', proc.stderr or '')
-            return msg.result(result)
-        return Fork(subproc_async)
-
-    @trans.unit(Fork)
-    def message_fork(self, data: Data, msg: Fork) -> None:
-        def dispatch() -> None:
-            try:
-                msg.callback() % self.send
-            except Exception as e:
-                self.log.caught_exception(f'running forked function {msg.callback}', e)
-        threading.Thread(target=dispatch).start()
-
-    @may_handle(RunMachine)
-    def message_run_machine(self, data, msg):
-        self.sub = self.sub.cat(msg.machine)
-        init = msg.options.get('init') | Init()
-        return EnvelopeOld(init, msg.machine.uuid)
-
-    @may_handle(KillMachine)
-    def message_kill_machine(self, data, msg):
-        self.sub = self.sub.filter_not(_.uuid == msg.uuid)
-
-    @handle(EnvelopeOld)
-    def message_envelope(self, data, msg):
-        return self.sub.find(_.uuid == msg.to) / __.loop_process(data, msg.message)
-
-    @handle(ToMachine)
-    def message_to_machine(self, data: D, msg: ToMachine[A]) -> Maybe:
-        return self.sub.find(_.name == msg.target) / __.loop_process(data, msg.message)
-
-    @may_handle(IfUnhandled)
-    def if_unhandled(self, data, msg):
-        result = self._send(data, msg.msg)
-        return result if result.handled else self._send(data, msg.unhandled)
-
-    def unhandled(self, data, msg):
+    def unhandled(self, data: D, msg: Message) -> TransState:
         prios = (self.sub // _.prios).distinct.sort(reverse=True)
-        step = lambda z, a: z if z.handled else self._fold_sub(z.data, msg, a)
-        return Just(prios.fold_left(TransitionResult.unhandled(data))(step))
+        @tdo(TransState)
+        def step(z: TransState, a: float) -> Generator:
+            current = yield z
+            yield EvalState.pure(current) if current.handled else self._fold_sub(current.data, msg, a)
+        return prios.fold_left(EvalState.pure(TransitionResult.unhandled(data)))(step)
 
-    def _fold_sub(self, data, msg, prio=None):
-        ''' send **msg** to all sub-machines, passing the transformed
-        data from each machine to the next and accumulating published
-        messages.
+    def _fold_sub(self, data: D, msg: Message, prio: float=None) -> TransState:
+        ''' send **msg** to all submachines, passing the transformed data from each machine to the next and
+        accumulating published messages.
         '''
-        send = lambda z, s: z.accum(s.loop_process(z.data, msg, prio))
-        return self.sub.fold_left(TransitionResult.unhandled(data))(send)
+        @tdo(TransState)
+        def send(z: TransState, sub: Machine) -> Generator:
+            current = yield z
+            next = yield sub.loop_process(current.data, msg, prio)
+            yield EvalState.pure(current.accum(next))
+        return self.sub.fold_left(EvalState.pure(TransitionResult.unhandled(data)))(send)
 
     @contextmanager
     def transient(self):
@@ -276,33 +132,6 @@ class StateMachineBase(Generic[D], ModularMachine):
         self.send(Nop())
         yield self
         self.stop()
-
-    async def _step(self):
-        self.data = await self._process_one_message(self.data)
-
-    async def _process_one_message(self, data):
-        raw = await self._messages.get()
-        msg = raw.delivery if isinstance(raw, Envelope) else raw
-        sent = self._send(data, msg)
-        result = (
-            self._failed_transition(msg, sent)
-            if sent.failure else
-            await self._successful_transition(data, msg, sent)
-            if sent.handled else
-            self._unhandled_message(msg, sent)
-        )
-        self._messages.task_done()
-        return result.data
-
-    async def _successful_transition(self, data, msg, sent):
-        result = (
-            await self._execute_coro_result(data, msg, sent)
-            if isinstance(sent, CoroTransitionResult) else
-            sent
-        )
-        for pub in result.pub:
-            await self._publish(pub)
-        return result
 
     async def _execute_coro_result(self, data: Data, msg: Message, ctr: CoroTransitionResult) -> None:
         try:
@@ -321,7 +150,41 @@ class StateMachineBase(Generic[D], ModularMachine):
                 self.log.warn(msg.format(result.resend, ctr.coro))
             return result
 
-    def _failed_transition(self, msg, sent: TransitionResult):
+    async def join_messages(self):
+        await self._messages.join()
+
+
+class MessageProcessor(Logging):
+
+    def __init__(
+            self,
+            messages: asyncio.PriorityQueue,
+            send: Callable[[D, Message], TransitionResult]
+    ) -> None:
+        self.messages = messages
+        self.send = send
+        self.message_log = Nil
+
+    async def process_one_message(self, data: D) -> D:
+        raw = await self.messages.get()
+        msg = raw.delivery if isinstance(raw, Envelope) else raw
+        log, sent = self.send(data, msg)
+        self.message_log = self.message_log + log.message_log
+        result = (
+            self.failed_transition(msg, sent)
+            if sent.failure else
+            await self.successful_transition(data, msg, sent)
+            if sent.handled else
+            self.unhandled_message(msg, sent)
+        )
+        self.messages.task_done()
+        return result.data
+
+    async def loop_messages(self, data: D) -> D:
+        next = await self.process_one_message(data)
+        return data if self.messages.empty() else await self.loop_messages(next)
+
+    def failed_transition(self, msg: Message, sent: TransitionResult) -> TransitionResult:
         msg_name = type(msg).__name__
         def log_error() -> None:
             errmsg = sent.error_message
@@ -338,35 +201,28 @@ class StateMachineBase(Generic[D], ModularMachine):
             self.log.error(f'error in `failed_transition`: {e}')
         return sent
 
-    def _unhandled_message(self, msg, sent):
+    async def successful_transition(self, data: D, msg: Message, sent: TransitionResult) -> TransitionResult:
+        result = (
+            await self._execute_coro_result(data, msg, sent)
+            if isinstance(sent, CoroTransitionResult) else
+            sent
+        )
+        for pub in result.pub:
+            await self.messages.put(pub)
+        return result
+
+    def unhandled_message(self, msg, sent):
         log = self.log.warning if warn_no_handler else self.log.debug
         log(f'no handler for {msg}')
         return sent
 
-    async def join_messages(self):
-        await self._messages.join()
 
+class StateMachine(StateMachineBase, AsyncIOBase):
 
-class StateMachine(StateMachineBase, AsyncIOThread):
-
-    def __init__(self, *a, **kw) -> None:
-        AsyncIOThread.__init__(self)
-        StateMachineBase.__init__(self, *a, **kw)
-
-    def wait_for_running(self) -> None:
-        self.running.wait(medium_timeout)
-
-    async def _main(self, data):
-        self.data = data
-        while not self.quit_now.is_set():
-            await self._step()
-
-
-class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
-
-    def __init__(self, *a, **kw) -> None:
-        StateMachineBase.__init__(self, *a, **kw)
+    def __init__(self, name: str, sub: List[Machine], parent: Maybe[Machine]=Nothing, debug: bool=False) -> None:
+        StateMachineBase.__init__(self, name, sub, parent, debug)
         AsyncIOBase.__init__(self)
+        self.last_message_log = Nil
 
     def start(self) -> None:
         self.log.debug(f'starting event loop in {self}')
@@ -379,24 +235,15 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
     def wait_for_running(self) -> None:
         pass
 
-    def process_messages(self):
-        return self._loop.run_until_complete(self._process_messages())
-
-    async def _process_messages(self):
-        while not self._messages.empty():
-            await self._step()
-
-    def run_coro_when_free(self, coro: Awaitable) -> None:
-        while self._loop.is_running():
-            time.sleep(.01)
-        self._loop.run_until_complete(coro)
-
-    def send_and_process(self, msg: Message) -> None:
+    def send_and_process(self, data: D, msg: Message) -> D:
         if self._messages is not None:
             self._messages.put_nowait(msg)
             if not self._loop.is_running():
                 try:
-                    self._loop.run_until_complete(self._process_messages())
+                    proc = MessageProcessor(self._messages, self._send)
+                    result = self._loop.run_until_complete(proc.loop_messages(data))
+                    self.last_message_log = proc.message_log
+                    return result
                 except Exception as e:
                     self.log.caught_exception('submitting `_process_messages` coro to loop', e)
         else:
@@ -409,7 +256,7 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         done = CFuture()
         def run() -> None:
             try:
-                self.send_and_process(msg)
+                self.data = self.send_and_process(self.data, msg)
             except Exception as e:
                 self.log.caught_exception_error(desc, e)
                 done.set_result(False)
@@ -426,44 +273,16 @@ class UnloopedStateMachine(StateMachineBase, AsyncIOBase):
         return self.data
 
     def send(self, msg: Message) -> CFuture:
-        return self.send_thread(msg, True)
+        return self.send_sync(msg)
 
 
-class PluginStateMachine(Machine):
+class PluginStateMachine(StateMachine, HasNvim):
 
-    def __init__(self, components: List[str]) -> None:
-        self.sub = components.flat_map(self.start_components)
-
-    def start_components(self, name: str):
-        def report(errs):
-            msg = 'invalid {} component module "{}": {}'
-            self.log.error(msg.format(self.name, name, errs))
-        return (
-            (self._find_component(name) // self._inst_component)
-            .lmap(List)
-            .accum_error_f(lambda: self.extra_component(name))
-            .leffect(report)
-        )
-
-    def _find_component(self, name: str) -> Either[List[str], Machine]:
-        mods = List(
-            Either.import_module(name),
-            Either.import_module(f'{self.name}.components.{name}'),
-            Either.import_module(f'{self.name}.plugins.{name}'),
-        )
-        # TODO .traverse(_.swap).swap
-        errors = mods.filter(_.is_left) / _.value
-        return mods.find(_.is_right) | Left(errors)
-
-    def _inst_component(self, mod):
-        return (
-            Try(getattr(mod, 'Component'), self.vim, self)
-            if hasattr(mod, 'Component')
-            else Left('module does not define class `Component`')
-        )
-
-    def extra_component(self, name: str) -> Either[List[str], Machine]:
-        return Left(List('not implemented'))
+    def __init__(self, name: str, vim: NvimFacade, sub: List[Machine], parent: Maybe[Machine]=Nothing, debug: bool=False
+                 ) -> None:
+        debug = vim.vars.p('debug') | False
+        HasNvim.__init__(self, vim)
+        StateMachine.__init__(self, name, sub, parent, debug)
 
     def component(self, name: str) -> Maybe[MachineBase]:
         return self.sub.find(_.name == name)
@@ -483,17 +302,6 @@ class PluginStateMachine(Machine):
         self.log_message(msg.msg, self.name)
         return msg.plug.process(data, msg.msg)
 
-
-class RootMachineBase(PluginStateMachine, HasNvim, Logging):
-
-    def __init__(self, vim: NvimFacade, components: List[str]=List(), name: str=None) -> None:
-        HasNvim.__init__(self, vim)
-        PluginStateMachine.__init__(self, components)
-
-    @property
-    def name(self):
-        return 'ribosome'
-
     @handle(RunScratchMachine)
     def _scratch_machine(self, data, msg):
         return (
@@ -504,147 +312,4 @@ class RootMachineBase(PluginStateMachine, HasNvim, Logging):
             L(RunMachine)(_, msg.options)
         )
 
-
-class RootMachine(StateMachine, RootMachineBase):
-
-    def __init__(self, vim: NvimFacade, components: List[str]=List(), name: str=Optional[None]) -> None:
-        StateMachine.__init__(self, name=name)
-        RootMachineBase.__init__(self, vim, components)
-
-
-T = TypeVar('T', bound=Transitions)
-
-
-class ComponentMachine(Generic[T], ModularMachine2[T], TransitionHelpers):
-
-    def __init__(self, vim: NvimFacade, trans: Type[T], name: Optional[str], parent: Optional[Machine]=None) -> None:
-        super().__init__(parent, name)
-        self.vim = vim
-        self.trans = trans
-
-    @property
-    def transitions(self) -> Type[T]:
-        return self.trans
-
-    def new_state(self):
-        pass
-
-
-class UnloopedRootMachine(UnloopedStateMachine, RootMachineBase):
-
-    def __init__(self, vim: NvimFacade, components: List[str]=List(), name: Optional[str]=None) -> None:
-        debug = vim.vars.p('debug') | False
-        UnloopedStateMachine.__init__(self, name=name, debug=debug)
-        RootMachineBase.__init__(self, vim, components)
-
-
-Settings = TypeVar('Settings', bound=PluginSettings)
-
-
-class AutoRootMachine(Generic[Settings, D], UnloopedRootMachine):
-
-    def __init__(self, vim: NvimFacade, config: Config[Settings, D], name: str) -> None:
-        self.config = config
-        self.available_components = config.components
-        additional_components = config.settings.components.value.attempt(vim).join | config.default_components
-        components = config.core_components + additional_components
-        self.log.debug(f'starting {config} with components {components}')
-        UnloopedRootMachine.__init__(self, vim, components, name)
-
-    def extra_component(self, name: str) -> Either[List[str], Machine]:
-        auto = f'{self.name}.components.{name}'
-        return (
-            self.declared_component(name)
-            .accum_error_f(lambda: self.component_from_exports(auto))
-            .accum_error_f(lambda: self.component_from_exports(name))
-            .flat_map(self.inst_auto(name))
-        )
-
-    def declared_component(self, name: str) -> Either[List[str], Machine]:
-        return (
-            self.available_components
-            .lift(name)
-            .to_either(List(f'no auto component defined for `{name}`'))
-        )
-
-    @do
-    def component_from_exports(self, mod: str) -> Either[List[str], Machine]:
-        exports = yield Either.exports(mod).lmap(List)
-        yield (
-            exports.find(L(Boolean.issubclass)(_, (Component, ComponentMachine)))
-            .to_either(f'none of `{mod}.__all__` is a `Component`: {exports}')
-            .lmap(List)
-        )
-
-    @curried
-    def inst_auto(self, name: str, plug: Union[str, Type]) -> Either[str, Machine]:
-        return (
-            Right(ComponentMachine(self.vim, plug, name, self))
-            if isinstance(plug, type) and issubclass(plug, Transitions) else
-            Right(plug(self.vim, name, self))
-            if isinstance(plug, type) and issubclass(plug, ComponentMachine) else
-            Left(List(f'invalid tpe for auto component: {plug}'))
-        )
-
-    @property
-    def init(self) -> D:
-        return self.config.state(self.vim)
-
-
-class SubMachine(ModularMachine, TransitionHelpers):
-
-    def new_state(self):
-        pass
-
-
-class SubTransitions(Transitions, TransitionHelpers):
-
-    def _state(self, data):
-        return data.sub_state(self.name, self.new_state)
-
-    @property
-    def state(self):
-        return self._state(self.data)
-
-    def _with_sub(self, data, state):
-        return data.with_sub_state(self.name, state)
-
-    def with_sub(self, state):
-        return self._with_sub(self.data, state)
-
-    @property
-    def new_state(self):
-        return self.machine.new_state
-
-    @property
-    def options(self):
-        return getattr(self.msg, 'options', Map())
-
-    @handle(UpdateRecord)
-    def message_update_record(self):
-        return (
-            self.record_lens(self.msg.tpe, self.msg.name) /
-            __.modify(__.update_from_opt(self.msg.options)) /
-            self.with_sub
-        )
-
-    def record_lens(self, tpe, name) -> Maybe[Lens]:
-        return Nothing
-
-    @trans.unit(UpdateState, trans.st)
-    @do
-    def message_update_state(self) -> Generator[State[Data, None], Any, None]:
-        mod = __.update_from_opt(self.msg.options)
-        l = yield self.state_lens(self.msg.tpe, self.msg.name)
-        yield State.modify(lambda s: l.map(__.modify(mod)) | s)
-
-    def state_lens(self, tpe: str, name: str) -> State[Data, Maybe[Lens]]:
-        return State.pure(Nothing)
-
-
-class Component(SubTransitions):
-    pass
-
-__all__ = ('StateMachine', 'PluginStateMachine', 'AsyncIOThread', 'StateMachineBase', 'UnloopedStateMachine',
-           'RootMachineBase', 'RootMachine', 'UnloopedRootMachine', 'SubMachine', 'SubTransitions', 'Component',
-           'ComponentMachine')
+__all__ = ('StateMachine', 'PluginStateMachine', 'StateMachineBase', 'StateMachine')

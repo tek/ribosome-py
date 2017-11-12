@@ -3,13 +3,13 @@ from typing import TypeVar, Generic, Callable, Type
 
 import neovim
 
-from ribosome.request.base import RequestHandler, MessageRequestHandler, JsonMessageRequestHandler
+from ribosome.request.base import RequestHandler1, MessageRequestHandler, JsonMessageRequestHandler
 from ribosome.machine.message_base import Message
 
 M = TypeVar('M', bound=Message)
 
 
-class Autocmd(RequestHandler):
+class Autocmd(RequestHandler1):
 
     @property
     def desc(self) -> str:
@@ -17,7 +17,7 @@ class Autocmd(RequestHandler):
 
     @property
     def neovim_autocmd(self) -> Callable:
-        @neovim.autocmd(self.name, **self.kw)
+        @neovim.autocmd(self.vim_name, **self.kw)
         @functools.wraps(self._fun)
         def neovim_autocmd_wrapper(obj, *rpc_args):
             return self.dispatch(obj, rpc_args)

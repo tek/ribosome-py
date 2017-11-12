@@ -6,7 +6,7 @@ from typing import Union, Any, Callable, Type, Optional, TypeVar, Generic, Gener
 import neovim
 from neovim.api import Nvim
 
-from amino import List
+from amino import List, Maybe
 
 import ribosome.nvim.components
 from ribosome.nvim import NvimFacade
@@ -19,8 +19,9 @@ from ribosome.machine.scratch import Mapping
 from ribosome.rpc import rpc_handlers_json
 from ribosome.record import encode_json_compat, decode_json_compat
 from ribosome.machine.messages import UpdateState, Stage1, Stage2, Stage3, Stage4, Quit
-from ribosome.machine.state import AutoRootMachine, AutoData, RootMachineBase
-from ribosome.settings import Config, PluginSettings, Full, Short
+from ribosome.machine.root import RootMachine, root_machine
+from ribosome.config import Config, PluginSettings, AutoData
+from ribosome.request.handler import Full, Short
 
 
 class NvimPluginBase(Logging):
@@ -124,7 +125,7 @@ class NvimStatePluginMeta(NvimPluginMeta):
 class NvimStatePlugin(NvimPlugin, metaclass=NvimStatePluginMeta):
 
     @abc.abstractmethod
-    def state(self) -> RootMachineBase:
+    def state(self) -> RootMachine:
         ...
 
     def message_log(self) -> List[Message]:
@@ -155,22 +156,19 @@ class AutoPluginMeta(NvimStatePluginMeta):
             debug: bool=False,
             config: Config[Settings, D]=None,
     ) -> Type['AutoPlugin[Settings, D]']:
-        inst: Type[AutoPlugin[Settings, D]] = super().__new__(cls, name, bases, namespace, pname, prefix, debug)
-        if config is not None:
-            setup_auto_plugin(inst, config)
-        return inst
+        return super().__new__(cls, name, bases, namespace, pname, prefix, debug)
 
 
 class AutoPlugin(Generic[Settings, D], NvimStatePlugin, metaclass=AutoPluginMeta):
 
-    def __init__(self, nvim: Union[NvimFacade, neovim.Nvim], config: Config[Settings, D]) -> None:
+    def __init__(self, nvim: Union[NvimFacade, neovim.Nvim], config: Config[Settings, D], initial_state: D) -> None:
         super().__init__(nvim)
         self.config = config
+        self.initial_state = initial_state
         self.root = self.create_root()
 
-    def create_root(self) -> AutoRootMachine[Settings, D]:
-        title = self.plugin_name
-        return AutoRootMachine(self.vim.proxy, self.config, title)
+    def create_root(self) -> RootMachine[Settings, D]:
+        return root_machine(self.vim.proxy, self.config, self.initial_state)
 
     def stage_1(self) -> None:
         self.root.start()
@@ -189,7 +187,7 @@ class AutoPlugin(Generic[Settings, D], NvimStatePlugin, metaclass=AutoPluginMeta
     def quit(self) -> None:
         self.root.send(Quit())
 
-    def state(self) -> RootMachineBase:
+    def state(self) -> RootMachine:
         return self.root
 
 
@@ -251,28 +249,14 @@ def setup_state_plugin(cls: Type[NSP], name: str, prefix: str, debug: bool) -> N
     help.short_handler('state', function, cls.state_data)
     help.json_msg_cmd('update_state', UpdateState)
     help.short_handler('plug', command, cls.plug_command)
-    if debug:
-        help.name_handler('message_log', function, cls.message_log, sync=True)
+    # if debug:
+    #     help.name_handler('message_log', function, cls.message_log, sync=True)
 
 
-def setup_auto_plugin(cls: Type[AutoPlugin], config: Config[Settings, D]) -> None:
-    help = Helpers(cls, config.name, config.prefix)
-    for hname, handler in config.request_handlers.handlers.items():
-        dispatcher = handler.dispatcher
-        helper = (
-            help.short_handler
-            if isinstance(handler.prefix, Short) else
-            help.name_handler
-            if isinstance(handler.prefix, Full) else
-            help.handler
-        )
-        helper(handler.name, dispatcher.decorator(), lambda: None, *dispatcher.args, **handler.options)
-
-
-def plugin_class_from_config(config: Config, parent: Type[AP], debug=bool) -> Type[AP]:
+def plugin_class_from_config(config: Config[Settings, D], parent: Type[AP], debug=bool) -> Type[AP]:
     class Plug(parent, config=config, pname=config.name, prefix=config.prefix, debug=debug):
-        def __init__(self, vim: Nvim) -> None:
-            super().__init__(vim, config)
+        def __init__(self, vim: Nvim, initial_state: D) -> None:
+            super().__init__(vim, config, initial_state)
     return Plug
 
 __all__ = ('NvimPlugin', 'NvimStatePlugin')

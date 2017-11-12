@@ -1,12 +1,12 @@
 import neovim
 
-from ribosome.request.base import (RequestHandler, MessageRequestHandler,
-                                   JsonMessageRequestHandler)
+from ribosome.request.base import RequestHandler1, MessageRequestHandler, JsonMessageRequestHandler
+from ribosome.request.handler import RequestDispatcher, MsgFun, Fun
 
 from amino import Map
 
 
-class Function(RequestHandler):
+class Function(RequestHandler1):
 
     @property
     def desc(self):
@@ -18,14 +18,21 @@ class Function(RequestHandler):
 
     @property
     def neovim_fun(self):
-        @neovim.function(self.name, **self.kw)
+        @neovim.function(self.vim_name, **self.kw)
         def neovim_fun_wrapper(obj, *rpc_args):
             return self.dispatch(obj, rpc_args)
         return neovim_fun_wrapper
 
+    @property
+    def dispatcher(self) -> RequestDispatcher:
+        return Fun(self._fun)
+
 
 class MessageFunction(Function, MessageRequestHandler):
-    pass
+
+    @property
+    def dispatcher(self) -> RequestDispatcher:
+        return MsgFun(self.msg)
 
 
 class JsonMessageFunction(Function, JsonMessageRequestHandler):
@@ -35,7 +42,8 @@ class JsonMessageFunction(Function, JsonMessageRequestHandler):
 def function(**kw):
     def neovim_fun_decorator(fun):
         handler = Function(fun, **kw)
-        return handler.neovim_fun
+        fun.spec = handler.spec
+        return fun
     return neovim_fun_decorator
 
 

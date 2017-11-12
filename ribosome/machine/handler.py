@@ -4,7 +4,7 @@ from typing import Any, Sequence, TypeVar, Generic, Type, Tuple, Union
 import asyncio
 
 import amino
-from amino import Maybe, _, List, Map, Just, Either, L, __, Right, Nil
+from amino import Maybe, _, List, Map, Just, Either, L, __, Right, Nil, Nothing
 from amino.io import IO
 from amino.state import StateT, EvalState, MaybeState, EitherState, IdState
 from amino.tc.optional import Optional
@@ -13,6 +13,7 @@ from amino.util.string import blue, ToStr
 from amino.dispatch import dispatch_alg
 from amino.tc.base import TypeClass
 from amino.func import flip
+from amino.dat import Dat
 
 from ribosome.logging import Logging
 from ribosome.machine.message_base import Message, Publish, Envelope, Messages
@@ -21,7 +22,7 @@ from ribosome.machine.transition import (Handler, TransitionResult, CoroTransiti
 from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop, RunNvimIOStateAlg
 from ribosome.machine.machine import Machine
 from ribosome.data import Data
-from ribosome.machine.trans import TransAction, Transit, Propagate, Unit, TransFailure
+from ribosome.machine.trans import TransAction, Transit, Propagate, Unit, TransFailure, Result
 from ribosome.nvim.io import NvimIOState
 from ribosome.nvim import NvimIO
 
@@ -34,7 +35,7 @@ def is_message(a):
     return isinstance(a, Message)
 
 
-class Handlers(Logging):
+class Handlers(Dat['Handlers']):
 
     def __init__(self, prio: int, handlers: Map[type, Handler]) -> None:
         self.prio = prio
@@ -46,15 +47,14 @@ class Handlers(Logging):
 
 M = TypeVar('M', bound=Machine)
 D = TypeVar('D', bound=Data)
-Msg = TypeVar('Msg', bound=Message)
 R = TypeVar('R')
 
 
-def create_result(data: D, msgs: List[Message]) -> TransitionResult:
+def create_result(data: D, msgs: List[Message], output: Maybe[Any]=Nothing) -> TransitionResult:
     publ, resend = msgs.split_type((Publish, Envelope))
     env, pub = publ.split_type(Envelope)
     pub_msgs = env + pub.map(_.message)
-    return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend)
+    return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend, output=output)
 
 
 def create_failure(data: D, desc: str, error: Union[str, Exception]) -> TransitionResult:
@@ -65,15 +65,22 @@ def create_failure(data: D, desc: str, error: Union[str, Exception]) -> Transiti
     )
 
 
-class HandlerJob(Generic[M, D], Logging, ToStr):
+class HandlerJob(Generic[D], Logging, ToStr):
 
-    def __init__(self, machine: M, data: D, msg: Message, handler: Handler, data_type: Type[D]) -> None:
-        self.machine = machine
+    def __init__(self, name: str, handler: Handler, data: D, msg: Message, data_type: Type[D]) -> None:
+        if not isinstance(handler, Handler):
+            raise 1
+        self.name = name
         self.data = data
         self.msg = msg
         self.handler = handler
         self.data_type = data_type
         self.start_time = time.time()
+
+    @staticmethod
+    def from_handler(name: str, handler: Handler, data: D, msg: Message) -> 'HandlerJob[M, D]':
+        tpe = DynHandlerJob if handler.dyn else AlgHandlerJob
+        return tpe(name, handler, data, msg, type(data))
 
     @abc.abstractmethod
     def run(self) -> TransitionResult:
@@ -81,7 +88,7 @@ class HandlerJob(Generic[M, D], Logging, ToStr):
 
     @property
     def trans_desc(self) -> str:
-        return blue(f'{self.machine.title}.{self.handler.name}')
+        return blue(f'{self.name}.{self.handler.name}')
 
     def _arg_desc(self) -> List[str]:
         return List(str(self.msg))
@@ -95,7 +102,7 @@ class DynHandlerJob(HandlerJob):
 
     def _execute_transition(self, handler, data, msg):
         try:
-            return handler.run(data, msg)
+            return handler.run(self, data, msg)
         except TransitionFailed as e:
             raise
         except Exception as e:
@@ -104,7 +111,7 @@ class DynHandlerJob(HandlerJob):
     def handle_transition_error(self, e):
         if amino.development:
             err = 'transition "{}" failed for {} in {}'
-            self.log.caught_exception(err.format(self.handler.name, self.msg, self.machine.title), e)
+            self.log.caught_exception(err.format(self.handler.name, self.msg, self.name), e)
             raise TransitionFailed(str(e)) from e
         return self.failure_result(str(e))
 
@@ -136,7 +143,7 @@ class DynHandlerJob(HandlerJob):
         msgs, rest = trans.split_type(Messages)
         if rest:
             tpl = 'invalid transition result parts for {} in {}: {}'
-            msg = tpl.format(self.msg, self.machine.title, rest)
+            msg = tpl.format(self.msg, self.name, rest)
             if amino.development:
                 raise MachineError(msg)
             else:
@@ -245,15 +252,18 @@ class AlgResultValidator(Logging):
     def validate_unit(self, action: Unit, data: D) -> TransitionResult:
         return create_result(data, action.messages)
 
+    def validate_result(self, action: Result, data: D) -> TransitionResult:
+        return create_result(data, Nil, Just(action.data))
+
     def validate_trans_failure(self, action: TransFailure, data: D) -> TransitionResult:
         return self.failure(data, action.message)
 
 
 class AlgHandlerJob(HandlerJob):
 
-    def run(self) -> TransitionResult:
+    def run(self, machine=None) -> TransitionResult:
         try:
-            r = self.handler.execute(self.data, self.msg)
+            r = self.handler.execute(machine, self.data, self.msg)
         except Exception as e:
             return self.exception(e)
         else:

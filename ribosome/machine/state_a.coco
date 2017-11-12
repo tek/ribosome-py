@@ -8,7 +8,7 @@ from amino.json import decode_json, dump_json
 
 from ribosome.nvim import NvimIO
 from ribosome.nvim.io import NvimIOState
-from ribosome.settings import AutoData
+from ribosome.config import AutoData
 
 A = TypeVar('A')
 D = TypeVar('D', bound=AutoData)

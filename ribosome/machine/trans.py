@@ -1,8 +1,8 @@
 import abc
-from typing import Callable, TypeVar, Type, Generic, Awaitable
+from typing import Callable, TypeVar, Type, Generic, Awaitable, Any
 import functools
 
-from amino import Either, List, Lists, IO, Id, L, _, Maybe
+from amino import Either, List, Lists, IO, Id, L, _, Maybe, Nil
 from amino.state import StateT
 from amino.util.string import red, green, ToStr
 from amino.dispatch import dispatch_alg
@@ -15,10 +15,12 @@ from ribosome.machine.messages import RunIOAlg, Error, Nop, RunNvimIOAlg, Corout
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO
 from ribosome.machine.transitions import Transitions
+from ribosome.machine.transition import Handler, DynHandler, _recover_error
+from ribosome.machine.machine import Machine
 
-M = TypeVar('M', bound=Transitions)
+T = TypeVar('T', bound=Transitions)
 D = TypeVar('D', bound=Data)
-Msg = TypeVar('Msg', bound=PMessage)
+Mes = TypeVar('Mes', bound=PMessage)
 R = TypeVar('R')
 N = TypeVar('N')
 O = TypeVar('O')
@@ -62,7 +64,17 @@ class Propagate(TransAction):
 class Unit(TransAction):
 
     def __init__(self) -> None:
-        super().__init__(List())
+        super().__init__(Nil)
+
+    def _arg_desc(self) -> List[str]:
+        return List()
+
+
+class Result(TransAction):
+
+    def __init__(self, data: Any) -> None:
+        self.data = data
+        super().__init__(Nil)
 
     def _arg_desc(self) -> List[str]:
         return List()
@@ -245,8 +257,18 @@ class TransEffectUnit(TransEffect[None]):
     def tpe(self) -> Type[PMessage]:
         return type(None)
 
-    def extract(self, data: PMessage, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+    def extract(self, data: None, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
         return Lift(Unit()) if tail.empty else TransEffectError('cannot apply trans effects to unit')
+
+
+class TransEffectResult(TransEffect[Any]):
+
+    @property
+    def tpe(self) -> Type[PMessage]:
+        return object
+
+    def extract(self, data: object, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+        return Lift(Result(data)) if tail.empty else TransEffectError('cannot apply trans effects to result')
 
 
 m: TransEffect = TransEffectMaybe()
@@ -258,6 +280,7 @@ coro: TransEffect = TransEffectCoro()
 single: TransEffect = TransEffectSingleMessage()
 strict: TransEffect = TransEffectMessages()
 none: TransEffect = TransEffectUnit()
+result: TransEffect = TransEffectResult()
 
 
 class Lifter(Logging):
@@ -296,34 +319,91 @@ def decorate(transition, msg_type, prio) -> None:
     return transition
 
 
-def base(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
-         ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
-    def add_handler(func: Callable[[M], R]):
+def message_trans(msg_type: Type[Mes], *effects: TransEffect, prio: float=default_prio
+                  ) -> Callable[[Callable[[T], R]], Callable[[T], TransAction]]:
+    def add_handler(func: Callable[[T], R]):
         @functools.wraps(func)
         def transition(m, *a) -> TransAction:
             return extract(func(m, *a), Lists.wrap(effects))
-        return decorate(transition, msg_type, prio)
+        decorate(transition, msg_type, prio)
+        return AlgHandler.create(transition)
     return add_handler
 
 
-def unit(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
-         ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
-    return base(msg_type, *effects, none, prio=prio)
+def plain(*effects: TransEffect, prio: float=default_prio) -> Callable[[Callable[[T], R]], Callable[[T], TransAction]]:
+    return message_trans(None, *effects, prio=prio)
 
 
-def one(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
-        ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
-    return base(msg_type, *effects, single, prio=prio)
+def unit(msg_type: Type[Mes], *effects: TransEffect, prio: float=default_prio
+         ) -> Callable[[Callable[[T], R]], Callable[[T], TransAction]]:
+    return message_trans(msg_type, *effects, none, prio=prio)
 
 
-def multi(msg_type: Type[Msg], *effects: TransEffect, prio: float=default_prio
-          ) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
-    return base(msg_type, *effects, strict, prio=prio)
+def one(msg_type: Type[Mes], *effects: TransEffect, prio: float=default_prio
+        ) -> Callable[[Callable[[T], R]], Callable[[T], TransAction]]:
+    return message_trans(msg_type, *effects, single, prio=prio)
 
 
-def relay(msg_type: Type[Msg], prio: float=default_prio) -> Callable[[Callable[[M], R]], Callable[[M], TransAction]]:
-    def add_handler(func: Callable[[M], R]):
+def multi(msg_type: Type[Mes], *effects: TransEffect, prio: float=default_prio
+          ) -> Callable[[Callable[[T], R]], Callable[[T], TransAction]]:
+    return message_trans(msg_type, *effects, strict, prio=prio)
+
+
+def relay(msg_type: Type[Mes], prio: float=default_prio) -> Callable[[Callable[[T], R]], Callable[[T], TransAction]]:
+    def add_handler(func: Callable[[T], R]):
         return decorate(func, msg_type, prio)
     return add_handler
 
-__all__ = ('multi', 'coro', 'single', 'one', 'relay')
+
+class WrappedHandler(Generic[Mes, D, T], DynHandler[Mes, D]):
+
+    def __init__(self, trans_tpe: Type[T], handler: Handler) -> None:
+        self.trans_tpe = trans_tpe
+        self.handler = handler
+
+    @staticmethod
+    def create(fun: Callable[[Machine, D, Mes], R], tpe: Type[T]) -> 'Handler[Mes, D, DynTrans]':
+        return WrappedHandler(tpe, Handler.create(fun))
+
+    def run(self, machine: Machine, data: D, msg: Mes) -> TransAction:
+        return _recover_error(self, self.execute(machine, data, msg))
+
+    def execute(self, machine: Machine, data: D, msg: Mes) -> TransAction:
+        trans = self.trans_tpe(machine, data, msg)
+        return self.handler.fun(trans)
+
+    @property
+    def prio(self) -> float:
+        return self.handler.prio
+
+    @property
+    def dyn(self) -> float:
+        return self.handler.dyn
+
+    @property
+    def message(self) -> Type[Mes]:
+        return self.handler.message
+
+    @property
+    def name(self) -> str:
+        return self.handler.name
+
+    @property
+    def fun(self) -> Callable[[Machine, D, Mes], R]:
+        return self.handler.fun
+
+
+class AlgHandler(Generic[Mes, D], Handler[Mes, D, TransAction]):
+
+    @staticmethod
+    def create(fun: Callable[..., R]) -> 'Handler[M, D, R]':
+        name, msg, prio, dyn = Handler.attrs(fun)
+        return AlgHandler(name, fun, msg, prio, dyn)
+
+    def run(self, machine: Machine, data: D, msg: Mes) -> TransAction:
+        ...
+
+    def execute(self, machine: Machine, data: D, msg: Mes) -> TransAction:
+        return self.fun(machine, data, msg)
+
+__all__ = ('multi', 'coro', 'single', 'one', 'relay', 'WrappedHandler', 'AlgHandler')

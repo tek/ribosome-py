@@ -144,7 +144,14 @@ class Publish(PMessage, fields=('message',)):
         return 'Publish({})'.format(str(self.message))
 
 
-class Message(Generic[A], Dat[A]):
+class Sendable:
+
+    @abc.abstractproperty
+    def msg(self) -> 'Message':
+        ...
+
+
+class Message(Generic[A], Dat[A], Sendable):
 
     def at(self, prio: float) -> 'Envelope[A]':
         return Envelope(self, time.time(), prio, Nothing)
@@ -159,6 +166,10 @@ class Message(Generic[A], Dat[A]):
 
     def to(self, target: str) -> 'Envelope[A]':
         return self.envelope.copy(recipient=Just(target))
+
+    @property
+    def msg(self) -> 'Message':
+        return self
 
 
 def message_init(fields: Map[str, Type], glob: dict) -> FunctionType:
@@ -192,7 +203,7 @@ class Msg(Generic[A], Message[A], metaclass=MsgMeta):
 
 
 @functools.total_ordering
-class Envelope(Generic[A], Dat['Envelope[A]']):
+class Envelope(Generic[A], Dat['Envelope[A]'], Sendable):
 
     def __init__(self, message: Message[A], time: float, prio: float, recipient: Maybe[str]) -> None:
         self.message = message
@@ -217,8 +228,12 @@ class Envelope(Generic[A], Dat['Envelope[A]']):
     def delivery(self) -> Message:
         return self.recipient / L(ToMachine)(self, _) | self.message
 
+    @property
+    def msg(self) -> 'Message':
+        return self.message
 
-class ToMachine(Generic[A], Dat['ToMachine[A]']):
+
+class ToMachine(Generic[A], Dat['ToMachine[A]'], Sendable):
 
     def __init__(self, envelope: Envelope[A], target: str) -> None:
         self.envelope = envelope
@@ -227,6 +242,10 @@ class ToMachine(Generic[A], Dat['ToMachine[A]']):
     @property
     def message(self) -> Message[A]:
         return self.envelope.message
+
+    @property
+    def msg(self) -> Message[A]:
+        return self.message
 
 
 class Messages(abc.ABC):

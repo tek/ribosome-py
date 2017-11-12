@@ -1,11 +1,12 @@
 import abc
 import inspect
 from types import FunctionType
-from typing import TypeVar, Callable, Union, Any, Dict
+from typing import TypeVar, Callable, Union, Any, Dict, Generator
 
-from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean, _, L
+from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean, _, L, __
 from amino.util.string import camelcaseify, ToStr
 from amino.list import Nil
+from amino.do import tdo
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log
@@ -81,6 +82,11 @@ class RpcHandlerSpec(Record):
         return RpcHandlerSpec.cons(RpcFunctionSpec, sync, name, opts, method, True)
 
     @staticmethod
+    def autocmd(sync: int, name: str, opts: dict) -> 'RpcHandlerSpec':
+        method = f'autocmd:{name}'
+        return RpcHandlerSpec.cons(RpcAutocommandSpec, sync, name, opts, method, True)
+
+    @staticmethod
     @do
     def decode(data: dict) -> 'Maybe[RpcHandlerSpec]':
         m = Map(data)
@@ -114,8 +120,8 @@ class RpcHandlerSpec(Record):
     def rpc_function(self) -> str:
         return 'rpcrequest' if self.sync else 'rpcnotify'
 
-    def rpc_method(self, plugin_file: str) -> str:
-        pre = f'{plugin_file}:' if self.prefix else ''
+    def rpc_method(self, prefix: str) -> str:
+        pre = f'{prefix}:' if self.prefix else ''
         return f'{pre}{self.method}'
 
     @property
@@ -261,6 +267,10 @@ def handler_function(method_name: str, fun: FunctionType) -> Maybe[RpcHandlerFun
     return handler(method_name, fun) / L(RpcHandlerFunction)(fun, _)
 
 
+def handler_function1(method_name: str, fun: FunctionType, name: str, prefix: str) -> Maybe[RpcHandlerFunction]:
+    return Maybe.getattr(fun, 'spec') / __.spec(name, prefix) / L(RpcHandlerFunction)(fun, _)
+
+
 def register_handler_args(host: str, spec: RpcHandlerSpec, plugin_file: str) -> List[str]:
     fun_prefix = camelcaseify(spec.tpe)
     return List(f'remote#define#{fun_prefix}OnHost', host, spec.rpc_method, spec.sync, spec.name, spec.opts)
@@ -328,9 +338,10 @@ def define_handler(channel: int, spec: RpcHandlerSpec, plugin_name: str, plugin_
         return NvimIO.failed(f'invalid type for {spec}')
 
 
-def define_handlers(channel: int, specs: List[RpcHandlerSpec], plugin_name: str, plugin_file: str
-                    ) -> NvimIO[List[DefinedHandler]]:
-    return specs.traverse(L(define_handler)(channel, _, plugin_name, plugin_file), NvimIO)
+@tdo(NvimIO[List[DefinedHandler]])
+def define_handlers(specs: List[RpcHandlerSpec], plugin_name: str, plugin_file: str) -> Generator:
+    channel = yield NvimIO(_.channel_id)
+    yield specs.traverse(L(define_handler)(channel, _, plugin_name, plugin_file), NvimIO)
 
 
 def rpc_handlers(plugin_class: type) -> List[RpcHandlerSpec]:
@@ -342,7 +353,11 @@ def rpc_handlers_json(plugin_class: type) -> List[str]:
 
 
 def rpc_handler_functions(plugin: Any) -> List[RpcHandlerFunction]:
-    return Lists.wrap(inspect.getmembers(plugin)).flat_map2(handler_function)
+    funs = inspect.getmembers(plugin)
+    return (
+        Lists.wrap(funs).flat_map2(handler_function) +
+        Lists.wrap(funs).flat_map2(L(handler_function1)(_, _, plugin.name, plugin.prefix))
+    )
 
 __all__ = ('RpcHandlerSpec', 'handler', 'define_handler', 'define_handlers', 'rpc_handlers', 'rpc_handlers_json',
            'rpc_handler_functions')

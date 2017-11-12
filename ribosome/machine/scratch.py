@@ -4,13 +4,13 @@ from typing import Callable
 
 from ribosome.machine.message_base import pmessage
 from ribosome.nvim import HasNvim, NvimFacade, ScratchBuffer
-from ribosome.machine.state import KillMachine, SubMachine
 from ribosome.machine.base import UnitIO
 from ribosome.machine.transition import may_handle, handle
+from ribosome.machine.sub import SubMachine
+from ribosome.machine.internal import KillMachine
 
 from amino import Map, Boolean, __, Empty
 from amino.io import IO
-from amino.lazy import lazy
 
 Mapping = pmessage('Mapping', 'uuid', 'keyseq')
 Quit = pmessage('Quit')

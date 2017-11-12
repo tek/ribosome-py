@@ -7,7 +7,7 @@ from ribosome.machine.message_base import pmessage
 from ribosome.machine.state import SubTransitions
 from ribosome.machine import trans
 from ribosome.machine.messages import Stage1
-from ribosome.settings import RequestHandler, Plain, AutoData
+from ribosome.config import RequestHandler, Plain, AutoData
 from ribosome.nvim import NvimIO
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 

@@ -1,10 +1,13 @@
-from typing import TypeVar, Callable, Any, Generic
+from typing import TypeVar, Callable, Any, Generic, Generator
+from threading import Thread
 
 from amino.tc.base import ImplicitInstances, F
 from amino.lazy import lazy
 from amino.tc.monad import Monad
-from amino import Either, Right, Left, __, IO
+from amino import Either, __, IO, Maybe, Try, Left
 from amino.state import tcs, StateT
+from amino.func import CallByName
+from amino.do import tdo
 
 from ribosome.nvim.components import NvimComponent
 
@@ -25,11 +28,15 @@ class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_c
 
     @staticmethod
     def wrap_either(f: Callable[[NvimComponent], A]) -> 'NvimIO[A]':
-        return NvimIO(lambda a: f(a).get_or_raise)
+        return NvimIO(lambda a: f(a).get_or_raise())
 
     @staticmethod
     def from_either(e: Either[str, A]) -> 'NvimIO[A]':
         return NvimIO.wrap_either(lambda v: e)
+
+    @staticmethod
+    def from_maybe(e: Maybe[A], error: CallByName) -> 'NvimIO[A]':
+        return NvimIO.from_either(e.to_either(error))
 
     @staticmethod
     def cmd_sync(cmdline: str, verbose=False) -> 'NvimIO[str]':
@@ -52,25 +59,35 @@ class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_c
         return NvimIO(lambda v: a)
 
     @staticmethod
+    def exception(exc: Exception) -> 'NvimIO[A]':
+        return NvimIO.from_either(Left(exc))
+
+    @staticmethod
     def failed(msg: str) -> 'NvimIO[A]':
-        def fail() -> A:
-            raise Exception(msg)
-        return NvimIO(lambda v: fail())
+        return NvimIO.exception(Exception(msg))
 
     @staticmethod
     def from_io(io: IO[A]) -> 'NvimIO[A]':
-        return NvimIO(lambda a: io.attempt.get_or_raise)
+        return NvimIO(lambda a: io.attempt.get_or_raise())
+
+    @staticmethod
+    def fork(f: Callable[[NvimComponent], None]) -> 'NvimIO[None]':
+        return NvimIO(lambda v: Thread(target=f, args=(v,)).start())
 
     def __init__(self, run: Callable[[NvimComponent], A]) -> None:
         self.run = run
 
     def attempt(self, vim: NvimComponent) -> Either[Exception, A]:
-        try:
-            return Right(self.run(vim))
-        except Exception as e:
-            return Left(e)
+        return Try(self.run, vim)
 
-    unsafe_perform_io = attempt
+    def recover(self, f: Callable[[Exception], B]) -> 'NvimIO[B]':
+        return NvimIO(self.attempt).map(__.value_or(f))
+
+    @tdo('NvimIO[A]')
+    def ensure(self, f: Callable[[Either[Exception, A]], 'NvimIO[None]']) -> Generator:
+        result = yield NvimIO(self.attempt)
+        yield f(result)
+        yield NvimIO.from_either(result)
 
     def effect(self, f: Callable[[A], Any]) -> 'NvimIO[A]':
         def wrap(v: NvimComponent) -> A:
@@ -81,6 +98,9 @@ class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_c
 
     __mod__ = effect
 
+    def error_effect(self, f: Callable[[Exception], None]) -> 'NvimIO[A]':
+        return self.ensure(lambda a: NvimIO(lambda v: a.leffect(f)))
+
 
 class NvimIOMonad(Monad[NvimIO]):
 
@@ -88,8 +108,7 @@ class NvimIOMonad(Monad[NvimIO]):
         return NvimIO.pure(a)
 
     def flat_map(self, fa: NvimIO[A], f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
-        g = lambda v: f(fa.run(v)).run(v)
-        return NvimIO(g)
+        return NvimIO(lambda v: f(fa.run(v)).run(v))
 
     def map(self, fa: NvimIO[A], f: Callable[[A], B]) -> NvimIO[B]:
         return NvimIO(lambda a: f(fa.run(a)))

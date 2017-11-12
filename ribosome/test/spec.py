@@ -69,7 +69,7 @@ class MockBuffer(MockNvim, Buffer):
 
 class MockNvimFacade(MockNvim, NvimFacade):
 
-    def __init__(self, prefix: str, vars: dict=dict()) -> None:
+    def __init__(self, prefix: str='ribosome', vars: dict=dict()) -> None:
         MockNvim.__init__(self, prefix, vars)
         self.target = self
 
