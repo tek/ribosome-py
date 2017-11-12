@@ -15,7 +15,8 @@ from amino.logging import amino_root_file_logging
 from amino.do import tdo
 from amino.dispatch import dispatch_alg
 from amino.util.exception import format_exception
-from amino.boolean import true
+from amino.boolean import true, false
+from amino.dat import Dat
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log
@@ -35,6 +36,8 @@ from ribosome.record import encode_json_compat
 from ribosome.machine.root import ComponentResolver
 from ribosome.machine.send_message import send_message
 from ribosome.machine import trans
+from ribosome.machine.messages import ShowLogInfo, UpdateState
+from ribosome.machine.scratch import Mapping
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)
@@ -46,21 +49,23 @@ C = TypeVar('C', bound=Config)
 R = TypeVar('R')
 
 
-class HostConfig:
+class HostConfig(Dat['HostConfig']):
 
     def __init__(
             self,
-            name: str,
             sync_dispatch: Map[str, Dispatch],
             async_dispatch: Map[str, Dispatch],
             config: Config,
             plugin_class: Maybe[Type[NP]],
     ) -> None:
-        self.name = name
         self.sync_dispatch = sync_dispatch
         self.async_dispatch = async_dispatch
         self.config = config
         self.plugin_class = plugin_class
+
+    @property
+    def name(self) -> str:
+        return self.config.name
 
     @property
     def dispatch(self) -> List[Dispatch]:
@@ -106,7 +111,7 @@ def request_error(job: DispatchJob, exc: Exception) -> int:
     tb = format_exception(exc).join_lines
     ribo_log.error(f'fatal error in {desc}')
     exc_logger = ribo_log.error if amino.development else ribo_log.debug
-    exc_logger(f'{desc}  failed:\n{tb}')
+    exc_logger(f'{desc} failed:\n{tb}')
     return 1
 
 
@@ -155,7 +160,7 @@ def request_handler(
 ) -> Callable[[str, tuple], Any]:
     sync_prefix = '' if sync else 'a'
     def handle(name: str, args: tuple) -> Generator:
-        decoded_name = vim.vim._from_nvim(decode_if_bytes(name))
+        decoded_name = vim.decode_vim_data(name)
         decoded_args = Lists.wrap(walk(decode_if_bytes, args))
         fun_args = decoded_args.head | Nil
         bang = decoded_args.lift(1).contains(1)
@@ -166,7 +171,7 @@ def request_handler(
             .attempt(vim)
             .value_or(L(request_error)(job, _))
         )
-        return walk(vim.vim._to_nvim, result)
+        return vim.encode_vim_data(result)
     return handle
 
 
@@ -243,7 +248,7 @@ def plugin_class_dispatchers(cls: Type[NP]) -> List[Dispatch]:
 
 def config_dispatchers(config: Config) -> List[Dispatch]:
     def choose(name: str, handler: RequestHandler) -> Dispatch:
-        return SendMessage(name, handler) if isinstance(handler.dispatcher, MsgDispatcher) else Trans(name, handler)
+        return SendMessage(handler) if isinstance(handler.dispatcher, MsgDispatcher) else Trans(name, handler)
     return config.request_handlers.handlers.map2(choose)
 
 
@@ -253,23 +258,33 @@ def message_log(machine: Any, state: PluginState, args: Any) -> List[str]:
 
 
 message_log_handler = RequestHandler.trans_function(message_log)('message_log', Full(), true)
+show_log_info_handler = RequestHandler.msg_cmd(ShowLogInfo)('show_log_info', Full(), false)
+update_state_handler = RequestHandler.json_msg_cmd(UpdateState)('update_state', Full(), false)
+mapping_handler = RequestHandler.msg_fun(Mapping)('mapping', Full(), false)
 
 
 def internal_dispatchers(config: Config) -> List[Dispatch]:
     return List(
         Internal(message_log_handler),
+        SendMessage(show_log_info_handler),
+        SendMessage(update_state_handler),
+        SendMessage(mapping_handler),
     )
+
+
+def host_config_1(config: Config, cls: Type[NP], debug: Boolean) -> HostConfig:
+    name = config.name
+    cls_dispatchers = plugin_class_dispatchers(cls)
+    cfg_dispatchers = config_dispatchers(config)
+    int_dispatchers = internal_dispatchers(config)
+    with_method = lambda ds: Map(ds.map(lambda d: (d.spec(config.name, config.prefix).rpc_method(name), d)))
+    sync_dispatch, async_dispatch = (cls_dispatchers + cfg_dispatchers + int_dispatchers).split(_.sync)
+    return HostConfig(with_method(sync_dispatch), with_method(async_dispatch), config, cls)
 
 
 def host_config(config: Config, sup: Type[NP], debug: Boolean) -> HostConfig:
     cls = plugin_class_from_config(config, sup, debug)
-    cls_dispatchers = plugin_class_dispatchers(cls)
-    cfg_dispatchers = config_dispatchers(config)
-    int_dispatchers = internal_dispatchers(config)
-    name = cls.name
-    with_method = lambda ds: Map(ds.map(lambda d: (d.spec(config.name, config.prefix).rpc_method(name), d)))
-    sync_dispatch, async_dispatch = (cls_dispatchers + cfg_dispatchers + int_dispatchers).split(_.sync)
-    return HostConfig(name, with_method(sync_dispatch), with_method(async_dispatch), config, cls)
+    return host_config_1(config, cls, debug)
 
 
 def start_config_stage_2(cls: Either[str, Type[NP]], config: Config) -> int:

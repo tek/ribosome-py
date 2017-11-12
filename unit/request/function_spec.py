@@ -1,4 +1,4 @@
-from ribosome.request import function
+from ribosome import function
 
 from kallikrein import kf
 from kallikrein.matchers.end_with import end_with
@@ -10,7 +10,7 @@ class FunctionSpec:
 
     def decorator(self):
         default = 1
-        class Fun(object):
+        class Fun:
             @function()
             def cmd_name(self, a=default):
                 return a

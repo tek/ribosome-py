@@ -20,7 +20,7 @@ from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.machine.machine import Machine
 from ribosome.machine.transition import (Handler, TransitionResult, may_handle, Error, Debug, handle, _io_result,
                                          _recover_error, DynHandler, TransitionLog)
-from ribosome.request.command import StateCommand
+# from ribosome.request.command import StateCommand
 from ribosome.process import NvimProcessExecutor
 from ribosome.machine.messages import (RunNvimIO, RunIO, UnitIO, RunCorosParallel, SubProcessSync, RunIOsParallel,
                                        ShowLogInfo, Nop, RunIOAlg, TransitionException, Info, RunNvimIOAlg, DataIO,
@@ -146,13 +146,13 @@ class MachineBase(Generic[D], Machine, ToStr):
             .find_map(__.find_key(lambda a: a.__name__ in [name, msg_name]))
         )
 
-    def command(self, name: str, args: list):
-        return (
-            self._command_by_message_name(name)
-            .map(lambda a: StateCommand(a[0]))
-            .map(__.dispatch(self, args))
-            .or_else(L(self._invalid_command)(name))
-        )
+    # def command(self, name: str, args: list):
+    #     return (
+    #         self._command_by_message_name(name)
+    #         .map(lambda a: StateCommand(a[0]))
+    #         .map(__.dispatch(self, args))
+    #         .or_else(L(self._invalid_command)(name))
+    #     )
 
     def _invalid_command(self, name):
         self.log.error('plugin "{}" has no command "{}"'.format(self.title, name))

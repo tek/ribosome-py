@@ -17,6 +17,8 @@ import neovim
 from neovim.api import NvimError, Nvim
 from neovim.api.common import Remote
 
+from msgpack import ExtType
+
 from amino.util.string import camelcaseify
 
 import amino
@@ -27,6 +29,7 @@ from amino.lazy import lazy
 from amino.io import IOException
 from amino.util.numeric import parse_int
 from amino.dat import Dat
+from amino.dispatch import dispatch_with
 
 import ribosome
 from ribosome.logging import Logging
@@ -537,6 +540,10 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     def channel_id(self) -> int:
         return self.vim.channel_id
 
+    @property
+    def rpc_types(self) -> Map[str, type]:
+        return self.vim.types
+
     def runtime(self, path: str, verbose=True):
         return self.cmd_sync('runtime! {}.vim'.format(path), verbose=verbose)
 
@@ -720,6 +727,22 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
     @property
     def pflags(self) -> 'Flags':
         return Flags(self.vars, True)
+
+    def decode_vim_data(self, data: Any) -> Any:
+        return decode(
+            Boolean.isinstance(data, ExtType)
+            .m(lambda: self.rpc_types.lift(data.code)) /
+            (lambda A: A(self, (data.code, data.data))) |
+            data
+        )
+
+    def encode_vim_data(self, data: Any) -> Any:
+        return decode(data)
+
+
+@decode.register(ExtType)
+def decode_ext_type(data: Remote) -> Any:
+    return ExtType(*data.code_data)
 
 
 class AsyncVimCallProxy(Generic[A]):

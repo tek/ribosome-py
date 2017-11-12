@@ -12,7 +12,7 @@ from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import Logging, ribo_log
 from ribosome.rpc import RpcHandlerFunction, RpcHandlerSpec
 # from ribosome.plugin import NvimPlugin
-from ribosome.machine.message_base import _message_attr, Message
+from ribosome.machine.message_base import Message
 from ribosome.machine.process_messages import PrioQueue
 from ribosome.machine.handler import AlgResultValidator, Handlers
 from ribosome.request.handler import RequestHandler, TransDispatcher
@@ -112,6 +112,10 @@ class PluginState(Generic[D, NP], Dat['PluginState']):
 
 class PluginStateHolder(Generic[D, NP], Dat['PluginStateHolder']):
 
+    @staticmethod
+    def cons(state: PluginState[D, NP]) -> 'PluginStateHolder':
+        return PluginStateHolder(state, Lock())
+
     def __init__(self, state: PluginState[D, NP], lock: Lock) -> None:
         self.state = state
         self.lock = lock
@@ -159,12 +163,15 @@ class Legacy(Dispatch):
 
 class SendMessage(Dispatch):
 
-    def __init__(self, name: str, handler: RequestHandler) -> None:
-        self.name = name
+    def __init__(self, handler: RequestHandler) -> None:
         self.handler = handler
 
     def _arg_desc(self) -> List[str]:
         return List(self.name, str(self.handler))
+
+    @property
+    def name(self) -> str:
+        return self.handler.name
 
     @property
     def sync(self) -> Boolean:

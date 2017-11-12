@@ -3,7 +3,7 @@ from contextlib import contextmanager
 
 from flexmock import flexmock
 
-from amino import List
+from amino import List, Map
 from amino.test.spec_spec import Spec
 
 import ribosome
@@ -32,7 +32,7 @@ class MockVars(Vars):
         self.vars[name] = value
 
 
-class MockNvim(object):
+class MockNvimComponent(object):
 
     def __init__(self, prefix, vars: dict) -> None:
         self.prefix = prefix
@@ -55,23 +55,34 @@ class MockNvim(object):
         pass
 
 
-class MockTab(MockNvim, Tab):
+class MockTab(MockNvimComponent, Tab):
     pass
 
 
-class MockWindow(MockNvim, Window):
+class MockWindow(MockNvimComponent, Window):
     pass
 
 
-class MockBuffer(MockNvim, Buffer):
+class MockBuffer(MockNvimComponent, Buffer):
     pass
 
 
-class MockNvimFacade(MockNvim, NvimFacade):
+class MockNvim:
+
+    @property
+    def types(self) -> Map[str, type]:
+        return Map()
+
+    def command(self, cmdline: str, **kw: Any) -> Any:
+        return 0
+
+
+class MockNvimFacade(MockNvimComponent, NvimFacade):
 
     def __init__(self, prefix: str='ribosome', vars: dict=dict()) -> None:
-        MockNvim.__init__(self, prefix, vars)
-        self.target = self
+        MockNvimComponent.__init__(self, prefix, vars)
+        self.vim = MockNvim()
+        self.target = self.vim
 
     @property
     def windows(self):

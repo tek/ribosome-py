@@ -1,4 +1,10 @@
-[![Join the chat at https://gitter.im/tek/ribosome](https://badges.gitter.im/tek/ribosome.svg)](https://gitter.im/tek/ribosome?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![gitter](https://badges.gitter.im/tek/ribosome.svg)](https://gitter.im/tek/ribosome)
 
-# Under Construction
-The library has changed a lot, the readme will get updated soon.
+# Intro
+**ribosome** is a framework for building and testing **neovim** python remote plugins.
+It builds on the official [neovim-python] host, providing a more flexible and modular startup mechanism.
+
+Plugins built with **ribosome** can be conveniently managed by [chromatin].
+
+[neovim-python]: https://github.com/???
+[chromatin]: https://github.com/tek/chromatin

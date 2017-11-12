@@ -2,8 +2,8 @@ import functools
 
 import neovim
 
-from ribosome.request.base import RequestHandler1, MessageRequestHandler, JsonMessageRequestHandler
-from ribosome.request.handler import MsgCmd, RequestDispatcher
+from ribosome.request.base import RequestHandler1
+from ribosome.request.handler import RequestDispatcher, Cmd
 
 
 class Command(RequestHandler1):
@@ -25,51 +25,13 @@ class Command(RequestHandler1):
         return Cmd(self._fun)
 
 
-class MessageCommand(Command, MessageRequestHandler):
-
-    @property
-    def dispatcher(self) -> RequestDispatcher:
-        return MsgCmd(self.msg)
-
-
-class JsonMessageCommand(Command, JsonMessageRequestHandler):
-    pass
-
-
-class StateCommand(MessageCommand):
-
-    def __init__(self, msg: type, **kw) -> None:
-        def fun():
-            pass
-        super(StateCommand, self).__init__(fun, msg, **kw)
-
-    def _call_fun(self, obj, *args, **kw):
-        return self._message(*args, **kw)
-
-    @property
-    def _infer_name(self):
-        return self._message.__name__
-
-
 def command(**kw):
     def neovim_cmd_decorator(fun):
         handler = Command(fun, **kw)
-        return handler.neovim_cmd
+        ncmd = handler.neovim_cmd
+        ncmd.spec = handler.spec
+        return ncmd
     return neovim_cmd_decorator
 
 
-def msg_command(msg: type, **kw):
-    def neovim_msg_cmd_decorator(fun):
-        handler = MessageCommand(fun, msg, **kw)
-        return handler.neovim_cmd
-    return neovim_msg_cmd_decorator
-
-
-def json_msg_command(msg: type, **kw):
-    def neovim_json_msg_cmd_decorator(fun):
-        handler = JsonMessageCommand(fun, msg, **kw)
-        return handler.neovim_cmd
-    return neovim_json_msg_cmd_decorator
-
-
-__all__ = ('command', 'msg_command', 'json_msg_command')
+__all__ = ('command',)

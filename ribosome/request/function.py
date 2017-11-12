@@ -1,7 +1,7 @@
 import neovim
 
-from ribosome.request.base import RequestHandler1, MessageRequestHandler, JsonMessageRequestHandler
-from ribosome.request.handler import RequestDispatcher, MsgFun, Fun
+from ribosome.request.base import RequestHandler1
+from ribosome.request.handler import RequestDispatcher, Fun
 
 from amino import Map
 
@@ -28,36 +28,13 @@ class Function(RequestHandler1):
         return Fun(self._fun)
 
 
-class MessageFunction(Function, MessageRequestHandler):
-
-    @property
-    def dispatcher(self) -> RequestDispatcher:
-        return MsgFun(self.msg)
-
-
-class JsonMessageFunction(Function, JsonMessageRequestHandler):
-    pass
-
-
 def function(**kw):
     def neovim_fun_decorator(fun):
         handler = Function(fun, **kw)
         fun.spec = handler.spec
-        return fun
+        nfun = handler.neovim_fun
+        nfun.spec = handler.spec
+        return nfun
     return neovim_fun_decorator
 
-
-def msg_function(msg: type, **kw):
-    def neovim_msg_fun_decorator(fun):
-        handler = MessageFunction(fun, msg, **kw)
-        return handler.neovim_fun
-    return neovim_msg_fun_decorator
-
-
-def json_msg_function(msg: type, **kw):
-    def neovim_json_msg_fun_decorator(fun):
-        handler = JsonMessageFunction(fun, msg, **kw)
-        return handler.neovim_fun
-    return neovim_json_msg_fun_decorator
-
-__all__ = ('function', 'msg_function', 'json_msg_function')
+__all__ = ('function',)

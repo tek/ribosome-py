@@ -6,22 +6,20 @@ from typing import Union, Any, Callable, Type, Optional, TypeVar, Generic, Gener
 import neovim
 from neovim.api import Nvim
 
-from amino import List, Maybe
+from amino import List
 
 import ribosome.nvim.components
 from ribosome.nvim import NvimFacade
 from ribosome.machine.message_base import Message
 from ribosome.logging import nvim_logging, Logging
-from ribosome.request.command import msg_command, command, json_msg_command
-from ribosome.request.function import msg_function, function
-from ribosome.machine.base import ShowLogInfo
+from ribosome.request.command import command
+from ribosome.request.function import function
 from ribosome.machine.scratch import Mapping
 from ribosome.rpc import rpc_handlers_json
 from ribosome.record import encode_json_compat, decode_json_compat
-from ribosome.machine.messages import UpdateState, Stage1, Stage2, Stage3, Stage4, Quit
+from ribosome.machine.messages import Stage1, Stage2, Stage3, Stage4, Quit
 from ribosome.machine.root import RootMachine, root_machine
 from ribosome.config import Config, PluginSettings, AutoData
-from ribosome.request.handler import Full, Short
 
 
 class NvimPluginBase(Logging):
@@ -215,14 +213,14 @@ class Helpers(Logging):
         n = f'{self.prefix}_{suf}'
         self.handler(n, dec, handler, *a, **kw)
 
-    def msg_cmd(self, suf: str, msg: type) -> None:
-        self.short_handler(suf, msg_command, lambda: None, msg)
+    # def msg_cmd(self, suf: str, msg: type) -> None:
+    #     self.short_handler(suf, msg_command, lambda: None, msg)
 
-    def msg_fun(self, suf: str, msg: type) -> None:
-        self.short_handler(suf, msg_function, lambda: None, msg)
+    # def msg_fun(self, suf: str, msg: type) -> None:
+    #     self.short_handler(suf, msg_function, lambda: None, msg)
 
-    def json_msg_cmd(self, suf: str, msg: type) -> None:
-        self.short_handler(suf, json_msg_command, lambda: None, msg)
+    # def json_msg_cmd(self, suf: str, msg: type) -> None:
+    #     self.short_handler(suf, json_msg_command, lambda: None, msg)
 
 
 def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> None:
@@ -230,9 +228,9 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     cls.name = name
     cls.prefix = prefix
     cls.debug = debug
-    help.msg_cmd('show_log_info', ShowLogInfo)
+    # help.msg_cmd('show_log_info', ShowLogInfo)
     help.short_handler('log_level', command, cls.set_log_level)
-    help.msg_fun('mapping', Mapping)
+    # help.msg_fun('mapping', Mapping)
     help.name_handler('stage_1', command, cls.stage_1, sync=True)
     help.name_handler('stage_2', command, cls.stage_2, sync=True)
     help.name_handler('stage_3', command, cls.stage_3, sync=True)
@@ -247,16 +245,16 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
 def setup_state_plugin(cls: Type[NSP], name: str, prefix: str, debug: bool) -> None:
     help = Helpers(cls, name, prefix)
     help.short_handler('state', function, cls.state_data)
-    help.json_msg_cmd('update_state', UpdateState)
+    # help.json_msg_cmd('update_state', UpdateState)
     help.short_handler('plug', command, cls.plug_command)
     # if debug:
     #     help.name_handler('message_log', function, cls.message_log, sync=True)
 
 
-def plugin_class_from_config(config: Config[Settings, D], parent: Type[AP], debug=bool) -> Type[AP]:
-    class Plug(parent, config=config, pname=config.name, prefix=config.prefix, debug=debug):
+def plugin_class_from_config(config: Config[Settings, D], cls: Type[AP], debug=bool) -> Type[AP]:
+    class Plug(AutoPlugin, config=config, pname=config.name, prefix=config.prefix, debug=debug):
         def __init__(self, vim: Nvim, initial_state: D) -> None:
             super().__init__(vim, config, initial_state)
-    return Plug
+    return type(cls.__name__, (cls, Plug), {})
 
 __all__ = ('NvimPlugin', 'NvimStatePlugin')

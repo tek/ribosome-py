@@ -4,26 +4,25 @@ from kallikrein import k, Expectation
 from kallikrein.matchers import equal
 from kallikrein.matchers.maybe import be_just
 
-from ribosome.request.base import RequestHandler, MessageRequestHandler, JsonMessageRequestHandler
+from amino.util.string import camelcase
+
+from ribosome.request.base import RequestHandler1
 from ribosome.machine.message_base import pmessage
+from ribosome.request.handler import RequestDispatcher
 
 BasicMessage = pmessage('BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
 JsonMessage = pmessage('JsonMessage', 'a', 'b')
 
 
-class RH(RequestHandler):
+class RH(RequestHandler1):
 
     @property
     def desc(self):
         return 'req_test'
 
-
-class MessageRH(RH, MessageRequestHandler):
-    pass
-
-
-class JsonMessageRH(RH, JsonMessageRequestHandler):
-    pass
+    @property
+    def dispatcher(self) -> RequestDispatcher:
+        ...
 
 
 class RequestHandlerSpec:
@@ -38,17 +37,15 @@ class RequestHandlerSpec:
     two optional parameters $two_opt
     six parameters $six
     varargs $var
-    message request handler $message
-    json message request handler $json_pmessage
     '''
 
     def name(self) -> Expectation:
         def cmd_name(a, b, c=2):
             pass
-        other_name = 'OtherName'
+        other_name = 'other_name'
         return (
-            k(RH(cmd_name).name).must(equal('CmdName')) &
-            k(RH(cmd_name, other_name).name).must(equal(other_name))
+            k(RH(cmd_name).vim_name).must(equal('CmdName')) &
+            k(RH(cmd_name, name=other_name).vim_name).must(equal(camelcase(other_name)))
         )
 
     def nargs(self) -> Expectation:
@@ -69,8 +66,8 @@ class RequestHandlerSpec:
                 k(c.count_spec).must(equal(spec))
             )
         return (
-            check(none, 0, 'none') &
-            check(one, 1, 'exactly 1') &
+            check(none, '0', 'none') &
+            check(one, '1', 'exactly 1') &
             check(two, '+', 'exactly 2') &
             check(two_default, '+', 'between 1 and 2') &
             check(more, '+', 'at least 3')
@@ -174,31 +171,6 @@ class RequestHandlerSpec:
             k(c.check_length([1])).true &
             k(c.check_length([1, 2])).true &
             k(c.check_length([1, 2, 3])).true
-        )
-
-    def message(self) -> Expectation:
-        def cmd_name():
-            pass
-        c = MessageRH(cmd_name, BasicMessage)
-        return (
-            k(c.check_length(['a'])).false &
-            k(c.check_length(['a', 'b'])).true &
-            k(c.check_length(['a', 'b', 'c'])).true &
-            k(c.check_length(['a', 'b', 'c', 'd'])).true &
-            k(c.check_length(['a', 'b', 'c', 'd', 'e'])).false
-        )
-
-    def json_pmessage(self) -> Expectation:
-        def cmd_name():
-            pass
-        c = JsonMessageRH(cmd_name, JsonMessage)
-        json_arg = dict(a=dict(b=2, c=[4, 5]), d=5, e=['a', 'z'])
-        regular = [2, 3]
-        args = c._extract_args(regular + json.dumps(json_arg).split())
-        return (
-            k(c.check_length(['a'])).false &
-            k(c.check_length(['a', 'b'])).true &
-            k(list(args)).must(equal(regular + [json_arg]))
         )
 
 __all__ = ('RequestHandlerSpec',)
