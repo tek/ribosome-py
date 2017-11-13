@@ -1,10 +1,10 @@
 import abc
 
 from amino import List, Maybe, Just, Nothing
-from amino.algebra import Algebra
+from amino.dat import ADT
 
 
-class Nargs(Algebra):
+class Nargs(ADT):
 
     @staticmethod
     def cons(min: int, mmax: Maybe[int]) -> 'Nargs':

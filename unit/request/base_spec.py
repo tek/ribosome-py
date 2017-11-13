@@ -1,4 +1,4 @@
-import json
+from typing import Callable
 
 from kallikrein import k, Expectation
 from kallikrein.matchers import equal
@@ -6,15 +6,17 @@ from kallikrein.matchers.maybe import be_just
 
 from amino.util.string import camelcase
 
-from ribosome.request.legacy import RequestHandler1
+from ribosome.request.legacy import LegacyRequestHandler
 from ribosome.machine.message_base import pmessage
 from ribosome.request.handler import RequestDispatcher
+from ribosome.request.args import ArgValidator, ParamsSpec
+from ribosome.request.nargs import NargsZero, NargsOne, NargsPlus
 
 BasicMessage = pmessage('BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
 JsonMessage = pmessage('JsonMessage', 'a', 'b')
 
 
-class RH(RequestHandler1):
+class RH(LegacyRequestHandler):
 
     @property
     def desc(self):
@@ -25,10 +27,47 @@ class RH(RequestHandler1):
         ...
 
 
+def check_args(fun: Callable, name: str=None) -> None:
+    def check() -> None:
+        return
+    return check
+
+
+class ArgValidatorSpec:
+    '''request arg validation
+    parameter count $nargs
+    '''
+
+    def nargs(self) -> Expectation:
+        def none():
+            pass
+        def one(a):
+            pass
+        def two(a, b):
+            pass
+        def two_default(a, b=1):
+            pass
+        def more(a, b, c, d=1, *va, **vkw):
+            pass
+        def check(fun, nargs, spec):
+            params = ParamsSpec.from_function(fun)
+            v = ArgValidator(params)
+            return (
+                k(params.nargs).must(equal(nargs)) &
+                k(v.count_spec).must(equal(spec))
+            )
+        return (
+            check(none, NargsZero(), 'none') &
+            check(one, NargsOne(), 'exactly 1') &
+            check(two, NargsPlus(), 'exactly 2') &
+            check(two_default, NargsPlus(), 'between 1 and 2') &
+            check(more, NargsPlus(), 'at least 3')
+        )
+
+
 class RequestHandlerSpec:
     '''request handlers
     command name $name
-    parameter count $nargs
     zero parameters $none
     one parameter $one
     one optional parameter $one_opt
@@ -48,129 +87,112 @@ class RequestHandlerSpec:
             k(RH(cmd_name, name=other_name).vim_name).must(equal(camelcase(other_name)))
         )
 
-    def nargs(self) -> Expectation:
-        def none():
-            pass
-        def one(a):
-            pass
-        def two(a, b):
-            pass
-        def two_default(a, b=1):
-            pass
-        def more(a, b, c, d=1, *va, **vkw):
-            pass
-        def check(fun, nargs, spec):
-            c = RH(fun)
-            return (
-                k(c.nargs).must(equal(nargs)) &
-                k(c.count_spec).must(equal(spec))
-            )
-        return (
-            check(none, '0', 'none') &
-            check(one, '1', 'exactly 1') &
-            check(two, '+', 'exactly 2') &
-            check(two_default, '+', 'between 1 and 2') &
-            check(more, '+', 'at least 3')
-        )
-
     def none(self) -> Expectation:
         def fun():
             pass
-        c = RH(fun)
+        params = ParamsSpec.from_function(fun)
+        v = ArgValidator(params)
         return (
-            k(c.min).must(equal(0)) &
-            k(c.max).must(be_just(0)) &
-            k(c.check_length([])).true &
-            k(c.check_length([1])).false
+            k(params.min).must(equal(0)) &
+            k(params.max).must(be_just(0)) &
+            k(v.validate([])).true &
+            k(v.validate([1])).false
         )
 
     def one(self) -> Expectation:
         def fun(a):
             pass
-        c = RH(fun)
+        params = ParamsSpec.from_function(fun)
+        v = ArgValidator(params)
         return (
-            k(c.min).must(equal(1)) &
-            k(c.max).must(be_just(1)) &
-            k(c.check_length([])).false &
-            k(c.check_length([1])).true &
-            k(c.check_length([1, 2])).false
+            k(params.min).must(equal(1)) &
+            k(params.max).must(be_just(1)) &
+            k(v.validate([])).false &
+            k(v.validate([1])).true &
+            k(v.validate([1, 2])).false
         )
 
     def one_opt(self) -> Expectation:
         def fun(a=1):
             pass
-        c = RH(fun)
+        params = ParamsSpec.from_function(fun)
+        v = ArgValidator(params)
         return (
-            k(c.min).must(equal(0)) &
-            k(c.max).must(be_just(1)) &
-            k(c.check_length([])).true &
-            k(c.check_length([1])).true &
-            k(c.check_length([1, 2])).false
+            k(params.min).must(equal(0)) &
+            k(params.max).must(be_just(1)) &
+            k(v.validate([])).true &
+            k(v.validate([1])).true &
+            k(v.validate([1, 2])).false
         )
 
     def two(self) -> Expectation:
         def fun(a, b):
             pass
-        c = RH(fun)
+        params = ParamsSpec.from_function(fun)
+        v = ArgValidator(params)
         return (
-            k(c.min).must(equal(2)) &
-            k(c.max).must(be_just(2)) &
-            k(c.check_length([])).false &
-            k(c.check_length([1])).false &
-            k(c.check_length([1, 2])).true &
-            k(c.check_length([1, 2, 3])).false
+            k(params.min).must(equal(2)) &
+            k(params.max).must(be_just(2)) &
+            k(v.validate([])).false &
+            k(v.validate([1])).false &
+            k(v.validate([1, 2])).true &
+            k(v.validate([1, 2, 3])).false
         )
 
     def two_one_opt(self) -> Expectation:
         def fun(a, b=1):
             pass
-        c = RH(fun)
+        params = ParamsSpec.from_function(fun)
+        v = ArgValidator(params)
         return (
-            k(c.min).must(equal(1)) &
-            k(c.max).must(be_just(2)) &
-            k(c.check_length([])).false &
-            k(c.check_length([1])).true &
-            k(c.check_length([1, 2])).true &
-            k(c.check_length([1, 2, 3])).false
+            k(params.min).must(equal(1)) &
+            k(params.max).must(be_just(2)) &
+            k(v.validate([])).false &
+            k(v.validate([1])).true &
+            k(v.validate([1, 2])).true &
+            k(v.validate([1, 2, 3])).false
         )
 
     def two_opt(self) -> Expectation:
         def fun(a=1, b=1):
             pass
-        c = RH(fun)
+        params = ParamsSpec.from_function(fun)
+        v = ArgValidator(params)
         return (
-            k(c.min).must(equal(0)) &
-            k(c.max).must(be_just(2)) &
-            k(c.check_length([])).true &
-            k(c.check_length([1])).true &
-            k(c.check_length([1, 2])).true &
-            k(c.check_length([1, 2, 3])).false
+            k(params.min).must(equal(0)) &
+            k(params.max).must(be_just(2)) &
+            k(v.validate([])).true &
+            k(v.validate([1])).true &
+            k(v.validate([1, 2])).true &
+            k(v.validate([1, 2, 3])).false
         )
 
     def six(self) -> Expectation:
         def fun(a, b, c, d, e, f):
             pass
-        c = RH(fun)
+        params = ParamsSpec.from_function(fun)
+        v = ArgValidator(params)
         return (
-            k(c.min).must(equal(6)) &
-            k(c.max).must(be_just(6)) &
-            k(c.check_length([])).false &
-            k(c.check_length([1])).false &
-            k(c.check_length([1, 2, 3, 4, 5, 6])).true &
-            k(c.check_length([1, 2, 3, 4, 5, 6, 7])).false
+            k(params.min).must(equal(6)) &
+            k(params.max).must(be_just(6)) &
+            k(v.validate([])).false &
+            k(v.validate([1])).false &
+            k(v.validate([1, 2, 3, 4, 5, 6])).true &
+            k(v.validate([1, 2, 3, 4, 5, 6, 7])).false
         )
 
     def var(self) -> Expectation:
         def fun(a, b=1, *args):
             pass
-        c = RH(fun)
+        params = ParamsSpec.from_function(fun)
+        v = ArgValidator(params)
         return (
-            k(c.min).must(equal(1)) &
-            k(c.max.is_just).false &
-            k(c.check_length([])).false &
-            k(c.check_length([1])).true &
-            k(c.check_length([1, 2])).true &
-            k(c.check_length([1, 2, 3])).true
+            k(params.min).must(equal(1)) &
+            k(params.max).must(~be_just) &
+            k(v.validate([])).false &
+            k(v.validate([1])).true &
+            k(v.validate([1, 2])).true &
+            k(v.validate([1, 2, 3])).true
         )
 
 __all__ = ('RequestHandlerSpec',)

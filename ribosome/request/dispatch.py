@@ -272,7 +272,7 @@ def handle_internal(trans: Trans, state: PluginState[D, NP], args: List[Any]) ->
     result = handler.execute(None, state, args)
     validator = AlgResultValidator(trans.name)
     trans_result = validator.validate(result, state.data)
-    return trans_result.output / DispatchOutput | DispatchUnit, state, Nil
+    return trans_result.output / DispatchReturn | DispatchUnit, state, Nil
 
 
 def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str) -> Either[str, Message]:
@@ -291,7 +291,7 @@ class RunDispatch(Generic[D, NP], Logging):
             self.state.root.state = self.state.data
             result = dispatch.handler.func(self.state.plugin, *self.args)
             new_state = self.state.update(self.state.root.state).log_messages(self.state.root.last_message_log)
-            return (DispatchOutput(result), new_state, Nil)
+            return (DispatchReturn(result), new_state, Nil)
         return NvimIO(send)
 
     def send_message(self, dispatch: SendMessage) -> NvimIO[DispatchResult]:
