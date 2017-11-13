@@ -1,12 +1,12 @@
 import neovim
 
-from ribosome.request.base import RequestHandler1
+from ribosome.request.legacy import LegacyRequestHandler
 from ribosome.request.handler import RequestDispatcher, Fun
 
 from amino import Map
 
 
-class Function(RequestHandler1):
+class Function(LegacyRequestHandler):
 
     @property
     def desc(self):

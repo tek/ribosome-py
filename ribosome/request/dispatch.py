@@ -1,12 +1,12 @@
 import abc
-from typing import TypeVar, Any, Generic, Tuple
+from typing import TypeVar, Any, Generic, Tuple, Type, Union
 from threading import Lock
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
-from amino import Map, List, Boolean, Nil, Either, _
+from amino import Map, List, Boolean, Nil, Either, _, Maybe, Try, Just, Left, Right, Nothing
 from amino.algebra import Algebra
-from amino.dat import Dat
+from amino.dat import Dat, ADT
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import Logging, ribo_log
@@ -21,6 +21,7 @@ from ribosome.machine.machine import Machine
 from ribosome.machine.sub import Component, ComponentMachine
 from ribosome.machine.base import message_handlers
 from ribosome.machine.modular import trans_handlers
+from ribosome.request.args import ArgValidator, ParamsSpec
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 # NP = TypeVar('NP', bound=NvimPlugin)
@@ -221,7 +222,40 @@ class Internal(Dispatch):
 class Custom(Dispatch): pass
 
 
-DispatchResult = Tuple[Any, PluginState[D, NP], List[Message]]
+class DispatchOutput(ADT): pass
+
+
+class DispatchError(DispatchOutput):
+
+    @staticmethod
+    def cons(problem: Union[str, Exception]) -> 'DispatchError':
+        msg = 'fatal error while handling request'
+        return DispatchError(msg, Just(problem)) if isinstance(problem, Exception) else DispatchError(problem, Nothing)
+
+    def __init__(self, message: str, exception: Maybe[Exception]) -> None:
+        self.message = message
+        self.exception = exception
+
+    def _arg_desc(self) -> List[str]:
+        return List(self.message)
+
+
+class DispatchReturn(DispatchOutput):
+
+    def __init__(self, value: Any) -> None:
+        self.value = value
+
+    def _arg_desc(self) -> List[str]:
+        return List(self.value)
+
+
+class DispatchUnit(DispatchOutput):
+
+    def _arg_desc(self) -> List[str]:
+        return Nil
+
+
+DispatchResult = Tuple[DispatchOutput, PluginState[D, NP], List[Message]]
 
 
 def handle_trans(trans: Trans, state: PluginState[D, NP], args: List[Any]) -> DispatchResult:
@@ -230,7 +264,7 @@ def handle_trans(trans: Trans, state: PluginState[D, NP], args: List[Any]) -> Di
     result = handler.execute(None, state.data, msg)
     validator = AlgResultValidator(trans.name)
     trans_result = validator.validate(result, state.data)
-    return None, state.log_message(msg).update(trans_result.data), trans_result.resend + trans_result.pub
+    return DispatchUnit(), state.log_message(msg).update(trans_result.data), trans_result.resend + trans_result.pub
 
 
 def handle_internal(trans: Trans, state: PluginState[D, NP], args: List[Any]) -> DispatchResult:
@@ -238,7 +272,12 @@ def handle_internal(trans: Trans, state: PluginState[D, NP], args: List[Any]) ->
     result = handler.execute(None, state, args)
     validator = AlgResultValidator(trans.name)
     trans_result = validator.validate(result, state.data)
-    return trans_result.output | None, state, Nil
+    return trans_result.output / DispatchOutput | DispatchUnit, state, Nil
+
+
+def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str) -> Either[str, Message]:
+    validator = ArgValidator(ParamsSpec.from_function(tpe.__init__))
+    return Right(tpe(*args)) if validator.validate(args) else Left(validator.error(args, method, cmd_name))
 
 
 class RunDispatch(Generic[D, NP], Logging):
@@ -251,15 +290,24 @@ class RunDispatch(Generic[D, NP], Logging):
         def send(v: Any) -> DispatchResult:
             self.state.root.state = self.state.data
             result = dispatch.handler.func(self.state.plugin, *self.args)
-            return result, self.state.update(self.state.root.state).log_messages(self.state.root.last_message_log), Nil
+            new_state = self.state.update(self.state.root.state).log_messages(self.state.root.last_message_log)
+            return (DispatchOutput(result), new_state, Nil)
         return NvimIO(send)
 
     def send_message(self, dispatch: SendMessage) -> NvimIO[DispatchResult]:
-        def send(v: Any) -> DispatchResult:
-            msg = dispatch.handler.dispatcher.msg(*self.args)
+        handler = dispatch.handler
+        dispatcher = handler.dispatcher
+        def send1(msg: Message) -> DispatchResult:
             tr = TransitionLog.empty
             log, result = self.state.plugin.root.loop_process(self.state.data, msg).run(tr).evaluate()
             return None, self.state.log_message(msg).update(result.data).log(log), result.pub
+        def error(problem: Union[str, Exception]) -> DispatchResult:
+            return DispatchError.cons(problem), self.state, Nil
+        def send(v: Any) -> DispatchResult:
+            name = self.state.config.name
+            prefix = self.state.config.prefix
+            msg = cons_message(dispatcher.msg, self.args, handler.vim_cmd_name(name, prefix), dispatcher.method)
+            return (msg // send1).value_or(error)
         return NvimIO(send)
 
     def trans(self, dispatch: Trans) -> NvimIO[DispatchResult]:
@@ -269,7 +317,7 @@ class RunDispatch(Generic[D, NP], Logging):
         return NvimIO(lambda v: handle_internal(dispatch, self.state, self.args))
 
     def custom(self, dispatch: Custom) -> NvimIO[DispatchResult]:
-        pass
+        return NvimIO.pure((DispatchUnit(), self.state, Nil))
 
 
 def invalid_dispatch(data: Any) -> NvimIO[Any]:

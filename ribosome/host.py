@@ -27,7 +27,8 @@ from ribosome import options
 from ribosome.plugin import plugin_class_from_config
 from ribosome.machine.process_messages import PrioQueue
 from ribosome.request.dispatch import (DispatchJob, Dispatch, RunDispatch, invalid_dispatch, PluginStateHolder,
-                                       PluginState, Legacy, SendMessage, Trans, DispatchResult, Internal)
+                                       PluginState, Legacy, SendMessage, Trans, DispatchResult, Internal,
+                                       DispatchOutput, DispatchError, DispatchReturn, DispatchUnit, DispatchOutput)
 from ribosome.request.handler import MsgDispatcher, RequestHandler, Full
 from ribosome.machine.message_base import Message
 from ribosome.machine.loop import process_message
@@ -151,6 +152,36 @@ def dispatch_request(job: DispatchJob) -> Generator:
     yield relay(job, dispatch)
 
 
+class HandleDispatchOutput:
+
+    def dispatch_error(self, result: DispatchError) -> NvimIO[Any]:
+        return result.exception / NvimIO.exception | NvimIO(lambda v: ribo_log.error(result.message))
+
+    def dispatch_return(self, result: DispatchReturn) -> NvimIO[Any]:
+        return NvimIO.pure(result.value)
+
+    def dispatch_unit(self, result: DispatchUnit) -> NvimIO[Any]:
+        return NvimIO.pure(0)
+
+
+dispatch_output = dispatch_alg(HandleDispatchOutput(), DispatchOutput, '')
+
+
+def dispatch_job(
+        vim: NvimFacade,
+        sync: bool,
+        dispatches: Map[str, Dispatch],
+        state: PluginStateHolder[D, NP],
+        name: str,
+        args: tuple,
+) -> DispatchJob:
+    decoded_name = vim.decode_vim_data(name)
+    decoded_args = vim.decode_vim_data(args)
+    fun_args = decoded_args.head | Nil
+    bang = decoded_args.lift(1).contains(1)
+    return DispatchJob(dispatches, state, decoded_name, fun_args, sync, vim.prefix, bang)
+
+
 def request_handler(
         vim: NvimFacade,
         sync: bool,
@@ -160,14 +191,11 @@ def request_handler(
 ) -> Callable[[str, tuple], Any]:
     sync_prefix = '' if sync else 'a'
     def handle(name: str, args: tuple) -> Generator:
-        decoded_name = vim.decode_vim_data(name)
-        decoded_args = Lists.wrap(walk(decode_if_bytes, args))
-        fun_args = decoded_args.head | Nil
-        bang = decoded_args.lift(1).contains(1)
-        job = DispatchJob(dispatches, state, decoded_name, fun_args, sync, vim.prefix, bang)
-        amino_log.debug(f'dispatching {sync_prefix}sync request: {decoded_name}({decoded_args})')
+        job = dispatch_job(vim, sync, dispatches, state, name, args)
+        amino_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
         result = (
             dispatch_request(job)
+            .flat_map(dispatch_output)
             .attempt(vim)
             .value_or(L(request_error)(job, _))
         )

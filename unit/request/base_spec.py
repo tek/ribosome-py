@@ -6,7 +6,7 @@ from kallikrein.matchers.maybe import be_just
 
 from amino.util.string import camelcase
 
-from ribosome.request.base import RequestHandler1
+from ribosome.request.legacy import RequestHandler1
 from ribosome.machine.message_base import pmessage
 from ribosome.request.handler import RequestDispatcher
 

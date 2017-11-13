@@ -2,11 +2,11 @@ import functools
 
 import neovim
 
-from ribosome.request.base import RequestHandler1
+from ribosome.request.legacy import LegacyRequestHandler
 from ribosome.request.handler import RequestDispatcher, Cmd
 
 
-class Command(RequestHandler1):
+class Command(LegacyRequestHandler):
 
     @property
     def desc(self):
