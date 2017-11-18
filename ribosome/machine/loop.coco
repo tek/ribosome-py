@@ -17,8 +17,8 @@ A = TypeVar('A')
 D = TypeVar('D')
 
 
-def process_message(messages: PrioQueue[A], state: D, send: (D, A) -> NvimIOState[D, DispatchResult]) -> (PrioQueue[A], NvimIOState[D, DispatchResult]) =
-    def process1(Right(((prio, msg), rest))) = rest, send(state, msg)
+def process_message(messages: PrioQueue[A], send: A -> NvimIOState[D, DispatchResult]) -> (PrioQueue[A], NvimIOState[D, DispatchResult]) =
+    def process1(Right(((prio, msg), rest))) = rest, send(msg)
     @addpattern(process1)
     def process1(Left(err)) = messages, NvimIOState.pure(DispatchResult(DispatchUnit(), Nil))
     process1(messages.get)

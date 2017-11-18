@@ -368,8 +368,8 @@ class WrappedHandler(Generic[Mes, D, T], DynHandler[Mes, D]):
     def run(self, machine: Machine, data: D, msg: Mes) -> TransAction:
         return _recover_error(self, self.execute(machine, data, msg))
 
-    def execute(self, machine: Machine, data: D, msg: Mes) -> TransAction:
-        trans = self.trans_tpe(machine, data, msg)
+    def execute(self, machine: Machine, msg: Mes) -> TransAction:
+        trans = self.trans_tpe(machine, msg)
         return self.handler.fun(trans)
 
     @property

@@ -131,90 +131,93 @@ class CoroExecutionHandler(DynHandler):
     pass
 
 
-class TransitionResult(Record):
-    data = any_field()
-    resend = list_field()
-    handled = bool_field(True)
-    failure = bool_field(False)
-    error = optional_field()
-    output = maybe_field(object)
+# class TransitionResult(Record):
+#     data = any_field()
+#     resend = list_field()
+#     handled = bool_field(True)
+#     failure = bool_field(False)
+#     error = optional_field()
+#     output = maybe_field(object)
 
-    @staticmethod
-    def empty(data, **kw):
-        return StrictTransitionResult(data=data, **kw)
+#     @staticmethod
+#     def empty(data, **kw):
+#         return StrictTransitionResult(data=data, **kw)
 
-    @staticmethod
-    def failed(data: D, error: Union[Exception, str], **kw: Any) -> 'TransitionResult':
-        return TransitionResult.unhandled(data, failure=True, error=Just(error), **kw)
+#     @staticmethod
+#     def failed(data: D, error: Union[Exception, str], **kw: Any) -> 'TransitionResult':
+#         return TransitionResult.unhandled(data, failure=True, error=Just(error), **kw)
 
-    @staticmethod
-    def unhandled(data, **kw):
-        return StrictTransitionResult(data=data, handled=False, **kw)
+#     @staticmethod
+#     def unhandled(data, **kw):
+#         return StrictTransitionResult(data=data, handled=False, **kw)
 
-    @property
-    def _str_extra(self):
-        return List(self.handled.cata('handled', 'unhandled')) + self.error.to_list + self.resend
+#     @property
+#     def _str_extra(self):
+#         return List(self.handled.cata('handled', 'unhandled')) + self.error.to_list + self.resend
 
-    def fold(self, f):
-        return self
+#     def fold(self, f):
+#         return self
 
-    def accum(self, other: 'TransitionResult'):
-        if isinstance(other, CoroTransitionResult):
-            return self.accum(StrictTransitionResult(
-                data=other.data,
-                pub=other.pub,
-                handled=other.handled or self.handled,
-                failure=other.failure or self.failure,
-                error=other.error.o(self.error),
-            ))
-        else:
-            return other.set(
-                pub=self.pub + other.pub,
-                handled=other.handled or self.handled,
-                failure=other.failure or self.failure,
-                error=other.error.o(self.error),
-            )
+#     def accum(self, other: 'TransitionResult'):
+#         if isinstance(other, CoroTransitionResult):
+#             return self.accum(StrictTransitionResult(
+#                 data=other.data,
+#                 pub=other.pub,
+#                 handled=other.handled or self.handled,
+#                 failure=other.failure or self.failure,
+#                 error=other.error.o(self.error),
+#             ))
+#         else:
+#             return other.set(
+#                 pub=self.pub + other.pub,
+#                 handled=other.handled or self.handled,
+#                 failure=other.failure or self.failure,
+#                 error=other.error.o(self.error),
+#             )
 
-    @property
-    def error_message(self):
-        def format(err):
-            return str(err.cause if isinstance(err, IOException) else err)
-        return self.error / format | 'unknown error'
+#     @property
+#     def error_message(self):
+#         def format(err):
+#             return str(err.cause if isinstance(err, IOException) else err)
+#         return self.error / format | 'unknown error'
 
-    @property
-    def exception(self) -> Maybe[Exception]:
-        def analyze(e: Exception) -> Exception:
-            return (
-                e.__cause__
-                if isinstance(e, TransitionFailed) and e.__cause__ is not None else
-                e.cause
-                if isinstance(e, IOException) else
-                e
-            )
-        return self.error // (lambda err: Just(analyze(err)) if isinstance(err, Exception) else Nothing)
+#     @property
+#     def exception(self) -> Maybe[Exception]:
+#         def analyze(e: Exception) -> Exception:
+#             return (
+#                 e.__cause__
+#                 if isinstance(e, TransitionFailed) and e.__cause__ is not None else
+#                 e.cause
+#                 if isinstance(e, IOException) else
+#                 e
+#             )
+#         return self.error // (lambda err: Just(analyze(err)) if isinstance(err, Exception) else Nothing)
 
-    @property
-    def exception_fmt(self) -> Maybe[str]:
-        return (self.exception / format_exception) / __.cons('Exception:') / _.join_lines
-
-
-class StrictTransitionResult(TransitionResult):
-    pub = list_field()
-
-    def fold(self, f):
-        return self.resend.fold_left(self)(f)
-
-    @property
-    def _str_extra(self) -> List[Any]:
-        return super()._str_extra + self.pub
+#     @property
+#     def exception_fmt(self) -> Maybe[str]:
+#         return (self.exception / format_exception) / __.cons('Exception:') / _.join_lines
 
 
-class CoroTransitionResult(TransitionResult, Logging):
-    coro = field(Coroutine)
+# class StrictTransitionResult(TransitionResult):
+#     pub = list_field()
 
-    @property
-    def pub(self):
-        return [self.coro]
+#     def fold(self, f):
+#         return self.resend.fold_left(self)(f)
+
+#     @property
+#     def _str_extra(self) -> List[Any]:
+#         return super()._str_extra + self.pub
+
+
+# class CoroTransitionResult(TransitionResult, Logging):
+#     coro = field(Coroutine)
+
+#     @property
+#     def pub(self):
+#         return [self.coro]
+
+
+TransitionResult = object
 
 
 class TransitionLogMeta(DatMeta):

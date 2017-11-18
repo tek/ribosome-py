@@ -1,8 +1,7 @@
 import time
 from typing import TypeVar, Callable, Generator
 
-from amino import __, Maybe, Boolean, _, L
-from amino.state import EvalState
+from amino import __, Maybe, Boolean, _, L, List
 from amino.do import do
 
 from ribosome.machine.transition import TransitionResult, TransitionLog
@@ -10,8 +9,9 @@ from ribosome.machine.base import TransState
 from ribosome.machine.message_base import Message, Sendable, Envelope
 from ribosome.logging import ribo_log
 from ribosome.machine.handler import HandlerJob
-from ribosome.plugin_state import PluginState, ComponentState
+from ribosome.plugin_state import PluginState, ComponentState, Components
 from ribosome.nvim.io import NvimIOState
+from ribosome.request.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchErrors
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -28,8 +28,8 @@ def resolve_handler(component: ComponentState, msg: Message, prio: float=None) -
     )
 
 
-def internal(data: D, msg: Message) -> TransState:
-    return EvalState.pure(TransitionResult.unhandled(data))
+def internal(msg: Message) -> TransState:
+    return DispatchResult.unit_nio
 
 
 def format_report(self, msg: Message, dur: float, name: str) -> str:
@@ -43,60 +43,66 @@ def check_time(start_time: int, msg: Message, name: str) -> None:
     #     self._reports = self._reports.cat((msg, dur))
 
 
-def process(component: ComponentState, data: D, msg: Message, prio: float=None) -> TransState:
-    def execute(handler: Callable) -> TransitionResult:
+def process(component: ComponentState, msg: Message, prio: float) -> TransState:
+    def execute(handler: Callable) -> TransState:
         ribo_log.debug(f'handling {msg} in {component.name}')
-        job = HandlerJob.from_handler(component.name, handler, data, msg)
+        job = HandlerJob.from_handler(component.name, handler, msg)
         result = job.run()
         check_time(job.start_time, msg, component.name)
-        return EvalState.pure(result)
-    return resolve_handler(component, msg, prio) / execute | (lambda: internal(data, msg))
+        return result
+    return resolve_handler(component, msg, prio) / execute | (lambda: internal(msg))
 
 
 @do(TransState)
-def send_message_to_component(component: ComponentState, data: D, msg: M, prio: float=None) -> TransState:
+def send_message_to_component(component: ComponentState, data: D, msg: M, prio: float) -> TransState:
     result = yield process(component, data, msg, prio)
-    log = yield EvalState.get()
+    log = yield NvimIOState.get()
     resend = result.resend
     new_log, next_msg = log.resend(resend).pop
-    yield EvalState.set(new_log)
-    yield EvalState.pure(result)
+    yield NvimIOState.set(new_log)
+    yield NvimIOState.pure(result)
 
 
-def send_to(msg: Message, prio: float=None) -> Callable[[TransState, ComponentState], TransState]:
+def send_to(msg: Message, prio: float) -> Callable[[TransState, ComponentState], TransState]:
     @do(TransState)
     def send(z: TransState, comp: ComponentState) -> Generator:
         current = yield z
         next = yield send_message_to_component(comp, current.data, msg, prio)
-        yield EvalState.pure(current.accum(next))
+        yield NvimIOState.pure(current.accum(next))
     return send
 
 
-def send_msg(state: PluginState[D, NP], z: TransState, msg: Message, prio: float=None) -> TransState:
-    return state.components.fold_left(z)(send_to(msg, prio))
+def aggregate(results: List[DispatchResult]) -> TransState:
+    errors = (results / _.output).filter_type(DispatchError)
+    msgs = results // _.msgs
+    return DispatchResult(DispatchErrors(errors) if errors else DispatchUnit(), msgs)
 
 
-def send_envelope(state: PluginState[D, NP], z: TransState, env: Envelope, prio: float=None) -> TransState:
+def send_msg(components: Components, msg: Message, prio: float) -> TransState:
+    return components.all.traverse(lambda comp: process(comp, msg, prio), NvimIOState) / aggregate
+
+
+def send_envelope(components: Components, env: Envelope, prio: float) -> TransState:
     msg = env.msg
     def to_comp(name: str) -> TransState:
-        return state.component(name) / L(send_to(msg, prio))(z, _) | z
-    return env.recipient / to_comp | (lambda: send_msg(state, z, msg, prio))
+        return components.by_name(name) / send_to(msg, prio) | (lambda: DispatchResult.unit_nio)
+    return env.recipient / to_comp | (lambda: send_msg(components, msg, prio))
 
 
 @do(TransState)
-def send_message1(state: PluginState[D, NP], msg: M, prio: float=None) -> Generator:
+def send_message1(components: Components, msg: M, prio: float) -> Generator:
     ''' send **msg** to all submachines, passing the transformed data from each machine to the next and accumulating
     published messages.
     '''
-    yield EvalState.modify(__.log(msg.msg))
     send = Boolean.isinstance(msg, Envelope).cata(send_envelope, send_msg)
-    yield send(state, EvalState.pure(TransitionResult.unhandled(state.data)), msg, prio)
+    yield send(components, msg, prio)
 
 
 @do(NvimIOState[PluginState[D, NP], TransitionResult])
 def send_message(msg: M, prio: float=None) -> Generator:
-    state = yield NvimIOState.get()
-    yield NvimIOState.pure(send_message1(state, msg, prio).run(TransitionLog.empty).evaluate())
+    yield NvimIOState.modify(__.log_message(msg.msg))
+    components = yield NvimIOState.inspect(_.components)
+    yield send_message1(components, msg, prio)
 
 
 __all__ = ('send_message',)

@@ -5,7 +5,7 @@ from amino import Map, List, Boolean, Nil, Either, _
 from amino.dat import Dat
 
 from ribosome.nvim import NvimFacade
-from ribosome.machine.message_base import Message
+from ribosome.machine.message_base import Message, Sendable, Envelope
 from ribosome.machine.process_messages import PrioQueue
 from ribosome.machine.handler import Handlers
 from ribosome.machine.transition import TransitionLog
@@ -34,36 +34,43 @@ class ComponentState(Dat['ComponentState']):
         return self.component.name
 
 
+class Components(Dat['Components']):
+
+    def __init__(self, all: List[ComponentState]) -> None:
+        self.all = all
+
+    def by_name(self, name: str) -> Either[str, ComponentState]:
+        return self.all.find(_.name == name).to_either(f'no component named {name}')
+
+
 class PluginState(Generic[D, NP], Dat['PluginState']):
 
     @staticmethod
     def cons(
-            vim: NvimFacade,
             data: D,
             plugin: NP,
             components: List[ComponentMachine],
             messages: PrioQueue[Message],
             message_log: List[Message]=Nil,
     ) -> 'PluginState':
-        component_state = components / ComponentState.cons
-        return PluginState(vim, data, plugin, component_state, messages, message_log)
+        component_state = Components(components / ComponentState.cons)
+        return PluginState(data, plugin, component_state, messages, message_log)
 
     def __init__(self,
-                 vim: NvimFacade,
                  data: D,
                  plugin: NP,
                  components: List[ComponentState],
                  messages: PrioQueue[Message],
                  message_log: List[Message]=Nil) -> None:
-        self.vim = vim
         self.data = data
         self.plugin = plugin
         self.components = components
         self.messages = messages
         self.message_log = message_log
 
-    def enqueue(self, messages: List[Message]) -> 'PluginState[D, NP]':
-        return self.copy(messages=messages.fold_left(self.messages)(lambda q, m: q.put(m, m.prio)))
+    def enqueue(self, messages: List[Sendable]) -> 'PluginState[D, NP]':
+        envelopes = messages / Envelope.from_sendable
+        return self.copy(messages=envelopes.fold_left(self.messages)(lambda q, m: q.put(m, m.prio)))
 
     def update(self, data: D) -> 'PluginState[D, NP]':
         return self.copy(data=data)
@@ -94,7 +101,7 @@ class PluginState(Generic[D, NP], Dat['PluginState']):
         return self.config.name
 
     def component(self, name: str) -> Either[str, ComponentState]:
-        return self.components.find(_.name == name).to_either(f'no component named {name}')
+        return self.components.by_name(name)
 
 
 class PluginStateHolder(Generic[D, NP], Dat['PluginStateHolder']):
@@ -121,4 +128,4 @@ class PluginStateHolder(Generic[D, NP], Dat['PluginStateHolder']):
         return self.state.has_messages
 
 
-__all__ = ('ComponentState', 'PluginState', 'PluginStateHolder')
+__all__ = ('ComponentState', 'PluginState', 'PluginStateHolder', 'Components')

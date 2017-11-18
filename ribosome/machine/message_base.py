@@ -209,6 +209,14 @@ class Msg(Generic[A], Message[A], metaclass=MsgMeta):
 @functools.total_ordering
 class Envelope(Generic[A], Dat['Envelope[A]'], Sendable):
 
+    @staticmethod
+    def from_sendable(s: Sendable) -> 'Envelope[A]':
+        return s if isinstance(s, Envelope) else Envelope.default(s)
+
+    @staticmethod
+    def default(m: Message[A]) -> 'Envelope[A]':
+        return Envelope(m, time.time(), 0.5, Nothing)
+
     def __init__(self, message: Message[A], time: float, prio: float, recipient: Maybe[str]) -> None:
         self.message = message
         self.time = time

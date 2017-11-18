@@ -88,10 +88,10 @@ class RunDispatchAsync(Generic[D, NP], Logging):
             return NvimIOState.pure(DispatchResult(DispatchError.cons(problem), Nil))
         @do(NvimIOState[PluginState[D, NP], DispatchResult])
         def send(msg: Message) -> Generator:
-            log, result = yield send_message(msg)
-            yield NvimIOState.modify(__.update(result.data))
-            yield NvimIOState.modify(__.log(log))
-            yield NvimIOState.pure(DispatchResult(DispatchUnit(), result.pub + result.resend))
+            result = yield send_message(msg)
+            # yield NvimIOState.modify(__.update(result.data))
+            # yield NvimIOState.modify(__.log(log))
+            # yield NvimIOState.pure(DispatchResult(DispatchUnit(), result.pub + result.resend))
         yield msg_e.cata(error, send)
 
     def internal(self, dispatch: Internal) -> NvimIO[DispatchResult1]:

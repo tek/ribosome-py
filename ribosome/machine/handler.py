@@ -16,8 +16,7 @@ from amino.dat import Dat
 
 from ribosome.logging import Logging
 from ribosome.machine.message_base import Message, Publish, Envelope, Messages
-from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
-                                         TransitionFailed, Coroutine, MachineError, Error)
+from ribosome.machine.transition import Handler, TransitionFailed, Coroutine, MachineError, Error
 from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop
 from ribosome.machine.machine import Machine
 from ribosome.data import Data
@@ -50,40 +49,38 @@ D = TypeVar('D', bound=Data)
 R = TypeVar('R')
 
 
-def create_result(data: D, msgs: List[Message], output: Maybe[Any]=Nothing) -> TransitionResult:
-    publ, resend = msgs.split_type((Publish, Envelope))
-    env, pub = publ.split_type(Envelope)
-    pub_msgs = env + pub.map(_.message)
-    return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend, output=output)
+# def create_result(data: D, msgs: List[Message], output: Maybe[Any]=Nothing) -> TransitionResult:
+#     publ, resend = msgs.split_type((Publish, Envelope))
+#     env, pub = publ.split_type(Envelope)
+#     pub_msgs = env + pub.map(_.message)
+#     return StrictTransitionResult(data=data, pub=pub_msgs, resend=resend, output=output)
 
 
-def create_failure(data: D, desc: str, error: Union[str, Exception]) -> TransitionResult:
-    return (
-        TransitionResult.failed(data, error)
-        if isinstance(error, Exception) else
-        TransitionResult.failed(data, f'{desc}: {error}')
-    )
+# def create_failure(data: D, desc: str, error: Union[str, Exception]) -> TransitionResult:
+#     return (
+#         TransitionResult.failed(data, error)
+#         if isinstance(error, Exception) else
+#         TransitionResult.failed(data, f'{desc}: {error}')
+#     )
 
 
 class HandlerJob(Generic[D], Logging, ToStr):
 
-    def __init__(self, name: str, handler: Handler, data: D, msg: Message, data_type: Type[D]) -> None:
+    def __init__(self, name: str, handler: Handler, msg: Message) -> None:
         if not isinstance(handler, Handler):
             raise 1
         self.name = name
-        self.data = data
         self.msg = msg
         self.handler = handler
-        self.data_type = data_type
         self.start_time = time.time()
 
     @staticmethod
-    def from_handler(name: str, handler: Handler, data: D, msg: Message) -> 'HandlerJob[M, D]':
+    def from_handler(name: str, handler: Handler, msg: Message) -> 'HandlerJob[M, D]':
         tpe = DynHandlerJob if handler.dyn else AlgHandlerJob
-        return tpe(name, handler, data, msg, type(data))
+        return tpe(name, handler, msg)
 
     @abc.abstractmethod
-    def run(self) -> TransitionResult:
+    def run(self) -> Any:
         ...
 
     @property
@@ -96,7 +93,7 @@ class HandlerJob(Generic[D], Logging, ToStr):
 
 class DynHandlerJob(HandlerJob):
 
-    def run(self) -> TransitionResult:
+    def run(self) -> Any:
         result = self._execute_transition(self.handler, self.data, self.msg)
         return self.dispatch_transition_result(result)
 
@@ -115,7 +112,7 @@ class DynHandlerJob(HandlerJob):
             raise TransitionFailed(str(e)) from e
         return self.failure_result(str(e))
 
-    def failure_result(self, err: str) -> Maybe[StrictTransitionResult]:
+    def failure_result(self, err: str) -> Maybe[Any]:
         return Just(TransitionResult.failed(self.data, err))
 
     def dispatch_transition_result(self, result):
@@ -125,7 +122,7 @@ class DynHandlerJob(HandlerJob):
             TransitionResult.empty(self.data)
         )
 
-    def process_result(self, res0: Any) -> TransitionResult:
+    def process_result(self, res0: Any) -> Any:
         if isinstance(res0, Coroutine):
             return CoroTransitionResult(data=self.data, coro=res0)
         elif isinstance(res0, TransitionResult):
@@ -273,7 +270,7 @@ class AlgHandlerJob(HandlerJob):
 
     def run(self, machine=None) -> NvimIOState[D, DispatchResult]:
         try:
-            r = self.handler.execute(machine, self.data, self.msg)
+            r = self.handler.execute(machine, self.msg)
         except Exception as e:
             return self.exception(e)
         else:

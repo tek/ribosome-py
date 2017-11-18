@@ -26,9 +26,7 @@ class SpecCore(Component):
     @trans.unit(Msg1, trans.nio)
     def msg1(self) -> NvimIO[None]:
         def f(v) -> None:
-            self.log.test(1)
             r = v.vars.set('msg_cmd_success', val)
-            self.log.test(r)
         # return NvimIO(__.vars.set('msg_cmd_success', val))
         return NvimIO(f)
 

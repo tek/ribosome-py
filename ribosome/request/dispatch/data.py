@@ -2,7 +2,7 @@ import abc
 from typing import TypeVar, Union, Any, Generic
 
 from amino import List, Boolean, Nil, Maybe, Just, Nothing, IO
-from amino.dat import Dat, ADT
+from amino.dat import Dat, ADT, DatMeta
 
 from ribosome.rpc import RpcHandlerFunction, RpcHandlerSpec
 from ribosome.request.handler.handler import RequestHandler
@@ -10,10 +10,13 @@ from ribosome.request.handler.dispatcher import TransDispatcher
 from ribosome.request.handler.method import RpcMethod
 from ribosome.nvim import NvimIO
 from ribosome.machine.message_base import Message
+from ribosome.nvim.io import NvimIOState
+from ribosome.data import Data
 
 B = TypeVar('B')
 Meth = TypeVar('Meth', bound=RpcMethod)
 DP = TypeVar('DP', bound='Dispatch')
+D = TypeVar('D', bound=Data)
 
 
 class Dispatch(Generic[DP]):
@@ -130,6 +133,12 @@ class DispatchError(DispatchOutput):
         return List(self.message)
 
 
+class DispatchErrors(DispatchOutput):
+
+    def __init__(self, errors: List[DispatchError]) -> None:
+        self.errors = errors
+
+
 class DispatchReturn(DispatchOutput):
 
     def __init__(self, value: Any) -> None:
@@ -183,7 +192,18 @@ class DispatchHandle(DispatchContinuation):
     pass
 
 
-class DispatchResult(Dat['DispatchResult']):
+class DispatchResultMeta(DatMeta):
+
+    @property
+    def unit(self) -> 'DispatchResult':
+        return DispatchResult(DispatchUnit(), Nil)
+
+    @property
+    def unit_nio(self) -> 'NvimIOState[D, DispatchResult]':
+        return NvimIOState.pure(DispatchResult.unit)
+
+
+class DispatchResult(Dat['DispatchResult'], metaclass=DispatchResultMeta):
 
     def __init__(self, output: DispatchOutput, msgs: List[Message]) -> None:
         self.output = output

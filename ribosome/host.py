@@ -1,4 +1,4 @@
-from typing import TypeVar, Type, Callable, Generator, Any, Tuple, Generic
+from typing import TypeVar, Type, Callable, Generator, Any
 from types import ModuleType
 from threading import Lock
 
@@ -7,14 +7,11 @@ from neovim.api import Nvim
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 from neovim.msgpack_rpc.event_loop.uv import UvEventLoop
 
-import amino
 from amino import Either, _, L, Maybe, Lists, amino_log, Logger, __, Path, Map, List, Boolean, Nil
 from amino.either import ImportFailure
 from amino.func import Val
 from amino.logging import amino_root_file_logging
 from amino.do import do
-from amino.dispatch import dispatch_alg
-from amino.util.exception import format_exception
 from amino.dat import Dat
 from amino.algebra import Algebra
 
@@ -26,24 +23,18 @@ from ribosome.config import Config
 from ribosome import options
 from ribosome.plugin import plugin_class_from_config
 from ribosome.machine.process_messages import PrioQueue
-from ribosome.machine.message_base import Message
-from ribosome.machine.loop import process_message
-from ribosome.machine.transition import TransitionResult
 from ribosome.record import encode_json_compat
 from ribosome.machine.root import ComponentResolver
-from ribosome.machine.send_message import send_message
 from ribosome.machine import trans
 from ribosome.machine.messages import ShowLogInfo, UpdateState
 from ribosome.machine.scratch import Mapping
 from ribosome.request.handler.dispatcher import MsgDispatcher
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
-from ribosome.nvim.io import NvimIOState
-from ribosome.request.dispatch.run import DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch
-from ribosome.request.dispatch.data import (Legacy, SendMessage, Trans, Internal, DispatchError, DispatchReturn,
-                                            DispatchUnit, DispatchOutput, DispatchSync, DispatchAsync, DispatchResult,
-                                            Dispatch, DispatchIO, IODIO, DIO)
+from ribosome.request.dispatch.run import DispatchJob
+from ribosome.request.dispatch.data import Legacy, SendMessage, Trans, Internal, DispatchSync, DispatchAsync, Dispatch
 from ribosome.plugin_state import PluginState, PluginStateHolder
+from ribosome.request.dispatch.handle import execute_dispatch_job, request_error
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)
@@ -84,129 +75,6 @@ class HostConfig(Dat['HostConfig']):
         return self.dispatch / __.spec(self.config.name, self.config.prefix)
 
 
-# def run_dispatch(state: PluginState[D, NP], args: List[Any], dispatch: Dispatch, runner: Type[RunDispatch]
-#                  ) -> NvimIO[Tuple[Any, D]]:
-#     amino_log.debug(f'running dispatch {dispatch}({args})')
-#     return dispatch_alg(Runner(state, args), Dispatch, '', invalid_dispatch)(dispatch)
-
-
-class ExecuteDispatchIO:
-
-    def i_o_dio(self, io: IODIO[A]) -> NvimIO[Any]:
-        return
-
-
-execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
-
-
-class ExecuteDispatchOutput:
-
-    def dispatch_error(self, result: DispatchError) -> NvimIO[Any]:
-        return result.exception / NvimIO.exception | NvimIO(lambda v: ribo_log.error(result.message))
-
-    def dispatch_return(self, result: DispatchReturn) -> NvimIO[Any]:
-        return NvimIO.pure(result.value)
-
-    def dispatch_unit(self, result: DispatchUnit) -> NvimIO[Any]:
-        return NvimIO.pure(0)
-
-    def dispatch_io(self, result: DispatchIO) -> NvimIO[Any]:
-        return execute_io(result)
-
-
-execute_output = dispatch_alg(ExecuteDispatchOutput(), DispatchOutput, '')
-
-
-# TODO check how long-running messages can be handled; timeout for acquire is 10s
-@do(NvimIO[R])
-def dispatch_step(holder: PluginStateHolder,
-                  action: Callable[[], NvimIOState[PluginState[D, NP], B]],
-                  update: Callable[[B], NvimIOState[PluginState[D, NP], Any]]) -> Generator:
-    def release(error: Any) -> NvimIO[R]:
-        holder.release()
-    yield NvimIO(lambda v: holder.acquire())
-    state1, response = yield action().run(holder.state).error_effect(release)
-    print(response)
-    state2, result = yield update(response).run(state1).error_effect(release)
-    print(result)
-    yield NvimIO(lambda v: holder.update(state2)).error_effect(release)
-    r = yield execute_output(result.output)
-    yield NvimIO(release)
-    yield NvimIO.pure(r)
-
-
-class DispatchRunner(Generic[RDP]):
-
-    @staticmethod
-    def cons(run: Type[RDP], dp: Type[DP]) -> 'DispatchRunner[RDP]':
-        return DispatchRunner(lambda args: dispatch_alg(run(args), dp, '', invalid_dispatch))
-
-    def __init__(self, f: Callable[[tuple], Callable[[RDP], NvimIOState[PluginState[D, NP], DispatchOutput]]]) -> None:
-        self.f = f
-
-    def __call__(self, args: tuple) -> Callable[[RDP], NvimIOState[PluginState[D, NP], DispatchOutput]]:
-        return self.f(args)
-
-
-def execute(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> NvimIO[Any]:
-    def send() -> NvimIOState[PluginState[D, NP], DispatchResult]:
-        return runner(job.args)(dispatch)
-    return dispatch_step(job.state, send, NvimIOState.pure)
-
-
-# unconditionally fork a resend loop in case the sync transition has returned messages
-# only allow the first transition to provide a return value
-def execute_sync(job: DispatchJob, dispatch: DispatchSync) -> NvimIO[Any]:
-    return execute(job, dispatch, DispatchRunner.cons(RunDispatchSync, DispatchSync))
-
-
-def request_error(job: DispatchJob, exc: Exception) -> int:
-    sync_prefix = '' if job.sync else 'a'
-    desc = f'{sync_prefix}sync request {job.name}({job.args}) to `{job.plugin_name}`'
-    tb = format_exception(exc).join_lines
-    ribo_log.error(f'fatal error in {desc}')
-    exc_logger = ribo_log.error if amino.development else ribo_log.debug
-    exc_logger(f'{desc} failed:\n{tb}')
-    return 1
-
-
-# maybe don't enqueue messages here, but in `execute_output`
-@do(NvimIO[Any])
-def resend_loop(holder: PluginStateHolder) -> Generator:
-    def send() -> NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]]:
-        return NvimIOState.inspect(lambda state: process_message(state.messages, state, send_message))
-    @do(NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]])
-    def update(result: Tuple[PrioQueue[Message], TransitionResult]) -> Generator:
-        messages, trs = result
-        tr = yield trs
-        # yield NvimIOState.modify(__.log(log))
-        # yield NvimIOState.modify(__.update(tr.data))
-        yield NvimIOState.modify(__.copy(messages=messages))
-        # yield NvimIOState.modify(__.enqueue(tr.resend + tr.pub))
-        yield NvimIOState.pure(tr)
-    yield dispatch_step(holder, send, update)
-    yield resend_loop(holder) if holder.has_messages else NvimIO.pure(None)
-
-
-@do(NvimIO[Any])
-def execute_async_loop(job: DispatchJob, dispatch: DispatchAsync) -> Generator:
-    yield execute(job, dispatch, DispatchRunner.cons(RunDispatchAsync, DispatchAsync))
-    yield resend_loop(job.state)
-
-
-def execute_async(job: DispatchJob, dispatch: DispatchAsync) -> NvimIO[None]:
-    def run(vim: NvimFacade) -> None:
-        execute_async_loop(job, dispatch).attempt(vim).lmap(L(request_error)(job, _))
-    return NvimIO.fork(run)
-
-
-@do(NvimIO[Any])
-def execute_dispatch_job(job: DispatchJob) -> Generator:
-    dispatch = yield NvimIO.from_maybe(job.dispatches.lift(job.name), 'no handler')
-    relay = execute_sync if dispatch.sync else execute_async
-    yield relay(job, dispatch)
-
-
 def dispatch_job(vim: NvimFacade,
                  sync: bool,
                  dispatches: Map[str, RDP],
@@ -238,13 +106,19 @@ def request_handler(vim: NvimFacade,
     return handle
 
 
+@do(NvimIO[PluginState[D, NP]])
+def init_state(host_config: HostConfig) -> Generator:
+    data = yield NvimIO(host_config.config.state)
+    components = yield ComponentResolver(host_config.config).run
+    plugin = yield NvimIO(lambda vim: host_config.plugin_class(vim, data))
+    yield NvimIO.pure(PluginState.cons(data, plugin, components, PrioQueue.empty))
+
+
+# can vim be injected into each request handling process?
 @do(NvimIO[int])
 def run_session(session: Session, host_config: HostConfig) -> Generator:
     yield define_handlers(host_config.specs, host_config.name, host_config.name)
-    vim = yield NvimIO(lambda a: a)
-    data = host_config.config.state(vim)
-    components = yield ComponentResolver(host_config.config).run
-    state = PluginState.cons(vim, data, host_config.plugin_class(vim, data), components, PrioQueue.empty)
+    state = yield init_state(host_config)
     holder = PluginStateHolder(state, Lock())
     yield NvimIO(
         lambda vim:

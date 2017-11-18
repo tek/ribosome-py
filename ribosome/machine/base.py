@@ -18,7 +18,7 @@ from ribosome.logging import print_ribo_log_info, ribo_log
 from ribosome.data import Data
 from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.machine.machine import Machine
-from ribosome.machine.transition import (Handler, TransitionResult, may_handle, Error, Debug, handle, _io_result,
+from ribosome.machine.transition import (Handler, may_handle, Error, Debug, handle, _io_result,
                                          _recover_error, DynHandler, TransitionLog)
 # from ribosome.request.command import StateCommand
 from ribosome.process import NvimProcessExecutor
@@ -28,10 +28,13 @@ from ribosome.machine.messages import (RunNvimIO, RunIO, UnitIO, RunCorosParalle
 from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
 from ribosome.machine import trans
 from ribosome.machine.trans import Propagate, Transit
+from ribosome.nvim.io import NvimIOState
+from ribosome.request.dispatch.data import DispatchResult
 
 A = TypeVar('A')
 D = TypeVar('D', bound=Data)
-TransState = EvalState[TransitionLog, TransitionResult]
+# TransState = EvalState[TransitionLog, Any]
+TransState = NvimIOState[D, DispatchResult]
 
 
 def nio(f: Callable[[NvimFacade], Any]) -> RunNvimIO:

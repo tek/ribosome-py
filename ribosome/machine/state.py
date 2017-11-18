@@ -1,4 +1,4 @@
-from typing import Callable, TypeVar, Generic, Generator
+from typing import Callable, TypeVar, Generic, Generator, Any
 import abc
 import threading
 import asyncio
@@ -11,8 +11,7 @@ from ribosome.nvim import HasNvim, ScratchBuilder
 from ribosome import NvimFacade
 from ribosome.machine.message_base import Message, Envelope
 from ribosome.machine.base import Machine, MachineBase, TransState
-from ribosome.machine.transition import (TransitionResult, may_handle, handle, CoroTransitionResult, _recover_error,
-                                         CoroExecutionHandler, TransitionLog)
+from ribosome.machine.transition import may_handle, handle, _recover_error, CoroExecutionHandler, TransitionLog
 from ribosome.machine.messages import Nop, PlugCommand, Stop, Error
 from ribosome.machine.handler import DynHandlerJob
 from ribosome.machine.modular import ModularMachine
@@ -90,7 +89,7 @@ class StateMachineBase(Generic[D], ModularMachine):
         data, components = pre(self.data, sub_map)
         return Try(eval, expr, None, dict(data=data, components=components))
 
-    def _send(self, data, msg: Message) -> TransitionResult:
+    def _send(self, data, msg: Message) -> Any:
         self.log_message(msg, self.name)
         result = self.loop_process(data, msg).run(TransitionLog(List(msg), Nil))
         return (
@@ -133,7 +132,7 @@ class StateMachineBase(Generic[D], ModularMachine):
         yield self
         self.stop()
 
-    async def _execute_coro_result(self, data: Data, msg: Message, ctr: CoroTransitionResult) -> None:
+    async def _execute_coro_result(self, data: Data, msg: Message, ctr: Any) -> None:
         try:
             job = DynHandlerJob(self, data, msg, CoroExecutionHandler(self, 'coroutine result', msg, None, 1.0, True),
                                 self._data_type)
@@ -159,7 +158,7 @@ class MessageProcessor(Logging):
     def __init__(
             self,
             messages: asyncio.PriorityQueue,
-            send: Callable[[D, Message], TransitionResult]
+            send: Callable[[D, Message], Any]
     ) -> None:
         self.messages = messages
         self.send = send
@@ -184,7 +183,7 @@ class MessageProcessor(Logging):
         next = await self.process_one_message(data)
         return data if self.messages.empty() else await self.loop_messages(next)
 
-    def failed_transition(self, msg: Message, sent: TransitionResult) -> TransitionResult:
+    def failed_transition(self, msg: Message, sent: Any) -> Any:
         msg_name = type(msg).__name__
         def log_error() -> None:
             errmsg = sent.error_message
@@ -201,7 +200,7 @@ class MessageProcessor(Logging):
             self.log.error(f'error in `failed_transition`: {e}')
         return sent
 
-    async def successful_transition(self, data: D, msg: Message, sent: TransitionResult) -> TransitionResult:
+    async def successful_transition(self, data: D, msg: Message, sent: Any) -> Any:
         result = (
             await self._execute_coro_result(data, msg, sent)
             if isinstance(sent, CoroTransitionResult) else

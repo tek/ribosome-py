@@ -10,9 +10,8 @@ from ribosome.nvim import NvimFacade
 class Transitions(Machine):
     State = Map
 
-    def __init__(self, machine: Machine, data: Data, msg: Message) -> None:
+    def __init__(self, machine: Machine, msg: Message) -> None:
         self.machine = machine
-        self.data = data
         self.msg = msg
 
     @property

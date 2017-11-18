@@ -24,6 +24,7 @@ class NvimIOInstances(ImplicitInstances):
         return Map({Monad: NvimIOMonad()})
 
 
+# make this an ADT, create NvimIOFailed that circumvents exception throwing
 class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
 
     @staticmethod

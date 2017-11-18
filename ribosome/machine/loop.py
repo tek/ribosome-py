@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0xd8e71b2a
+# __coconut_hash__ = 0x31f80b9d
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -48,7 +48,7 @@ D = TypeVar('D')
 
 
 @_coconut_tco
-def process_message(messages: 'PrioQueue[A]', state: 'D', send: '_coconut.typing.Callable[[D, A], NvimIOState[D, DispatchResult]]') -> '(PrioQueue[A], NvimIOState[D, DispatchResult])':
+def process_message(messages: 'PrioQueue[A]', send: '_coconut.typing.Callable[[A], NvimIOState[D, DispatchResult]]') -> '(PrioQueue[A], NvimIOState[D, DispatchResult])':
     def process1(*_coconut_match_to_args, **_coconut_match_to_kwargs):
         _coconut_match_check = False
         if (_coconut.len(_coconut_match_to_args) == 1) and (_coconut.isinstance(_coconut_match_to_args[0], Right)) and (_coconut.len(_coconut_match_to_args[0]) == 1) and (_coconut.isinstance(_coconut_match_to_args[0][0], _coconut.abc.Sequence)) and (_coconut.len(_coconut_match_to_args[0][0]) == 2) and (_coconut.isinstance(_coconut_match_to_args[0][0][0], _coconut.abc.Sequence)) and (_coconut.len(_coconut_match_to_args[0][0][0]) == 2):
@@ -58,12 +58,12 @@ def process_message(messages: 'PrioQueue[A]', state: 'D', send: '_coconut.typing
             if not _coconut_match_to_kwargs:
                 _coconut_match_check = True
         if not _coconut_match_check:
-            _coconut_match_err = _coconut_MatchError("pattern-matching failed for " "'def process1(Right(((prio, msg), rest))) = rest, send(state, msg)'" " in " + _coconut.repr(_coconut.repr(_coconut_match_to_args)))
-            _coconut_match_err.pattern = 'def process1(Right(((prio, msg), rest))) = rest, send(state, msg)'
+            _coconut_match_err = _coconut_MatchError("pattern-matching failed for " "'def process1(Right(((prio, msg), rest))) = rest, send(msg)'" " in " + _coconut.repr(_coconut.repr(_coconut_match_to_args)))
+            _coconut_match_err.pattern = 'def process1(Right(((prio, msg), rest))) = rest, send(msg)'
             _coconut_match_err.value = _coconut_match_to_args
             raise _coconut_match_err
 
-        return rest, send(state, msg)
+        return rest, send(msg)
     @addpattern(process1)
     def process1(*_coconut_match_to_args, **_coconut_match_to_kwargs):
         _coconut_match_check = False
