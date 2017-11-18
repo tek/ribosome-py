@@ -1,12 +1,8 @@
 from typing import Callable, Any, Optional
 from contextlib import contextmanager
 
-from flexmock import flexmock
-
 from amino import List, Map
-from amino.test.spec_spec import Spec
 
-import ribosome
 from ribosome.nvim import Buffer, Tab, Window
 from ribosome import NvimFacade
 from ribosome.nvim.components import Options, Vars
@@ -101,17 +97,4 @@ class MockNvimFacade(MockNvimComponent, NvimFacade):
     def reload_windows(self):
         pass
 
-
-class MockNvimSpec(Spec):
-
-    def __init__(self, prefix):
-        Spec.__init__(self)
-        self.prefix = prefix
-
-    def setup(self):
-        Spec.setup(self)
-        ribosome.in_vim = False
-        self.vim = MockNvimFacade(self.prefix)
-        self.vim_mock = flexmock(self.vim)
-
-__all__ = ('MockNvimSpec', 'MockNvimFacade')
+__all__ = ('MockNvimFacade',)

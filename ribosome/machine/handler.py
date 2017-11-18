@@ -1,30 +1,30 @@
 import abc
 import time
-from typing import Any, Sequence, TypeVar, Generic, Type, Tuple, Union
+from typing import Any, Sequence, TypeVar, Generic, Type, Union
 import asyncio
 
 import amino
-from amino import Maybe, _, List, Map, Just, Either, L, __, Right, Nil, Nothing
+from amino import Maybe, _, List, Map, Just, L, __, Nil, Nothing, Either
 from amino.io import IO
 from amino.state import StateT, EvalState, MaybeState, EitherState, IdState
 from amino.tc.optional import Optional
 from amino.id import Id
 from amino.util.string import blue, ToStr
 from amino.dispatch import dispatch_alg
-from amino.tc.base import TypeClass
-from amino.func import flip
+from amino.tc.base import TypeClass, F
 from amino.dat import Dat
 
 from ribosome.logging import Logging
 from ribosome.machine.message_base import Message, Publish, Envelope, Messages
 from ribosome.machine.transition import (Handler, TransitionResult, CoroTransitionResult, StrictTransitionResult,
                                          TransitionFailed, Coroutine, MachineError, Error)
-from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop, RunNvimIOStateAlg
+from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop
 from ribosome.machine.machine import Machine
 from ribosome.data import Data
 from ribosome.machine.trans import TransAction, Transit, Propagate, Unit, TransFailure, Result
 from ribosome.nvim.io import NvimIOState
 from ribosome.nvim import NvimIO
+from ribosome.request.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchReturn
 
 
 def is_seq(a):
@@ -192,38 +192,50 @@ class DynHandlerJob(HandlerJob):
 
 
 A = TypeVar('A')
+G = TypeVar('G', bound=F)
 
 
-class UnpackTransState(Generic[A], TypeClass[A]):
+class TransformTransState(Generic[G], TypeClass):
 
     @abc.abstractmethod
-    def unpack(self, a: A, data: D) -> Either[Message, Tuple[D, List[Message]]]:
+    def transform(self, st: StateT[G, D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
         ...
 
+    def run(self, st: StateT[G, D, List[Message]]) -> NvimIOState[D, DispatchResult]:
+        return self.transform(self.result(st))
 
-class UnpackIdState(Generic[D], UnpackTransState[IdState[D, List[Message]]], tpe=IdState):
-
-    def unpack(self, a: IdState[D, List[Message]], data: D) -> Either[Message, Tuple[D, List[Message]]]:
-        return Right(a.run(data).value)
-
-
-class UnpackMaybeState(Generic[D], UnpackTransState[MaybeState[D, List[Message]]], tpe=MaybeState):
-
-    def unpack(self, a: MaybeState[D, List[Message]], data: D) -> Either[Message, Tuple[D, List[Message]]]:
-        return Right(a.run(data) | (data, Nil))
+    def result(self, st: StateT[G, D, List[Message]]) -> StateT[F, D, DispatchResult]:
+        return st / L(DispatchResult)(DispatchUnit(), _)
 
 
-class UnpackEitherState(Generic[D], UnpackTransState[EitherState[D, List[Message]]], tpe=EitherState):
+class TransformIdState(TransformTransState[Id], tpe=IdState):
 
-    def unpack(self, a: EitherState[D, List[Message]], data: D) -> Either[Message, Tuple[D, List[Message]]]:
-        return a.run(data)
+    def transform(self, st: IdState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.from_id(st)
 
 
-class UnpackNvimIOState(Generic[D], UnpackTransState[NvimIOState[D, List[Message]]], tpe=NvimIOState):
+class TransformMaybeState(TransformTransState[Maybe], tpe=MaybeState):
 
-    def unpack(self, a: NvimIOState[D, List[Message]], data: D) -> Either[Message, Tuple[D, List[Message]]]:
-        return Right((data, Propagate.one(RunNvimIOStateAlg(NvimIO(lambda v: lambda d: a.run(d).attempt(v))))))
+    def transform(self, st: MaybeState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.apply(lambda s: NvimIO.pure(st.run(s) | (s, DispatchResult(DispatchUnit(), Nil))))
 
+
+class TransformEitherState(TransformTransState[Either], tpe=EitherState):
+
+    def transform(self, st: EitherState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.apply(
+            lambda s: NvimIO.pure(st.run(s).value_or(lambda err: (s, DispatchResult(DispatchError.cons(err), Nil))))
+        )
+
+
+class TransformNvimIOState(TransformTransState[NvimIO], tpe=NvimIOState):
+
+    def transform(self, st: NvimIOState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
+        return st
+
+
+# StateT[D, List[Message]] -> ? -> StateT[D, DispatchResult] -> NvimIOState[D, DispatchResult] ->
+# NvimIOState[PluginState, DispatchResult] -> NvimIO[Any]
 
 class AlgResultValidator(Logging):
 
@@ -231,49 +243,47 @@ class AlgResultValidator(Logging):
         self.desc = desc
 
     @property
-    def validate(self) -> TransitionResult:
+    def validate(self) -> NvimIOState[D, DispatchResult]:
         return dispatch_alg(self, TransAction, 'validate_')
 
-    def failure(self, data: D, error: Union[str, Exception]) -> TransitionResult:
-        return create_failure(data, self.desc, error)
+    def failure(self, error: Union[str, Exception]) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.pure(DispatchResult(DispatchError.cons(error), Nil))
 
-    def validate_transit(self, action: Transit, data: D) -> TransitionResult:
+    def validate_transit(self, action: Transit) -> NvimIOState[D, DispatchResult]:
         return (
-            UnpackTransState.e_for(action.trans)
-            .flat_map(__.unpack(action.trans, data))
-            .map2(flip)
-            .map2(self.validate)
-            .value_or(L(self.failure)(data, _))
+            TransformTransState.e_for(action.trans)
+            .flat_map(__.run(action.trans))
+            .value_or(self.failure)
         )
 
-    def validate_propagate(self, action: Propagate, data: D) -> TransitionResult:
-        return create_result(data, action.messages)
+    def validate_propagate(self, action: Propagate) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.pure(DispatchResult(DispatchUnit(), action.messages))
 
-    def validate_unit(self, action: Unit, data: D) -> TransitionResult:
-        return create_result(data, action.messages)
+    def validate_unit(self, action: Unit) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.pure(DispatchResult(DispatchUnit(), action.messages))
 
-    def validate_result(self, action: Result, data: D) -> TransitionResult:
-        return create_result(data, Nil, Just(action.data))
+    def validate_result(self, action: Result) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.pure(DispatchResult(DispatchReturn(action.data), Nil))
 
-    def validate_trans_failure(self, action: TransFailure, data: D) -> TransitionResult:
-        return self.failure(data, action.message)
+    def validate_trans_failure(self, action: TransFailure) -> NvimIOState[D, DispatchResult]:
+        return self.failure(action.message)
 
 
 class AlgHandlerJob(HandlerJob):
 
-    def run(self, machine=None) -> TransitionResult:
+    def run(self, machine=None) -> NvimIOState[D, DispatchResult]:
         try:
             r = self.handler.execute(machine, self.data, self.msg)
         except Exception as e:
             return self.exception(e)
         else:
-            return AlgResultValidator(self.trans_desc).validate(r, self.data)
+            return AlgResultValidator(self.trans_desc).validate(r)
 
     def exception(self, e: Exception) -> StateT[Id, D, R]:
         if amino.development:
             err = f'transitioning {self.trans_desc}'
             self.log.caught_exception(err, e)
             raise TransitionFailed(str(e)) from e
-        return create_failure(self.data, self.trans_desc, f'exception raised: {e}')
+        return NvimIOState.pure(DispatchResult(DispatchError.cons(e), Nil))
 
 __all__ = ('Handlers', 'HandlerJob', 'AlgHandlerJob', 'DynHandlerJob')

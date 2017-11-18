@@ -1,4 +1,4 @@
-from typing import Generator, Any, TypeVar, Generic, Type
+from typing import Generator, TypeVar, Generic, Type
 
 from lenses import Lens
 
@@ -75,8 +75,8 @@ class SubTransitions(Transitions, TransitionHelpers):
         return Nothing
 
     @trans.unit(UpdateState, trans.st)
-    @do
-    def message_update_state(self) -> Generator[State[Data, None], Any, None]:
+    @do(State[Data, None])
+    def message_update_state(self) -> Generator:
         mod = __.update_from_opt(self.msg.options)
         l = yield self.state_lens(self.msg.tpe, self.msg.name)
         yield State.modify(lambda s: l.map(__.modify(mod)) | s)

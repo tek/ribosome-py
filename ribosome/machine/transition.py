@@ -10,7 +10,7 @@ from amino.util.exception import format_exception
 from amino.state import StateT
 from amino.util.string import ToStr
 from amino.dat import Dat, DatMeta
-from amino.do import tdo
+from amino.do import do
 
 from ribosome.machine.message_base import (_message_attr, _machine_attr, Message, default_prio, _prio_attr,
                                            fallback_prio, override_prio, _dyn_attr)
@@ -132,7 +132,6 @@ class CoroExecutionHandler(DynHandler):
 
 
 class TransitionResult(Record):
-    machine = optional_field(Machine)
     data = any_field()
     resend = list_field()
     handled = bool_field(True)
@@ -239,7 +238,7 @@ class TransitionLog(Dat['TransitionLog'], metaclass=TransitionLogMeta):
 
     @property
     def pop(self) -> Generator:
-        @tdo(Maybe[Tuple['TransitionLog', Maybe[Message]]])
+        @do(Maybe[Tuple['TransitionLog', Maybe[Message]]])
         def pop1() -> Generator:
             head, tail = yield self.message_resend.detach_head
             yield Just((self.copy(message_resend=tail).log(head), Just(head)))

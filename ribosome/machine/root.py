@@ -11,7 +11,7 @@ from ribosome.machine.internal import Internal
 from ribosome.config import PluginSettings, Config, AutoData
 
 from amino import Try, _, L, Either, List, Left, do, Right, curried, Boolean, Nothing
-from amino.do import tdo
+from amino.do import do
 
 Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D', bound=AutoData)
@@ -74,8 +74,8 @@ class ComponentResolver(Logging):
             .to_either(List(f'no auto component defined for `{name}`'))
         )
 
-    @do
-    def component_from_exports(self, mod: str) -> Either[List[str], ComponentMachine]:
+    @do(Either[List[str], ComponentMachine])
+    def component_from_exports(self, mod: str) -> Generator:
         exports = yield Either.exports(mod).lmap(List)
         yield (
             exports.find(L(Boolean.issubclass)(_, (Component, ComponentMachine)))
@@ -94,7 +94,7 @@ class ComponentResolver(Logging):
         )
 
     @property
-    @tdo(NvimIO[List[str]])
+    @do(NvimIO[List[str]])
     def components(self) -> Generator:
         from_user = yield self.config.settings.components.value
         additional = from_user | self.config.default_components
@@ -115,7 +115,7 @@ class ComponentResolver(Logging):
         )
 
     @property
-    @tdo(NvimIO[List[ComponentMachine]])
+    @do(NvimIO[List[ComponentMachine]])
     def run(self) -> Generator:
         comp = yield self.components
         sub = yield comp.traverse(self.create_components, NvimIO)

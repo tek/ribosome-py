@@ -51,6 +51,13 @@ def _update_field_metadata(inst, fields, opt_fields, varargs):
         else Just(inst._field_count_min + len(opt_fields)))
 
 
+class Sendable:
+
+    @abc.abstractproperty
+    def msg(self) -> 'Message':
+        ...
+
+
 class PMessageMeta(RecordMeta, abc.ABCMeta):
 
     def __new__(cls, name, bases, namespace, fields=[], opt_fields=[], varargs=None, skip_fields=False, **kw):
@@ -78,7 +85,7 @@ A = TypeVar('A', bound='Message')
 
 
 @functools.total_ordering
-class PMessage(Record, metaclass=PMessageMeta, skip_fields=True):
+class PMessage(Record, Sendable, metaclass=PMessageMeta, skip_fields=True):
     ''' Interface between vim commands and state.
     Provides a constructor that allows specification of fields via positional arguments.
     '''
@@ -122,6 +129,10 @@ class PMessage(Record, metaclass=PMessageMeta, skip_fields=True):
     def _str_extra(self) -> List[Any]:
         return Lists.wrap(self._field_order) // L(Maybe.getattr)(self, _) + self.bang.l('bang!')
 
+    @property
+    def msg(self) -> Sendable:
+        return self
+
 
 def message_definition_module() -> Optional[str]:
     return inspect.currentframe().f_back.f_back.f_globals['__name__']
@@ -142,13 +153,6 @@ class Publish(PMessage, fields=('message',)):
 
     def __str__(self):
         return 'Publish({})'.format(str(self.message))
-
-
-class Sendable:
-
-    @abc.abstractproperty
-    def msg(self) -> 'Message':
-        ...
 
 
 class Message(Generic[A], Dat[A], Sendable):

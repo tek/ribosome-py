@@ -3,14 +3,15 @@ from typing import TypeVar, Callable, Generator
 
 from amino import __, Maybe, Boolean, _, L
 from amino.state import EvalState
-from amino.do import tdo
+from amino.do import do
 
-from ribosome.machine.transition import TransitionResult
+from ribosome.machine.transition import TransitionResult, TransitionLog
 from ribosome.machine.base import TransState
-from ribosome.request.dispatch import PluginState, ComponentState
 from ribosome.machine.message_base import Message, Sendable, Envelope
 from ribosome.logging import ribo_log
 from ribosome.machine.handler import HandlerJob
+from ribosome.plugin_state import PluginState, ComponentState
+from ribosome.nvim.io import NvimIOState
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -52,7 +53,7 @@ def process(component: ComponentState, data: D, msg: Message, prio: float=None) 
     return resolve_handler(component, msg, prio) / execute | (lambda: internal(data, msg))
 
 
-@tdo(TransState)
+@do(TransState)
 def send_message_to_component(component: ComponentState, data: D, msg: M, prio: float=None) -> TransState:
     result = yield process(component, data, msg, prio)
     log = yield EvalState.get()
@@ -63,7 +64,7 @@ def send_message_to_component(component: ComponentState, data: D, msg: M, prio: 
 
 
 def send_to(msg: Message, prio: float=None) -> Callable[[TransState, ComponentState], TransState]:
-    @tdo(TransState)
+    @do(TransState)
     def send(z: TransState, comp: ComponentState) -> Generator:
         current = yield z
         next = yield send_message_to_component(comp, current.data, msg, prio)
@@ -82,14 +83,20 @@ def send_envelope(state: PluginState[D, NP], z: TransState, env: Envelope, prio:
     return env.recipient / to_comp | (lambda: send_msg(state, z, msg, prio))
 
 
-@tdo(TransState)
-def send_message(state: PluginState[D, NP], msg: M, prio: float=None) -> Generator:
-    ''' send **msg** to all submachines, passing the transformed data from each machine to the next and
-    accumulating published messages.
+@do(TransState)
+def send_message1(state: PluginState[D, NP], msg: M, prio: float=None) -> Generator:
+    ''' send **msg** to all submachines, passing the transformed data from each machine to the next and accumulating
+    published messages.
     '''
     yield EvalState.modify(__.log(msg.msg))
     send = Boolean.isinstance(msg, Envelope).cata(send_envelope, send_msg)
     yield send(state, EvalState.pure(TransitionResult.unhandled(state.data)), msg, prio)
+
+
+@do(NvimIOState[PluginState[D, NP], TransitionResult])
+def send_message(msg: M, prio: float=None) -> Generator:
+    state = yield NvimIOState.get()
+    yield NvimIOState.pure(send_message1(state, msg, prio).run(TransitionLog.empty).evaluate())
 
 
 __all__ = ('send_message',)

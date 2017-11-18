@@ -1,7 +1,7 @@
 import abc
 import uuid
 import json
-from typing import Callable, Union, Pattern, Tuple, TypeVar, Any, Type, cast
+from typing import Callable, Union, Pattern, Tuple, TypeVar, Any, Type, cast, Generator
 
 import pyrsistent
 
@@ -354,8 +354,8 @@ def _decode_json_obj(obj):
 Rec = TypeVar('Rec', bound=Record)
 
 
-@do
-def decode_json_record(obj: dict) -> Either[str, Rec]:
+@do(Either[str, Rec])
+def decode_json_record(obj: dict) -> Generator:
     m = yield Try(Map, obj)
     tpe_path = yield m.lift('__type__').to_either(f'json object {obj} has no `__type__` field')
     tpe = yield Either.import_path(tpe_path)

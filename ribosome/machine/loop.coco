@@ -1,22 +1,24 @@
 from typing import TypeVar
 
-from amino import Just, Nothing, Right, Left, L, _, __
+from amino import Just, Nothing, Right, Left, L, _, __, Nil
 from amino.state import EvalState, EvalState
-from amino.do import tdo
+from amino.do import do
 
 from ribosome.machine.transition import TransitionResult, TransitionLog, TransitionResult
 from ribosome.machine.process_messages import PrioQueue
 from ribosome.logging import ribo_log
 from ribosome.machine.base import TransState
-from ribosome.request.dispatch import PluginState, ComponentState
 from ribosome.machine.message_base import Message
+from ribosome.plugin_state import ComponentState, PluginState
+from ribosome.nvim.io import NvimIOState
+from ribosome.request.dispatch.data import DispatchResult, DispatchUnit
 
 A = TypeVar('A')
 D = TypeVar('D')
 
 
-def process_message(messages: PrioQueue[A], state: D, send: (D, A) -> TransState) -> (PrioQueue[A], TransState) =
+def process_message(messages: PrioQueue[A], state: D, send: (D, A) -> NvimIOState[D, DispatchResult]) -> (PrioQueue[A], NvimIOState[D, DispatchResult]) =
     def process1(Right(((prio, msg), rest))) = rest, send(state, msg)
     @addpattern(process1)
-    def process1(Left(err)) = messages, EvalState.pure(TransitionResult.empty(state))
+    def process1(Left(err)) = messages, NvimIOState.pure(DispatchResult(DispatchUnit(), Nil))
     process1(messages.get)

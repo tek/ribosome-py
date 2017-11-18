@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0x921c276
+# __coconut_hash__ = 0xf9fef8e4
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -20,7 +20,7 @@ from typing import TypeVar
 
 from lenses import Lens
 
-from amino.do import tdo
+from amino.do import do
 from amino import IO
 from amino import List
 from amino import Path
@@ -35,7 +35,7 @@ A = TypeVar('A')
 D = TypeVar('D', bound=AutoData)
 
 
-@tdo(NvimIOState[D, Path])
+@do(NvimIOState[D, Path])
 def state_file(name: 'str') -> 'Generator':
     settings = yield NvimIOState.inspect(lambda a: a.settings)
     dir = yield NvimIOState.lift(settings.project_state_dir.value_or_default)
@@ -43,7 +43,7 @@ def state_file(name: 'str') -> 'Generator':
     yield NvimIOState.pure(dir / f'{name}.json')
 
 
-@tdo(NvimIOState[D, None])
+@do(NvimIOState[D, None])
 def load_json_state(name: 'str', l: 'Lens') -> 'Generator':
     file = yield state_file(name)
     exists = yield NvimIOState.lift(NvimIO.from_io(IO.delay(file.exists)))
@@ -55,7 +55,7 @@ def load_json_state(name: 'str', l: 'Lens') -> 'Generator':
         yield NvimIOState.pure(None)
 
 
-@tdo(NvimIOState[D, None])
+@do(NvimIOState[D, None])
 def store_json_data(name: 'str', data: 'A') -> 'Generator':
     file = yield state_file(name)
     json = yield NvimIOState.lift(NvimIO.from_either(encode_json(data)))
@@ -63,7 +63,7 @@ def store_json_data(name: 'str', data: 'A') -> 'Generator':
     yield NvimIOState.pure(None)
 
 
-@tdo(NvimIOState[D, None])
+@do(NvimIOState[D, None])
 def store_json_state(name: 'str', data: '_coconut.typing.Callable[[D], A]') -> 'Generator':
     payload = yield NvimIOState.inspect(data)
     yield store_json_data(name, payload)

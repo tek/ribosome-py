@@ -5,6 +5,7 @@ import neovim
 
 from ribosome.request.legacy import LegacyRequestHandler
 from ribosome.machine.message_base import Message
+from ribosome.request.handler.method import RpcMethod, AutocmdMethod
 
 M = TypeVar('M', bound=Message)
 
@@ -22,6 +23,10 @@ class Autocmd(LegacyRequestHandler):
         def neovim_autocmd_wrapper(obj, *rpc_args):
             return self.dispatch(obj, rpc_args)
         return neovim_autocmd_wrapper
+
+    @property
+    def method(self) -> RpcMethod:
+        return AutocmdMethod()
 
 
 def autocmd(**kw):

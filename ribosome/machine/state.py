@@ -23,7 +23,7 @@ import amino
 from amino import Maybe, Map, Try, _, L, List, Nothing, Lists, Nil
 from amino.util.string import red, blue
 from amino.state import EvalState
-from amino.do import tdo
+from amino.do import do
 
 short_timeout = 3
 medium_timeout = 3
@@ -108,7 +108,7 @@ class StateMachineBase(Generic[D], ModularMachine):
 
     def unhandled(self, data: D, msg: Message) -> TransState:
         prios = (self.sub // _.prios).distinct.sort(reverse=True)
-        @tdo(TransState)
+        @do(TransState)
         def step(z: TransState, a: float) -> Generator:
             current = yield z
             yield EvalState.pure(current) if current.handled else self._fold_sub(current.data, msg, a)
@@ -118,7 +118,7 @@ class StateMachineBase(Generic[D], ModularMachine):
         ''' send **msg** to all submachines, passing the transformed data from each machine to the next and
         accumulating published messages.
         '''
-        @tdo(TransState)
+        @do(TransState)
         def send(z: TransState, sub: Machine) -> Generator:
             current = yield z
             next = yield sub.loop_process(current.data, msg, prio)

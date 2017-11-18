@@ -1,7 +1,7 @@
 import neovim
 
 from ribosome.request.legacy import LegacyRequestHandler
-from ribosome.request.handler import RequestDispatcher, Fun
+from ribosome.request.handler.method import RpcMethod, FunctionMethod
 
 from amino import Map
 
@@ -24,8 +24,8 @@ class Function(LegacyRequestHandler):
         return neovim_fun_wrapper
 
     @property
-    def dispatcher(self) -> RequestDispatcher:
-        return Fun(self._fun)
+    def method(self) -> RpcMethod:
+        return FunctionMethod()
 
 
 def function(**kw):

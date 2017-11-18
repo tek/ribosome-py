@@ -6,7 +6,7 @@ from typing import TypeVar, Callable, Union, Any, Dict, Generator
 from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean, _, L, __
 from amino.util.string import camelcaseify, ToStr
 from amino.list import Nil
-from amino.do import tdo
+from amino.do import do
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log
@@ -62,8 +62,8 @@ class RpcHandlerSpec(Record):
         return Ctor(sync=sync, name=name, opts=opts, method=method, prefix=prefix)
 
     @staticmethod
-    @do
-    def from_spec(spec: Dict[str, Any], method: str, prefix: bool) -> Maybe['RpcHandlerSpec']:
+    @do(Maybe['RpcHandlerSpec'])
+    def from_spec(spec: Dict[str, Any], method: str, prefix: bool) -> Generator:
         m = Map(spec)
         ctors = Map(command=RpcCommandSpec, function=RpcFunctionSpec, autocmd=RpcAutocommandSpec)
         tpe = yield m.lift('type')
@@ -87,8 +87,8 @@ class RpcHandlerSpec(Record):
         return RpcHandlerSpec.cons(RpcAutocommandSpec, sync, name, opts, method, True)
 
     @staticmethod
-    @do
-    def decode(data: dict) -> 'Maybe[RpcHandlerSpec]':
+    @do('Maybe[RpcHandlerSpec]')
+    def decode(data: dict) -> Generator:
         m = Map(data)
         method, prefix = yield m.get_all('method', 'prefix')
         yield RpcHandlerSpec.from_spec(m, method, prefix)
@@ -319,8 +319,8 @@ def define_command(channel: int, spec: RpcHandlerSpec, plugin_file: str) -> Nvim
     return define_handler_io(lambda a: f'call {a}', channel, spec, plugin_file)
 
 
-@do
-def define_autocmd(channel: int, spec: RpcHandlerSpec, plugin_name: str, plugin_file: str) -> NvimIO[DefinedHandler]:
+@do(NvimIO[DefinedHandler])
+def define_autocmd(channel: int, spec: RpcHandlerSpec, plugin_name: str, plugin_file: str) -> Generator:
     yield NvimIO.cmd_sync(f'augroup {plugin_name}')
     result = yield define_handler_io(lambda a: f'call {a}', channel, spec, plugin_file)
     yield NvimIO.cmd_sync(f'augroup end')
@@ -338,7 +338,7 @@ def define_handler(channel: int, spec: RpcHandlerSpec, plugin_name: str, plugin_
         return NvimIO.failed(f'invalid type for {spec}')
 
 
-@tdo(NvimIO[List[DefinedHandler]])
+@do(NvimIO[List[DefinedHandler]])
 def define_handlers(specs: List[RpcHandlerSpec], plugin_name: str, plugin_file: str) -> Generator:
     channel = yield NvimIO(_.channel_id)
     yield specs.traverse(L(define_handler)(channel, _, plugin_name, plugin_file), NvimIO)

@@ -7,8 +7,11 @@ from amino import List, Maybe, Map
 from amino.util.string import camelcase
 
 from ribosome.logging import Logging
-from ribosome.request.handler import RequestHandler, RequestDispatcher, Plain
 from ribosome.request.args import ParamsSpec, ArgValidator
+from ribosome.request.handler.handler import RequestHandler
+from ribosome.request.handler.dispatcher import RequestDispatcher, FunctionDispatcher
+from ribosome.request.handler.prefix import Plain
+from ribosome.request.handler.method import RpcMethod
 
 
 def to_int(val: Union[int, str, None]) -> Union[int, str, None]:
@@ -97,11 +100,15 @@ class LegacyRequestHandler(Logging, metaclass=abc.ABCMeta):
             return validator.error(args, self.desc, self.vim_name)
 
     @abc.abstractproperty
-    def dispatcher(self) -> RequestDispatcher:
+    def method(self) -> RpcMethod:
         ...
 
     @property
+    def dispatcher(self) -> RequestDispatcher:
+        return FunctionDispatcher(self._fun)
+
+    @property
     def spec(self) -> RequestHandler:
-        return RequestHandler(self.dispatcher, self.name, Plain(), self.kw.lift('sync').true, self.kw)
+        return RequestHandler(self.method, self.dispatcher, self.name, Plain(), self.kw)
 
 __all__ = ('LegacyRequestHandler',)

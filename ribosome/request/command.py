@@ -3,7 +3,7 @@ import functools
 import neovim
 
 from ribosome.request.legacy import LegacyRequestHandler
-from ribosome.request.handler import RequestDispatcher, Cmd
+from ribosome.request.handler.method import RpcMethod, CmdMethod
 
 
 class Command(LegacyRequestHandler):
@@ -21,8 +21,8 @@ class Command(LegacyRequestHandler):
         return neovim_cmd_wrapper
 
     @property
-    def dispatcher(self) -> RequestDispatcher:
-        return Cmd(self._fun)
+    def method(self) -> RpcMethod:
+        return CmdMethod()
 
 
 def command(**kw):

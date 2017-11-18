@@ -5,9 +5,9 @@ from amino.tc.base import ImplicitInstances, F
 from amino.lazy import lazy
 from amino.tc.monad import Monad
 from amino import Either, __, IO, Maybe, Try, Left
-from amino.state import tcs, StateT
+from amino.state import tcs, StateT, IdState
 from amino.func import CallByName
-from amino.do import tdo
+from amino.do import do
 
 from ribosome.nvim.components import NvimComponent
 
@@ -83,7 +83,7 @@ class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_c
     def recover(self, f: Callable[[Exception], B]) -> 'NvimIO[B]':
         return NvimIO(self.attempt).map(__.value_or(f))
 
-    @tdo('NvimIO[A]')
+    @do('NvimIO[A]')
     def ensure(self, f: Callable[[Either[Exception, A]], 'NvimIO[None]']) -> Generator:
         result = yield NvimIO(self.attempt)
         yield f(result)
@@ -119,6 +119,10 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
     @staticmethod
     def io(f: Callable[[NvimComponent], A]) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO(f))
+
+    @staticmethod
+    def from_id(st: IdState[S, A]) -> 'NvimIOState[S, A]':
+        return st.transform_f(lambda s: NvimIO.pure(s.value))
 
 tcs(NvimIO, NvimIOState)  # type: ignore
 

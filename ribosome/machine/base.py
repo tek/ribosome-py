@@ -11,7 +11,7 @@ from amino.util.string import camelcaseify, ToStr
 from amino.lazy import lazy
 from amino.func import flip
 from amino.state import EitherState, EvalState
-from amino.do import tdo
+from amino.do import do
 
 from ribosome.machine.message_base import Message
 from ribosome.logging import print_ribo_log_info, ribo_log
@@ -107,7 +107,7 @@ class MachineBase(Generic[D], Machine, ToStr):
         pass
 
     def loop_process(self, data: D, msg: Message, prio: float=None) -> TransState:
-        @tdo(TransState)
+        @do(TransState)
         def loop(current: TransitionResult, m: Message, prio: float=None) -> Generator:
             result = yield self.process(current.data, m, prio)
             log = yield EvalState.get()
@@ -118,7 +118,7 @@ class MachineBase(Generic[D], Machine, ToStr):
             yield next_msg / L(loop)(next, _) | EvalState.pure(next)
         return loop(TransitionResult.empty(data), msg, prio)
 
-    @tdo(TransState)
+    @do(TransState)
     def process_message(self, data: D, msg: Message, prio: float=None) -> Generator:
         yield EvalState.modify(__.log(msg))
         yield self.loop_process(data, msg, prio)

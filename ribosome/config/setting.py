@@ -3,7 +3,7 @@ from typing import Callable, Type, TypeVar, Generic, Generator
 
 from amino import List, Either, __, Left, Eval
 from amino.util.string import ToStr
-from amino.do import tdo
+from amino.do import do
 
 from ribosome.nvim import NvimIO
 from ribosome.nvim.components import NvimComponent
@@ -25,7 +25,7 @@ class PluginSetting(Generic[B], Logging, ToStr):
 
     @property
     def value_or_default(self) -> NvimIO[B]:
-        @tdo(NvimIO[B])
+        @do(NvimIO[B])
         def run() -> Generator:
             value = yield self.value
             yield NvimIO.from_either(value.o(self.default_e))
@@ -54,7 +54,7 @@ class StrictSetting(Generic[A, B], PluginSetting[B]):
 
     @property
     def value(self) -> NvimIO[Either[str, B]]:
-        @tdo(Either[str, B])
+        @do(Either[str, B])
         def read(v: NvimComponent) -> Generator:
             vars = v.vars
             getter = vars.p if self.prefix else vars

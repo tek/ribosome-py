@@ -6,9 +6,9 @@ from amino.dat import Dat
 from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.data import Data
 from ribosome.record import field
-from ribosome.request.dispatch import DispatchJob
-from ribosome.request.handler import RequestHandler, RequestHandlers
+from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import PluginSettings
+from ribosome.request.dispatch.run import DispatchJob
 
 A = TypeVar('A', contravariant=True)
 B = TypeVar('B')

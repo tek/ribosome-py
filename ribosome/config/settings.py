@@ -5,7 +5,7 @@ from amino.options import env_xdg_data_dir
 from amino import List, Either, Lists, Map, _, L, __, Path, Right, Try, Nil, Boolean, Left, Eval
 from amino.func import flip
 from amino.util.string import ToStr
-from amino.do import tdo
+from amino.do import do
 
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
@@ -25,14 +25,14 @@ custom components.
 '''
 
 
-@tdo(Either[str, str])
+@do(Either[str, str])
 def project_name_from_path() -> Generator:
     cwd = yield Try(Path.cwd)
     name = cwd.name
     yield Right(name) if name else Left('cwd broken')
 
 
-@tdo(NvimIO[Either[str, Path]])
+@do(NvimIO[Either[str, Path]])
 def state_dir_with_name(state_dir: PluginSetting[Path], proteome_name: PluginSetting[str],
                         session_name: PluginSetting[str]) -> Generator:
     base = yield state_dir.value_or_default
