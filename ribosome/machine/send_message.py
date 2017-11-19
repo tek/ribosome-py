@@ -11,7 +11,7 @@ from ribosome.logging import ribo_log
 from ribosome.machine.handler import HandlerJob, AlgHandlerJob
 from ribosome.plugin_state import PluginState, ComponentState, Components
 from ribosome.nvim.io import NvimIOState
-from ribosome.request.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchErrors
+from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchErrors
 
 A = TypeVar('A')
 D = TypeVar('D')

@@ -3,7 +3,7 @@ import subprocess
 from subprocess import PIPE
 from typing import TypeVar
 
-from ribosome.machine.sub import Component
+from ribosome.dispatch.component import Component
 from ribosome.machine.message_base import pmessage, json_pmessage, Message, ToMachine
 
 from amino.util.string import blue

@@ -22,7 +22,7 @@ from ribosome.machine.machine import Machine
 from ribosome.data import Data
 from ribosome.nvim.io import NvimIOState
 from ribosome.nvim import NvimIO
-from ribosome.request.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchReturn
+from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchReturn
 from ribosome.trans.action import Transit, Propagate, Unit, Result, TransFailure, TransAction
 
 

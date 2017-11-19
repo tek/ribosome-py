@@ -5,7 +5,7 @@ from ribosome.nvim import NvimIO
 from ribosome import NvimFacade
 from ribosome.machine.state import PluginStateMachine
 from ribosome.machine.machine import Machine
-from ribosome.machine.sub import Component
+from ribosome.dispatch.component import Component
 from ribosome.machine.internal import Internal
 from ribosome.config import PluginSettings, Config, AutoData
 

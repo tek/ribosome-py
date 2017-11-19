@@ -4,7 +4,7 @@ from typing import TypeVar, Union, Any, Generic, Type
 from amino import List, Boolean, Nil, Maybe, Just, Nothing, IO
 from amino.dat import Dat, ADT, DatMeta
 
-from ribosome.rpc import RpcHandlerFunction, RpcHandlerSpec
+from ribosome.request.rpc import RpcHandlerFunction, RpcHandlerSpec
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.dispatcher import TransDispatcher
 from ribosome.request.handler.method import RpcMethod

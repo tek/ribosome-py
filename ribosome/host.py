@@ -17,7 +17,7 @@ from amino.algebra import Algebra
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log
-from ribosome.rpc import rpc_handler_functions, define_handlers, RpcHandlerSpec
+from ribosome.request.rpc import rpc_handler_functions, define_handlers, RpcHandlerSpec
 from ribosome import NvimPlugin
 from ribosome.config import Config
 from ribosome import options
@@ -31,10 +31,10 @@ from ribosome.machine.scratch import Mapping
 from ribosome.request.handler.dispatcher import MsgDispatcher
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
-from ribosome.request.dispatch.run import DispatchJob
-from ribosome.request.dispatch.data import Legacy, SendMessage, Trans, Internal, DispatchSync, DispatchAsync, Dispatch
+from ribosome.dispatch.run import DispatchJob
+from ribosome.dispatch.data import Legacy, SendMessage, Trans, Internal, DispatchSync, DispatchAsync, Dispatch
 from ribosome.plugin_state import PluginState, PluginStateHolder
-from ribosome.request.dispatch.handle import execute_dispatch_job, request_error
+from ribosome.dispatch.handle import execute_dispatch_job, request_error
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)

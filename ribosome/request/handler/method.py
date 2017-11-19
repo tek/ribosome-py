@@ -3,7 +3,7 @@ from typing import Type, TypeVar
 
 from amino.dat import ADT
 
-from ribosome.rpc import RpcHandlerSpec, RpcCommandSpec, RpcFunctionSpec, RpcAutocommandSpec
+from ribosome.request.rpc import RpcHandlerSpec, RpcCommandSpec, RpcFunctionSpec, RpcAutocommandSpec
 
 RHS = TypeVar('RHS', bound=RpcHandlerSpec)
 

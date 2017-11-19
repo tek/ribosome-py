@@ -5,7 +5,7 @@ from amino import List, Nil, Boolean
 from amino.util.string import snake_case
 from amino.algebra import Algebra
 
-from ribosome.rpc import RpcHandlerSpec
+from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.machine.message_base import Message
 from ribosome.logging import Logging
 from ribosome.machine.transition import Handler

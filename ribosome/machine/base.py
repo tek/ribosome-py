@@ -28,7 +28,7 @@ from ribosome.machine.messages import (RunNvimIO, RunIO, UnitIO, RunCorosParalle
 from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
 from ribosome.trans.api import trans
 from ribosome.nvim.io import NvimIOState
-from ribosome.request.dispatch.data import DispatchResult
+from ribosome.dispatch.data import DispatchResult
 from ribosome.trans.action import Propagate, Transit
 
 A = TypeVar('A')

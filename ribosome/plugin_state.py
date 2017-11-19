@@ -9,7 +9,7 @@ from ribosome.machine.process_messages import PrioQueue
 from ribosome.machine.handler import Handlers
 from ribosome.machine.transition import TransitionLog
 from ribosome.machine.machine import Machine
-from ribosome.machine.sub import Component
+from ribosome.dispatch.component import Component
 from ribosome.machine.base import message_handlers, handlers
 
 NP = TypeVar('NP')

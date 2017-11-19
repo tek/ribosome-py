@@ -5,7 +5,7 @@ from ribosome import NvimStatePlugin, msg_command
 # from amino.state import IdState, StateT, EitherState
 # from ribosome.logging import Logging
 # from ribosome.machine.message_base import pmessage
-# from ribosome.machine.state import Component, ComponentMachine
+# from ribosome.machine.state import Component
 # from ribosome.nvim import NvimFacade, AsyncVimProxy
 # from ribosome.data import Data
 # from ribosome.record import field

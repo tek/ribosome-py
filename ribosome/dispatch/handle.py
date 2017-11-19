@@ -19,8 +19,8 @@ from ribosome.machine.loop import process_message
 from ribosome.machine.transition import TransitionResult
 from ribosome.machine.send_message import send_message
 from ribosome.nvim.io import NvimIOState
-from ribosome.request.dispatch.run import DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch
-from ribosome.request.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
+from ribosome.dispatch.run import DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch
+from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
                                             DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO,
                                             DispatchErrors)
 from ribosome.plugin_state import PluginState, PluginStateHolder

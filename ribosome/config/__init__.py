@@ -8,7 +8,7 @@ from ribosome.data import Data
 from ribosome.record import field
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import PluginSettings
-from ribosome.request.dispatch.run import DispatchJob
+from ribosome.dispatch.run import DispatchJob
 
 A = TypeVar('A', contravariant=True)
 B = TypeVar('B')

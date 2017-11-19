@@ -11,9 +11,9 @@ from ribosome.machine.loop import process_message
 from ribosome.machine.message_base import Msg, Message
 from ribosome.machine.transition import TransitionResult, handle, TransitionLog
 from ribosome.machine.process_messages import PrioQueue
-from ribosome.request.dispatch import PluginState
+from ribosome.dispatch import PluginState
 from ribosome.test.spec import MockNvimFacade
-from ribosome.machine.sub import Component, ComponentMachine
+from ribosome.dispatch.component import Component
 from ribosome.machine.send_message import send_message
 
 
@@ -49,7 +49,7 @@ class LoopSpec(SpecBase):
     def send_message(self) -> Expectation:
         d = AutoData(config=Config('test'))
         vim = MockNvimFacade()
-        state = PluginState.cons(vim, d, None, List(ComponentMachine(vim, Comp1, 'comp1', Nothing)), PrioQueue.empty)
+        state = PluginState.cons(vim, d, None, List(Comp1('comp1')), PrioQueue.empty)
         a = Msg1()
         r = send_message(state, a).run(TransitionLog.empty).evaluate()[1]
         return k(r.pub.head / _.msg).must(be_just(have_type(Msg2)))

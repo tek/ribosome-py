@@ -9,7 +9,7 @@ from ribosome.machine.messages import Stage1
 from ribosome.config import RequestHandler, AutoData
 from ribosome.nvim import NvimIO
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
-from ribosome.machine.sub import Component
+from ribosome.dispatch.component import Component
 from ribosome.request.handler import Plain
 
 Msg1 = pmessage('Msg1')

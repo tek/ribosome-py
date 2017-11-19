@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0x31f80b9d
+# __coconut_hash__ = 0xd07cf0cc
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -40,8 +40,8 @@ from ribosome.machine.message_base import Message
 from ribosome.plugin_state import ComponentState
 from ribosome.plugin_state import PluginState
 from ribosome.nvim.io import NvimIOState
-from ribosome.request.dispatch.data import DispatchResult
-from ribosome.request.dispatch.data import DispatchUnit
+from ribosome.dispatch.data import DispatchResult
+from ribosome.dispatch.data import DispatchUnit
 
 A = TypeVar('A')
 D = TypeVar('D')

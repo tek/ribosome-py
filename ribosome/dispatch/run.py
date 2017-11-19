@@ -12,7 +12,7 @@ from ribosome.machine.handler import AlgResultValidator
 from ribosome.request.args import ArgValidator, ParamsSpec
 from ribosome.machine.send_message import send_message
 from ribosome.plugin_state import PluginState, PluginStateHolder
-from ribosome.request.dispatch.data import (Legacy, DispatchReturn, Internal, Trans, DispatchUnit, SendMessage,
+from ribosome.dispatch.data import (Legacy, DispatchReturn, Internal, Trans, DispatchUnit, SendMessage,
                                             DispatchResult)
 from ribosome.nvim.io import NvimIOState
 

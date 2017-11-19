@@ -11,7 +11,7 @@ from ribosome.machine.base import TransState
 from ribosome.machine.message_base import Message
 from ribosome.plugin_state import ComponentState, PluginState
 from ribosome.nvim.io import NvimIOState
-from ribosome.request.dispatch.data import DispatchResult, DispatchUnit
+from ribosome.dispatch.data import DispatchResult, DispatchUnit
 
 A = TypeVar('A')
 D = TypeVar('D')
