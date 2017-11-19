@@ -1,10 +1,10 @@
-from typing import TypeVar, Type, Callable, Generator, Any, Tuple, Generic
+from typing import TypeVar, Type, Callable, Any, Tuple, Generic
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
 import amino
 from amino import _, L, __
-from amino.do import do
+from amino.do import do, Do
 from amino.dispatch import dispatch_alg
 from amino.util.exception import format_exception
 from amino.algebra import Algebra
@@ -35,6 +35,7 @@ C = TypeVar('C', bound=Config)
 R = TypeVar('R')
 DP = TypeVar('DP', bound=Dispatch)
 RDP = TypeVar('RDP', bound=Algebra)
+Res = NvimIOState[PluginState[D, NP], DispatchResult]
 
 
 class ExecuteDispatchIO:
@@ -48,40 +49,49 @@ execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
 
 class ExecuteDispatchOutput:
 
-    def dispatch_error(self, result: DispatchError) -> NvimIO[Any]:
-        return result.exception / NvimIO.exception | NvimIO(lambda v: ribo_log.error(result.message))
+    def dispatch_error(self, result: DispatchError) -> NvimIOState[PluginState[D, NP], R]:
+        return NvimIOState.lift(result.exception / NvimIO.exception | NvimIO(lambda v: ribo_log.error(result.message)))
 
-    def dispatch_errors(self, result: DispatchErrors) -> NvimIO[Any]:
-        return result.errors.traverse(self.dispatch_error, NvimIO)
+    def dispatch_errors(self, result: DispatchErrors) -> NvimIOState[PluginState[D, NP], R]:
+        return result.errors.traverse(self.dispatch_error, NvimIOState)
 
-    def dispatch_return(self, result: DispatchReturn) -> NvimIO[Any]:
-        return NvimIO.pure(result.value)
+    def dispatch_return(self, result: DispatchReturn) -> NvimIOState[PluginState[D, NP], R]:
+        return NvimIOState.pure(result.value)
 
-    def dispatch_unit(self, result: DispatchUnit) -> NvimIO[Any]:
-        return NvimIO.pure(0)
+    def dispatch_unit(self, result: DispatchUnit) -> NvimIOState[PluginState[D, NP], R]:
+        return NvimIOState.pure(0)
 
-    def dispatch_io(self, result: DispatchIO) -> NvimIO[Any]:
+    def dispatch_io(self, result: DispatchIO) -> NvimIOState[PluginState[D, NP], R]:
         return execute_io(result)
 
 
 execute_output = dispatch_alg(ExecuteDispatchOutput(), DispatchOutput, '')
 
 
-# TODO check how long-running messages can be handled; timeout for acquire is 10s
-@do(NvimIO[R])
-def dispatch_step(holder: PluginStateHolder,
-                  action: Callable[[], NvimIOState[PluginState[D, NP], B]],
-                  update: Callable[[B], NvimIOState[PluginState[D, NP], DispatchResult]]) -> Generator:
-    def release(error: Any) -> NvimIO[R]:
+@do(NvimIOState[PluginState[D, NP], R])
+def run_dispatch(action: Callable[[], NvimIOState[PluginState[D, NP], B]], update: Callable[[B], Res]) -> Do:
+    response = yield action()
+    result = yield update(response)
+    yield NvimIOState.modify(__.enqueue(result.msgs))
+    yield execute_output(result.output)
+
+
+# FIXME check how long-running messages can be handled; timeout for acquire is 10s
+def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[R]]) -> NvimIO[R]:
+    def release(error: Any) -> None:
         holder.release()
     yield NvimIO(lambda v: holder.acquire())
-    state1, response = yield action().run(holder.state).error_effect(release)
-    state2, result = yield update(response).run(state1).error_effect(release)
-    state3 = state2.enqueue(result.msgs)
-    yield NvimIO(lambda v: holder.update(state3)).error_effect(release)
-    r = yield execute_output(result.output)
+    state, response = yield f.error_effect(release)
+    yield NvimIO(lambda v: holder.update(state))
     yield NvimIO(release)
-    yield NvimIO.pure(r)
+    yield NvimIO.pure(response)
+
+
+@do(NvimIO[R])
+def unsafe_dispatch_and_update(holder: PluginStateHolder,
+                               action: Callable[[], NvimIOState[PluginState[D, NP], B]],
+                               update: Callable[[B], NvimIOState[PluginState[D, NP], DispatchResult]]) -> Do:
+    return exclusive(holder, lambda: run_dispatch(action, update).run(holder.state))
 
 
 class DispatchRunner(Generic[RDP]):
@@ -97,16 +107,24 @@ class DispatchRunner(Generic[RDP]):
         return self.f(args)
 
 
-def execute(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> NvimIO[Any]:
+sync_runner = DispatchRunner.cons(RunDispatchSync, DispatchSync)
+async_runner = DispatchRunner.cons(RunDispatchAsync, DispatchAsync)
+
+
+def sync_sender(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> Callable[[], Res]:
     def send() -> NvimIOState[PluginState[D, NP], DispatchResult]:
         return runner(job.args)(dispatch)
-    return dispatch_step(job.state, send, NvimIOState.pure)
+    return send
+
+
+def execute(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> NvimIO[Any]:
+    return unsafe_dispatch_and_update(job.state, sync_sender(job, dispatch, runner), NvimIOState.pure)
 
 
 # unconditionally fork a resend loop in case the sync transition has returned messages
 # only allow the first transition to provide a return value
 def execute_sync(job: DispatchJob, dispatch: DispatchSync) -> NvimIO[Any]:
-    return execute(job, dispatch, DispatchRunner.cons(RunDispatchSync, DispatchSync))
+    return execute(job, dispatch, sync_runner)
 
 
 def request_error(job: DispatchJob, exc: Exception) -> int:
@@ -120,22 +138,22 @@ def request_error(job: DispatchJob, exc: Exception) -> int:
 
 
 # maybe don't enqueue messages here, but in `execute_output`
-@do(NvimIO[Any])
-def resend_loop(holder: PluginStateHolder) -> Generator:
+@do(NvimIO[PluginState[D, NP]])
+def resend_loop(holder: PluginStateHolder) -> Do:
     def send() -> NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]]:
         return NvimIOState.inspect(lambda state: process_message(state.messages, send_message))
     @do(NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]])
-    def update(result: Tuple[PrioQueue[Message], TransitionResult]) -> Generator:
+    def update(result: Tuple[PrioQueue[Message], TransitionResult]) -> Do:
         messages, trs = result
         yield NvimIOState.modify(__.copy(messages=messages))
         yield trs
-    yield dispatch_step(holder, send, update)
+    yield unsafe_dispatch_and_update(holder, send, update)
     yield resend_loop(holder) if holder.has_messages else NvimIO.pure(holder.state)
 
 
 @do(NvimIO[Any])
-def execute_async_loop(job: DispatchJob, dispatch: DispatchAsync) -> Generator:
-    yield execute(job, dispatch, DispatchRunner.cons(RunDispatchAsync, DispatchAsync))
+def execute_async_loop(job: DispatchJob, dispatch: DispatchAsync) -> Do:
+    yield execute(job, dispatch, async_runner)
     yield resend_loop(job.state)
 
 
@@ -146,7 +164,7 @@ def execute_async(job: DispatchJob, dispatch: DispatchAsync) -> NvimIO[None]:
 
 
 @do(NvimIO[Any])
-def execute_dispatch_job(job: DispatchJob) -> Generator:
+def execute_dispatch_job(job: DispatchJob) -> Do:
     dispatch = yield NvimIO.from_maybe(job.dispatches.lift(job.name), 'no handler')
     relay = execute_sync if dispatch.sync else execute_async
     yield relay(job, dispatch)

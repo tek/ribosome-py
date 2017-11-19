@@ -1,5 +1,5 @@
 import abc
-from typing import TypeVar, Union, Any, Generic
+from typing import TypeVar, Union, Any, Generic, Type
 
 from amino import List, Boolean, Nil, Maybe, Just, Nothing, IO
 from amino.dat import Dat, ADT, DatMeta
@@ -76,6 +76,14 @@ class SendMessage(DispatchAsync):
 
     def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
         return self.handler.spec(name, prefix)
+
+    @property
+    def msg(self) -> Type[Message]:
+        return self.handler.dispatcher.msg
+
+    @property
+    def method(self) -> str:
+        return self.handler.method.method
 
 
 class Trans(Generic[Meth, B], DispatchSync, DispatchAsync):
@@ -201,6 +209,12 @@ class DispatchResultMeta(DatMeta):
     @property
     def unit_nio(self) -> 'NvimIOState[D, DispatchResult]':
         return NvimIOState.pure(DispatchResult.unit)
+
+    def error(problem: Union[str, Exception]) -> 'NvimIOState[D, DispatchResult]':
+        return DispatchResult(DispatchError.cons(problem), Nil)
+
+    def error_nio(problem: Union[str, Exception]) -> 'NvimIOState[D, DispatchResult]':
+        return NvimIOState.pure(DispatchResult.error(problem))
 
 
 class DispatchResult(Dat['DispatchResult'], metaclass=DispatchResultMeta):

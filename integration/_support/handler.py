@@ -9,7 +9,7 @@ from ribosome import NvimStatePlugin, msg_command
 # from ribosome.nvim import NvimFacade, AsyncVimProxy
 # from ribosome.data import Data
 # from ribosome.record import field
-# from ribosome.machine import trans
+# from ribosome.trans.api import trans
 # from ribosome.machine.machine import Machine
 
 # Msg1 = pmessage('Msg1')

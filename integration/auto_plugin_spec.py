@@ -4,7 +4,7 @@ from amino import Map, __, List
 
 from ribosome.plugin import Config, PluginSettings
 from ribosome.machine.message_base import pmessage
-from ribosome.machine import trans
+from ribosome.trans.api import trans
 from ribosome.machine.messages import Stage1
 from ribosome.config import RequestHandler, AutoData
 from ribosome.nvim import NvimIO

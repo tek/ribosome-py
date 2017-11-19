@@ -81,6 +81,9 @@ class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_c
     def attempt(self, vim: NvimComponent) -> Either[Exception, A]:
         return Try(self.run, vim)
 
+    def unsafe(self, vim: NvimComponent) -> A:
+        return self.attempt(vim).get_or_raise()
+
     def recover(self, f: Callable[[Exception], B]) -> 'NvimIO[B]':
         return NvimIO(self.attempt).map(__.value_or(f))
 

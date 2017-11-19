@@ -56,6 +56,9 @@ class Config(Generic[Settings, S], Dat['Config']):
     def json_repr(self) -> dict:
         return dict(__type__='ribosome.config.Config', name=self.name, prefix=self.prefix)
 
+    def vim_cmd_name(self, handler: RequestHandler) -> str:
+        return handler.vim_cmd_name(self.name, self.prefix)
+
 
 class AutoData(Data):
     config: Config = field(Config)

@@ -11,7 +11,7 @@ from amino import Just, Maybe, __, _
 from ribosome.machine.transition import may_handle, handle
 from ribosome.machine.messages import Nop, Done, Quit, Stop, CoroutineAlg, SubProcessAsync, Fork, Coroutine
 from ribosome.machine.handler import AlgResultValidator
-from ribosome.machine import trans
+from ribosome.trans.api import trans
 from ribosome.data import Data
 
 Callback = pmessage('Callback', 'func')
@@ -55,7 +55,7 @@ class Internal(Component):
             return Just(AlgResultValidator(trans_desc).validate(res, self.data))
         return run_coro_alg()
 
-    @trans.one(SubProcessAsync)
+    @trans.msg.one(SubProcessAsync)
     def message_sub_process_async(self) -> None:
         def subproc_async() -> Message:
             job = self.msg.job
@@ -72,7 +72,7 @@ class Internal(Component):
             return self.msg.result(result)
         return Fork(subproc_async)
 
-    @trans.unit(Fork)
+    @trans.msg.unit(Fork)
     def message_fork(self) -> None:
         def dispatch() -> None:
             try:

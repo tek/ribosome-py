@@ -6,8 +6,8 @@ from ribosome.machine.message_base import pmessage
 from ribosome.nvim import HasNvim, NvimFacade, ScratchBuffer
 from ribosome.machine.base import UnitIO
 from ribosome.machine.transition import may_handle, handle
-from ribosome.machine.sub import SubMachine
 from ribosome.machine.internal import KillMachine
+from ribosome.machine.sub import Component
 
 from amino import Map, Boolean, __, Empty
 from amino.io import IO
@@ -16,12 +16,11 @@ Mapping = pmessage('Mapping', 'uuid', 'keyseq')
 Quit = pmessage('Quit')
 
 
-class ScratchMachine(SubMachine, HasNvim, metaclass=abc.ABCMeta):
+class Scratch(Component, metaclass=abc.ABCMeta):
 
-    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer, parent=None, name=None) -> None:
+    def __init__(self, scratch: ScratchBuffer, parent=None, name=None) -> None:
         self.scratch = scratch
-        SubMachine.__init__(self, parent, name=name)
-        HasNvim.__init__(self, vim)
+        Component.__init__(self, parent, name=name)
         self._create_mappings()
         self._create_autocmds()
 

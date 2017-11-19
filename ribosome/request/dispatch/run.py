@@ -1,39 +1,36 @@
-from typing import TypeVar, Any, Generic, Tuple, Type, Union, Generator
+from typing import TypeVar, Any, Generic, Type
 
-from amino import Map, List, Boolean, Nil, Either, Left, Right, _, __, __
+from amino import Map, List, Boolean, Nil, Either, Left, Right, __, _
 from amino.dat import Dat
 from amino.algebra import Algebra
-from amino.do import do
+from amino.do import do, Do
 
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
 from ribosome.machine.message_base import Message
 from ribosome.machine.handler import AlgResultValidator
-from ribosome.machine.transition import TransitionLog
 from ribosome.request.args import ArgValidator, ParamsSpec
 from ribosome.machine.send_message import send_message
 from ribosome.plugin_state import PluginState, PluginStateHolder
-from ribosome.request.dispatch.data import (DispatchOutput, Legacy, DispatchReturn, Internal, Trans, DispatchUnit,
-                                            DispatchError, SendMessage, DispatchResult, DispatchDone)
+from ribosome.request.dispatch.data import (Legacy, DispatchReturn, Internal, Trans, DispatchUnit, SendMessage,
+                                            DispatchResult)
 from ribosome.nvim.io import NvimIOState
 
 # NP = TypeVar('NP', bound=NvimPlugin)
 NP = TypeVar('NP')
 D = TypeVar('D')
 DP = TypeVar('DP', bound=Algebra)
-DispatchResult1 = Tuple[DispatchOutput, PluginState[D, NP], List[Message]]
+Res = NvimIOState[PluginState[D, NP], DispatchResult]
 
 
-def handle_trans(trans: Trans, state: PluginState[D, NP], args: List[Any]) -> DispatchResult:
+def run_trans(trans: Trans, args: List[Any]) -> Res:
     handler = trans.handler.dispatcher.handler
-    msg = handler.message(*args)
-    result = handler.execute(None, state.data, msg)
+    result = handler.run(args)
     validator = AlgResultValidator(trans.name)
-    trans_result = validator.validate(result, state.data)
-    return DispatchUnit(), state.log_message(msg).update(trans_result.data), trans_result.resend + trans_result.pub
+    return validator.validate(result)
 
 
-def handle_internal(trans: Trans, state: PluginState[D, NP], args: List[Any]) -> DispatchResult1:
+def run_internal(trans: Trans, state: PluginState[D, NP], args: List[Any]) -> Res:
     handler = trans.handler.dispatcher.handler
     result = handler.execute(None, state, args)
     validator = AlgResultValidator(trans.name)
@@ -46,59 +43,42 @@ def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str
     return Right(tpe(*args)) if validator.validate(args) else Left(validator.error(args, method, cmd_name))
 
 
-class RunDispatchSync(Generic[D, NP], Logging):
+class RunDispatch(Generic[D, NP], Logging):
+
+    def internal(self, dispatch: Internal) -> NvimIOState[PluginState[D, NP], DispatchResult]:
+        return run_internal(dispatch, self.args)
+
+    def trans(self, dispatch: Trans) -> NvimIOState[PluginState[D, NP], DispatchResult]:
+        return run_trans(dispatch, self.args)
+
+
+class RunDispatchSync(RunDispatch):
 
     def __init__(self, args: List[Any]) -> None:
         self.args = args
 
     @do(NvimIOState[PluginState[D, NP], DispatchResult])
-    def legacy(self, dispatch: Legacy) -> Generator:
-        state = yield NvimIOState.get()
-        root = state.root
-        root.state = state.data
-        result = dispatch.handler.func(state.plugin, *self.args)
-        new_state = state.update(root.state).log_messages(root.last_message_log)
-        yield NvimIOState.set(new_state)
+    def legacy(self, dispatch: Legacy) -> Do:
+        plugin = yield NvimIOState.inspect(_.plugin)
+        root = yield NvimIOState.inspect(_.root)
+        data = yield NvimIOState.inspect(_.data)
+        root.state = data
+        result = dispatch.handler.func(plugin, *self.args)
+        yield NvimIOState.modify(__.update(root.state))
+        yield NvimIOState.modify(__.log_messages(root.last_message_log))
         yield NvimIOState.pure((DispatchResult(DispatchReturn(result), Nil)))
 
-    def internal(self, dispatch: Internal) -> NvimIO[DispatchResult1]:
-        return NvimIO(lambda v: handle_internal(dispatch, self.state, self.args))
 
-    def trans(self, dispatch: Trans) -> NvimIO[DispatchResult1]:
-        return NvimIO(lambda v: handle_trans(dispatch, self.state, self.args))
-
-
-class RunDispatchAsync(Generic[D, NP], Logging):
+class RunDispatchAsync(RunDispatch):
 
     def __init__(self, args: List[Any]) -> None:
         self.args = args
 
-    # sending messages cannot produce return values to vim, ever, because we want to support multiple components.
-    # therefore, we can accumulate the results of the components by aggregating errors and messages.
     @do(NvimIOState[PluginState[D, NP], DispatchResult])
-    def send_message(self, dispatch: SendMessage) -> Generator:
-        handler = dispatch.handler
-        dispatcher = handler.dispatcher
-        method = handler.method
-        config = yield NvimIOState.inspect(_.config)
-        name = config.name
-        prefix = config.prefix
-        msg_e = cons_message(dispatcher.msg, self.args, handler.vim_cmd_name(name, prefix), method.method)
-        def error(problem: Union[str, Exception]) -> NvimIOState[PluginState[D, NP], DispatchResult]:
-            return NvimIOState.pure(DispatchResult(DispatchError.cons(problem), Nil))
-        @do(NvimIOState[PluginState[D, NP], DispatchResult])
-        def send(msg: Message) -> Generator:
-            result = yield send_message(msg)
-            # yield NvimIOState.modify(__.update(result.data))
-            # yield NvimIOState.modify(__.log(log))
-            # yield NvimIOState.pure(DispatchResult(DispatchUnit(), result.pub + result.resend))
-        yield msg_e.cata(error, send)
-
-    def internal(self, dispatch: Internal) -> NvimIO[DispatchResult1]:
-        return NvimIO(lambda v: handle_internal(dispatch, self.state, self.args))
-
-    def trans(self, dispatch: Trans) -> NvimIO[DispatchResult1]:
-        return NvimIO(lambda v: handle_trans(dispatch, self.state, self.args))
+    def send_message(self, dispatch: SendMessage) -> Do:
+        cmd_name = yield NvimIOState.inspect(__.vim_cmd_name(dispatch.handler))
+        msg_e = cons_message(dispatch.msg, self.args, cmd_name, dispatch.method)
+        yield msg_e.cata(DispatchResult.error_nio, send_message)
 
 
 def invalid_dispatch(data: Any) -> NvimIO[Any]:

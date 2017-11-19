@@ -5,8 +5,6 @@ from asyncio import iscoroutinefunction
 
 from amino.tc.optional import Optional
 from amino import Maybe, may, Either, Just, Left, I, List, Nothing, _, __, Id, Nil
-from amino.io import IOException
-from amino.util.exception import format_exception
 from amino.state import StateT
 from amino.util.string import ToStr
 from amino.dat import Dat, DatMeta
@@ -15,11 +13,9 @@ from amino.do import do
 from ribosome.machine.message_base import (_message_attr, _machine_attr, Message, default_prio, _prio_attr,
                                            fallback_prio, override_prio, _dyn_attr)
 
-from ribosome.record import Record, any_field, list_field, field, bool_field, optional_field, maybe_field
-from ribosome.logging import Logging, ribo_log
+from ribosome.logging import Logging
 from ribosome.machine.machine import Machine
 from ribosome.data import Data
-from ribosome.machine.transitions import Transitions
 from ribosome.machine.messages import Error, Debug, Coroutine
 
 A = TypeVar('A')
@@ -68,8 +64,6 @@ def _io_result(result):
 D = TypeVar('D', bound=Data)
 M = TypeVar('M', bound=Message)
 R = TypeVar('R')
-T = TypeVar('T', bound=Transitions)
-Mes = TypeVar('Mes', bound=Message)
 DynResult = Union[Message, List[Message]]
 DynTrans = Union[DynResult, Maybe[DynResult], Either[str, DynResult], StateT[Id, Data, DynResult]]
 
@@ -86,23 +80,23 @@ class Handler(Generic[M, D, R], Logging, ToStr):
     @staticmethod
     def attrs(fun: Callable) -> Tuple[str, Type[M], float, bool]:
         name = fun.__name__
-        msg = getattr(fun, _message_attr)
+        msg = getattr(fun, _message_attr, None)
         prio = getattr(fun, _prio_attr, default_prio)
-        dyn = getattr(fun, _dyn_attr)
+        dyn = getattr(fun, _dyn_attr, False)
         return name, msg, prio, dyn
 
     @staticmethod
     def create(fun: Callable[[Machine, D, M], R]) -> 'Handler[M, D, R]':
         name, msg, prio, dyn = Handler.attrs(fun)
-        tpe = CoroHandler if iscoroutinefunction(fun) else DynHandler  # if dyn else AlgHandler
+        tpe = CoroHandler if iscoroutinefunction(fun) else DynHandler  # if dyn else TransHandler
         return tpe(name, fun, msg, prio, dyn)
 
     @abc.abstractmethod
-    def execute(self, machine: Machine, data: D, msg: Mes) -> R:
+    def execute(self, machine: Machine, data: D, msg: M) -> R:
         ...
 
     @abc.abstractmethod
-    def run(self, machine: Machine, data: D, msg: Mes) -> R:
+    def run(self, machine: Machine, data: D, msg: M) -> R:
         ...
 
     def _arg_desc(self) -> List[str]:

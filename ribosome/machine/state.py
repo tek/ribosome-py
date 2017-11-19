@@ -14,7 +14,6 @@ from ribosome.machine.base import Machine, MachineBase, TransState
 from ribosome.machine.transition import may_handle, handle, _recover_error, CoroExecutionHandler, TransitionLog
 from ribosome.machine.messages import Nop, PlugCommand, Stop, Error
 from ribosome.machine.handler import DynHandlerJob
-from ribosome.machine.modular import ModularMachine
 from ribosome.machine.internal import RunScratchMachine, RunMachine
 from ribosome.config import AutoData
 
@@ -51,7 +50,7 @@ class AsyncIOBase(Logging, abc.ABC):
 D = TypeVar('D', bound=AutoData)
 
 
-class StateMachineBase(Generic[D], ModularMachine):
+class StateMachineBase(Generic[D], MachineBase):
 
     def __init__(self, name: str, sub: List[Machine], parent: Maybe[Machine]=Nothing, debug: bool=False
                  ) -> None:

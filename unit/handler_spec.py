@@ -7,7 +7,7 @@ from kallikrein.matchers.maybe import be_just
 from ribosome.machine.message_base import pmessage
 from ribosome.machine.messages import RunIOAlg
 from ribosome.machine.handler import AlgResultValidator
-from ribosome.machine import trans
+from ribosome.trans.api import trans
 from ribosome.machine.trans import Transit
 
 from amino import Right, IO, _, Either, Id, Maybe, L

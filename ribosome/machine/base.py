@@ -26,10 +26,10 @@ from ribosome.machine.messages import (RunNvimIO, RunIO, UnitIO, RunCorosParalle
                                        ShowLogInfo, Nop, RunIOAlg, TransitionException, Info, RunNvimIOAlg, DataIO,
                                        RunNvimUnitIO, RunNvimIOStateAlg)
 from ribosome.machine.handler import Handlers, DynHandlerJob, AlgHandlerJob, HandlerJob
-from ribosome.machine import trans
-from ribosome.machine.trans import Propagate, Transit
+from ribosome.trans.api import trans
 from ribosome.nvim.io import NvimIOState
 from ribosome.request.dispatch.data import DispatchResult
+from ribosome.trans.action import Propagate, Transit
 
 A = TypeVar('A')
 D = TypeVar('D', bound=Data)
@@ -171,15 +171,15 @@ class MachineBase(Generic[D], Machine, ToStr):
             self.log.error(f'NvimIO returned None: {io}')
         return result
 
-    @trans.multi(RunNvimIO, trans.e)
+    @trans.msg.multi(RunNvimIO, trans.e)
     def message_run_nvim_io(self, data: D, msg: RunNvimIO) -> Either[str, List[Message]]:
         return self._run_nio(msg.io)
 
-    @trans.relay(RunNvimIOAlg)
+    @trans.msg.relay(RunNvimIOAlg)
     def message_run_nvim_io_alg(self, data: D, msg: RunNvimIOAlg) -> Either[str, List[Message]]:
         return Propagate.from_either(self._run_nio(msg.io))
 
-    @trans.relay(RunNvimIOStateAlg)
+    @trans.msg.relay(RunNvimIOStateAlg)
     def message_run_nvim_io_state_alg(self, data: D, msg: RunNvimIOAlg) -> Either[str, List[Message]]:
         return Transit(EitherState.apply(self._run_nio(msg.io_f).join))
 
@@ -193,7 +193,7 @@ class MachineBase(Generic[D], Machine, ToStr):
     def message_run_io(self, data: D, msg):
         return self._run_io(msg.io)
 
-    @trans.relay(RunIOAlg)
+    @trans.msg.relay(RunIOAlg)
     def message_run_io_alg(self, data: D, msg: RunIOAlg):
         return self._run_io(msg.io)
 

@@ -18,7 +18,6 @@ from ribosome.machine.scratch import Mapping
 from ribosome.rpc import rpc_handlers_json
 from ribosome.record import encode_json_compat, decode_json_compat
 from ribosome.machine.messages import Stage1, Stage2, Stage3, Stage4, Quit
-from ribosome.machine.root import RootMachine, root_machine
 from ribosome.config import Config, PluginSettings, AutoData
 
 
@@ -122,9 +121,9 @@ class NvimStatePluginMeta(NvimPluginMeta):
 
 class NvimStatePlugin(NvimPlugin, metaclass=NvimStatePluginMeta):
 
-    @abc.abstractmethod
-    def state(self) -> RootMachine:
-        ...
+#     @abc.abstractmethod
+#     def state(self) -> RootMachine:
+#         ...
 
     def message_log(self) -> List[Message]:
         return self.state().message_log // encode_json_compat
@@ -163,10 +162,10 @@ class AutoPlugin(Generic[Settings, D], NvimStatePlugin, metaclass=AutoPluginMeta
         super().__init__(nvim)
         self.config = config
         self.initial_state = initial_state
-        self.root = self.create_root()
+        # self.root = self.create_root()
 
-    def create_root(self) -> RootMachine[Settings, D]:
-        return root_machine(self.vim.proxy, self.config, self.initial_state)
+    # def create_root(self) -> RootMachine[Settings, D]:
+    #     return root_machine(self.vim.proxy, self.config, self.initial_state)
 
     def stage_1(self) -> None:
         self.root.start()
@@ -185,8 +184,8 @@ class AutoPlugin(Generic[Settings, D], NvimStatePlugin, metaclass=AutoPluginMeta
     def quit(self) -> None:
         self.root.send(Quit())
 
-    def state(self) -> RootMachine:
-        return self.root
+    # def state(self) -> RootMachine:
+    #     return self.root
 
 
 class Helpers(Logging):

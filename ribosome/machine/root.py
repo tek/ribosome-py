@@ -3,33 +3,31 @@ from typing import Generator, Union, TypeVar, Generic, Type
 from ribosome.logging import Logging, ribo_log
 from ribosome.nvim import NvimIO
 from ribosome import NvimFacade
-from ribosome.machine.transitions import Transitions
 from ribosome.machine.state import PluginStateMachine
 from ribosome.machine.machine import Machine
-from ribosome.machine.sub import ComponentMachine, Component
+from ribosome.machine.sub import Component
 from ribosome.machine.internal import Internal
 from ribosome.config import PluginSettings, Config, AutoData
 
-from amino import Try, _, L, Either, List, Left, do, Right, curried, Boolean, Nothing
-from amino.do import do
+from amino import Try, _, L, Either, List, Left, do, Right, curried, Boolean
 
 Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D', bound=AutoData)
 
 
-class RootMachine(Generic[Settings, D], PluginStateMachine):
+# class RootMachine(Generic[Settings, D], PluginStateMachine):
 
-    def __init__(self, vim: NvimFacade, config: Config[Settings, D], sub: List[Machine], initial_state: D) -> None:
-        self.config = config
-        self.initial_state = initial_state
-        PluginStateMachine.__init__(self, config.name, vim, sub.cons(ComponentMachine(vim, Internal, 'internal', self)))
+#     def __init__(self, vim: NvimFacade, config: Config[Settings, D], sub: List[Machine], initial_state: D) -> None:
+#         self.config = config
+#         self.initial_state = initial_state
+#         PluginStateMachine.__init__(self, config.name, vim, sub.cons(Component(vim, Internal, 'internal', self)))
 
-    @property
-    def init(self) -> D:
-        return self.initial_state
+#     @property
+#     def init(self) -> D:
+#         return self.initial_state
 
-    def trans(self, *a, **kw) -> None:
-        pass
+#     def trans(self, *a, **kw) -> None:
+#         pass
 
 
 class ComponentResolver(Logging):
@@ -41,7 +39,7 @@ class ComponentResolver(Logging):
     def name(self) -> str:
         return self.config.name
 
-    def find_component(self, name: str) -> Either[List[str], ComponentMachine]:
+    def find_component(self, name: str) -> Either[List[str], Component]:
         mods = List(
             Either.import_module(name),
             Either.import_module(f'{self.name}.components.{name}'),
@@ -58,7 +56,7 @@ class ComponentResolver(Logging):
             else Left('module does not define class `Component`')
         )
 
-    def extra_component(self, name: str, vim: NvimFacade) -> Either[List[str], ComponentMachine]:
+    def extra_component(self, name: str, vim: NvimFacade) -> Either[List[str], Component]:
         auto = f'{self.config.name}.components.{name}'
         return (
             self.declared_component(name)
@@ -74,22 +72,20 @@ class ComponentResolver(Logging):
             .to_either(List(f'no auto component defined for `{name}`'))
         )
 
-    @do(Either[List[str], ComponentMachine])
+    @do(Either[List[str], Component])
     def component_from_exports(self, mod: str) -> Generator:
         exports = yield Either.exports(mod).lmap(List)
         yield (
-            exports.find(L(Boolean.issubclass)(_, (Component, ComponentMachine)))
+            exports.find(L(Boolean.issubclass)(_, (Component, Component)))
             .to_either(f'none of `{mod}.__all__` is a `Component`: {exports}')
             .lmap(List)
         )
 
     @curried
-    def inst_auto(self, name: str, vim: NvimFacade, plug: Union[str, Type]) -> Either[str, ComponentMachine]:
+    def inst_auto(self, name: str, vim: NvimFacade, plug: Union[str, Type]) -> Either[str, Component]:
         return (
-            Right(ComponentMachine(vim, plug, name, Nothing))
-            if isinstance(plug, type) and issubclass(plug, Transitions) else
-            Right(plug(vim, name))
-            if isinstance(plug, type) and issubclass(plug, ComponentMachine) else
+            Right(plug(name))
+            if isinstance(plug, type) and issubclass(plug, Component) else
             Left(List(f'invalid tpe for auto component: {plug}'))
         )
 
@@ -115,16 +111,16 @@ class ComponentResolver(Logging):
         )
 
     @property
-    @do(NvimIO[List[ComponentMachine]])
+    @do(NvimIO[List[Component]])
     def run(self) -> Generator:
         comp = yield self.components
         sub = yield comp.traverse(self.create_components, NvimIO)
         yield NvimIO.from_either(sub.sequence(Either))
 
 
-def root_machine(vim: NvimFacade, config: Config[Settings, D], initial_state: D) -> None:
-    sub = ComponentResolver(config).run.attempt(vim).get_or_raise()
-    return RootMachine(vim, config, sub, initial_state)
+# def root_machine(vim: NvimFacade, config: Config[Settings, D], initial_state: D) -> None:
+#     sub = ComponentResolver(config).run.attempt(vim).get_or_raise()
+#     return RootMachine(vim, config, sub, initial_state)
 
 
-__all__ = ('RootMachine', 'root_machine')
+__all__ = ('ComponentResolver',)

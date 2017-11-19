@@ -9,7 +9,7 @@ from amino import Map, List, __
 from ribosome.config import Config, RequestHandler
 from ribosome.machine.message_base import Message
 from ribosome.machine.messages import Stage1
-from ribosome.machine import trans
+from ribosome.trans.api import trans
 from ribosome.machine.sub import Component
 from ribosome.logging import ribo_log
 

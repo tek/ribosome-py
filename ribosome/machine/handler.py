@@ -1,10 +1,10 @@
 import abc
 import time
-from typing import Any, Sequence, TypeVar, Generic, Type, Union
+from typing import Any, Sequence, TypeVar, Generic, Union
 import asyncio
 
 import amino
-from amino import Maybe, _, List, Map, Just, L, __, Nil, Nothing, Either
+from amino import Maybe, _, List, Map, Just, L, __, Nil, Either
 from amino.io import IO
 from amino.state import StateT, EvalState, MaybeState, EitherState, IdState
 from amino.tc.optional import Optional
@@ -15,15 +15,15 @@ from amino.tc.base import TypeClass, F
 from amino.dat import Dat
 
 from ribosome.logging import Logging
-from ribosome.machine.message_base import Message, Publish, Envelope, Messages
+from ribosome.machine.message_base import Message, Messages
 from ribosome.machine.transition import Handler, TransitionFailed, Coroutine, MachineError, Error
 from ribosome.machine.messages import RunIO, UnitIO, DataIO, Nop
 from ribosome.machine.machine import Machine
 from ribosome.data import Data
-from ribosome.machine.trans import TransAction, Transit, Propagate, Unit, TransFailure, Result
 from ribosome.nvim.io import NvimIOState
 from ribosome.nvim import NvimIO
 from ribosome.request.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchReturn
+from ribosome.trans.action import Transit, Propagate, Unit, Result, TransFailure, TransAction
 
 
 def is_seq(a):
@@ -230,9 +230,6 @@ class TransformNvimIOState(TransformTransState[NvimIO], tpe=NvimIOState):
     def transform(self, st: NvimIOState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
         return st
 
-
-# StateT[D, List[Message]] -> ? -> StateT[D, DispatchResult] -> NvimIOState[D, DispatchResult] ->
-# NvimIOState[PluginState, DispatchResult] -> NvimIO[Any]
 
 class AlgResultValidator(Logging):
 

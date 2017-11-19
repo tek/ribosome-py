@@ -4,15 +4,13 @@ from threading import Lock
 from amino import Map, List, Boolean, Nil, Either, _
 from amino.dat import Dat
 
-from ribosome.nvim import NvimFacade
 from ribosome.machine.message_base import Message, Sendable, Envelope
 from ribosome.machine.process_messages import PrioQueue
 from ribosome.machine.handler import Handlers
 from ribosome.machine.transition import TransitionLog
 from ribosome.machine.machine import Machine
-from ribosome.machine.sub import Component, ComponentMachine
-from ribosome.machine.base import message_handlers
-from ribosome.machine.modular import trans_handlers
+from ribosome.machine.sub import Component
+from ribosome.machine.base import message_handlers, handlers
 
 NP = TypeVar('NP')
 D = TypeVar('D')
@@ -21,9 +19,9 @@ D = TypeVar('D')
 class ComponentState(Dat['ComponentState']):
 
     @staticmethod
-    def cons(comp: ComponentMachine) -> 'ComponentState':
-        handlers = message_handlers(trans_handlers(comp.transitions))
-        return ComponentState(comp, handlers)
+    def cons(comp: Component) -> 'ComponentState':
+        hs = message_handlers(handlers(comp))
+        return ComponentState(comp, hs)
 
     def __init__(self, component: Component, handlers: Map[float, Handlers]) -> None:
         self.component = component
@@ -49,7 +47,7 @@ class PluginState(Generic[D, NP], Dat['PluginState']):
     def cons(
             data: D,
             plugin: NP,
-            components: List[ComponentMachine],
+            components: List[Component],
             messages: PrioQueue[Message],
             message_log: List[Message]=Nil,
     ) -> 'PluginState':

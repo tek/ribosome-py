@@ -25,7 +25,7 @@ from ribosome.plugin import plugin_class_from_config
 from ribosome.machine.process_messages import PrioQueue
 from ribosome.record import encode_json_compat
 from ribosome.machine.root import ComponentResolver
-from ribosome.machine import trans
+from ribosome.trans.api import trans
 from ribosome.machine.messages import ShowLogInfo, UpdateState
 from ribosome.machine.scratch import Mapping
 from ribosome.request.handler.dispatcher import MsgDispatcher
@@ -65,10 +65,6 @@ class HostConfig(Dat['HostConfig']):
     @property
     def name(self) -> str:
         return self.config.name
-
-    # @property
-    # def dispatch(self) -> List[Dispatch]:
-    #     return self.sync_dispatch.v + self.async_dispatch.v
 
     @property
     def specs(self) -> List[RpcHandlerSpec]:
@@ -189,8 +185,8 @@ def config_dispatchers(config: Config) -> List[DispatchAsync]:
     return config.request_handlers.handlers.map2(choose)
 
 
-@trans.plain(trans.result)
-def message_log(machine: Any, state: PluginState[D, NP], args: Any) -> List[str]:
+@trans.free.unit(trans.result)
+def message_log(args: Any) -> List[str]:
     return state.message_log // encode_json_compat
 
 
