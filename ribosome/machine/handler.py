@@ -265,9 +265,9 @@ class AlgResultValidator(Logging):
 
 class AlgHandlerJob(HandlerJob):
 
-    def run(self, machine=None) -> NvimIOState[D, DispatchResult]:
+    def run(self) -> NvimIOState[D, DispatchResult]:
         try:
-            r = self.handler.execute(machine, self.msg)
+            r = self.handler.execute(self.msg)
         except Exception as e:
             return self.exception(e)
         else:

@@ -68,7 +68,11 @@ DynResult = Union[Message, List[Message]]
 DynTrans = Union[DynResult, Maybe[DynResult], Either[str, DynResult], StateT[Id, Data, DynResult]]
 
 
-class Handler(Generic[M, D, R], Logging, ToStr):
+class Handler:
+    pass
+
+
+class LegacyHandler(Generic[M, D, R], Handler, Logging, ToStr):
 
     def __init__(self, name: str, fun: Callable[[Machine, D, M], R], message: Type[M], prio: float, dyn: bool) -> None:
         self.name = name
@@ -86,8 +90,8 @@ class Handler(Generic[M, D, R], Logging, ToStr):
         return name, msg, prio, dyn
 
     @staticmethod
-    def create(fun: Callable[[Machine, D, M], R]) -> 'Handler[M, D, R]':
-        name, msg, prio, dyn = Handler.attrs(fun)
+    def create(fun: Callable[[Machine, D, M], R]) -> 'LegacyHandler[M, D, R]':
+        name, msg, prio, dyn = LegacyHandler.attrs(fun)
         tpe = CoroHandler if iscoroutinefunction(fun) else DynHandler  # if dyn else TransHandler
         return tpe(name, fun, msg, prio, dyn)
 
@@ -103,7 +107,7 @@ class Handler(Generic[M, D, R], Logging, ToStr):
         return List(self.name, str(self.message), str(self.fun))
 
 
-class DynHandler(Generic[M, D], Handler[M, D, DynTrans]):
+class DynHandler(Generic[M, D], LegacyHandler[M, D, DynTrans]):
 
     def run(self, machine: Machine, data, msg) -> DynTrans:
         return _recover_error(self, self.execute(machine, data, msg))
@@ -112,7 +116,7 @@ class DynHandler(Generic[M, D], Handler[M, D, DynTrans]):
         return self.fun(machine, data, msg)
 
 
-class CoroHandler(Handler):
+class CoroHandler(LegacyHandler):
 
     def run(self, data, msg) -> Maybe[Coroutine]:
         return Maybe(Coroutine(self.fun(data, msg)))
@@ -248,7 +252,7 @@ def handle(msg: type, prio=default_prio):
         setattr(func, _message_attr, msg)
         setattr(func, _prio_attr, prio)
         setattr(func, _dyn_attr, True)
-        return Handler.create(func)
+        return LegacyHandler.create(func)
     return add_handler
 
 
@@ -294,5 +298,5 @@ class MachineError(RuntimeError):
 class TransitionFailed(MachineError):
     pass
 
-__all__ = ('Handler', 'CoroHandler', 'TransitionResult', 'StrictTransitionResult', 'CoroTransitionResult', 'handle',
-           'may_handle', 'either_msg', 'either_handle', 'MachineError', 'TransitionFailed', 'TransitionLog')
+__all__ = ('LegacyHandler', 'CoroHandler', 'TransitionResult', 'StrictTransitionResult', 'CoroTransitionResult',
+           'handle', 'may_handle', 'either_msg', 'either_handle', 'MachineError', 'TransitionFailed', 'TransitionLog')

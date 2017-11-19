@@ -1,8 +1,10 @@
 from kallikrein import Expectation, kf, k
 from kallikrein.matchers.either import be_right
+from kallikrein.matchers.maybe import be_just
+from kallikrein.matchers.length import have_length
 
 from amino.test.spec import SpecBase
-from amino import Lists, Map, List, Nothing
+from amino import Lists, Map, List, Nothing, _
 
 from ribosome.test.spec import MockNvimFacade
 from ribosome.config import Config, AutoData
@@ -14,8 +16,10 @@ from ribosome.plugin_state import PluginStateHolder
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.dispatch.data import DispatchError
 from ribosome.host import host_config, request_handler, init_state, dispatch_job
-from ribosome.request.dispatch.handle import execute_async_loop, execute_sync, run_dispatch, sync_sender, sync_runner
+from ribosome.request.dispatch.handle import execute_async_loop, run_dispatch, sync_sender, sync_runner, async_runner
 from ribosome.nvim.io import NvimIOState
+from ribosome.machine.root import ComponentResolver
+from ribosome.machine.base import handlers
 
 
 specimen = Lists.random_string()
@@ -81,11 +85,17 @@ host_conf = host_config(config, HS, True)
 # TODO test free trans function with invalid arg count
 class HostSpec(SpecBase):
     '''
+    resolve component handlers $handlers
     send a request to a legacy handler with @command decorator $legacy
     send a message $send_message
     error when arguments don't match a message constructor $msg_arg_error
     run a free trans function that returns a message $trans_free
     '''
+
+    def handlers(self) -> Expectation:
+        vim = MockNvimFacade(prefix='hs', vars=dict(hs_components=List('p', 'q')))
+        components = ComponentResolver(config).run.unsafe(vim)
+        return k(components.head / handlers).must(be_just(have_length(2)))
 
     def legacy(self) -> Expectation:
         vim = MockNvimFacade()
@@ -112,9 +122,10 @@ class HostSpec(SpecBase):
         name, args = 'hs:command:muh', ((specimen,),)
         job = dispatch_job(vim, True, host_conf.async_dispatch, holder, name, args)
         dispatch = job.dispatches.lift(job.name).get_or_fail('no matching dispatch')
-        io = execute_async_loop(job, dispatch)
+        sender = sync_sender(job, dispatch, async_runner)
+        result = sender().run_a(state).attempt(vim) / _.output
         err = f'argument count for command `HsMuh` is 1, must be exactly 2 ([{specimen}])'
-        return kf(io.attempt, vim).must(be_right(DispatchError(err, Nothing)))
+        return k(result).must(be_right(DispatchError(err, Nothing)))
 
     def trans_free(self) -> Expectation:
         vim = MockNvimFacade(prefix='hs', vars=dict(hs_components=List('p', 'q')))

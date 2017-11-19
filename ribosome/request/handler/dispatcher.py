@@ -10,6 +10,7 @@ from ribosome.machine.message_base import Message
 from ribosome.logging import Logging
 from ribosome.machine.transition import Handler
 from ribosome.data import Data
+from ribosome.trans.handler import FreeTransHandler
 
 B = TypeVar('B')
 D = TypeVar('D', bound=Data)
@@ -58,7 +59,7 @@ class MsgDispatcher(Generic[M], AsyncRequestDispatcher):
 
 class TransDispatcher(Generic[B], AsyncRequestDispatcher):
 
-    def __init__(self, handler: Handler[None, D, B]) -> None:
+    def __init__(self, handler: FreeTransHandler[D, B]) -> None:
         self.handler = handler
 
     @property

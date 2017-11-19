@@ -60,12 +60,7 @@ class RunDispatchSync(RunDispatch):
     @do(NvimIOState[PluginState[D, NP], DispatchResult])
     def legacy(self, dispatch: Legacy) -> Do:
         plugin = yield NvimIOState.inspect(_.plugin)
-        root = yield NvimIOState.inspect(_.root)
-        data = yield NvimIOState.inspect(_.data)
-        root.state = data
         result = dispatch.handler.func(plugin, *self.args)
-        yield NvimIOState.modify(__.update(root.state))
-        yield NvimIOState.modify(__.log_messages(root.last_message_log))
         yield NvimIOState.pure((DispatchResult(DispatchReturn(result), Nil)))
 
 
@@ -76,7 +71,7 @@ class RunDispatchAsync(RunDispatch):
 
     @do(NvimIOState[PluginState[D, NP], DispatchResult])
     def send_message(self, dispatch: SendMessage) -> Do:
-        cmd_name = yield NvimIOState.inspect(__.vim_cmd_name(dispatch.handler))
+        cmd_name = yield NvimIOState.inspect(__.config.vim_cmd_name(dispatch.handler))
         msg_e = cons_message(dispatch.msg, self.args, cmd_name, dispatch.method)
         yield msg_e.cata(DispatchResult.error_nio, send_message)
 

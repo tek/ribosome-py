@@ -8,7 +8,7 @@ from ribosome.machine.transition import TransitionResult, TransitionLog
 from ribosome.machine.base import TransState
 from ribosome.machine.message_base import Message, Sendable, Envelope
 from ribosome.logging import ribo_log
-from ribosome.machine.handler import HandlerJob
+from ribosome.machine.handler import HandlerJob, AlgHandlerJob
 from ribosome.plugin_state import PluginState, ComponentState, Components
 from ribosome.nvim.io import NvimIOState
 from ribosome.request.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchErrors
@@ -46,7 +46,7 @@ def check_time(start_time: int, msg: Message, name: str) -> None:
 def process(component: ComponentState, msg: Message, prio: float) -> TransState:
     def execute(handler: Callable) -> TransState:
         ribo_log.debug(f'handling {msg} in {component.name}')
-        job = HandlerJob.from_handler(component.name, handler, msg)
+        job = AlgHandlerJob(component.name, handler, msg)
         result = job.run()
         check_time(job.start_time, msg, component.name)
         return result

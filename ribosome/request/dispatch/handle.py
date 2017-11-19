@@ -69,9 +69,9 @@ execute_output = dispatch_alg(ExecuteDispatchOutput(), DispatchOutput, '')
 
 
 @do(NvimIOState[PluginState[D, NP], R])
-def run_dispatch(action: Callable[[], NvimIOState[PluginState[D, NP], B]], update: Callable[[B], Res]) -> Do:
+def run_dispatch(action: Callable[[], NvimIOState[PluginState[D, NP], B]], unpack: Callable[[B], Res]) -> Do:
     response = yield action()
-    result = yield update(response)
+    result = yield unpack(response)
     yield NvimIOState.modify(__.enqueue(result.msgs))
     yield execute_output(result.output)
 
@@ -81,17 +81,17 @@ def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[R]]) -> NvimIO[R
     def release(error: Any) -> None:
         holder.release()
     yield NvimIO(lambda v: holder.acquire())
-    state, response = yield f.error_effect(release)
+    state, response = yield f().error_effect(release)
     yield NvimIO(lambda v: holder.update(state))
     yield NvimIO(release)
     yield NvimIO.pure(response)
 
 
 @do(NvimIO[R])
-def unsafe_dispatch_and_update(holder: PluginStateHolder,
-                               action: Callable[[], NvimIOState[PluginState[D, NP], B]],
-                               update: Callable[[B], NvimIOState[PluginState[D, NP], DispatchResult]]) -> Do:
-    return exclusive(holder, lambda: run_dispatch(action, update).run(holder.state))
+def exclusive_dispatch(holder: PluginStateHolder,
+                       action: Callable[[], NvimIOState[PluginState[D, NP], B]],
+                       unpack: Callable[[B], NvimIOState[PluginState[D, NP], DispatchResult]]) -> Do:
+    return exclusive(holder, lambda: run_dispatch(action, unpack).run(holder.state))
 
 
 class DispatchRunner(Generic[RDP]):
@@ -118,7 +118,7 @@ def sync_sender(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> 
 
 
 def execute(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> NvimIO[Any]:
-    return unsafe_dispatch_and_update(job.state, sync_sender(job, dispatch, runner), NvimIOState.pure)
+    return exclusive_dispatch(job.state, sync_sender(job, dispatch, runner), NvimIOState.pure)
 
 
 # unconditionally fork a resend loop in case the sync transition has returned messages
@@ -137,17 +137,21 @@ def request_error(job: DispatchJob, exc: Exception) -> int:
     return 1
 
 
+def resend_send() -> NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]]:
+    return NvimIOState.inspect(lambda state: process_message(state.messages, send_message))
+
+
+@do(NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]])
+def resend_unpack(result: Tuple[PrioQueue[Message], TransitionResult]) -> Do:
+    messages, trs = result
+    yield NvimIOState.modify(__.copy(messages=messages))
+    yield trs
+
+
 # maybe don't enqueue messages here, but in `execute_output`
 @do(NvimIO[PluginState[D, NP]])
 def resend_loop(holder: PluginStateHolder) -> Do:
-    def send() -> NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]]:
-        return NvimIOState.inspect(lambda state: process_message(state.messages, send_message))
-    @do(NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]])
-    def update(result: Tuple[PrioQueue[Message], TransitionResult]) -> Do:
-        messages, trs = result
-        yield NvimIOState.modify(__.copy(messages=messages))
-        yield trs
-    yield unsafe_dispatch_and_update(holder, send, update)
+    yield exclusive_dispatch(holder, resend_send, resend_unpack)
     yield resend_loop(holder) if holder.has_messages else NvimIO.pure(holder.state)
 
 

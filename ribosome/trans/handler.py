@@ -7,6 +7,7 @@ from ribosome.data import Data
 from ribosome.machine.machine import Machine
 from ribosome.trans.effect import TransEffect, cont, lift
 from ribosome.trans.action import TransAction
+from ribosome.machine.transition import Handler
 
 D = TypeVar('D', bound=Data)
 M = TypeVar('M', bound=Message)
@@ -19,10 +20,10 @@ def extract(output: O, effects: List[TransEffect]) -> TransAction:
     return lift(trans_result, False)
 
 
-class MessageTransHandler(Generic[M, D]):
+class MessageTransHandler(Generic[M, D], Handler):
 
     @staticmethod
-    def create(fun: Callable[..., R], msg: Type[M], effects: List[TransEffect], prio: float) -> 'Handler[M, D, R]':
+    def create(fun: Callable[[M], R], msg: Type[M], effects: List[TransEffect], prio: float) -> 'Handler[M, D, R]':
         name = fun.__name__
         return MessageTransHandler(name, fun, msg, prio, effects)
 
@@ -34,22 +35,18 @@ class MessageTransHandler(Generic[M, D]):
         self.prio = prio
         self.effects = effects
 
-    def execute(self, machine: Machine, msg: M) -> TransAction:
-        return extract(self.fun(machine, msg), Lists.wrap(self.effects))
-
-    # def execute(self, machine: Machine, msg: M) -> TransAction:
-    #     trans = self.trans_tpe(machine, msg)
-    #     return self.handler.fun(trans)
+    def execute(self, msg: M) -> TransAction:
+        return extract(self.fun(msg), Lists.wrap(self.effects))
 
 
-class FreeTransHandler(Generic[M, D]):
+class FreeTransHandler(Generic[D, R], Handler):
 
     @staticmethod
-    def create(fun: Callable[..., R], effects: List[TransEffect], prio: float) -> 'Handler[M, D, R]':
+    def create(fun: Callable[..., R], effects: List[TransEffect], prio: float) -> 'Handler[D, R]':
         name = fun.__name__
         return FreeTransHandler(name, fun, prio, effects)
 
-    def __init__(self, name: str, fun: Callable[[D, M], R], prio: float, effects: List[TransEffect]) -> None:
+    def __init__(self, name: str, fun: Callable[..., R], prio: float, effects: List[TransEffect]) -> None:
         self.name = name
         self.fun = fun
         self.prio = prio
