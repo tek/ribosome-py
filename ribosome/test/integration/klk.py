@@ -19,9 +19,8 @@ from kallikrein.matchers.typed import have_type
 from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationSpec, ExternalIntegrationSpec,
                                             PluginIntegrationSpec, AutoPluginIntegrationSpec)
 from ribosome.nvim.components import Buffer
-from ribosome.machine.message_base import Message
-from ribosome.config import PluginSettings
-from ribosome.machine.state import AutoData
+from ribosome.trans.message_base import Message
+from ribosome.config import PluginSettings, AutoData
 
 
 def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> Expectation:

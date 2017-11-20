@@ -3,16 +3,15 @@ import subprocess
 from subprocess import PIPE
 from typing import TypeVar
 
-from ribosome.dispatch.component import Component
-from ribosome.machine.message_base import pmessage, json_pmessage, Message, ToMachine
-
 from amino.util.string import blue
 from amino import Just, Maybe, __, _
-from ribosome.machine.transition import may_handle, handle
-from ribosome.machine.messages import Nop, Done, Quit, Stop, CoroutineAlg, SubProcessAsync, Fork, Coroutine
-from ribosome.machine.handler import AlgResultValidator
+
+from ribosome.trans.messages import Nop, Done, Quit, Stop, CoroutineAlg, SubProcessAsync, Fork, Coroutine
 from ribosome.trans.api import trans
 from ribosome.data import Data
+from ribosome.dispatch.component import Component
+from ribosome.trans.message_base import pmessage, json_pmessage, Message, ToMachine
+from ribosome.dispatch.transform import AlgResultValidator
 
 Callback = pmessage('Callback', 'func')
 EnvelopeOld = pmessage('EnvelopeOld', 'message', 'to')
@@ -27,27 +26,27 @@ D = TypeVar('D', bound=Data)
 
 class Internal(Component):
 
-    @may_handle(Nop)
+    @trans.msg.unit(Nop)
     def _nop(self):
         pass
 
-    @may_handle(Stop)
+    @trans.msg.unit(Stop)
     def _stop_msg(self):
         return Quit(), Done().pub.at(1)
 
-    @may_handle(Done)
+    @trans.msg.unit(Done)
     def _done_msg(self):
         self._done()
 
-    @may_handle(Callback)
+    @trans.msg.unit(Callback)
     def message_callback(self):
         return self.msg.func(self.data)
 
-    @may_handle(Coroutine)
+    @trans.msg.unit(Coroutine)
     def _couroutine(self):
         return self.msg
 
-    @may_handle(CoroutineAlg)
+    @trans.msg.unit(CoroutineAlg)
     def message_couroutine_alg(self):
         async def run_coro_alg() -> None:
             res = await self.msg.coro
@@ -81,25 +80,25 @@ class Internal(Component):
                 self.log.caught_exception(f'running forked function {self.msg.callback}', e)
         threading.Thread(target=dispatch).start()
 
-    @may_handle(RunMachine)
+    @trans.msg.unit(RunMachine)
     def message_run_machine(self):
         self.sub = self.sub.cat(self.msg.machine)
         init = self.msg.options.get('init') | Init()
         return EnvelopeOld(init, self.msg.machine.uuid)
 
-    @may_handle(KillMachine)
+    @trans.msg.unit(KillMachine)
     def message_kill_machine(self):
         self.sub = self.sub.filter_not(_.uuid == self.msg.uuid)
 
-    @handle(EnvelopeOld)
+    @trans.msg.unit(EnvelopeOld)
     def message_envelope(self):
         return self.sub.find(_.uuid == self.msg.to) / __.loop_process(self.data, self.msg.message)
 
-    @handle(ToMachine)
+    @trans.msg.unit(ToMachine)
     def message_to_machine(self) -> Maybe:
         return self.sub.find(_.name == self.msg.target) / __.loop_process(self.data, self.msg.message)
 
-    @may_handle(IfUnhandled)
+    @trans.msg.unit(IfUnhandled)
     def if_unhandled(self):
         result = self._send(self.data, self.msg.msg)
         return result if result.handled else self._send(self.data, self.msg.unhandled)

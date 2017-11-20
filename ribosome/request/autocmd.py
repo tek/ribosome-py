@@ -4,7 +4,7 @@ from typing import TypeVar, Callable
 import neovim
 
 from ribosome.request.legacy import LegacyRequestHandler
-from ribosome.machine.message_base import Message
+from ribosome.trans.message_base import Message
 from ribosome.request.handler.method import RpcMethod, AutocmdMethod
 
 M = TypeVar('M', bound=Message)

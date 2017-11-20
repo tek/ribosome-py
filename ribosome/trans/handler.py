@@ -1,13 +1,12 @@
 from typing import Callable, TypeVar, Type, Generic
 
-from ribosome.machine.message_base import Message
-
 from amino import List, Lists
+
 from ribosome.data import Data
-from ribosome.machine.machine import Machine
 from ribosome.trans.effect import TransEffect, cont, lift
 from ribosome.trans.action import TransAction
-from ribosome.machine.transition import Handler
+from ribosome.trans.message_base import Message
+from ribosome.trans.legacy import Handler
 
 D = TypeVar('D', bound=Data)
 M = TypeVar('M', bound=Message)
@@ -27,7 +26,7 @@ class MessageTransHandler(Generic[M, D], Handler):
         name = fun.__name__
         return MessageTransHandler(name, fun, msg, prio, effects)
 
-    def __init__(self, name: str, fun: Callable[[Machine, M], R], message: Type[M], prio: float,
+    def __init__(self, name: str, fun: Callable[[M], R], message: Type[M], prio: float,
                  effects: List[TransEffect]) -> None:
         self.name = name
         self.message = message

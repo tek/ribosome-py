@@ -1,19 +1,35 @@
-from typing import TypeVar, Generic
+import inspect
+from typing import TypeVar, Generic, Type
 from threading import Lock
 
-from amino import Map, List, Boolean, Nil, Either, _
-from amino.dat import Dat
+import toolz
 
-from ribosome.machine.message_base import Message, Sendable, Envelope
-from ribosome.machine.process_messages import PrioQueue
-from ribosome.machine.handler import Handlers
-from ribosome.machine.transition import TransitionLog
-from ribosome.machine.machine import Machine
+from amino import Map, List, Boolean, Nil, Either, _, Lists
+from amino.dat import Dat
+from amino.func import flip
+
+from ribosome.trans.message_base import Message, Sendable, Envelope
 from ribosome.dispatch.component import Component
-from ribosome.machine.base import message_handlers, handlers
+from ribosome.nvim.io import NvimIOState
+from ribosome.dispatch.data import DispatchResult
+from ribosome.trans.queue import PrioQueue
+from ribosome.dispatch.transform import Handlers
+from ribosome.trans.legacy import Handler
 
 NP = TypeVar('NP')
 D = TypeVar('D')
+TransState = NvimIOState[D, DispatchResult]
+
+
+def handlers(cls: Type['MachineBase']) -> List[Handler]:
+    return Lists.wrap(inspect.getmembers(cls, Boolean.is_a(Handler))) / _[1]
+
+
+def message_handlers(handlers: List[Handler]) -> Map[float, Handlers]:
+    def create(prio, h):
+        h = List.wrap(h).apzip(_.message).map2(flip)
+        return prio, Handlers(prio, Map(h))
+    return Map(toolz.groupby(_.prio, handlers)).map(create)
 
 
 class ComponentState(Dat['ComponentState']):
@@ -73,9 +89,6 @@ class PluginState(Generic[D, NP], Dat['PluginState']):
     def update(self, data: D) -> 'PluginState[D, NP]':
         return self.copy(data=data)
 
-    def log(self, log: TransitionLog) -> 'PluginState[D, NP]':
-        return self.log_messages(log.message_log)
-
     def log_messages(self, msgs: List[Message]) -> 'PluginState[D, NP]':
         return self.append.message_log(msgs)
 
@@ -89,10 +102,6 @@ class PluginState(Generic[D, NP], Dat['PluginState']):
     @property
     def config(self) -> 'ribosome.config.Config':
         return self.plugin.config
-
-    @property
-    def root(self) -> Machine:
-        return self.plugin.root
 
     @property
     def name(self) -> str:

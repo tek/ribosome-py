@@ -9,9 +9,9 @@ from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.dispatcher import TransDispatcher
 from ribosome.request.handler.method import RpcMethod
 from ribosome.nvim import NvimIO
-from ribosome.machine.message_base import Message
 from ribosome.nvim.io import NvimIOState
 from ribosome.data import Data
+from ribosome.trans.message_base import Message
 
 B = TypeVar('B')
 Meth = TypeVar('Meth', bound=RpcMethod)

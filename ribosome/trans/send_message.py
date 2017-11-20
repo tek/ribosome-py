@@ -1,17 +1,15 @@
 import time
 from typing import TypeVar, Callable, Generator
 
-from amino import __, Maybe, Boolean, _, L, List
+from amino import __, Maybe, Boolean, _, List
 from amino.do import do
 
-from ribosome.machine.transition import TransitionResult, TransitionLog
-from ribosome.machine.base import TransState
-from ribosome.machine.message_base import Message, Sendable, Envelope
+from ribosome.trans.message_base import Message, Sendable, Envelope
 from ribosome.logging import ribo_log
-from ribosome.machine.handler import HandlerJob, AlgHandlerJob
-from ribosome.plugin_state import PluginState, ComponentState, Components
+from ribosome.plugin_state import PluginState, ComponentState, Components, TransState
 from ribosome.nvim.io import NvimIOState
 from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchErrors
+from ribosome.dispatch.transform import AlgHandlerJob
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -98,7 +96,7 @@ def send_message1(components: Components, msg: M, prio: float) -> Generator:
     yield send(components, msg, prio)
 
 
-@do(NvimIOState[PluginState[D, NP], TransitionResult])
+@do(NvimIOState[PluginState[D, NP], TransState])
 def send_message(msg: M, prio: float=None) -> Generator:
     yield NvimIOState.modify(__.log_message(msg.msg))
     components = yield NvimIOState.inspect(_.components)

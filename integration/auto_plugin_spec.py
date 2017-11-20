@@ -3,9 +3,9 @@ from kallikrein import Expectation
 from amino import Map, __, List
 
 from ribosome.plugin import Config, PluginSettings
-from ribosome.machine.message_base import pmessage
+from ribosome.trans.message_base import pmessage
 from ribosome.trans.api import trans
-from ribosome.machine.messages import Stage1
+from ribosome.trans.messages import Stage1
 from ribosome.config import RequestHandler, AutoData
 from ribosome.nvim import NvimIO
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec

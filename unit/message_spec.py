@@ -1,6 +1,6 @@
 from kallikrein import k, Expectation
 
-from ribosome.machine.message_base import pmessage, json_pmessage
+from ribosome.trans.message_base import pmessage, json_pmessage
 
 
 Mess = pmessage('Mess')

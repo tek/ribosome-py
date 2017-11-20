@@ -7,8 +7,8 @@ from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 
 from amino import Map, List, __
 from ribosome.config import Config, RequestHandler
-from ribosome.machine.message_base import Message
-from ribosome.machine.messages import Stage1
+from ribosome.trans.message_base import Message
+from ribosome.trans.messages import Stage1
 from ribosome.trans.api import trans
 from ribosome.dispatch.component import Component
 from ribosome.logging import ribo_log

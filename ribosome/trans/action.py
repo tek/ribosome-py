@@ -5,9 +5,9 @@ from amino.state import StateT
 from amino.util.string import ToStr
 from amino.algebra import AlgebraMeta, Algebra
 
-from ribosome.machine.message_base import Sendable, Message
 from ribosome.data import Data
-from ribosome.machine.messages import Error
+from ribosome.trans.message_base import Sendable, Message
+from ribosome.trans.messages import Error
 
 D = TypeVar('D', bound=Data)
 M = TypeVar('M', bound=Message)

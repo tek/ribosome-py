@@ -4,13 +4,14 @@ from amino import List, __, _
 
 from ribosome.unite import UniteMessage, UniteSource
 from ribosome.unite.data import UniteKind, UniteSyntax
-from ribosome.machine.transition import handle
-from ribosome.machine.base import UnitIO
+from ribosome.trans.api import trans
+from ribosome.trans.messages import UnitIO
+from ribosome.dispatch.component import Component
 
 
-class UniteTransitions:
+class Unite(Component):
 
-    @handle(UniteSyntax)
+    @trans.msg.one(UniteSyntax, trans.m)
     def syntax(self):
         return self.machine.syntax(self.msg.source) / UnitIO
 
@@ -41,4 +42,4 @@ class UniteMachine:
         return (self.sources.find(_.name == source) /
                 __.syntax_task(self.vim.buffer.syntax))
 
-__all__ = ('UniteTransitions',)
+__all__ = ('Unite',)

@@ -2,19 +2,19 @@ from kallikrein import k, Expectation
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.typed import have_type
 
-from amino import Nothing, List, Just, _
+from amino import List, Just, _
 from amino.test.spec import SpecBase
 
 from ribosome.config import AutoData, Config
 
-from ribosome.machine.loop import process_message
-from ribosome.machine.message_base import Msg, Message
-from ribosome.machine.transition import TransitionResult, handle, TransitionLog
-from ribosome.machine.process_messages import PrioQueue
-from ribosome.dispatch import PluginState
 from ribosome.test.spec import MockNvimFacade
 from ribosome.dispatch.component import Component
-from ribosome.machine.send_message import send_message
+from ribosome.dispatch.loop import process_message
+from ribosome.trans.message_base import Msg, Message
+from ribosome.trans.queue import PrioQueue
+from ribosome.trans.send_message import send_message
+from ribosome.plugin_state import PluginState
+from ribosome.trans.api import trans
 
 
 class Msg1(Msg): pass
@@ -25,9 +25,9 @@ class Msg2(Msg): pass
 
 class Comp1(Component):
 
-    @handle(Msg1)
+    @trans.msg.one(Msg1, trans.m)
     def msg1(self) -> None:
-        return Just(Msg2().pub)
+        return Just(Msg2())
 
 
 class LoopSpec(SpecBase):

@@ -5,24 +5,22 @@ import neovim
 
 from ribosome import command, NvimStatePlugin, msg_function, msg_command, function
 
-from amino.lazy import lazy
 from amino import Left, L, _, Map, List, Just, Lists, IO
 from amino.state import EvalState
 from ribosome.logging import Logging
-from ribosome.machine.state import UnloopedRootMachine, RunScratchMachine, RootMachine
-from ribosome.machine.transition import Fatal, may_fallback, may_handle, handle
-from ribosome.machine.scratch import ScratchMachine, Mapping
 from ribosome.nvim import NvimFacade, ScratchBuffer
 from ribosome.data import Data
 from ribosome.record import int_field
-from ribosome.machine.base import RunCorosParallel, RunIOsParallel, MachineBase
-from ribosome.machine.message_base import pmessage, Message
-from ribosome.machine.messages import Nop
+from ribosome.trans.message_base import pmessage, Message
+from ribosome.trans.messages import Nop, RunCorosParallel, RunIOsParallel
+from ribosome.trans.legacy import Fatal
+from ribosome.components.scratch import Mapping, Scratch
+from ribosome.trans.api import trans
 
 
 Msg1 = pmessage('Msg1', 'text')
 Err = pmessage('Err')
-Scratch = pmessage('Scratch')
+ScratchMsg = pmessage('ScratchMsg')
 ScratchTest = pmessage('ScratchTest')
 ScratchCheck = pmessage('ScratchCheck')
 St = pmessage('St')
@@ -41,33 +39,33 @@ class TData(Data):
 
 class Mach(Logging):
 
-    @may_handle(Msg1)
+    @trans.msg.one(Msg1)
     def mess(self, data, msg):
         self.log.info(msg.text)
         return data.set(v=3)
 
-    @handle(Err)
+    @trans.msg.unit(Err)
     def err(self, data, msg):
         return Left(Fatal(TestPlugin.test_error))
 
-    @may_handle(Scratch)
+    @trans.msg.one(ScratchMsg)
     def run_scratch(self, data, msg):
         ctor = L(ScratchM)(self.vim, _, _)
         return RunScratchMachine(ctor)
 
-    @may_handle(ScratchCheck)
+    @trans.msg.one(ScratchCheck)
     def check_scratch(self, data, msg):
         self.log.info(self.sub.length)
 
-    @may_handle(St)
+    @trans.msg.one(St)
     def st(self, data, msg) -> EvalState[TData, Message]:
         return EvalState.inspect(lambda a: Just(Print(a.v * 2)))
 
-    @may_handle(Print)
+    @trans.msg.one(Print)
     def print_(self, data: Data, msg: Print) -> Message:
         self.log.info(msg.msg)
 
-    @may_handle(RunParallel)
+    @trans.msg.one(RunParallel)
     def run_parallel(self, data: Data, msg: RunParallel) -> Message:
         async def go(n: int) -> None:
             self.log.info(f'sleeping in {n}')
@@ -76,7 +74,7 @@ class Mach(Logging):
         coros = Lists.range(3) / go
         return RunCorosParallel(coros)
 
-    @may_handle(RunParallelIOs)
+    @trans.msg.one(RunParallelIOs)
     def run_parallel_ios(self, data: Data, msg: RunParallelIOs) -> Message:
         def go(n: int) -> None:
             self.log.info(f'sleeping in {n}')
@@ -94,10 +92,10 @@ class MachUnlooped(Mach, UnloopedRootMachine):
     _data_type = TData
 
 
-class ScratchM(ScratchMachine):
+class ScratchM(Scratch):
 
-    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer, parent: MachineBase) -> None:
-        super().__init__(vim, scratch, parent=parent, name='scratch')
+    def __init__(self, vim: NvimFacade, scratch: ScratchBuffer) -> None:
+        super().__init__(vim, scratch, name='scratch')
 
     @property
     def prefix(self):
@@ -147,7 +145,7 @@ class TestPlugin(NvimStatePlugin, Logging):
     def st(self):
         pass
 
-    @msg_command(Scratch)
+    @msg_command(ScratchMsg)
     def scratch(self):
         pass
 

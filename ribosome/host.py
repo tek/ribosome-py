@@ -15,26 +15,26 @@ from amino.do import do
 from amino.dat import Dat
 from amino.algebra import Algebra
 
-from ribosome.nvim import NvimFacade, NvimIO
-from ribosome.logging import ribo_log
-from ribosome.request.rpc import rpc_handler_functions, define_handlers, RpcHandlerSpec
 from ribosome import NvimPlugin
-from ribosome.config import Config
 from ribosome import options
+from ribosome.components.scratch import Mapping
+from ribosome.config import Config
+from ribosome.dispatch.data import Legacy, SendMessage, Trans, Internal, DispatchSync, DispatchAsync, Dispatch
+from ribosome.dispatch.handle import execute_dispatch_job, request_error
+from ribosome.dispatch.resolve import ComponentResolver
+from ribosome.dispatch.run import DispatchJob
+from ribosome.logging import ribo_log
+from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.plugin import plugin_class_from_config
-from ribosome.machine.process_messages import PrioQueue
+from ribosome.plugin_state import PluginState, PluginStateHolder
 from ribosome.record import encode_json_compat
-from ribosome.machine.root import ComponentResolver
-from ribosome.trans.api import trans
-from ribosome.machine.messages import ShowLogInfo, UpdateState
-from ribosome.machine.scratch import Mapping
 from ribosome.request.handler.dispatcher import MsgDispatcher
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
-from ribosome.dispatch.run import DispatchJob
-from ribosome.dispatch.data import Legacy, SendMessage, Trans, Internal, DispatchSync, DispatchAsync, Dispatch
-from ribosome.plugin_state import PluginState, PluginStateHolder
-from ribosome.dispatch.handle import execute_dispatch_job, request_error
+from ribosome.request.rpc import rpc_handler_functions, define_handlers, RpcHandlerSpec
+from ribosome.trans.api import trans
+from ribosome.trans.messages import ShowLogInfo, UpdateState
+from ribosome.trans.queue import PrioQueue
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)

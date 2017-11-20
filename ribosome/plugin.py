@@ -10,15 +10,14 @@ from amino import List
 
 import ribosome.nvim.components
 from ribosome.nvim import NvimFacade
-from ribosome.machine.message_base import Message
 from ribosome.logging import nvim_logging, Logging
 from ribosome.request.command import command
 from ribosome.request.function import function
-from ribosome.machine.scratch import Mapping
 from ribosome.request.rpc import rpc_handlers_json
 from ribosome.record import encode_json_compat, decode_json_compat
-from ribosome.machine.messages import Stage1, Stage2, Stage3, Stage4, Quit
+from ribosome.trans.messages import Stage1, Stage2, Stage3, Stage4, Quit
 from ribosome.config import Config, PluginSettings, AutoData
+from ribosome.trans.message_base import Message
 
 
 class NvimPluginBase(Logging):

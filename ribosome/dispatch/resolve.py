@@ -1,33 +1,12 @@
-from typing import Generator, Union, TypeVar, Generic, Type
+from typing import Generator, Union, Type
+
+from amino import Try, _, L, Either, List, Left, do, Right, curried, Boolean
 
 from ribosome.logging import Logging, ribo_log
 from ribosome.nvim import NvimIO
 from ribosome import NvimFacade
-from ribosome.machine.state import PluginStateMachine
-from ribosome.machine.machine import Machine
+from ribosome.config import Config
 from ribosome.dispatch.component import Component
-from ribosome.machine.internal import Internal
-from ribosome.config import PluginSettings, Config, AutoData
-
-from amino import Try, _, L, Either, List, Left, do, Right, curried, Boolean
-
-Settings = TypeVar('Settings', bound=PluginSettings)
-D = TypeVar('D', bound=AutoData)
-
-
-# class RootMachine(Generic[Settings, D], PluginStateMachine):
-
-#     def __init__(self, vim: NvimFacade, config: Config[Settings, D], sub: List[Machine], initial_state: D) -> None:
-#         self.config = config
-#         self.initial_state = initial_state
-#         PluginStateMachine.__init__(self, config.name, vim, sub.cons(Component(vim, Internal, 'internal', self)))
-
-#     @property
-#     def init(self) -> D:
-#         return self.initial_state
-
-#     def trans(self, *a, **kw) -> None:
-#         pass
 
 
 class ComponentResolver(Logging):
@@ -65,7 +44,7 @@ class ComponentResolver(Logging):
             .flat_map(self.inst_auto(name, vim))
         )
 
-    def declared_component(self, name: str) -> Either[List[str], Machine]:
+    def declared_component(self, name: str) -> Either[List[str], Component]:
         return (
             self.config.components
             .lift(name)
@@ -76,7 +55,7 @@ class ComponentResolver(Logging):
     def component_from_exports(self, mod: str) -> Generator:
         exports = yield Either.exports(mod).lmap(List)
         yield (
-            exports.find(L(Boolean.issubclass)(_, (Component, Component)))
+            exports.find(L(Boolean.issubclass)(_, Component))
             .to_either(f'none of `{mod}.__all__` is a `Component`: {exports}')
             .lmap(List)
         )
@@ -98,7 +77,7 @@ class ComponentResolver(Logging):
         ribo_log.debug(f'starting {self.config} with components {components}')
         yield NvimIO.pure(components)
 
-    def create_components(self, name: str) -> NvimIO[Machine]:
+    def create_components(self, name: str) -> NvimIO[List[Component]]:
         def report(errs):
             msg = 'invalid {} component module "{}": {}'
             self.log.error(msg.format(self.name, name, errs))
@@ -116,11 +95,6 @@ class ComponentResolver(Logging):
         comp = yield self.components
         sub = yield comp.traverse(self.create_components, NvimIO)
         yield NvimIO.from_either(sub.sequence(Either))
-
-
-# def root_machine(vim: NvimFacade, config: Config[Settings, D], initial_state: D) -> None:
-#     sub = ComponentResolver(config).run.attempt(vim).get_or_raise()
-#     return RootMachine(vim, config, sub, initial_state)
 
 
 __all__ = ('ComponentResolver',)

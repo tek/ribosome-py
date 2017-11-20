@@ -3,16 +3,15 @@ from typing import Callable, Type, Generic, Any, TypeVar
 from amino import List, Lists, Map, _, Boolean
 from amino.func import flip
 from amino.util.string import ToStr, camelcase
-from amino.boolean import false
 from amino.dat import ADT
 
 from ribosome.request.rpc import RpcHandlerSpec
-from ribosome.machine.message_base import Message
 from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.request.handler.dispatcher import RequestDispatcher, MsgDispatcher, TransDispatcher
 from ribosome.request.handler.prefix import PrefixStyle, Short
 from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod, AutocmdMethod
+from ribosome.trans.message_base import Message
 
 B = TypeVar('B')
 D = TypeVar('D', bound=Data)

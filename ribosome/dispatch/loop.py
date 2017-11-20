@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0xd07cf0cc
+# __coconut_hash__ = 0xf5f7bde2
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -30,18 +30,15 @@ from amino.state import EvalState
 from amino.state import EvalState
 from amino.do import do
 
-from ribosome.machine.transition import TransitionResult
-from ribosome.machine.transition import TransitionLog
-from ribosome.machine.transition import TransitionResult
-from ribosome.machine.process_messages import PrioQueue
 from ribosome.logging import ribo_log
-from ribosome.machine.base import TransState
-from ribosome.machine.message_base import Message
 from ribosome.plugin_state import ComponentState
 from ribosome.plugin_state import PluginState
+from ribosome.plugin_state import TransState
 from ribosome.nvim.io import NvimIOState
 from ribosome.dispatch.data import DispatchResult
 from ribosome.dispatch.data import DispatchUnit
+from ribosome.trans.message_base import Message
+from ribosome.trans.queue import PrioQueue
 
 A = TypeVar('A')
 D = TypeVar('D')

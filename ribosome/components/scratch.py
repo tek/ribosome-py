@@ -2,14 +2,14 @@ import re
 import abc
 from typing import Callable
 
-from ribosome.machine.message_base import pmessage
-from ribosome.nvim import HasNvim, NvimFacade, ScratchBuffer
-from ribosome.machine.base import UnitIO
-from ribosome.machine.transition import may_handle, handle
-from ribosome.machine.internal import KillMachine
+from ribosome.trans.message_base import pmessage
+from ribosome.nvim import ScratchBuffer
 from ribosome.dispatch.component import Component
+from ribosome.trans.messages import UnitIO
+from ribosome.components.internal import KillMachine
+from ribosome.trans.api import trans
 
-from amino import Map, Boolean, __, Empty
+from amino import Map, Boolean, __, Empty, List
 from amino.io import IO
 
 Mapping = pmessage('Mapping', 'uuid', 'keyseq')
@@ -59,7 +59,7 @@ class Scratch(Component, metaclass=abc.ABCMeta):
         cmd = self.scratch.buffer.autocmd('BufWipeout', self._mapping_call(self._quit_seq))
         cmd.run_async()
 
-    @handle(Mapping)
+    @trans.msg.one(Mapping, trans.m)
     def input(self, data, msg):
         return (
             Boolean(str(msg.uuid) == str(self.uuid))
@@ -68,9 +68,9 @@ class Scratch(Component, metaclass=abc.ABCMeta):
             __()
         )
 
-    @may_handle(Quit)
+    @trans.msg.multi(Quit)
     def quit(self, data, msg):
         close = IO.delay(self.scratch.close)
-        return UnitIO(close), KillMachine(self.uuid).pub
+        return List(UnitIO(close), KillMachine(self.uuid).pub)
 
-__all__ = ('ScratchMachine',)
+__all__ = ('Scratch',)

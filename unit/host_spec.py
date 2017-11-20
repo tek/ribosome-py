@@ -9,17 +9,16 @@ from amino import Lists, Map, List, Nothing, _
 from ribosome.test.spec import MockNvimFacade
 from ribosome.config import Config, AutoData
 from ribosome import command
-from ribosome.machine.message_base import Msg, Message
+from ribosome.trans.message_base import Msg, Message
 from ribosome.dispatch.component import Component
 from ribosome.trans.api import trans
-from ribosome.plugin_state import PluginStateHolder
+from ribosome.plugin_state import PluginStateHolder, handlers
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.dispatch.data import DispatchError
 from ribosome.host import host_config, request_handler, init_state, dispatch_job
 from ribosome.dispatch.handle import execute_async_loop, run_dispatch, sync_sender, sync_runner, async_runner
 from ribosome.nvim.io import NvimIOState
-from ribosome.machine.root import ComponentResolver
-from ribosome.machine.base import handlers
+from ribosome.dispatch.resolve import ComponentResolver
 
 
 specimen = Lists.random_string()

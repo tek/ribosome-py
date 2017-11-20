@@ -13,17 +13,15 @@ from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log
 from ribosome import NvimPlugin
 from ribosome.config import Config
-from ribosome.machine.process_messages import PrioQueue
-from ribosome.machine.message_base import Message
-from ribosome.machine.loop import process_message
-from ribosome.machine.transition import TransitionResult
-from ribosome.machine.send_message import send_message
 from ribosome.nvim.io import NvimIOState
 from ribosome.dispatch.run import DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch
 from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
-                                            DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO,
-                                            DispatchErrors)
+                                    DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors)
 from ribosome.plugin_state import PluginState, PluginStateHolder
+from ribosome.trans.queue import PrioQueue
+from ribosome.trans.message_base import Message
+from ribosome.dispatch.loop import process_message
+from ribosome.trans.send_message import send_message
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)
@@ -137,12 +135,12 @@ def request_error(job: DispatchJob, exc: Exception) -> int:
     return 1
 
 
-def resend_send() -> NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]]:
+def resend_send() -> NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], DispatchResult]]:
     return NvimIOState.inspect(lambda state: process_message(state.messages, send_message))
 
 
-@do(NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], TransitionResult]])
-def resend_unpack(result: Tuple[PrioQueue[Message], TransitionResult]) -> Do:
+@do(NvimIOState[PluginState[D, NP], DispatchResult])
+def resend_unpack(result: Tuple[PrioQueue[Message], DispatchResult]) -> Do:
     messages, trs = result
     yield NvimIOState.modify(__.copy(messages=messages))
     yield trs

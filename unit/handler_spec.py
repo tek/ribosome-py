@@ -4,11 +4,11 @@ from kallikrein import Expectation, k
 from kallikrein.matchers.typed import have_type
 from kallikrein.matchers.maybe import be_just
 
-from ribosome.machine.message_base import pmessage
-from ribosome.machine.messages import RunIOAlg
-from ribosome.machine.handler import AlgResultValidator
 from ribosome.trans.api import trans
-from ribosome.machine.trans import Transit
+from ribosome.trans.message_base import pmessage
+from ribosome.trans.messages import RunIOAlg
+from ribosome.trans.action import Transit
+from ribosome.dispatch.transform import AlgResultValidator
 
 from amino import Right, IO, _, Either, Id, Maybe, L
 from amino.state import IdState, StateT

@@ -5,12 +5,10 @@ from amino import List, Nil, Boolean
 from amino.util.string import snake_case
 from amino.algebra import Algebra
 
-from ribosome.request.rpc import RpcHandlerSpec
-from ribosome.machine.message_base import Message
 from ribosome.logging import Logging
-from ribosome.machine.transition import Handler
 from ribosome.data import Data
 from ribosome.trans.handler import FreeTransHandler
+from ribosome.trans.message_base import Message
 
 B = TypeVar('B')
 D = TypeVar('D', bound=Data)

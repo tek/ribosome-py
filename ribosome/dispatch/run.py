@@ -7,14 +7,13 @@ from amino.do import do, Do
 
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
-from ribosome.machine.message_base import Message
-from ribosome.machine.handler import AlgResultValidator
 from ribosome.request.args import ArgValidator, ParamsSpec
-from ribosome.machine.send_message import send_message
 from ribosome.plugin_state import PluginState, PluginStateHolder
-from ribosome.dispatch.data import (Legacy, DispatchReturn, Internal, Trans, DispatchUnit, SendMessage,
-                                            DispatchResult)
+from ribosome.dispatch.data import Legacy, DispatchReturn, Internal, Trans, DispatchUnit, SendMessage, DispatchResult
 from ribosome.nvim.io import NvimIOState
+from ribosome.trans.message_base import Message
+from ribosome.dispatch.transform import AlgResultValidator
+from ribosome.trans.send_message import send_message
 
 # NP = TypeVar('NP', bound=NvimPlugin)
 NP = TypeVar('NP')

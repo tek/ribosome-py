@@ -7,10 +7,10 @@ from kallikrein.matchers.maybe import be_just
 from amino.util.string import camelcase
 
 from ribosome.request.legacy import LegacyRequestHandler
-from ribosome.machine.message_base import pmessage
-from ribosome.request.handler import RequestDispatcher
+from ribosome.trans.message_base import pmessage
 from ribosome.request.args import ArgValidator, ParamsSpec
 from ribosome.request.nargs import NargsZero, NargsOne, NargsPlus
+from ribosome.request.handler.dispatcher import RequestDispatcher
 
 BasicMessage = pmessage('BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
 JsonMessage = pmessage('JsonMessage', 'a', 'b')

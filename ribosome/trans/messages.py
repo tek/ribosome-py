@@ -1,7 +1,7 @@
 from amino import Nothing
 from amino.logging import LogError
 
-from ribosome.machine.message_base import pmessage, json_pmessage, PMessage, Message
+from ribosome.trans.message_base import pmessage, json_pmessage, Message
 
 Nop = pmessage('Nop')
 Stop = pmessage('Stop')
