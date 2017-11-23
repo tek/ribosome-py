@@ -82,7 +82,7 @@ host_conf = host_config(config, HS, True)
 
 
 # TODO test free trans function with invalid arg count
-class HostSpec(SpecBase):
+class DispatchSpec(SpecBase):
     '''
     resolve component handlers $handlers
     send a request to a legacy handler with @command decorator $legacy
@@ -136,4 +136,4 @@ class HostSpec(SpecBase):
         result = run_dispatch(sync_sender(job, dispatch, sync_runner), NvimIOState.pure).run_s(state).unsafe(vim)
         return k(result.message_log) == List()
 
-__all__ = ('HostSpec',)
+__all__ = ('DispatchSpec',)
