@@ -15,8 +15,8 @@ from ribosome.logging import Logging
 from ribosome.data import Data
 from ribosome.nvim.io import NvimIOState
 from ribosome.nvim import NvimIO
-from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchReturn
-from ribosome.trans.action import Transit, Propagate, Unit, Result, TransFailure, TransAction
+from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchReturn, DispatchIO, DIO
+from ribosome.trans.action import Transit, Propagate, TransUnit, TransResult, TransFailure, TransAction, TransIO
 from ribosome.trans.message_base import Message
 from ribosome.trans.legacy import Handler, TransitionFailed
 
@@ -34,6 +34,7 @@ class Handlers(Dat['Handlers']):
 D = TypeVar('D', bound=Data)
 R = TypeVar('R')
 G = TypeVar('G', bound=F)
+I = TypeVar('I')
 
 
 class TransformTransState(Generic[G], TypeClass):
@@ -43,10 +44,7 @@ class TransformTransState(Generic[G], TypeClass):
         ...
 
     def run(self, st: StateT[G, D, List[Message]]) -> NvimIOState[D, DispatchResult]:
-        return self.transform(self.result(st))
-
-    def result(self, st: StateT[G, D, List[Message]]) -> StateT[F, D, DispatchResult]:
-        return st / L(DispatchResult)(DispatchUnit(), _)
+        return self.transform(st)
 
 
 class TransformIdState(TransformTransState[Id], tpe=IdState):
@@ -90,21 +88,26 @@ class AlgResultValidator(Logging):
     def validate_transit(self, action: Transit) -> NvimIOState[D, DispatchResult]:
         return (
             TransformTransState.e_for(action.trans)
-            .flat_map(__.run(action.trans))
+            .map(__.run(action.trans))
+            .map(__.flat_map(self.validate))
             .value_or(self.failure)
         )
 
     def validate_propagate(self, action: Propagate) -> NvimIOState[D, DispatchResult]:
         return NvimIOState.pure(DispatchResult(DispatchUnit(), action.messages))
 
-    def validate_unit(self, action: Unit) -> NvimIOState[D, DispatchResult]:
+    def validate_trans_unit(self, action: TransUnit) -> NvimIOState[D, DispatchResult]:
         return NvimIOState.pure(DispatchResult(DispatchUnit(), action.messages))
 
-    def validate_result(self, action: Result) -> NvimIOState[D, DispatchResult]:
+    def validate_trans_result(self, action: TransResult) -> NvimIOState[D, DispatchResult]:
         return NvimIOState.pure(DispatchResult(DispatchReturn(action.data), Nil))
 
     def validate_trans_failure(self, action: TransFailure) -> NvimIOState[D, DispatchResult]:
         return self.failure(action.message)
+
+    def validate_trans_io(self, action: TransIO[I]) -> NvimIOState[D, DispatchResult]:
+        output = DIO.cons(action.io).cata(DispatchError.cons, DispatchIO)
+        return NvimIOState.pure(DispatchResult(output, Nil))
 
 
 class HandlerJob(Generic[D], Logging, ToStr):

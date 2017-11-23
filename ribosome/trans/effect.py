@@ -9,10 +9,10 @@ from amino.dispatch import dispatch_alg
 from ribosome.data import Data
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO
-from ribosome.trans.action import (TransStep, TransEffectError, Lift, Propagate, Strict, Unit, Result, TransAction,
-                                   Transit, TransFailure)
+from ribosome.trans.action import (TransStep, TransEffectError, Lift, Propagate, Strict, TransUnit, TransResult,
+                                   TransAction, Transit, TransFailure, TransIO)
 from ribosome.trans.message_base import Sendable, Messages
-from ribosome.trans.messages import RunIOAlg, Error, Nop, RunNvimIOAlg, CoroutineAlg
+from ribosome.trans.messages import Error, Nop, CoroutineAlg
 
 D = TypeVar('D', bound=Data)
 R = TypeVar('R')
@@ -99,9 +99,9 @@ class TransEffectIO(Generic[R], TransEffect[IO[R]]):
     def tpe(self) -> Type[IO[R]]:
         return IO
 
-    def extract(self, data: IO[R], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+    def extract(self, data: IO[R], tail: List[TransEffect], in_state: bool) -> TransStep:
         io = cont(tail, False, data.map) | data
-        return Lift(Propagate.one(RunIOAlg(io.map(L(lift)(_, in_state)))))
+        return Lift(TransIO(io.map(L(lift)(_, in_state))))
 
 
 class TransEffectNvimIO(Generic[R], TransEffect[NvimIO[R]]):
@@ -110,9 +110,9 @@ class TransEffectNvimIO(Generic[R], TransEffect[NvimIO[R]]):
     def tpe(self) -> Type[NvimIO[R]]:
         return NvimIO
 
-    def extract(self, data: NvimIO[R], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+    def extract(self, data: NvimIO[R], tail: List[TransEffect], in_state: bool) -> TransStep:
         io = cont(tail, False, data.map) | data
-        return Lift(Propagate.one(RunNvimIOAlg(io.map(L(lift)(_, in_state)))))
+        return Lift(TransIO(io.map(L(lift)(_, in_state))))
 
 
 class TransEffectCoro(TransEffect):
@@ -159,7 +159,7 @@ class TransEffectUnit(TransEffect[None]):
         return type(None)
 
     def extract(self, data: None, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
-        return Lift(Unit()) if tail.empty else TransEffectError('cannot apply trans effects to unit')
+        return Lift(TransUnit()) if tail.empty else TransEffectError('cannot apply trans effects to unit')
 
 
 class TransEffectResult(TransEffect[Any]):
@@ -169,7 +169,7 @@ class TransEffectResult(TransEffect[Any]):
         return object
 
     def extract(self, data: object, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
-        return Lift(Result(data)) if tail.empty else TransEffectError('cannot apply trans effects to result')
+        return Lift(TransResult(data)) if tail.empty else TransEffectError('cannot apply trans effects to result')
 
 
 class Lifter(Logging):

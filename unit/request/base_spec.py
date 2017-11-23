@@ -26,6 +26,10 @@ class RH(LegacyRequestHandler):
     def dispatcher(self) -> RequestDispatcher:
         ...
 
+    @property
+    def method(self) -> str:
+        'telepathy'
+
 
 def check_args(fun: Callable, name: str=None) -> None:
     def check() -> None:

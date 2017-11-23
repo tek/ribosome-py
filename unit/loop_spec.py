@@ -1,3 +1,5 @@
+from typing import Any
+
 from kallikrein import k, Expectation
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.typed import have_type
@@ -15,6 +17,8 @@ from ribosome.trans.queue import PrioQueue
 from ribosome.trans.send_message import send_message
 from ribosome.plugin_state import PluginState
 from ribosome.trans.api import trans
+from ribosome.dispatch.data import DispatchResult, DispatchUnit
+from ribosome.nvim.io import NvimIOState
 
 
 class Msg1(Msg): pass
@@ -30,6 +34,9 @@ class Comp1(Component):
         return Just(Msg2())
 
 
+vim = MockNvimFacade()
+
+
 class LoopSpec(SpecBase):
     '''
     process the lowest prio message in the queue $prio
@@ -41,18 +48,18 @@ class LoopSpec(SpecBase):
         a = Msg1()
         b = Msg2()
         messages = PrioQueue.empty.put_default(a).put(b, 0.1)
-        def send(dat: AutoData, msg: Message) -> TransitionResult:
-            return TransitionResult.empty(dat, output=Just(msg))
-        result = process_message(messages, d, send)[1]
-        return k(result.output).must(be_just(b))
+        def send(msg: Message) -> NvimIOState[Any, DispatchResult]:
+            return NvimIOState.pure(DispatchResult(DispatchUnit(), msgs=List(msg)))
+        (messages1, s) = process_message(messages, send)
+        result = s.run_a(d).unsafe(vim)
+        return k(result.msgs.head).must(be_just(b))
 
     def send_message(self) -> Expectation:
         d = AutoData(config=Config('test'))
-        vim = MockNvimFacade()
-        state = PluginState.cons(vim, d, None, List(Comp1('comp1')), PrioQueue.empty)
+        state = PluginState.cons(d, None, List(Comp1('comp1')), PrioQueue.empty)
         a = Msg1()
-        r = send_message(state, a).run(TransitionLog.empty).evaluate()[1]
-        return k(r.pub.head / _.msg).must(be_just(have_type(Msg2)))
+        r = send_message(a).run_a(state).unsafe(vim)
+        return k(r.msgs.head / _.msg).must(be_just(have_type(Msg2)))
 
 
 __all__ = ('LoopSpec',)

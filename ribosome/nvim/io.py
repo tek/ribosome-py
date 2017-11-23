@@ -126,7 +126,7 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
 
     @staticmethod
     def from_id(st: IdState[S, A]) -> 'NvimIOState[S, A]':
-        return st.transform_f(lambda s: NvimIO.pure(s.value))
+        return st.transform_f(NvimIOState, lambda s: NvimIO.pure(s.value))
 
 tcs(NvimIO, NvimIOState)  # type: ignore
 

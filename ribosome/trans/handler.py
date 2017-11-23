@@ -1,6 +1,7 @@
 from typing import Callable, TypeVar, Type, Generic
 
 from amino import List, Lists
+from amino.dat import Dat
 
 from ribosome.data import Data
 from ribosome.trans.effect import TransEffect, cont, lift
@@ -19,7 +20,7 @@ def extract(output: O, effects: List[TransEffect]) -> TransAction:
     return lift(trans_result, False)
 
 
-class MessageTransHandler(Generic[M, D], Handler):
+class MessageTransHandler(Generic[M, D], Dat['MessageTransHandler[M, D]'], Handler):
 
     @staticmethod
     def create(fun: Callable[[M], R], msg: Type[M], effects: List[TransEffect], prio: float) -> 'Handler[M, D, R]':
@@ -34,11 +35,11 @@ class MessageTransHandler(Generic[M, D], Handler):
         self.prio = prio
         self.effects = effects
 
-    def execute(self, msg: M) -> TransAction:
+    def run(self, msg: M) -> TransAction:
         return extract(self.fun(msg), Lists.wrap(self.effects))
 
 
-class FreeTransHandler(Generic[D, R], Handler):
+class FreeTransHandler(Generic[D, R], Dat['FreeTransHandler[M, D]'], Handler):
 
     @staticmethod
     def create(fun: Callable[..., R], effects: List[TransEffect], prio: float) -> 'Handler[D, R]':

@@ -3,7 +3,8 @@ from typing import TypeVar, Generic, Any
 from amino import Either, List, Id, Maybe, Nil
 from amino.state import StateT
 from amino.util.string import ToStr
-from amino.algebra import AlgebraMeta, Algebra
+from amino.algebra import AlgebraMeta
+from amino.dat import ADT
 
 from ribosome.data import Data
 from ribosome.trans.message_base import Sendable, Message
@@ -15,9 +16,10 @@ R = TypeVar('R')
 N = TypeVar('N')
 O = TypeVar('O')
 G = TypeVar('G')
+I = TypeVar('I')
 
 
-class TransAction(Algebra, base=True):
+class TransAction(ADT['TransAction'], base=True):
 
     def __init__(self, messages: List[Sendable]) -> None:
         self.messages = messages
@@ -51,7 +53,7 @@ class Propagate(TransAction):
         return self.messages / str
 
 
-class Unit(TransAction):
+class TransUnit(TransAction):
 
     def __init__(self) -> None:
         super().__init__(Nil)
@@ -60,7 +62,7 @@ class Unit(TransAction):
         return List()
 
 
-class Result(TransAction):
+class TransResult(TransAction):
 
     def __init__(self, data: Any) -> None:
         self.data = data
@@ -78,6 +80,12 @@ class TransFailure(TransAction):
 
     def _arg_desc(self) -> List[str]:
         return List(self.message)
+
+
+class TransIO(Generic[I], TransAction):
+
+    def __init__(self, io: I) -> None:
+        self.io = io
 
 
 class TransStep(Generic[R], ToStr, metaclass=AlgebraMeta, base=True):
@@ -109,5 +117,5 @@ class TransEffectError(TransStep[str]):
     pass
 
 
-__all__ = ('TransAction', 'Transit', 'Propagate', 'Unit', 'Result', 'TransFailure', 'TransStep', 'Strict', 'Lift',
-           'TransEffectError')
+__all__ = ('TransAction', 'Transit', 'Propagate', 'TransUnit', 'TransResult', 'TransFailure', 'TransStep', 'Strict',
+           'Lift', 'TransEffectError')

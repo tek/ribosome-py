@@ -1,16 +1,18 @@
-from typing import TypeVar, Callable
+from typing import TypeVar
 
 from kallikrein import Expectation, k
 from kallikrein.matchers.typed import have_type
 from kallikrein.matchers.maybe import be_just
+from kallikrein.matchers.either import be_right
 
 from ribosome.trans.api import trans
 from ribosome.trans.message_base import pmessage
-from ribosome.trans.messages import RunIOAlg
-from ribosome.trans.action import Transit
+from ribosome.trans.action import Transit, Propagate
 from ribosome.dispatch.transform import AlgResultValidator
+from ribosome.dispatch.data import DispatchResult, DispatchIO
+from ribosome.trans.handler import MessageTransHandler
 
-from amino import Right, IO, _, Either, Id, Maybe, L
+from amino import Right, IO, _, Either, Id, Maybe
 from amino.state import IdState, StateT
 
 
@@ -29,43 +31,44 @@ class HandlerSpec:
 
     @property
     def validator(self) -> AlgResultValidator:
-        return AlgResultValidator(1)
+        return AlgResultValidator('desc')
 
-    def run(self, f: Callable[[Msg1], R]) -> Maybe[Msg2]:
-        res = self.validator.validate(f(Msg1()), {})
-        return k(res.resend.head).must(be_just(have_type(Msg2)))
+    def run(self, f: MessageTransHandler) -> Maybe[Msg2]:
+        res = self.validator.validate(f.run(Msg1()))
+        print()
+        return k(res.run_a(None).attempt(None) / _.msgs // _.head).must(be_just(have_type(Msg2)))
 
     def eso(self) -> Expectation:
-        @trans.one(Msg1, trans.e, trans.st, trans.io)
-        def f(msg) -> Either[str, StateT[Id, int, IO[Msg2]]]:
+        @trans.msg.one(Msg1, trans.e, trans.st, trans.io)
+        def f(msg: Msg1) -> Either[str, StateT[Id, int, IO[Msg2]]]:
             return Right(IdState.pure(IO.pure(Msg2())))
-        res = f.fun(Msg1())
-        valid = self.validator.validate(res, {}).resend.head
-        res1 = valid.to_either('').flat_map(_.io.attempt)
-        valid1 = res1 / L(self.validator.validate)(_, {}) / _.resend // _.head
+        res = f.run(Msg1())
+        s = self.validator.validate(res)
+        valid = s.run_a(None).attempt(None)
         return (
             k(res).must(have_type(Transit)) &
             k(res.trans).must(have_type(StateT)) &
-            k(valid).must(be_just(have_type(RunIOAlg))) &
-            k(valid1).must(be_just(have_type(Msg2)))
+            k(valid).must(be_right(have_type(DispatchResult))) &
+            k(valid / _.output).must(be_right(have_type(DispatchIO))) &
+            k(valid / _.output.io.io // _.attempt).must(be_right(Propagate.one(Msg2())))
         )
 
     def se(self) -> Expectation:
-        @trans.one(Msg1, trans.st, trans.e)
+        @trans.msg.one(Msg1, trans.st, trans.e)
         def f(msg) -> StateT[Id, int, Either[str, Msg2]]:
             return IdState.pure(Right(Msg2()))
-        return self.run(f.fun)
+        return self.run(f)
 
     def single(self) -> Expectation:
-        @trans.one(Msg1, trans.e)
+        @trans.msg.one(Msg1, trans.e)
         def f(msg) -> Either[str, Msg2]:
             return Right(Msg2())
-        return self.run(f.fun)
+        return self.run(f)
 
     def single_st(self) -> Expectation:
-        @trans.one(Msg1, trans.e, trans.st)
+        @trans.msg.one(Msg1, trans.e, trans.st)
         def f(msg) -> Either[str, StateT[Id, int, Msg2]]:
             return Right(IdState.pure(Msg2()))
-        return self.run(f.fun)
+        return self.run(f)
 
 __all__ = ('HandlerSpec',)

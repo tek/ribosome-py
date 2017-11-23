@@ -1,7 +1,7 @@
 import abc
 from typing import TypeVar, Union, Any, Generic, Type
 
-from amino import List, Boolean, Nil, Maybe, Just, Nothing, IO
+from amino import List, Boolean, Nil, Maybe, Just, Nothing, IO, Either, Right, Left
 from amino.dat import Dat, ADT, DatMeta
 
 from ribosome.request.rpc import RpcHandlerFunction, RpcHandlerSpec
@@ -166,17 +166,26 @@ A = TypeVar('A')
 I = TypeVar('I')
 
 
-class DIO(Generic[I], ADT['DIO'], base=True):
-    pass
+class DIO(Generic[I], ADT['DIO[I]'], base=True):
+
+    @staticmethod
+    def cons(io: I) -> Either[str, 'DIO[I]']:
+        return (
+            Right(IODIO(io))
+            if isinstance(io, IO) else
+            Right(NvimIODIO(io))
+            if isinstance(io, NvimIO) else
+            Left(f'invalid type for DIO: {io}')
+        )
 
 
-class IODIO(Generic[A], ADT[IO[A]]):
+class IODIO(Generic[A], DIO[IO[A]]):
 
     def __init__(self, io: IO[A]) -> None:
         self.io = io
 
 
-class NvimIODIO(Generic[A], ADT[NvimIO[A]]):
+class NvimIODIO(Generic[A], DIO[NvimIO[A]]):
 
     def __init__(self, io: NvimIO[A]) -> None:
         self.io = io
