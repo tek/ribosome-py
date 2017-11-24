@@ -140,7 +140,7 @@ class AlgHandlerJob(HandlerJob):
 
     def run(self) -> NvimIOState[D, DispatchResult]:
         try:
-            r = self.handler.execute(self.msg)
+            r = self.handler.run(self.msg)
         except Exception as e:
             return self.exception(e)
         else:
