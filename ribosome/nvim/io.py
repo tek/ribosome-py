@@ -28,7 +28,7 @@ class NvimIOInstances(ImplicitInstances):
 class NvimIO(Generic[A], F[A], implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
 
     @staticmethod
-    def wrap_either(f: Callable[[NvimComponent], A]) -> 'NvimIO[A]':
+    def wrap_either(f: Callable[[NvimComponent], Either[B, A]]) -> 'NvimIO[A]':
         return NvimIO(lambda a: f(a).get_or_raise())
 
     @staticmethod
@@ -123,6 +123,10 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
     @staticmethod
     def io(f: Callable[[NvimComponent], A]) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO(f))
+
+    @staticmethod
+    def from_io(io: IO[A]) -> 'NvimIOState[S, A]':
+        return NvimIOState.lift(NvimIO.wrap_either(lambda v: io.attempt))
 
     @staticmethod
     def from_id(st: IdState[S, A]) -> 'NvimIOState[S, A]':

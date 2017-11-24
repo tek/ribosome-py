@@ -16,12 +16,14 @@ from ribosome.config import Config
 from ribosome.nvim.io import NvimIOState
 from ribosome.dispatch.run import DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch
 from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
-                                    DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors)
+                                    DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors,
+                                    NvimIODIO)
 from ribosome.plugin_state import PluginState, PluginStateHolder
 from ribosome.trans.queue import PrioQueue
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.loop import process_message
 from ribosome.trans.send_message import send_message
+from ribosome.dispatch.transform import AlgResultValidator
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)
@@ -38,8 +40,11 @@ Res = NvimIOState[PluginState[D, NP], DispatchResult]
 
 class ExecuteDispatchIO:
 
-    def i_o_dio(self, io: IODIO[A]) -> NvimIO[Any]:
-        return
+    def iodio(self, io: IODIO[A]) -> NvimIOState[PluginState[D, NP], R]:
+        return NvimIOState.from_io(io.io)
+
+    def nvim_iodio(self, io: NvimIODIO[A]) -> NvimIOState[PluginState[D, NP], R]:
+        return NvimIOState.lift(io.io)
 
 
 execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
@@ -59,19 +64,28 @@ class ExecuteDispatchOutput:
     def dispatch_unit(self, result: DispatchUnit) -> NvimIOState[PluginState[D, NP], R]:
         return NvimIOState.pure(0)
 
-    def dispatch_io(self, result: DispatchIO) -> NvimIOState[PluginState[D, NP], R]:
-        return execute_io(result)
+    @do(NvimIOState[PluginState[D, NP], R])
+    def dispatch_io(self, result: DispatchIO) -> Do:
+        inner = yield execute_io(result.io)
+        validator = AlgResultValidator('execute result')
+        result1 = yield validator.validate(inner)
+        yield normalize_output(result1)
 
 
 execute_output = dispatch_alg(ExecuteDispatchOutput(), DispatchOutput, '')
 
 
 @do(NvimIOState[PluginState[D, NP], R])
+def normalize_output(result: DispatchResult) -> Do:
+    yield NvimIOState.modify(__.enqueue(result.msgs))
+    yield execute_output(result.output)
+
+
+@do(NvimIOState[PluginState[D, NP], R])
 def run_dispatch(action: Callable[[], NvimIOState[PluginState[D, NP], B]], unpack: Callable[[B], Res]) -> Do:
     response = yield action()
     result = yield unpack(response)
-    yield NvimIOState.modify(__.enqueue(result.msgs))
-    yield execute_output(result.output)
+    yield normalize_output(result)
 
 
 # FIXME check how long-running messages can be handled; timeout for acquire is 10s
