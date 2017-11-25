@@ -1,20 +1,24 @@
 import os
 import abc
+import pty
 import json
+import time
 import asyncio
+import subprocess
 from functools import wraps
 from threading import Thread
+from datetime import datetime
 from contextlib import contextmanager
 from typing import Any, Callable, Generic, TypeVar, Type
 
 import neovim
 from neovim.api import Nvim
 
-from amino import List, Either, Left, __, env, Path, Lists, _
+from amino import List, Either, Left, __, env, Path, Lists, _, Map
 from amino.lazy import lazy
 from amino.test import fixture_path, temp_dir, temp_file
 from amino.test.path import base_dir, pkg_dir
-from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase
+from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase, default_timeout
 from amino.util.string import camelcase
 from amino.json import dump_json
 
@@ -25,10 +29,18 @@ from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
 from ribosome.request.rpc import rpc_handlers, RpcHandlerSpec
 from ribosome.trans.message_base import Message
-from ribosome.record import decode_json_compat, JsonError, encode_json_compat
+from ribosome.record import decode_json_compat, JsonError, encode_json_compat, decode_json
 from ribosome.config import PluginSettings, AutoData
 
 A = TypeVar('A', bound=NvimPlugin)
+
+
+def wait_for(cond: Callable[[], bool], timeout: float=None, intval: float=0.1) -> bool:
+    to = default_timeout if timeout is None else timeout
+    start = datetime.now()
+    while (not cond() and (datetime.now() - start).total_seconds() < to):
+        time.sleep(intval)
+    return cond()
 
 
 class IntegrationSpecBase(AminoIntegrationSpecBase):
@@ -53,11 +65,14 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def __init__(self) -> None:
         IntegrationSpecBase.__init__(self)
         self.tmux_nvim = 'RIBOSOME_TMUX_SPEC' in env
-        self._tmux_pane = None
+        self.tmux_nvim_external = False
+        self.tmux_pane = None
         self.keep_tmux_pane = False
         self.vimlog = temp_dir('log') / 'vim'
-        self._cmdline = ('nvim', '-V{}'.format(self.vimlog), '-n', '-u', 'NONE')
+        self.nvim_cmdline = List('nvim', '-V{}'.format(self.vimlog), '-n', '-u', 'NONE')
         self.log_format = '{levelname} {name}:{message}'
+        self.subproc = None
+        self.tmux_server = None
 
     def setup(self) -> None:
         IntegrationSpecBase.setup(self)
@@ -70,27 +85,43 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         os.environ['RIBOSOME_LOG_FILE'] = str(self.logfile)
         os.environ['RIBOSOME_FILE_LOG_FMT'] = self.log_format
         self._pre_start_neovim()
-        self._start_neovim()
+        self.start_neovim()
         self._post_start_neovim()
         self._pre_start()
         self._start_plugin()
         self._post_start()
 
-    def _start_neovim(self) -> None:
+    def start_neovim(self) -> None:
         asyncio.get_child_watcher().attach_loop(asyncio.get_event_loop())
         if self.tmux_nvim:
-            self._start_neovim_tmux()
+            self.start_neovim_tmux_pane()
+        elif self.tmux_nvim_external:
+            self.start_neovim_tmux_bg()
         else:
-            self._start_neovim_embedded()
+            self.start_neovim_embedded()
         self.vim = self._nvim_facade(self.neovim)
 
-    def _start_neovim_embedded(self) -> None:
+    @property
+    def python_path(self) -> str:
+        global_path = env['PYTHONPATH'] | ''
+        return '{}:{}'.format(self.project_path, global_path)
+
+    @property
+    def vim_proc_env(self) -> Map:
+        return Map(
+            NVIM_LISTEN_ADDRESS=self.nvim_socket,
+            PYTHONPATH=self.python_path,
+            RIBOSOME_LOG_FILE=self.logfile,
+            RIBOSOME_FILE_LOG_FMT=f'\'{self.log_format}\'',
+            AMINO_DEVELOPMENT='1',
+        )
+
+    def start_neovim_embedded(self) -> None:
         ''' start an embedded vim session that loads no init.vim.
-        **self.vimlog** is set as log file. aside from being convenient,
-        this is crucially necessary, as the first use of the session
-        will block if stdout is used for output.
+        **self.vimlog** is set as log file. aside from being convenient, this is crucially necessary, as the first use
+        of the session will block if stdout is used for output.
         '''
-        argv = self._cmdline + ('--embed',)
+        argv = self.nvim_cmdline.cat('--embed')
         self.neovim = neovim.attach('child', argv=argv)
 
     @lazy
@@ -101,39 +132,52 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def project_path(self) -> str:
         return str(base_dir().parent)
 
-    @lazy
-    def _tmux_window(self) -> Any:
+    @property
+    def tmux_socket(self) -> str:
+        return f'ribosome_{os.getpid()}'
+
+    def connect_tmux(self, socket: str) -> Any:
         try:
             import libtmux
         except ImportError:
             raise Exception('install libtmux to run nvim in a tmux pane')
         else:
-            server = libtmux.Server()
-            session = next(s for s in server.sessions
-                           if int(s['session_attached']) >= 1)
-            return session.attached_window
+            return libtmux.Server(socket_name=socket)
 
-    def _start_neovim_tmux(self) -> None:
+    @property
+    def tmux_window_external(self) -> Any:
+        self.tmux_server = self.connect_tmux(self.tmux_socket)
+        return self.tmux_server.sessions[0].windows[0]
+
+    @property
+    def tmux_window_local(self) -> Any:
+        server = self.connect_tmux(None)
+        session = next(s for s in server.sessions if int(s['session_attached']) >= 1)
+        return session.attached_window
+
+    @lazy
+    def tmux_window(self) -> Any:
+        return self.tmux_window_external if self.tmux_nvim_external else self.tmux_window_local
+
+    def start_neovim_tmux_bg(self) -> None:
+        conf = fixture_path('conf', 'tmux.conf')
+        args = ['tmux', '-L', self.tmux_socket, '-f', str(conf)]
+        master, slave = pty.openpty()
+        self.subproc = subprocess.Popen(args, stdout=slave, stdin=slave, stderr=slave)
+        self.start_neovim_tmux_pane()
+
+    def start_neovim_tmux_pane(self) -> None:
+        env_args = self.vim_proc_env.map2(lambda k, v: f'{k}={v}').cons('env')
+        cmd = tuple(env_args + self.nvim_cmdline)
+        out = self.tmux_window.cmd('split-window', '-d', '-P', '-F#{pane_id}', *cmd).stdout
         from libtmux import Pane
-        global_path = env['PYTHONPATH'] | ''
-        path = '{}:{}'.format(self.project_path, global_path)
-        tmux_env = (
-            'env',
-            'NVIM_LISTEN_ADDRESS={}'.format(self.nvim_socket),
-            'PYTHONPATH={}'.format(path),
-            'RIBOSOME_LOG_FILE={}'.format(self.logfile),
-            'RIBOSOME_FILE_LOG_FMT=\'{}\''.format(self.log_format),
-            'AMINO_DEVELOPMENT=1',
-        )
-        cmd = tuple(tmux_env + self._cmdline)
-        out = self._tmux_window.cmd('split-window', '-d', '-P', '-F#{pane_id}', *cmd).stdout
-        self._tmux_pane = Pane(self._tmux_window, pane_id=out[0])
+        self.tmux_pane = Pane(self.tmux_window, pane_id=out[0])
         self.neovim = neovim.attach('socket', path=self.nvim_socket)
-        self.neovim.command('python3 sys.path.insert(0, \'{}\')'.format(path))
+        self.neovim.command('python3 sys.path.insert(0, \'{}\')'.format(self.python_path))
 
     def _cleanup_tmux(self) -> None:
-        if self._tmux_pane is not None and not self.keep_tmux_pane:
-            self._tmux_pane.cmd('kill-pane')
+        if self.tmux_pane is not None and not self.keep_tmux_pane:
+            self.tmux_pane.cmd('kill-pane')
 
     def _nvim_facade(self, vim: Nvim) -> NvimFacade:
         return NvimFacade(vim, self._prefix)
@@ -152,6 +196,10 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
             self._log_out.foreach(self.log.info)
         if self.tmux_nvim:
             self._cleanup_tmux()
+        if self.subproc is not None:
+            self.subproc.kill()
+        if self.tmux_server is not None:
+            self.tmux_server.kill_server()
 
     def _pre_start_neovim(self) -> None:
         pass
