@@ -6,7 +6,6 @@ from typing import TypeVar, Callable, Union, Any, Dict, Generator
 from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean, _, L, __
 from amino.util.string import camelcaseify, ToStr
 from amino.list import Nil
-from amino.do import do
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log
@@ -228,7 +227,8 @@ class RpcAutocommandSpec(RpcHandlerSpec):
 
     @property
     def rpc_opts_post(self) -> List[str]:
-        return Map(self.opts).map2(rpc_autocmd_opt).join
+        defaults = Map(pattern='*')
+        return Map(defaults ** self.opts).map2(rpc_autocmd_opt).join
 
     @property
     def rpc_args(self) -> List[str]:
