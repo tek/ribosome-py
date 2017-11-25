@@ -35,7 +35,6 @@ class HandlerSpec:
 
     def run(self, f: MessageTransHandler) -> Maybe[Msg2]:
         res = self.validator.validate(f.run(Msg1()))
-        print()
         return k(res.run_a(None).attempt(None) / _.msgs // _.head).must(be_just(have_type(Msg2)))
 
     def eso(self) -> Expectation:

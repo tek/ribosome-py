@@ -10,7 +10,7 @@ from ribosome.config import RequestHandler, AutoData
 from ribosome.nvim import NvimIO
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 from ribosome.dispatch.component import Component
-from ribosome.request.handler import Plain
+from ribosome.request.handler.prefix import Plain
 
 Msg1 = pmessage('Msg1')
 Msg2 = pmessage('Msg2')
@@ -19,18 +19,15 @@ val = 71
 
 class SpecCore(Component):
 
-    @trans.unit(Stage1)
+    @trans.msg.unit(Stage1)
     def stage_1(self) -> None:
         pass
 
-    @trans.unit(Msg1, trans.nio)
+    @trans.msg.unit(Msg1, trans.nio)
     def msg1(self) -> NvimIO[None]:
-        def f(v) -> None:
-            r = v.vars.set('msg_cmd_success', val)
-        # return NvimIO(__.vars.set('msg_cmd_success', val))
-        return NvimIO(f)
+        return NvimIO(__.vars.set('msg_cmd_success', val))
 
-    @trans.unit(Msg2, trans.nio)
+    @trans.msg.unit(Msg2, trans.nio)
     def msg2(self) -> NvimIO[None]:
         return NvimIO(__.vars.set('autocmd_success', val))
 
@@ -39,8 +36,8 @@ auto_config = Config(
     name='plug',
     components=Map(core=SpecCore),
     request_handlers=List(
-        RequestHandler.msg_cmd(Msg1)('msg1', prefix=Plain(), sync=True),
-        RequestHandler.msg_autocmd(Msg2)('vim_resized', prefix=Plain())
+        RequestHandler.msg_cmd(Msg1)('msg1', prefix=Plain()),
+        RequestHandler.msg_autocmd(Msg2)('vim_resized', prefix=Plain()),
     ),
 )
 

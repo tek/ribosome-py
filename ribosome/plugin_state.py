@@ -100,6 +100,10 @@ class PluginState(Generic[D, NP], Dat['PluginState']):
         return not self.messages.empty
 
     @property
+    def unwrapped_messages(self) -> List[Message]:
+        return self.messages.items / _[1] / _.msg
+
+    @property
     def config(self) -> 'ribosome.config.Config':
         return self.plugin.config
 
@@ -133,6 +137,14 @@ class PluginStateHolder(Generic[D, NP], Dat['PluginStateHolder']):
     @property
     def has_messages(self) -> Boolean:
         return self.state.has_messages
+
+    @property
+    def message_queue(self) -> PrioQueue[Message]:
+        return self.state.messages
+
+    @property
+    def messages(self) -> List[Message]:
+        return self.state.unwrapped_messages
 
 
 __all__ = ('ComponentState', 'PluginState', 'PluginStateHolder', 'Components')

@@ -595,7 +595,7 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
             self._call(name, *args, sync=sync, **kw)
             .lmap(L(self._call_error)(name, args, kw, _, sync))
             .leffect(self._log_call_error)
-            .lmap(lambda a: 'vim call `{}` failed: {}'.format(a.funcall, a.msg))
+            .lmap(lambda a: f'vim call `{a.funcall}` failed: {a.msg}')
         )
 
     def _call_error(self, name: str, args: tuple, kw: dict, err: Exception, sync: bool) -> CallError:

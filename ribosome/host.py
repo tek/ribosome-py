@@ -14,6 +14,7 @@ from amino.logging import amino_root_file_logging
 from amino.do import do
 from amino.dat import Dat
 from amino.algebra import Algebra
+from amino.state import EitherState
 
 from ribosome import NvimPlugin
 from ribosome import options
@@ -33,7 +34,7 @@ from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
 from ribosome.request.rpc import rpc_handler_functions, define_handlers, RpcHandlerSpec
 from ribosome.trans.api import trans
-from ribosome.trans.messages import ShowLogInfo, UpdateState
+from ribosome.trans.messages import ShowLogInfo, UpdateState, Stage1, Quit
 from ribosome.trans.queue import PrioQueue
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
@@ -67,6 +68,10 @@ class HostConfig(Dat['HostConfig']):
         return self.config.name
 
     @property
+    def dispatch(self) -> List[Dispatch]:
+        return self.sync_dispatch.v + self.async_dispatch.v
+
+    @property
     def specs(self) -> List[RpcHandlerSpec]:
         return self.dispatch / __.spec(self.config.name, self.config.prefix)
 
@@ -98,6 +103,8 @@ def request_handler(vim: NvimFacade,
             .attempt(vim)
             .value_or(L(request_error)(job, _))
         )
+        if sync:
+            ribo_log.debug(f'request `{job.name}` completed: {result}')
         return vim.encode_vim_data(result)
     return handle
 
@@ -185,16 +192,17 @@ def config_dispatchers(config: Config) -> List[DispatchAsync]:
     return config.request_handlers.handlers.map2(choose)
 
 
-@trans.free.unit(trans.result)
-def message_log(args: Any) -> List[str]:
-    return state.message_log // encode_json_compat
+@trans.free.result(trans.st)
+def message_log(args: Any) -> EitherState[PluginState[D, NP], str]:
+    return EitherState.inspect_f(lambda state: state.message_log // encode_json_compat)
 
 
 message_log_handler = RequestHandler.trans_function(message_log)('message_log', Full())
 show_log_info_handler = RequestHandler.msg_cmd(ShowLogInfo)('show_log_info', Full())
 update_state_handler = RequestHandler.json_msg_cmd(UpdateState)('update_state', Full())
 mapping_handler = RequestHandler.msg_fun(Mapping)('mapping', Full())
-# nvim_io_handler = RequestHandler.internal(RunNvimIOAlg, run_nvim_io)
+stage_1_handler = RequestHandler.msg_cmd(Stage1)('stage_1', Full())
+quit_handler = RequestHandler.msg_cmd(Quit)('quit', Full())
 
 
 def internal_dispatchers(config: Config) -> List[Dispatch]:
@@ -203,6 +211,8 @@ def internal_dispatchers(config: Config) -> List[Dispatch]:
         SendMessage(show_log_info_handler),
         SendMessage(update_state_handler),
         SendMessage(mapping_handler),
+        SendMessage(stage_1_handler),
+        SendMessage(quit_handler),
     )
 
 

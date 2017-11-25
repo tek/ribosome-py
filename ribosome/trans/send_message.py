@@ -1,14 +1,14 @@
 import time
 from typing import TypeVar, Callable, Generator
 
-from amino import __, Maybe, Boolean, _, List
+from amino import __, Maybe, Boolean, _, List, Nil, L
 from amino.do import do
 
 from ribosome.trans.message_base import Message, Sendable, Envelope
 from ribosome.logging import ribo_log
 from ribosome.plugin_state import PluginState, ComponentState, Components, TransState
 from ribosome.nvim.io import NvimIOState
-from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchErrors
+from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchErrors, DispatchOutputAggregate
 from ribosome.dispatch.transform import AlgHandlerJob
 
 A = TypeVar('A')
@@ -30,7 +30,7 @@ def internal(msg: Message) -> TransState:
     return DispatchResult.unit_nio
 
 
-def format_report(self, msg: Message, dur: float, name: str) -> str:
+def format_report(msg: Message, dur: float, name: str) -> str:
     return '{} took {:.4f}s for {} to process'.format(msg, dur, name)
 
 
@@ -70,14 +70,20 @@ def send_to(msg: Message, prio: float) -> Callable[[TransState, ComponentState],
     return send
 
 
-def aggregate(results: List[DispatchResult]) -> TransState:
+# FIXME IOs are discarded here. create a special DispatchOutput that contains the aggregated outputs
+def aggregate(results: List[DispatchResult]) -> DispatchResult:
     errors = (results / _.output).filter_type(DispatchError)
     msgs = results // _.msgs
     return DispatchResult(DispatchErrors(errors) if errors else DispatchUnit(), msgs)
 
 
 def send_msg(components: Components, msg: Message, prio: float) -> TransState:
-    return components.all.traverse(lambda comp: process(comp, msg, prio), NvimIOState) / aggregate
+    return (
+        components.all
+        .traverse(lambda comp: process(comp, msg, prio), NvimIOState) /
+        DispatchOutputAggregate /
+        L(DispatchResult)(_, Nil)
+    )
 
 
 def send_envelope(components: Components, env: Envelope, prio: float) -> TransState:

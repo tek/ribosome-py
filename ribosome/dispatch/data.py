@@ -33,6 +33,10 @@ class Dispatch(Generic[DP]):
     def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
         ...
 
+    @abc.abstractproperty
+    def desc(self) -> str:
+        ...
+
 
 class DispatchSync(ADT['DispatchSync'], Dispatch['DispatchSync'], base=True):
     pass
@@ -56,6 +60,10 @@ class Legacy(DispatchSync):
 
     def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
         return self.handler.spec
+
+    @property
+    def desc(self) -> str:
+        return f'legacy `{self.handler}`'
 
 
 class SendMessage(DispatchAsync):
@@ -85,6 +93,10 @@ class SendMessage(DispatchAsync):
     def method(self) -> str:
         return self.handler.method.method
 
+    @property
+    def desc(self) -> str:
+        return f'send `{self.msg.__name__}`'
+
 
 class Trans(Generic[Meth, B], DispatchSync, DispatchAsync):
 
@@ -97,6 +109,10 @@ class Trans(Generic[Meth, B], DispatchSync, DispatchAsync):
 
     def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
         return self.handler.spec(name, prefix)
+
+    @property
+    def desc(self) -> str:
+        return f'trans `self.name`'
 
 
 class Internal(Generic[Meth, B], DispatchSync, DispatchAsync):
@@ -117,6 +133,10 @@ class Internal(Generic[Meth, B], DispatchSync, DispatchAsync):
     @property
     def name(self) -> str:
         return self.handler.name
+
+    @property
+    def desc(self) -> str:
+        return f'internal `self.name`'
 
 
 class DispatchOutput(ADT, base=True): pass
@@ -160,6 +180,12 @@ class DispatchUnit(DispatchOutput):
 
     def _arg_desc(self) -> List[str]:
         return Nil
+
+
+class DispatchOutputAggregate(DispatchOutput):
+
+    def __init__(self, results: List['DispatchResult']) -> None:
+        self.results = results
 
 
 A = TypeVar('A')

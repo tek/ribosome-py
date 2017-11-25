@@ -166,22 +166,22 @@ class AutoPlugin(Generic[Settings, D], NvimStatePlugin, metaclass=AutoPluginMeta
     # def create_root(self) -> RootMachine[Settings, D]:
     #     return root_machine(self.vim.proxy, self.config, self.initial_state)
 
-    def stage_1(self) -> None:
-        self.root.start()
-        self.root.wait_for_running()
-        self.root.send(Stage1())
+#     def stage_1(self) -> None:
+#         self.root.start()
+#         self.root.wait_for_running()
+#         self.root.send(Stage1())
 
-    def stage_2(self) -> None:
-        self.root.send(Stage2().at(0.6))
+#     def stage_2(self) -> None:
+#         self.root.send(Stage2().at(0.6))
 
-    def stage_3(self) -> None:
-        self.root.send(Stage3().at(0.7))
+#     def stage_3(self) -> None:
+#         self.root.send(Stage3().at(0.7))
 
-    def stage_4(self) -> None:
-        self.root.send(Stage4().at(0.8))
+#     def stage_4(self) -> None:
+#         self.root.send(Stage4().at(0.8))
 
-    def quit(self) -> None:
-        self.root.send(Quit())
+    # def quit(self) -> None:
+    #     self.root.send(Quit())
 
     # def state(self) -> RootMachine:
     #     return self.root
@@ -229,11 +229,11 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     # help.msg_cmd('show_log_info', ShowLogInfo)
     help.short_handler('log_level', command, cls.set_log_level)
     # help.msg_fun('mapping', Mapping)
-    help.name_handler('stage_1', command, cls.stage_1, sync=True)
-    help.name_handler('stage_2', command, cls.stage_2, sync=True)
-    help.name_handler('stage_3', command, cls.stage_3, sync=True)
-    help.name_handler('stage_4', command, cls.stage_4, sync=True)
-    help.name_handler('quit', command, cls.quit, sync=True)
+    # help.name_handler('stage_1', command, cls.stage_1, sync=True)
+    # help.name_handler('stage_2', command, cls.stage_2, sync=True)
+    # help.name_handler('stage_3', command, cls.stage_3, sync=True)
+    # help.name_handler('stage_4', command, cls.stage_4, sync=True)
+    # help.name_handler('quit', command, cls.quit, sync=True)
     help.name_handler('rpc_handlers', function, cls.rpc_handlers, sync=True)
     help.name_handler('append_python_path', function, cls.append_python_path)
     help.name_handler('show_python_path', function, cls.show_python_path)
