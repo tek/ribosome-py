@@ -24,7 +24,7 @@ A = TypeVar('A')
 D = TypeVar('D', bound=Data)
 
 
-class Internal(Component):
+class InternalC(Component):
 
     @trans.msg.unit(Nop)
     def _nop(self):
@@ -103,4 +103,4 @@ class Internal(Component):
         result = self._send(self.data, self.msg.msg)
         return result if result.handled else self._send(self.data, self.msg.unhandled)
 
-__all__ = ('Internal', 'RunMachine', 'KillMachine', 'RunScratchMachine')
+__all__ = ('InternalC', 'RunMachine', 'KillMachine', 'RunScratchMachine')

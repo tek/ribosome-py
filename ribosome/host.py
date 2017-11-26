@@ -1,4 +1,4 @@
-from typing import TypeVar, Type, Callable, Generator, Any
+from typing import TypeVar, Type, Callable, Any
 from types import ModuleType
 from threading import Lock
 
@@ -11,7 +11,7 @@ from amino import Either, _, L, Maybe, Lists, amino_log, Logger, __, Path, Map, 
 from amino.either import ImportFailure
 from amino.func import Val
 from amino.logging import amino_root_file_logging
-from amino.do import do
+from amino.do import do, Do
 from amino.dat import Dat
 from amino.algebra import Algebra
 from amino.state import EitherState
@@ -95,7 +95,7 @@ def request_handler(vim: NvimFacade,
                     state: PluginStateHolder[D, NP],
                     config: Config) -> Callable[[str, tuple], Any]:
     sync_prefix = '' if sync else 'a'
-    def handle(name: str, args: tuple) -> Generator:
+    def handle(name: str, args: tuple) -> Do:
         job = dispatch_job(vim, sync, dispatches, state, name, args)
         amino_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
         result = (
@@ -110,7 +110,7 @@ def request_handler(vim: NvimFacade,
 
 
 @do(NvimIO[PluginState[D, NP]])
-def init_state(host_config: HostConfig) -> Generator:
+def init_state(host_config: HostConfig) -> Do:
     data = yield NvimIO.delay(host_config.config.state)
     components = yield ComponentResolver(host_config.config).run
     plugin = yield NvimIO.delay(lambda vim: host_config.plugin_class(vim, data))
@@ -119,7 +119,7 @@ def init_state(host_config: HostConfig) -> Generator:
 
 # can vim be injected into each request handling process?
 @do(NvimIO[int])
-def run_session(session: Session, host_config: HostConfig) -> Generator:
+def run_session(session: Session, host_config: HostConfig) -> Do:
     yield define_handlers(host_config.specs, host_config.name, host_config.name)
     state = yield init_state(host_config)
     holder = PluginStateHolder(state, Lock())
@@ -147,7 +147,7 @@ def start_host(prefix: str, host_config: HostConfig) -> int:
 
 
 @do(Either[str, A])
-def instance_from_module(mod: ModuleType, pred: Callable[[Any], bool], desc: str) -> Generator:
+def instance_from_module(mod: ModuleType, pred: Callable[[Any], bool], desc: str) -> Do:
     all = yield Maybe.getattr(mod, '__all__').to_either(f'module `{mod.__name__}` does not define `__all__`')
     yield (
         Lists.wrap(all)
@@ -200,11 +200,12 @@ def config_dispatchers(config: Config) -> List[DispatchAsync]:
 
 
 @trans.free.result(trans.st)
-def message_log() -> EitherState[PluginState[D, NP], str]:
-    return EitherState.inspect_f(lambda state: state.message_log // encode_json_compat)
+@do(EitherState[PluginState[D, NP], str])
+def message_log() -> Do:
+    yield EitherState.inspect_f(__.message_log.traverse(encode_json_compat, Either))
 
 
-message_log_handler = RequestHandler.trans_function(message_log)('message_log', Full())
+message_log_handler = RequestHandler.trans_function(message_log)('message_log', Full(), sync=True)
 show_log_info_handler = RequestHandler.msg_cmd(ShowLogInfo)('show_log_info', Full())
 update_state_handler = RequestHandler.json_msg_cmd(UpdateState)('update_state', Full())
 mapping_handler = RequestHandler.msg_fun(Mapping)('mapping', Full())

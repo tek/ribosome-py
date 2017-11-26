@@ -59,7 +59,7 @@ class LoopSpec(SpecBase):
         state = PluginState.cons(d, None, List(Comp1('comp1')), PrioQueue.empty)
         a = Msg1()
         r = send_message(a).run_a(state).unsafe(vim)
-        return k(r.msgs.head / _.msg).must(be_just(have_type(Msg2)))
+        return k(r.output.results.head // _.msgs.head / _.msg).must(be_just(have_type(Msg2)))
 
 
 __all__ = ('LoopSpec',)

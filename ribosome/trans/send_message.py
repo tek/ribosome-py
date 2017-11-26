@@ -51,25 +51,6 @@ def process(component: ComponentState, msg: Message, prio: float) -> TransState:
     return resolve_handler(component, msg, prio) / execute | (lambda: internal(msg))
 
 
-@do(TransState)
-def send_message_to_component(component: ComponentState, data: D, msg: M, prio: float) -> TransState:
-    result = yield process(component, data, msg, prio)
-    log = yield NvimIOState.get()
-    resend = result.resend
-    new_log, next_msg = log.resend(resend).pop
-    yield NvimIOState.set(new_log)
-    yield NvimIOState.pure(result)
-
-
-def send_to(msg: Message, prio: float) -> Callable[[TransState, ComponentState], TransState]:
-    @do(TransState)
-    def send(z: TransState, comp: ComponentState) -> Generator:
-        current = yield z
-        next = yield send_message_to_component(comp, current.data, msg, prio)
-        yield NvimIOState.pure(current.accum(next))
-    return send
-
-
 def send_msg(components: Components, msg: Message, prio: float) -> TransState:
     return (
         components.all
@@ -82,7 +63,7 @@ def send_msg(components: Components, msg: Message, prio: float) -> TransState:
 def send_envelope(components: Components, env: Envelope, prio: float) -> TransState:
     msg = env.msg
     def to_comp(name: str) -> TransState:
-        return components.by_name(name) / send_to(msg, prio) | (lambda: DispatchResult.unit_nio)
+        return components.by_name(name) / L(process)(_, msg, prio) | (lambda: DispatchResult.unit_nio)
     return env.recipient / to_comp | (lambda: send_msg(components, msg, prio))
 
 
@@ -99,7 +80,6 @@ def transform_data_state(st: NvimIOState[D, DispatchResult]) -> NvimIOState[Plug
     return st.transform_s(_.data, lambda r, s: r.copy(data=s))
 
 
-# FIXME need to transform state here to use AutoData, not PluginState, for send_message1
 @do(NvimIOState[PluginState[D, NP], DispatchResult])
 def send_message(msg: M, prio: float=None) -> Generator:
     yield NvimIOState.modify(__.log_message(msg.msg))

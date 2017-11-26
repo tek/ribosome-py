@@ -5,6 +5,7 @@ from typing import Callable, Any, Union
 
 from amino import List, Maybe, Map
 from amino.util.string import camelcase
+from amino.boolean import true, false
 
 from ribosome.logging import Logging
 from ribosome.request.args import ParamsSpec, ArgValidator
@@ -109,6 +110,6 @@ class LegacyRequestHandler(Logging, metaclass=abc.ABCMeta):
 
     @property
     def spec(self) -> RequestHandler:
-        return RequestHandler(self.method, self.dispatcher, self.name, Plain(), self.kw)
+        return RequestHandler(self.method, self.dispatcher, self.name, Plain(), false, true, self.kw)
 
 __all__ = ('LegacyRequestHandler',)

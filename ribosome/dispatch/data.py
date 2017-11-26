@@ -115,7 +115,7 @@ class Trans(Generic[Meth, B], DispatchSync, DispatchAsync):
 
     @property
     def desc(self) -> str:
-        return f'trans `self.name`'
+        return f'trans `{self.name}`'
 
 
 class Internal(Generic[Meth, B], DispatchSync, DispatchAsync):
@@ -135,7 +135,7 @@ class Internal(Generic[Meth, B], DispatchSync, DispatchAsync):
 
     @property
     def desc(self) -> str:
-        return f'internal `self.name`'
+        return f'internal `{self.name}`'
 
 
 class DispatchOutput(ADT, base=True): pass

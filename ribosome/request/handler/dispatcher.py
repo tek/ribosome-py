@@ -26,7 +26,7 @@ class RequestDispatcher(Algebra, Logging, base=True):
         ...
 
     @property
-    def sync(self) -> Boolean:
+    def allow_sync(self) -> Boolean:
         return Boolean.isinstance(self, SyncRequestDispatcher)
 
 
@@ -44,7 +44,7 @@ class MsgDispatcher(Generic[M], AsyncRequestDispatcher):
         self.msg = msg
 
     def _arg_desc(self) -> List[str]:
-        return List(str(self.msg))
+        return List(self.msg.__name__)
 
     @property
     def args(self) -> List[Any]:
@@ -55,7 +55,7 @@ class MsgDispatcher(Generic[M], AsyncRequestDispatcher):
         return snake_case(self.msg.__name__)
 
 
-class TransDispatcher(Generic[B], AsyncRequestDispatcher):
+class TransDispatcher(Generic[B], SyncRequestDispatcher):
 
     def __init__(self, handler: FreeTransHandler[D, B]) -> None:
         self.handler = handler

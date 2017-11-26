@@ -53,7 +53,8 @@ execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
 class ExecuteDispatchOutput(Logging):
 
     def dispatch_error(self, result: DispatchError) -> NvimIOState[PluginState[D, NP], R]:
-        return NvimIOState.lift(result.exception / NvimIO.delay.exception | NvimIO.delay(lambda v: ribo_log.error(result.message)))
+        io = result.exception / NvimIO.delay.exception | NvimIO.delay(lambda v: ribo_log.error(result.message))
+        return NvimIOState.lift(io)
 
     def dispatch_errors(self, result: DispatchErrors) -> NvimIOState[PluginState[D, NP], R]:
         return result.errors.traverse(self.dispatch_error, NvimIOState)
@@ -141,10 +142,18 @@ def execute(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> Nvim
     return exclusive_dispatch(job.state, sync_sender(job, dispatch, runner), NvimIOState.pure, dispatch.desc)
 
 
-# unconditionally fork a resend loop in case the sync transition has returned messages
-# only allow the first transition to provide a return value
-def execute_sync(job: DispatchJob, dispatch: DispatchSync) -> NvimIO[Any]:
-    return execute(job, dispatch, sync_runner)
+def fork_job(f: Callable[[], NvimIO[None]], job: DispatchJob) -> NvimIO[None]:
+    def run(vim: NvimFacade) -> None:
+        (Try(f) // __.attempt(vim)).leffect(L(request_error)(job, _))
+        ribo_log.debug(f'async job {job.name} completed')
+    return NvimIO.fork(run)
+
+
+@do(NvimIO)
+def execute_sync(job: DispatchJob, dispatch: DispatchSync) -> Do:
+    response = yield execute(job, dispatch, sync_runner)
+    yield fork_job(lambda: resend_loop(job.state), job)
+    yield NvimIO.pure(response)
 
 
 def request_error(job: DispatchJob, exc: Exception) -> int:
@@ -185,10 +194,7 @@ def execute_async_loop(job: DispatchJob, dispatch: DispatchAsync) -> Do:
 
 
 def execute_async(job: DispatchJob, dispatch: DispatchAsync) -> NvimIO[None]:
-    def run(vim: NvimFacade) -> None:
-        (Try(execute_async_loop, job, dispatch) // __.attempt(vim)).leffect(L(request_error)(job, _))
-        ribo_log.debug(f'async job {job.name} completed')
-    return NvimIO.fork(run)
+    return fork_job(lambda: execute_async_loop(job, dispatch), job)
 
 
 @do(NvimIO[Any])

@@ -29,16 +29,18 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
             method: Meth,
             dispatcher: DP,
             name: str,
-            prefix: PrefixStyle=Short(),
-            internal: Boolean=false,
-            options: Map[str, Any]=Map(),
+            prefix: PrefixStyle,
+            internal: Boolean,
+            sync: Boolean,
+            extra_options: Map[str, Any],
     ) -> None:
         self.method = method
         self.dispatcher = dispatcher
         self.name = name
         self.prefix = prefix
         self.internal = internal
-        self.extra_options = options
+        self.sync = sync
+        self.extra_options = extra_options
 
     @staticmethod
     def msg_cmd(msg: Type[M]) -> 'RequestHandlerBuilder':
@@ -65,8 +67,8 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
         return RequestHandlerBuilder(FunctionMethod(), TransDispatcher(func))
 
     @property
-    def sync(self) -> Boolean:
-        return self.dispatcher.sync
+    def allow_sync(self) -> Boolean:
+        return self.dispatcher.allow_sync
 
     @property
     def options(self) -> Map[str, Any]:
@@ -100,10 +102,11 @@ class RequestHandlerBuilder(Generic[Meth, DP]):
             name: str=None,
             prefix: PrefixStyle=Short(),
             internal: Boolean=false,
+            sync: Boolean=false,
             **options: Any
     ) -> RequestHandler:
         name1 = name or self.dispatcher.name
-        return RequestHandler(self.method, self.dispatcher, name1, prefix, internal, Map(options))
+        return RequestHandler(self.method, self.dispatcher, name1, prefix, internal, sync, Map(options))
 
 
 class RequestHandlers(ToStr):
