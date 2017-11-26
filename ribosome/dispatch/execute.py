@@ -53,7 +53,7 @@ execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
 class ExecuteDispatchOutput(Logging):
 
     def dispatch_error(self, result: DispatchError) -> NvimIOState[PluginState[D, NP], R]:
-        return NvimIOState.lift(result.exception / NvimIO.exception | NvimIO(lambda v: ribo_log.error(result.message)))
+        return NvimIOState.lift(result.exception / NvimIO.delay.exception | NvimIO.delay(lambda v: ribo_log.error(result.message)))
 
     def dispatch_errors(self, result: DispatchErrors) -> NvimIOState[PluginState[D, NP], R]:
         return result.errors.traverse(self.dispatch_error, NvimIOState)
@@ -97,11 +97,11 @@ def run_dispatch(action: Callable[[], NvimIOState[PluginState[D, NP], B]], unpac
 def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[R]], desc: str) -> NvimIO[R]:
     def release(error: Any) -> None:
         holder.release()
-    yield NvimIO(lambda v: holder.acquire())
+    yield NvimIO.delay(lambda v: holder.acquire())
     ribo_log.debug(f'exclusive: {desc}')
     state, response = yield f().error_effect(release)
-    yield NvimIO(lambda v: holder.update(state))
-    yield NvimIO(release)
+    yield NvimIO.delay(lambda v: holder.update(state))
+    yield NvimIO.delay(release)
     ribo_log.debug(f'release: {desc}')
     yield NvimIO.pure(response)
 
