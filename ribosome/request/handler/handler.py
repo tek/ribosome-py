@@ -4,6 +4,7 @@ from amino import List, Lists, Map, _, Boolean
 from amino.func import flip
 from amino.util.string import ToStr, camelcase
 from amino.dat import ADT
+from amino.boolean import false
 
 from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.logging import Logging
@@ -29,12 +30,14 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
             dispatcher: DP,
             name: str,
             prefix: PrefixStyle=Short(),
+            internal: Boolean=false,
             options: Map[str, Any]=Map(),
     ) -> None:
         self.method = method
         self.dispatcher = dispatcher
         self.name = name
         self.prefix = prefix
+        self.internal = internal
         self.extra_options = options
 
     @staticmethod
@@ -96,10 +99,11 @@ class RequestHandlerBuilder(Generic[Meth, DP]):
             self,
             name: str=None,
             prefix: PrefixStyle=Short(),
+            internal: Boolean=false,
             **options: Any
     ) -> RequestHandler:
         name1 = name or self.dispatcher.name
-        return RequestHandler(self.method, self.dispatcher, name1, prefix, Map(options))
+        return RequestHandler(self.method, self.dispatcher, name1, prefix, internal, Map(options))
 
 
 class RequestHandlers(ToStr):

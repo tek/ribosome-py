@@ -70,13 +70,6 @@ def send_to(msg: Message, prio: float) -> Callable[[TransState, ComponentState],
     return send
 
 
-# FIXME IOs are discarded here. create a special DispatchOutput that contains the aggregated outputs
-def aggregate(results: List[DispatchResult]) -> DispatchResult:
-    errors = (results / _.output).filter_type(DispatchError)
-    msgs = results // _.msgs
-    return DispatchResult(DispatchErrors(errors) if errors else DispatchUnit(), msgs)
-
-
 def send_msg(components: Components, msg: Message, prio: float) -> TransState:
     return (
         components.all
@@ -102,11 +95,16 @@ def send_message1(components: Components, msg: M, prio: float) -> Generator:
     yield send(components, msg, prio)
 
 
-@do(NvimIOState[PluginState[D, NP], TransState])
+def transform_data_state(st: NvimIOState[D, DispatchResult]) -> NvimIOState[PluginState[D, NP], DispatchResult]:
+    return st.transform_s(_.data, lambda r, s: r.copy(data=s))
+
+
+# FIXME need to transform state here to use AutoData, not PluginState, for send_message1
+@do(NvimIOState[PluginState[D, NP], DispatchResult])
 def send_message(msg: M, prio: float=None) -> Generator:
     yield NvimIOState.modify(__.log_message(msg.msg))
     components = yield NvimIOState.inspect(_.components)
-    yield send_message1(components, msg, prio)
+    yield transform_data_state(send_message1(components, msg, prio))
 
 
 __all__ = ('send_message',)

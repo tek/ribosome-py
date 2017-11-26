@@ -9,11 +9,11 @@ from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.args import ArgValidator, ParamsSpec
 from ribosome.plugin_state import PluginState, PluginStateHolder
-from ribosome.dispatch.data import Legacy, DispatchReturn, Internal, Trans, DispatchUnit, SendMessage, DispatchResult
+from ribosome.dispatch.data import Legacy, DispatchReturn, Internal, Trans, SendMessage, DispatchResult
 from ribosome.nvim.io import NvimIOState
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.transform import AlgResultValidator
-from ribosome.trans.send_message import send_message
+from ribosome.trans.send_message import send_message, transform_data_state
 
 # NP = TypeVar('NP', bound=NvimPlugin)
 NP = TypeVar('NP')
@@ -26,15 +26,14 @@ def run_trans(trans: Trans, args: List[Any]) -> Res:
     handler = trans.handler.dispatcher.handler
     result = handler.run(args)
     validator = AlgResultValidator(trans.name)
-    return validator.validate(result)
+    return transform_data_state(validator.validate(result))
 
 
-def run_internal(trans: Trans, state: PluginState[D, NP], args: List[Any]) -> Res:
+def run_internal(trans: Trans, args: List[Any]) -> Res:
     handler = trans.handler.dispatcher.handler
-    result = handler.execute(None, state, args)
+    result = handler.run(args)
     validator = AlgResultValidator(trans.name)
-    trans_result = validator.validate(result, state.data)
-    return trans_result.output / DispatchReturn | DispatchUnit, state, Nil
+    return validator.validate(result)
 
 
 def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str) -> Either[str, Message]:
@@ -44,10 +43,10 @@ def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str
 
 class RunDispatch(Generic[D, NP], Logging):
 
-    def internal(self, dispatch: Internal) -> NvimIOState[PluginState[D, NP], DispatchResult]:
+    def internal(self, dispatch: Internal) -> Res:
         return run_internal(dispatch, self.args)
 
-    def trans(self, dispatch: Trans) -> NvimIOState[PluginState[D, NP], DispatchResult]:
+    def trans(self, dispatch: Trans) -> Res:
         return run_trans(dispatch, self.args)
 
 

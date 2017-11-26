@@ -6,7 +6,8 @@ from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.length import have_length
 
 from amino.test.spec import SpecBase
-from amino import Lists, Map, List, Nothing, _, IO
+from amino import Lists, Map, List, Nothing, _, IO, __
+from amino.boolean import true
 
 from ribosome.test.spec import MockNvimFacade
 from ribosome.config import Config, AutoData
@@ -18,11 +19,12 @@ from ribosome.plugin_state import PluginStateHolder, handlers, PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.dispatch.data import DispatchError, Dispatch, DispatchResult
 from ribosome.host import host_config, request_handler, init_state, dispatch_job
-from ribosome.dispatch.handle import execute_async_loop, run_dispatch, sync_sender, sync_runner, async_runner
+from ribosome.dispatch.execute import execute_async_loop, run_dispatch, sync_sender, sync_runner, async_runner
 from ribosome.nvim.io import NvimIOState
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.nvim import NvimFacade
 from ribosome.dispatch.run import DispatchJob
+from ribosome.record import int_field
 
 
 specimen = Lists.random_string()
@@ -44,15 +46,22 @@ class M2(Msg): pass
 class M3(Msg): pass
 
 
+class M4(Msg): pass
+
+
 class P(Component):
 
     @trans.msg.one(M1)
     def m1(self) -> Message:
         return M2()
 
-    @trans.msg.one(M2, trans.io)
-    def m2(self) -> IO[Message]:
-        return IO.pure(M3())
+    @trans.msg.unit(M2)
+    def m2(self) -> None:
+        return None
+
+    @trans.msg.one(M3, trans.io)
+    def m3(self) -> IO[Message]:
+        return IO.pure(M4())
 
 
 class Q(Component):
@@ -61,8 +70,12 @@ class Q(Component):
     def m1(self) -> str:
         return M2()
 
-    @trans.msg.one(M2, trans.io)
-    def m2(self) -> IO[Message]:
+    @trans.msg.unit(M2)
+    def m2(self) -> None:
+        return None
+
+    @trans.msg.one(M3, trans.io)
+    def m3(self) -> IO[Message]:
         return IO.pure(m1)
 
 
@@ -74,8 +87,8 @@ class HS:
         return specimen
 
 
-class HSData(AutoData):
-    pass
+class HsData(AutoData):
+    counter = int_field(initial=7)
 
 
 @trans.free.one()
@@ -88,15 +101,29 @@ def trans_io() -> IO[Message]:
     return IO.pure(m1)
 
 
+# TODO allow args here
+@trans.free.result(trans.st)
+def trans_internal() -> NvimIOState[PluginState, str]:
+    return NvimIOState.inspect(_.name)
+
+
+@trans.free.unit(trans.st)
+def trans_data() -> NvimIOState[HsData, None]:
+    return NvimIOState.modify(__.set(counter=23))
+
+
 config = Config.cons(
     'hs',
     components=Map(p=P, q=Q),
     request_handlers=List(
         RequestHandler.msg_cmd(M1)('muh'),
-        RequestHandler.msg_cmd(M2)('meh'),
+        RequestHandler.msg_cmd(M3)('meh'),
         RequestHandler.trans_cmd(trans_free)('trfree'),
         RequestHandler.trans_cmd(trans_io)('trio'),
+        RequestHandler.trans_function(trans_internal)('int', internal=true),
+        RequestHandler.trans_function(trans_data)('dat'),
     ),
+    state_type=HsData,
 )
 host_conf = host_config(config, HS, True)
 
@@ -130,12 +157,14 @@ class DispatchSpec(SpecBase):
     run a free trans function that returns a message $trans_free
     run an IO result from a free trans $io
     aggregate IO results from multiple components $multi_io
+    work on PluginState in internal trans $internal
+    modify the state data $data
     '''
 
     def handlers(self) -> Expectation:
         vim = MockNvimFacade(prefix='hs', vars=dict(hs_components=List('p', 'q')))
         components = ComponentResolver(config).run.unsafe(vim)
-        return k(components.head / handlers).must(be_just(have_length(2)))
+        return k(components.head / handlers).must(be_just(have_length(3)))
 
     def legacy(self) -> Expectation:
         vim = MockNvimFacade()
@@ -167,6 +196,14 @@ class DispatchSpec(SpecBase):
 
     def multi_io(self) -> Expectation:
         state, result = run('hs:command:meh', 'p', 'q', sync=False)
-        return k(state.unwrapped_messages) == List(m1, M3())
+        return k(state.unwrapped_messages) == List(m1, M4())
+
+    def internal(self) -> Expectation:
+        state, result = run('hs:function:int')
+        return k(result) == state.name
+
+    def data(self) -> Expectation:
+        state, result = run('hs:function:dat')
+        return k(state.data.counter) == 23
 
 __all__ = ('DispatchSpec',)

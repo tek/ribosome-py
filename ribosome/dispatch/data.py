@@ -100,8 +100,7 @@ class SendMessage(DispatchAsync):
 
 class Trans(Generic[Meth, B], DispatchSync, DispatchAsync):
 
-    def __init__(self, name: str, handler: RequestHandler[Meth, TransDispatcher[B]]) -> None:
-        self.name = name
+    def __init__(self, handler: RequestHandler[Meth, TransDispatcher[B]]) -> None:
         self.handler = handler
 
     def _arg_desc(self) -> List[str]:
@@ -109,6 +108,10 @@ class Trans(Generic[Meth, B], DispatchSync, DispatchAsync):
 
     def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
         return self.handler.spec(name, prefix)
+
+    @property
+    def name(self) -> str:
+        return self.handler.name
 
     @property
     def desc(self) -> str:
@@ -122,10 +125,6 @@ class Internal(Generic[Meth, B], DispatchSync, DispatchAsync):
 
     def _arg_desc(self) -> List[str]:
         return List(str(self.handler))
-
-    @property
-    def sync(self) -> Boolean:
-        return self.handler.sync
 
     def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
         return self.handler.spec(name, prefix)

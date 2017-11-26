@@ -11,7 +11,6 @@ from ribosome.trans.message_base import Message
 from ribosome.trans.messages import Stage1
 from ribosome.trans.api import trans
 from ribosome.dispatch.component import Component
-from ribosome.logging import ribo_log
 
 
 class Pub(Message['Pub']):
@@ -60,41 +59,41 @@ class S3(Message['S3']):
 
 class P(Component):
 
-    @trans.unit(Stage1)
+    @trans.msg.unit(Stage1)
     def stage_1(self) -> None:
         pass
 
-    @trans.one(Target)
+    @trans.msg.one(Target)
     def target(self) -> Message:
         return T1().to('q')
 
-    @trans.one(T1)
+    @trans.msg.one(T1)
     def t1(self) -> Message:
-        return T2().pub
+        return T2()
 
-    @trans.multi(Seq)
+    @trans.msg.multi(Seq)
     def seq(self) -> List[Message]:
         return List(S1().at(1), S2().at(0.1))
 
 
 class Q(Component):
 
-    @trans.one(P1)
+    @trans.msg.one(P1)
     def p1(self) -> Message:
-        return P2().pub
+        return P2()
 
-    @trans.one(T1)
+    @trans.msg.one(T1)
     def t1(self) -> Message:
-        return T3().pub
+        return T3()
 
-    @trans.one(S2)
+    @trans.msg.one(S2)
     def s1(self) -> Message:
         return S3().at(0.6)
 
 
-@trans.one(Pub)
-def pub(machine: Any, msg: Pub, args: Any) -> Message:
-    return P1().pub
+@trans.msg.one(Pub)
+def pub(msg: Pub) -> Message:
+    return P1()
 
 
 config = Config.cons(

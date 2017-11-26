@@ -21,7 +21,7 @@ from ribosome import options
 from ribosome.components.scratch import Mapping
 from ribosome.config import Config
 from ribosome.dispatch.data import Legacy, SendMessage, Trans, Internal, DispatchSync, DispatchAsync, Dispatch
-from ribosome.dispatch.handle import execute_dispatch_job, request_error
+from ribosome.dispatch.execute import execute_dispatch_job, request_error
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.dispatch.run import DispatchJob
 from ribosome.logging import ribo_log
@@ -188,12 +188,19 @@ def plugin_class_dispatchers(cls: Type[NP]) -> List[DispatchSync]:
 
 def config_dispatchers(config: Config) -> List[DispatchAsync]:
     def choose(name: str, handler: RequestHandler) -> DispatchAsync:
-        return SendMessage(handler) if isinstance(handler.dispatcher, MsgDispatcher) else Trans(name, handler)
+        tpe = (
+            SendMessage
+            if isinstance(handler.dispatcher, MsgDispatcher) else
+            Internal
+            if handler.internal else
+            Trans
+        )
+        return tpe(handler)
     return config.request_handlers.handlers.map2(choose)
 
 
 @trans.free.result(trans.st)
-def message_log(args: Any) -> EitherState[PluginState[D, NP], str]:
+def message_log() -> EitherState[PluginState[D, NP], str]:
     return EitherState.inspect_f(lambda state: state.message_log // encode_json_compat)
 
 
