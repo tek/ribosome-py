@@ -81,7 +81,7 @@ class ComponentResolver(Logging):
         def report(errs):
             msg = 'invalid {} component module "{}": {}'
             self.log.error(msg.format(self.name, name, errs))
-        return NvimIO(
+        return NvimIO.delay(
             lambda v:
             (self.find_component(name) // self.inst_component)
             .lmap(List)

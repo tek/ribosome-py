@@ -111,9 +111,9 @@ def request_handler(vim: NvimFacade,
 
 @do(NvimIO[PluginState[D, NP]])
 def init_state(host_config: HostConfig) -> Generator:
-    data = yield NvimIO(host_config.config.state)
+    data = yield NvimIO.delay(host_config.config.state)
     components = yield ComponentResolver(host_config.config).run
-    plugin = yield NvimIO(lambda vim: host_config.plugin_class(vim, data))
+    plugin = yield NvimIO.delay(lambda vim: host_config.plugin_class(vim, data))
     yield NvimIO.pure(PluginState.cons(data, plugin, components, PrioQueue.empty))
 
 
@@ -123,7 +123,7 @@ def run_session(session: Session, host_config: HostConfig) -> Generator:
     yield define_handlers(host_config.specs, host_config.name, host_config.name)
     state = yield init_state(host_config)
     holder = PluginStateHolder(state, Lock())
-    yield NvimIO(
+    yield NvimIO.delay(
         lambda vim:
         session.run(
             request_handler(vim, True, host_config.sync_dispatch, holder, host_config.config),

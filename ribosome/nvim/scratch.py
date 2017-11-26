@@ -19,7 +19,7 @@ class ScratchBuilder(Record):
     @property
     def build(self):
         return (
-            NvimIO(self._setup_window)
+            NvimIO.delay(self._setup_window)
             .map2(self._setup_buffer)
             .map3(self._create)
         )

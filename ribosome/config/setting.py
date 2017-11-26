@@ -60,7 +60,7 @@ class StrictSetting(Generic[A, B], PluginSetting[B]):
             getter = vars.p if self.prefix else vars
             raw = yield vars.typed(self.tpe, getter(self.name))
             yield self.ctor(raw)
-        return NvimIO(read)
+        return NvimIO.delay(read)
 
     def value_or(self, default: B) -> NvimIO[B]:
         return self.value / __.get_or_else(default)

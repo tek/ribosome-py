@@ -340,7 +340,7 @@ def define_handler(channel: int, spec: RpcHandlerSpec, plugin_name: str, plugin_
 
 @do(NvimIO[List[DefinedHandler]])
 def define_handlers(specs: List[RpcHandlerSpec], plugin_name: str, plugin_file: str) -> Generator:
-    channel = yield NvimIO(_.channel_id)
+    channel = yield NvimIO.delay(_.channel_id)
     yield specs.traverse(L(define_handler)(channel, _, plugin_name, plugin_file), NvimIO)
 
 

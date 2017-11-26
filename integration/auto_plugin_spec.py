@@ -25,11 +25,11 @@ class SpecCore(Component):
 
     @trans.msg.unit(Msg1, trans.nio)
     def msg1(self) -> NvimIO[None]:
-        return NvimIO(__.vars.set('msg_cmd_success', val))
+        return NvimIO.delay(__.vars.set('msg_cmd_success', val))
 
     @trans.msg.unit(Msg2, trans.nio)
     def msg2(self) -> NvimIO[None]:
-        return NvimIO(__.vars.set('autocmd_success', val))
+        return NvimIO.delay(__.vars.set('autocmd_success', val))
 
 
 auto_config = Config(
