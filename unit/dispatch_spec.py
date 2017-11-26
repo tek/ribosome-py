@@ -88,7 +88,7 @@ def trans_io() -> IO[Message]:
     return IO.pure(m1)
 
 
-config = Config(
+config = Config.cons(
     'hs',
     components=Map(p=P, q=Q),
     request_handlers=List(

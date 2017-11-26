@@ -32,7 +32,7 @@ class SpecCore(Component):
         return NvimIO.delay(__.vars.set('autocmd_success', val))
 
 
-auto_config = Config(
+auto_config = Config.cons(
     name='plug',
     components=Map(core=SpecCore),
     request_handlers=List(

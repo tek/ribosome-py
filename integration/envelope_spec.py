@@ -97,7 +97,7 @@ def pub(machine: Any, msg: Pub, args: Any) -> Message:
     return P1().pub
 
 
-config = Config(
+config = Config.cons(
     name='envl',
     components=Map(p=P, q=Q),
     request_handlers=List(

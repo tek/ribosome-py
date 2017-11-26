@@ -44,7 +44,7 @@ class LoopSpec(SpecBase):
     '''
 
     def prio(self) -> Expectation:
-        d = AutoData(config=Config('test'))
+        d = AutoData(config=Config.cons('test'))
         a = Msg1()
         b = Msg2()
         messages = PrioQueue.empty.put_default(a).put(b, 0.1)
@@ -55,7 +55,7 @@ class LoopSpec(SpecBase):
         return k(result.msgs.head).must(be_just(b))
 
     def send_message(self) -> Expectation:
-        d = AutoData(config=Config('test'))
+        d = AutoData(config=Config.cons('test'))
         state = PluginState.cons(d, None, List(Comp1('comp1')), PrioQueue.empty)
         a = Msg1()
         r = send_message(a).run_a(state).unsafe(vim)
