@@ -1,11 +1,10 @@
-from typing import Callable, Type, TypeVar, Generic, Union, Any, Optional
+import abc
+from typing import Callable, TypeVar, Generic, Union, Any, Optional
 
-from amino import List, Nil, Just, Maybe, Map
+from amino import List, Nil, Maybe, Map
 from amino.dat import Dat
 
 from ribosome.nvim import NvimIO, NvimFacade
-from ribosome.data import Data
-from ribosome.record import field
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import PluginSettings
 from ribosome.dispatch.run import DispatchJob
@@ -13,14 +12,14 @@ from ribosome.dispatch.run import DispatchJob
 A = TypeVar('A', contravariant=True)
 B = TypeVar('B')
 Settings = TypeVar('Settings', bound=PluginSettings)
-S = TypeVar('S', bound='AutoData')
+D = TypeVar('D', bound='SimpleData')
 
 
 # TODO remove vim from state
-class Config(Generic[Settings, S], Dat['Config[Settings, S]']):
+class Config(Generic[Settings, D], Dat['Config[Settings, D]']):
 
     @staticmethod
-    def from_opt(data: Map) -> 'Config[Settings, S]':
+    def from_opt(data: Map) -> 'Config[Settings, D]':
         return Config.cons(data.lift('name') | 'no name in json', data.lift('prefix') | None)
 
     @staticmethod
@@ -28,20 +27,18 @@ class Config(Generic[Settings, S], Dat['Config[Settings, S]']):
             name: str,
             prefix: Optional[str]=None,
             components: Map[str, Union[str, type]]=Map(),
-            state_type: Optional[Type[S]]=None,
-            state_ctor: Optional[Callable[['Config', NvimFacade], S]]=None,
+            state_ctor: Optional[Callable[['Config', NvimFacade], D]]=None,
             settings: Optional[Settings]=None,
             request_handlers: List[RequestHandler]=Nil,
             core_components: List[str]=Nil,
             default_components: List[str]=Nil,
             request_dispatcher: Optional[Callable[[DispatchJob], NvimIO[Any]]]=None,
-    ) -> 'Config[Settings, S]':
+    ) -> 'Config[Settings, D]':
         return Config(
             name,
             prefix or name,
             components,
-            state_type or AutoData,
-            state_ctor or (lambda c, v: c.state_type(config=c, vim_facade=Just(v))),
+            state_ctor or SimpleData,
             settings or PluginSettings(name=name),
             RequestHandlers.cons(*request_handlers),
             core_components,
@@ -54,8 +51,7 @@ class Config(Generic[Settings, S], Dat['Config[Settings, S]']):
             name: str,
             prefix: str,
             components: Map[str, Union[str, type]],
-            state_type: Type[S],
-            state_ctor: Callable[['Config', NvimFacade], S],
+            state_ctor: Callable[['Config', NvimFacade], D],
             settings: Settings,
             request_handlers: RequestHandlers,
             core_components: List[str],
@@ -65,7 +61,6 @@ class Config(Generic[Settings, S], Dat['Config[Settings, S]']):
         self.name = name
         self.prefix = prefix
         self.components = components
-        self.state_type = state_type
         self.state_ctor = state_ctor
         self.settings = settings
         self.request_handlers = request_handlers
@@ -76,8 +71,8 @@ class Config(Generic[Settings, S], Dat['Config[Settings, S]']):
     def _arg_desc(self) -> List[str]:
         return List(str(self.components), str(self.settings), str(self.request_handlers))
 
-    def state(self, vim: NvimFacade) -> S:
-        return self.state_ctor(self, vim)
+    def state(self, vim: NvimFacade) -> D:
+        return self.state_ctor(self)
 
     @property
     def json_repr(self) -> dict:
@@ -87,8 +82,10 @@ class Config(Generic[Settings, S], Dat['Config[Settings, S]']):
         return handler.vim_cmd_name(self.name, self.prefix)
 
 
-class AutoData(Data):
-    config: Config = field(Config)
+class Data:
+
+    def __init__(self, config: Config) -> None:
+        self.config = config
 
     @property
     def _str_extra(self) -> List[Any]:
@@ -99,4 +96,10 @@ class AutoData(Data):
         return self.config.settings
 
 
-__all__ = ('Config', 'AutoData')
+class SimpleData(Dat['SimpleData'], Data):
+
+    def __init__(self, config: Config) -> None:
+        super().__init__(config)
+
+
+__all__ = ('Config', 'Data', 'SimpleData')

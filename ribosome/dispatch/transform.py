@@ -12,7 +12,6 @@ from amino.tc.base import TypeClass, F
 from amino.dat import Dat
 
 from ribosome.logging import Logging
-from ribosome.data import Data
 from ribosome.nvim.io import NvimIOState
 from ribosome.nvim import NvimIO
 from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchReturn, DispatchIO, DIO
@@ -31,7 +30,7 @@ class Handlers(Dat['Handlers']):
         return self.handlers.get(type(msg))
 
 
-D = TypeVar('D', bound=Data)
+D = TypeVar('D')
 R = TypeVar('R')
 G = TypeVar('G', bound=F)
 I = TypeVar('I')

@@ -1,5 +1,4 @@
 import sys
-import abc
 import typing
 from typing import Union, Any, Callable, Type, Optional, TypeVar, Generic, GenericMeta
 
@@ -15,8 +14,8 @@ from ribosome.request.command import command
 from ribosome.request.function import function
 from ribosome.request.rpc import rpc_handlers_json
 from ribosome.record import encode_json_compat, decode_json_compat
-from ribosome.trans.messages import Stage1, Stage2, Stage3, Stage4, Quit
-from ribosome.config import Config, PluginSettings, AutoData
+# from ribosome.trans.messages import Stage1, Stage2, Stage3, Stage4, Quit
+from ribosome.config import Config, PluginSettings
 from ribosome.trans.message_base import Message
 
 
@@ -135,7 +134,7 @@ class NvimStatePlugin(NvimPlugin, metaclass=NvimStatePluginMeta):
 
 
 Settings = TypeVar('Settings', bound=PluginSettings)
-D = TypeVar('D', bound=AutoData)
+D = TypeVar('D')
 APM = TypeVar('APM', bound='AutoPluginMeta')
 AP = TypeVar('AP', bound='AutoPlugin')
 

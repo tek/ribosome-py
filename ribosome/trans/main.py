@@ -1,7 +1,6 @@
 from typing import Callable, TypeVar, Type
 
 from amino import Lists
-from ribosome.data import Data
 from ribosome.trans.effect import (TransEffect, TransEffectUnit, TransEffectSingleMessage, TransEffectMessages,
                                    TransEffectResult)
 from ribosome.trans.handler import FreeTransHandler, MessageTransHandler
@@ -9,7 +8,7 @@ from ribosome.dispatch.component import Component
 from ribosome.trans.message_base import default_prio, Message
 
 C = TypeVar('C', bound=Component)
-D = TypeVar('D', bound=Data)
+D = TypeVar('D')
 M = TypeVar('M', bound=Message)
 R = TypeVar('R')
 dp = default_prio

@@ -8,7 +8,6 @@ from amino import Just, Maybe, __, _
 
 from ribosome.trans.messages import Nop, Done, Quit, Stop, CoroutineAlg, SubProcessAsync, Fork, Coroutine
 from ribosome.trans.api import trans
-from ribosome.data import Data
 from ribosome.dispatch.component import Component
 from ribosome.trans.message_base import pmessage, json_pmessage, Message, ToMachine
 from ribosome.dispatch.transform import AlgResultValidator
@@ -21,7 +20,7 @@ RunScratchMachine = json_pmessage('RunScratchMachine', 'machine')
 Init = pmessage('Init')
 IfUnhandled = pmessage('IfUnhandled', 'msg', 'unhandled')
 A = TypeVar('A')
-D = TypeVar('D', bound=Data)
+D = TypeVar('D')
 
 
 class InternalC(Component):

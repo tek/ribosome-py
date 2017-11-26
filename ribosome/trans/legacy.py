@@ -12,7 +12,6 @@ from amino.do import do
 from ribosome.trans.message_base import _message_attr, Message, default_prio, _prio_attr, _dyn_attr
 
 from ribosome.logging import Logging
-from ribosome.data import Data
 from ribosome.trans.messages import Error, Debug, Coroutine
 
 A = TypeVar('A')
@@ -58,11 +57,11 @@ def _recover_error(handler: Any, result: Any) -> Maybe[Any]:
 def _io_result(result):
     return result.cata(Left, I)
 
-D = TypeVar('D', bound=Data)
+D = TypeVar('D')
 M = TypeVar('M', bound=Message)
 R = TypeVar('R')
 DynResult = Union[Message, List[Message]]
-DynTrans = Union[DynResult, Maybe[DynResult], Either[str, DynResult], StateT[Id, Data, DynResult]]
+DynTrans = Union[DynResult, Maybe[DynResult], Either[str, DynResult], StateT[Id, D, DynResult]]
 
 
 class Handler:

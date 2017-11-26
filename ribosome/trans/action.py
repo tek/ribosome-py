@@ -6,11 +6,10 @@ from amino.util.string import ToStr
 from amino.algebra import AlgebraMeta
 from amino.dat import ADT
 
-from ribosome.data import Data
 from ribosome.trans.message_base import Sendable, Message
 from ribosome.trans.messages import Error
 
-D = TypeVar('D', bound=Data)
+D = TypeVar('D')
 M = TypeVar('M', bound=Message)
 R = TypeVar('R')
 N = TypeVar('N')

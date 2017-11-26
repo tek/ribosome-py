@@ -8,14 +8,13 @@ from amino.boolean import false
 
 from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.logging import Logging
-from ribosome.data import Data
 from ribosome.request.handler.dispatcher import RequestDispatcher, MsgDispatcher, TransDispatcher
 from ribosome.request.handler.prefix import PrefixStyle, Short
 from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod, AutocmdMethod
 from ribosome.trans.message_base import Message
 
 B = TypeVar('B')
-D = TypeVar('D', bound=Data)
+D = TypeVar('D')
 M = TypeVar('M', bound=Message)
 RHS = TypeVar('RHS', bound=RpcHandlerSpec)
 DP = TypeVar('DP', bound=RequestDispatcher)

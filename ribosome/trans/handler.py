@@ -3,13 +3,12 @@ from typing import Callable, TypeVar, Type, Generic
 from amino import List, Lists
 from amino.dat import Dat
 
-from ribosome.data import Data
 from ribosome.trans.effect import TransEffect, cont, lift
 from ribosome.trans.action import TransAction
 from ribosome.trans.message_base import Message
 from ribosome.trans.legacy import Handler
 
-D = TypeVar('D', bound=Data)
+D = TypeVar('D')
 M = TypeVar('M', bound=Message)
 R = TypeVar('R')
 O = TypeVar('O')

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0x16695065
+# __coconut_hash__ = 0x9b5f7ea0
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -30,10 +30,10 @@ from amino.json import dump_json
 
 from ribosome.nvim import NvimIO
 from ribosome.nvim.io import NvimIOState
-from ribosome.config import AutoData
+from ribosome.config import Data
 
 A = TypeVar('A')
-D = TypeVar('D', bound=AutoData)
+D = TypeVar('D', bound=Data)
 
 
 @do(NvimIOState[D, Path])

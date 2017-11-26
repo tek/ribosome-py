@@ -30,7 +30,7 @@ from ribosome.test.fixtures import rplugin_template
 from ribosome.request.rpc import rpc_handlers, RpcHandlerSpec
 from ribosome.trans.message_base import Message
 from ribosome.record import decode_json_compat, JsonError, encode_json_compat, decode_json
-from ribosome.config import PluginSettings, AutoData
+from ribosome.config import PluginSettings
 
 A = TypeVar('A', bound=NvimPlugin)
 
@@ -406,11 +406,11 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
 
 
 Settings = TypeVar('Settings', bound=PluginSettings)
-Data = TypeVar('Data', bound=AutoData)
+D = TypeVar('D')
 M = TypeVar('M', bound=Message)
 
 
-class AutoPluginIntegrationSpec(Generic[Settings, Data], VimIntegrationSpec):
+class AutoPluginIntegrationSpec(Generic[Settings, D], VimIntegrationSpec):
 
     def setup(self) -> None:
         self.log_format = '{message}'

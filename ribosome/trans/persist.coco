@@ -8,10 +8,10 @@ from amino.json import decode_json, dump_json
 
 from ribosome.nvim import NvimIO
 from ribosome.nvim.io import NvimIOState
-from ribosome.config import AutoData
+from ribosome.config import Data
 
 A = TypeVar('A')
-D = TypeVar('D', bound=AutoData)
+D = TypeVar('D', bound=Data)
 
 
 @do(NvimIOState[D, Path])

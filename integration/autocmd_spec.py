@@ -1,13 +1,13 @@
 from kallikrein import Expectation
 
 from ribosome.plugin import PluginSettings
-from ribosome.config import AutoData
+from ribosome.config import SimpleData
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 
 from integration._support.autocmd import val
 
 
-class AutoPluginSpec(AutoPluginIntegrationKlkSpec[PluginSettings, AutoData]):
+class AutoPluginSpec(AutoPluginIntegrationKlkSpec[PluginSettings, SimpleData]):
     '''
     zero-setup plugin $auto_plugin
     '''

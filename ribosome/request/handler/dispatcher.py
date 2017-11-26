@@ -6,12 +6,11 @@ from amino.util.string import snake_case
 from amino.algebra import Algebra
 
 from ribosome.logging import Logging
-from ribosome.data import Data
 from ribosome.trans.handler import FreeTransHandler
 from ribosome.trans.message_base import Message
 
 B = TypeVar('B')
-D = TypeVar('D', bound=Data)
+D = TypeVar('D')
 M = TypeVar('M', bound=Message)
 
 

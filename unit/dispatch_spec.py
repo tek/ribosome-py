@@ -8,9 +8,10 @@ from kallikrein.matchers.length import have_length
 from amino.test.spec import SpecBase
 from amino import Lists, Map, List, Nothing, _, IO, __
 from amino.boolean import true
+from amino.dat import Dat
 
 from ribosome.test.spec import MockNvimFacade
-from ribosome.config import Config, AutoData
+from ribosome.config import Config, Data
 from ribosome import command
 from ribosome.trans.message_base import Msg, Message
 from ribosome.dispatch.component import Component
@@ -24,7 +25,6 @@ from ribosome.nvim.io import NvimIOState
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.nvim import NvimFacade
 from ribosome.dispatch.run import DispatchJob
-from ribosome.record import int_field
 
 
 specimen = Lists.random_string()
@@ -87,8 +87,11 @@ class HS:
         return specimen
 
 
-class HsData(AutoData):
-    counter = int_field(initial=7)
+class HsData(Dat['HsData'], Data):
+
+    def __init__(self, config: Config, counter: int=7) -> None:
+        super().__init__(config)
+        self.counter = counter
 
 
 @trans.free.one()
@@ -109,7 +112,7 @@ def trans_internal() -> NvimIOState[PluginState, str]:
 
 @trans.free.unit(trans.st)
 def trans_data() -> NvimIOState[HsData, None]:
-    return NvimIOState.modify(__.set(counter=23))
+    return NvimIOState.modify(__.set.counter(23))
 
 
 config = Config.cons(
@@ -123,7 +126,7 @@ config = Config.cons(
         RequestHandler.trans_function(trans_internal)('int', internal=true),
         RequestHandler.trans_function(trans_data)('dat'),
     ),
-    state_type=HsData,
+    state_ctor=HsData,
 )
 host_conf = host_config(config, HS, True)
 

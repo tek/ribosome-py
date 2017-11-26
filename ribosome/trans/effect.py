@@ -6,7 +6,6 @@ from amino.state import StateT
 from amino.util.string import red, green
 from amino.dispatch import dispatch_alg
 
-from ribosome.data import Data
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO
 from ribosome.trans.action import (TransStep, TransEffectError, Lift, Propagate, Strict, TransUnit, TransResult,
@@ -14,7 +13,7 @@ from ribosome.trans.action import (TransStep, TransEffectError, Lift, Propagate,
 from ribosome.trans.message_base import Sendable, Messages
 from ribosome.trans.messages import Error, Nop, CoroutineAlg
 
-D = TypeVar('D', bound=Data)
+D = TypeVar('D')
 R = TypeVar('R')
 N = TypeVar('N')
 G = TypeVar('G')
