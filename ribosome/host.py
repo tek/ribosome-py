@@ -230,7 +230,7 @@ def host_config_1(config: Config, cls: Type[NP], debug: Boolean) -> HostConfig:
     cfg_dispatchers = config_dispatchers(config)
     int_dispatchers = internal_dispatchers(config)
     with_method = lambda ds: Map(ds.map(lambda d: (d.spec(config.name, config.prefix).rpc_method(name), d)))
-    dispatches = cls_dispatchers + cfg_dispatchers + int_dispatchers
+    dispatches = int_dispatchers + cfg_dispatchers + cls_dispatchers
     sync_dispatch, async_dispatch = dispatches.filter(_.sync), dispatches.filter(_.async)
     return HostConfig(with_method(sync_dispatch), with_method(async_dispatch), config, cls)
 
