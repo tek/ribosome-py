@@ -49,7 +49,7 @@ def ribosome_logger(name: str) -> Logger:
     return ribosome_root_logger.getChild(name)
 
 
-def ribosome_file_logging(name: str, file_kw: dict=dict()) -> None:
+def ribosome_file_logging(name: str, file_kw: dict=dict()) -> logging.Handler:
     prefix_path = options.nvim_log_file.value | (lambda: amino.logging.log_dir() / 'nvim')
     level = (
         DDEBUG

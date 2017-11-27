@@ -65,7 +65,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def __init__(self) -> None:
         IntegrationSpecBase.__init__(self)
         self.tmux_nvim = 'RIBOSOME_TMUX_SPEC' in env
-        self.tmux_nvim_external = False
+        self.tmux_nvim_external = True
         self.tmux_pane = None
         self.keep_tmux_pane = False
         self.vimlog = temp_dir('log') / 'vim'
@@ -170,6 +170,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         env_args = self.vim_proc_env.map2(lambda k, v: f'{k}={v}').cons('env')
         cmd = tuple(env_args + self.nvim_cmdline)
         out = self.tmux_window.cmd('split-window', '-d', '-P', '-F#{pane_id}', *cmd).stdout
+        wait_for(Path(self.nvim_socket).is_socket)
         from libtmux import Pane
         self.tmux_pane = Pane(self.tmux_window, pane_id=out[0])
         self.neovim = neovim.attach('socket', path=self.nvim_socket)
@@ -407,7 +408,6 @@ class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
 
 Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D')
-M = TypeVar('M', bound=Message)
 
 
 class AutoPluginIntegrationSpec(Generic[Settings, D], VimIntegrationSpec):
@@ -435,23 +435,21 @@ class AutoPluginIntegrationSpec(Generic[Settings, D], VimIntegrationSpec):
     def _post_start_neovim(self) -> None:
         super()._post_start_neovim()
         if self.autostart_plugin:
-            self._setup_handlers()
+            self.start_plugin()
 
-    def _setup_handlers(self) -> None:
-        stderr_handler_name = 'RibosomeJobStderr'
+    def start_plugin(self) -> None:
+        stderr_handler_name = 'RibosomeSpecStderr'
         stderr_handler_body = '''echo 'error starting rpc job on channel ' . a:id . ': ' . string(a:data)'''
         self.vim.define_function(stderr_handler_name, List('id', 'data', 'event'), stderr_handler_body)
         cmd = f'from ribosome.host import start_module; start_module({self.module()!r})'
-        (
-            self.vim
-            .call('jobstart', ['python3', '-c', cmd], dict(rpc=True, on_stderr=stderr_handler_name))
-            .get_or_raise()
-        )
+        args = ['python3', '-c', cmd]
+        opts = dict(rpc=True, on_stderr=stderr_handler_name)
+        self.vim.call('jobstart', args, opts).get_or_raise()
 
     def send_json(self, data: str) -> None:
         self.vim.call(f'{self.plugin_name}Send', data)
 
-    def send(self, msg: M) -> None:
+    def send(self, msg: Message) -> None:
         self.send_json(dump_json(msg).get_or_raise())
 
 

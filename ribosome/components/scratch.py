@@ -4,7 +4,6 @@ from typing import Callable
 
 from ribosome.trans.message_base import pmessage
 from ribosome.dispatch.component import Component
-from ribosome.trans.messages import UnitIO
 from ribosome.components.internal import KillMachine
 from ribosome.trans.api import trans
 from ribosome.nvim.scratch import ScratchBuffer

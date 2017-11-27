@@ -6,6 +6,7 @@ import neovim
 from neovim.api import Nvim
 
 from amino import List
+from amino.json import decode_json
 
 import ribosome.nvim.components
 from ribosome.nvim import NvimFacade
@@ -13,9 +14,7 @@ from ribosome.logging import nvim_logging, Logging
 from ribosome.request.command import command
 from ribosome.request.function import function
 from ribosome.request.rpc import rpc_handlers_json
-# from ribosome.trans.messages import Stage1, Stage2, Stage3, Stage4, Quit
 from ribosome.config import Config, PluginSettings
-from ribosome.trans.message_base import Message
 
 
 class NvimPluginBase(Logging):
@@ -28,7 +27,6 @@ class NvimPluginBase(Logging):
 
     def __init__(self, nvim: Union[NvimFacade, neovim.Nvim]) -> None:
         self.vim = NvimFacade(nvim, self.plugin_name) if isinstance(nvim, neovim.Nvim) else nvim
-        self.setup_logging()
 
     def setup_logging(self) -> None:
         self.file_log_handler = nvim_logging(self.vim)
@@ -58,18 +56,6 @@ class NvimPluginMeta(GenericMeta):
 
 class NvimPlugin(NvimPluginBase, metaclass=NvimPluginMeta):
     prefix: Optional[str] = None
-
-    def stage_1(self) -> None:
-        pass
-
-    def stage_2(self) -> None:
-        pass
-
-    def stage_3(self) -> None:
-        pass
-
-    def stage_4(self) -> None:
-        pass
 
     def quit(self) -> None:
         pass
@@ -118,13 +104,6 @@ class NvimStatePluginMeta(NvimPluginMeta):
 
 class NvimStatePlugin(NvimPlugin, metaclass=NvimStatePluginMeta):
 
-#     @abc.abstractmethod
-#     def state(self) -> RootMachine:
-#         ...
-
-    def message_log(self) -> List[Message]:
-        return self.state().message_log // encode_json
-
     def state_data(self) -> str:
         return self.state().data.json.value_or(lambda a: f'could not serialize state: {a}')
 
@@ -155,34 +134,9 @@ class AutoPluginMeta(NvimStatePluginMeta):
 
 class AutoPlugin(Generic[Settings, D], NvimStatePlugin, metaclass=AutoPluginMeta):
 
-    def __init__(self, nvim: Union[NvimFacade, neovim.Nvim], config: Config[Settings, D], initial_state: D) -> None:
+    def __init__(self, nvim: Union[NvimFacade, neovim.Nvim], config: Config[Settings, D]) -> None:
         super().__init__(nvim)
         self.config = config
-        self.initial_state = initial_state
-        # self.root = self.create_root()
-
-    # def create_root(self) -> RootMachine[Settings, D]:
-    #     return root_machine(self.vim.proxy, self.config, self.initial_state)
-
-#     def stage_1(self) -> None:
-#         self.root.start()
-#         self.root.wait_for_running()
-#         self.root.send(Stage1())
-
-#     def stage_2(self) -> None:
-#         self.root.send(Stage2().at(0.6))
-
-#     def stage_3(self) -> None:
-#         self.root.send(Stage3().at(0.7))
-
-#     def stage_4(self) -> None:
-#         self.root.send(Stage4().at(0.8))
-
-    # def quit(self) -> None:
-    #     self.root.send(Quit())
-
-    # def state(self) -> RootMachine:
-    #     return self.root
 
 
 class Helpers(Logging):
@@ -249,8 +203,8 @@ def setup_state_plugin(cls: Type[NSP], name: str, prefix: str, debug: bool) -> N
 
 def plugin_class_from_config(config: Config[Settings, D], cls: Type[AP], debug=bool) -> Type[AP]:
     class Plug(AutoPlugin, config=config, pname=config.name, prefix=config.prefix, debug=debug):
-        def __init__(self, vim: Nvim, initial_state: D) -> None:
-            super().__init__(vim, config, initial_state)
+        def __init__(self, vim: Nvim) -> None:
+            super().__init__(vim, config)
     return type(cls.__name__, (cls, Plug), {})
 
 __all__ = ('NvimPlugin', 'NvimStatePlugin')

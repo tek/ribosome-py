@@ -1,10 +1,11 @@
 import inspect
+import logging
 from typing import TypeVar, Generic, Type
 from threading import Lock
 
 import toolz
 
-from amino import Map, List, Boolean, Nil, Either, _, Lists
+from amino import Map, List, Boolean, Nil, Either, _, Lists, Maybe, Nothing
 from amino.dat import Dat
 from amino.func import flip
 
@@ -66,21 +67,26 @@ class PluginState(Generic[D, NP], Dat['PluginState']):
             components: List[Component],
             messages: PrioQueue[Message],
             message_log: List[Message]=Nil,
+            log_handler: Maybe[logging.Handler]=Nothing,
     ) -> 'PluginState':
         component_state = Components(components / ComponentState.cons)
-        return PluginState(data, plugin, component_state, messages, message_log)
+        return PluginState(data, plugin, component_state, messages, message_log, log_handler)
 
-    def __init__(self,
-                 data: D,
-                 plugin: NP,
-                 components: List[ComponentState],
-                 messages: PrioQueue[Message],
-                 message_log: List[Message]=Nil) -> None:
+    def __init__(
+            self,
+            data: D,
+            plugin: NP,
+            components: List[ComponentState],
+            messages: PrioQueue[Message],
+            message_log: List[Message],
+            log_handler: Maybe[logging.Handler],
+    ) -> None:
         self.data = data
         self.plugin = plugin
         self.components = components
         self.messages = messages
         self.message_log = message_log
+        self.log_handler = log_handler
 
     def enqueue(self, messages: List[Sendable]) -> 'PluginState[D, NP]':
         envelopes = messages / Envelope.from_sendable
@@ -118,12 +124,13 @@ class PluginState(Generic[D, NP], Dat['PluginState']):
 class PluginStateHolder(Generic[D, NP], Dat['PluginStateHolder']):
 
     @staticmethod
-    def cons(state: PluginState[D, NP]) -> 'PluginStateHolder':
-        return PluginStateHolder(state, Lock())
+    def cons(state: PluginState[D, NP], log_handler: logging.Handler=None) -> 'PluginStateHolder':
+        return PluginStateHolder(state, Lock(), Maybe.check(log_handler))
 
-    def __init__(self, state: PluginState[D, NP], lock: Lock) -> None:
+    def __init__(self, state: PluginState[D, NP], lock: Lock, log_handler: Maybe[logging.Handler]=Nothing) -> None:
         self.state = state
         self.lock = lock
+        self.log_handler = log_handler
 
     def update(self, state: PluginState[D, NP]) -> None:
         self.state = state
