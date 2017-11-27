@@ -7,9 +7,9 @@ from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 from integration._support.autocmd import val
 
 
-class AutoPluginSpec(AutoPluginIntegrationKlkSpec[PluginSettings, SimpleData]):
+class AutocmdSpec(AutoPluginIntegrationKlkSpec[PluginSettings, SimpleData]):
     '''
-    zero-setup plugin $auto_plugin
+    execute handler when triggering an autocmd $autocmd
     '''
 
     @property
@@ -23,10 +23,10 @@ class AutoPluginSpec(AutoPluginIntegrationKlkSpec[PluginSettings, SimpleData]):
         super()._pre_start()
         self.vim.vars.set_p('components', ['core'])
 
-    def auto_plugin(self) -> Expectation:
+    def autocmd(self) -> Expectation:
         self.vim.cmd_once_defined('PlugStage1')
         self.cmd_sync('Msg1')
         self.vim.doautocmd('VimResized')
         return self.var_becomes('msg_cmd_success', val) & self.var_becomes('autocmd_success', val)
 
-__all__ = ('AutoPluginSpec',)
+__all__ = ('AutocmdSpec',)

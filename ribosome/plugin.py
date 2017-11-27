@@ -13,7 +13,6 @@ from ribosome.logging import nvim_logging, Logging
 from ribosome.request.command import command
 from ribosome.request.function import function
 from ribosome.request.rpc import rpc_handlers_json
-from ribosome.record import encode_json_compat, decode_json_compat
 # from ribosome.trans.messages import Stage1, Stage2, Stage3, Stage4, Quit
 from ribosome.config import Config, PluginSettings
 from ribosome.trans.message_base import Message
@@ -93,7 +92,7 @@ class NvimPlugin(NvimPluginBase, metaclass=NvimPluginMeta):
         self.quit()
 
     def send_message(self, data: str) -> None:
-        return decode_json_compat(data) / self.root.send
+        return decode_json(data) / self.root.send
 
 
 NSP = TypeVar('NSP', bound='NvimStatePlugin')
@@ -124,7 +123,7 @@ class NvimStatePlugin(NvimPlugin, metaclass=NvimStatePluginMeta):
 #         ...
 
     def message_log(self) -> List[Message]:
-        return self.state().message_log // encode_json_compat
+        return self.state().message_log // encode_json
 
     def state_data(self) -> str:
         return self.state().data.json.value_or(lambda a: f'could not serialize state: {a}')

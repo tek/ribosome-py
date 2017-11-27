@@ -20,7 +20,8 @@ from amino.test import fixture_path, temp_dir, temp_file
 from amino.test.path import base_dir, pkg_dir
 from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase, default_timeout
 from amino.util.string import camelcase
-from amino.json import dump_json
+from amino.json import dump_json, decode_json
+from amino.json.data import JsonError
 
 import ribosome
 from ribosome.logging import Logging
@@ -29,7 +30,6 @@ from ribosome.nvim import AsyncVimProxy
 from ribosome.test.fixtures import rplugin_template
 from ribosome.request.rpc import rpc_handlers, RpcHandlerSpec
 from ribosome.trans.message_base import Message
-from ribosome.record import decode_json_compat, JsonError, encode_json_compat, decode_json
 from ribosome.config import PluginSettings
 
 A = TypeVar('A', bound=NvimPlugin)
@@ -252,7 +252,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return self.vim.buffer.content
 
     def message_log(self) -> Either[str, List[Message]]:
-        return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json_compat, Either)
+        return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
 
     @property
     def state(self) -> Any:
@@ -452,7 +452,7 @@ class AutoPluginIntegrationSpec(Generic[Settings, D], VimIntegrationSpec):
         self.vim.call(f'{self.plugin_name}Send', data)
 
     def send(self, msg: M) -> None:
-        self.send_json(dump_json(msg).o(encode_json_compat(msg)).get_or_raise())
+        self.send_json(dump_json(msg).get_or_raise())
 
 
 __all__ = ('VimIntegrationSpec', 'ExternalIntegrationSpec', 'PluginIntegrationSpec')

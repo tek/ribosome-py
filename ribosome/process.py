@@ -7,15 +7,15 @@ from typing import Tuple, Awaitable, Any
 import asyncio
 from asyncio.subprocess import PIPE
 
-from amino import Map, Future, __, Boolean, _, L, List
+from amino import Map, Future, __, Boolean, _, L, List, Maybe
 from amino.lazy import lazy
 from amino.either import Right, Left
 from amino.util.string import ToStr
+from amino.dat import Dat
 
 import ribosome
 from ribosome.logging import Logging
 from ribosome.nvim import NvimFacade
-from ribosome.record import Record, any_field, field, list_field, maybe_field, map_field
 
 
 class Result(ToStr):
@@ -37,18 +37,22 @@ class Result(ToStr):
         return self.success.maybe(Right(good)) | Left(bad)
 
 
-class JobClient(Record):
-    cwd = field(Path)
-    name = field(str)
+class JobClient(Dat['JobClient']):
+
+    def __init__(self, cwd: Path, name: str) -> None:
+        self.cwd = cwd
+        self.name = name
 
 
-class Job(Record):
-    client = field(JobClient)
-    exe = field(str)
-    args = list_field()
-    kw = map_field()
-    loop = any_field()
-    pipe_in = maybe_field(str)
+class Job(Dat['Job']):
+
+    def __init__(self, client: JobClient, exe: str, args: List, kw: Map, loop: Any, pipe_in: Maybe[str]) -> None:
+        self.client = client
+        self.exe = exe
+        self.args = args
+        self.kw = kw
+        self.loop = loop
+        self.pipe_in = pipe_in
 
     @lazy
     def status(self):

@@ -4,7 +4,7 @@ from typing import Callable, TypeVar, Generic, Union, Any, Optional
 from amino import List, Nil, Maybe, Map
 from amino.dat import Dat
 
-from ribosome.nvim import NvimIO, NvimFacade
+from ribosome.nvim import NvimIO
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import PluginSettings
 from ribosome.dispatch.run import DispatchJob
@@ -15,7 +15,6 @@ Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D', bound='SimpleData')
 
 
-# TODO remove vim from state
 class Config(Generic[Settings, D], Dat['Config[Settings, D]']):
 
     @staticmethod
@@ -27,7 +26,7 @@ class Config(Generic[Settings, D], Dat['Config[Settings, D]']):
             name: str,
             prefix: Optional[str]=None,
             components: Map[str, Union[str, type]]=Map(),
-            state_ctor: Optional[Callable[['Config', NvimFacade], D]]=None,
+            state_ctor: Optional[Callable[['Config'], D]]=None,
             settings: Optional[Settings]=None,
             request_handlers: List[RequestHandler]=Nil,
             core_components: List[str]=Nil,
@@ -51,7 +50,7 @@ class Config(Generic[Settings, D], Dat['Config[Settings, D]']):
             name: str,
             prefix: str,
             components: Map[str, Union[str, type]],
-            state_ctor: Callable[['Config', NvimFacade], D],
+            state_ctor: Callable[['Config'], D],
             settings: Settings,
             request_handlers: RequestHandlers,
             core_components: List[str],
@@ -71,12 +70,8 @@ class Config(Generic[Settings, D], Dat['Config[Settings, D]']):
     def _arg_desc(self) -> List[str]:
         return List(str(self.components), str(self.settings), str(self.request_handlers))
 
-    def state(self, vim: NvimFacade) -> D:
+    def state(self) -> D:
         return self.state_ctor(self)
-
-    @property
-    def json_repr(self) -> dict:
-        return dict(__type__='ribosome.config.Config', name=self.name, prefix=self.prefix)
 
     def vim_cmd_name(self, handler: RequestHandler) -> str:
         return handler.vim_cmd_name(self.name, self.prefix)

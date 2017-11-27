@@ -6,10 +6,10 @@ from typing import TypeVar, Callable, Union, Any, Dict, Generator
 from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean, _, L, __
 from amino.util.string import camelcaseify, ToStr
 from amino.list import Nil
+from amino.dat import Dat
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log
-from ribosome.record import Record, field, int_field, str_field, bool_field
 
 A = TypeVar('A')
 
@@ -46,19 +46,19 @@ RHS = TypeVar('RHS', bound='RpcHandlerSpec')
 
 
 def from_bool(a: Union[int, bool, Boolean]) -> int:
-    return int(a.value) if isinstance(a, Boolean) else int(a) if isinstance(a, bool) else a
+    return a.to_int if isinstance(a, Boolean) else int(a) if isinstance(a, bool) else a
 
 
-class RpcHandlerSpec(Record):
-    sync = int_field(factory=from_bool)
-    name = str_field()
-    opts = field(dict)
-    method = str_field()
-    prefix = bool_field()
+class RpcHandlerSpec(Dat['RpcHandlerSpec']):
 
     @staticmethod
-    def cons(Ctor: type, sync: Union[int, bool], name: str, opts: dict, method: str, prefix: bool) -> 'RpcHandlerSpec':
-        return Ctor(sync=sync, name=name, opts=opts, method=method, prefix=prefix)
+    def cons(Ctor: type,
+             sync: Union[int, bool, Boolean],
+             name: str,
+             opts: dict,
+             method: str,
+             prefix: bool) -> 'RpcHandlerSpec':
+        return Ctor(from_bool(sync), name, opts, method, Boolean(prefix))
 
     @staticmethod
     @do(Maybe['RpcHandlerSpec'])
@@ -111,6 +111,13 @@ class RpcHandlerSpec(Record):
     @abc.abstractproperty
     def def_cmd(self) -> str:
         ...
+
+    def __init__(self, sync: Boolean, name: str, opts: dict, method: str, prefix: Boolean) -> None:
+        self.sync = sync
+        self.name = name
+        self.opts = opts
+        self.method = method
+        self.prefix = prefix
 
     def _arg_desc(self) -> List[str]:
         return List(self.name, self.tpe, str(self.sync), str(self.opts), self.method, str(self.prefix))
@@ -283,12 +290,11 @@ def define_handler_native(vim: NvimFacade, host: str, spec: RpcHandlerSpec, plug
     return vim.call(*args)
 
 
-class DefinedHandler(Record):
-    spec = field(RpcHandlerSpec)
-    channel = int_field()
+class DefinedHandler(Dat['DefinedHandler']):
 
-    def _arg_desc(self) -> List[str]:
-        return List(str(self.spec), str(self.channel))
+    def __init__(self, spec: RpcHandlerSpec, channel: int) -> None:
+        self.spec = spec
+        self.channel = channel
 
 
 def quote(a: str) -> str:
@@ -308,7 +314,7 @@ def define_handler_cmd(rhs_f: Callable[[str], str], channel: int, spec: RpcHandl
 def define_handler_io(rhs: Callable[[str], str], channel: int, spec: RpcHandlerSpec, plugin_file: str
                       ) -> NvimIO[DefinedHandler]:
     tokens = define_handler_cmd(rhs, channel, spec, plugin_file)
-    return NvimIO.cmd_sync(tokens.join_tokens).replace(DefinedHandler(spec=spec, channel=channel))
+    return NvimIO.cmd_sync(tokens.join_tokens).replace(DefinedHandler(spec, channel))
 
 
 def define_function(channel: int, spec: RpcHandlerSpec, plugin_file: str) -> NvimIO[DefinedHandler]:

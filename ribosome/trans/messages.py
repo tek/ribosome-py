@@ -1,4 +1,3 @@
-from amino import Nothing
 from amino.logging import LogError
 
 from ribosome.trans.message_base import pmessage, json_pmessage, Message
@@ -8,14 +7,6 @@ Stop = pmessage('Stop')
 Quit = pmessage('Quit')
 Done = pmessage('Done')
 PlugCommand = pmessage('PlugCommand', 'plug', 'msg')
-RunNvimIO = pmessage('RunNvimIO', 'io')
-RunNvimUnitIO = pmessage('RunNvimUnitIO', 'io')
-RunIO = pmessage('RunIO', 'io', opt_fields=(('msg', Nothing),))
-RunIOAlg = pmessage('RunIOAlg', 'io', opt_fields=(('msg', Nothing),))
-RunNvimIOAlg = pmessage('RunNvimIOAlg', 'io')
-RunNvimIOStateAlg = pmessage('RunNvimIOStateAlg', 'io_f')
-UnitIO = pmessage('UnitIO', 'io', opt_fields=(('msg', Nothing),))
-DataIO = pmessage('DataIO', 'cons', opt_fields=(('msg', Nothing),))
 Info = pmessage('Info', 'message')
 ShowLogInfo = pmessage('ShowLogInfo')
 RunIOsParallel = pmessage('RunIOsParallel', 'ios')
@@ -55,7 +46,6 @@ class Error(Message['Error'], LogError):
     def short(self) -> str:
         return self.main
 
-__all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'RunNvimIO', 'RunNvimUnitIO', 'RunIO', 'RunIOAlg',
-           'RunNvimIOAlg', 'RunNvimIOStateAlg', 'UnitIO', 'DataIO', 'Info', 'ShowLogInfo', 'RunIOsParallel',
+__all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'Info', 'ShowLogInfo', 'RunIOsParallel',
            'RunCorosParallel', 'SubProcessSync', 'SubProcessAsync', 'Fork', 'Error', 'Warning', 'Debug', 'Coroutine',
            'CoroutineAlg', 'TransitionException', 'UpdateRecord', 'UpdateState', 'Stage1', 'Stage2', 'Stage3', 'Stage4')

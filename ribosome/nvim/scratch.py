@@ -1,16 +1,18 @@
-from ribosome.record import map_field, bool_field, Record, maybe_field
+from amino import Empty, Just, Maybe, __, Map
+from amino.dat import Dat
 
-from amino import Empty, Just, Maybe, __
 from ribosome.nvim.components import HasWindow
 from ribosome.nvim import NvimIO, Tab
 
 
-class ScratchBuilder(Record):
-    params = map_field()
-    use_tab = bool_field()
-    vertical = bool_field()
-    size = maybe_field(int)
-    wrap = bool_field()
+class ScratchBuilder(Dat['ScratchBuilder']):
+
+    def __init__(self, params: Map, use_tab: bool, vertical: bool, size: Maybe, wrap: bool) -> None:
+        self.params = params
+        self.use_tab = use_tab
+        self.vertical = vertical
+        self.size = size
+        self.wrap = wrap
 
     @property
     def tab(self):

@@ -15,7 +15,6 @@ setup(
     install_requires=[
         'amino~=12.5.0',
         'neovim~=0.1.13',
-        'pyrsistent~=0.12.3',
         'pyuv~=1.4.0',
     ],
     tests_require=[

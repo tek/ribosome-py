@@ -15,6 +15,7 @@ from amino.do import do, Do
 from amino.dat import Dat
 from amino.algebra import Algebra
 from amino.state import EitherState
+from amino.json import dump_json
 
 from ribosome import NvimPlugin
 from ribosome import options
@@ -28,7 +29,6 @@ from ribosome.logging import ribo_log
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.plugin import plugin_class_from_config
 from ribosome.plugin_state import PluginState, PluginStateHolder
-from ribosome.record import encode_json_compat
 from ribosome.request.handler.dispatcher import MsgDispatcher
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
@@ -111,7 +111,7 @@ def request_handler(vim: NvimFacade,
 
 @do(NvimIO[PluginState[D, NP]])
 def init_state(host_config: HostConfig) -> Do:
-    data = yield NvimIO.delay(host_config.config.state)
+    data = host_config.config.state()
     components = yield ComponentResolver(host_config.config).run
     plugin = yield NvimIO.delay(lambda vim: host_config.plugin_class(vim, data))
     yield NvimIO.pure(PluginState.cons(data, plugin, components, PrioQueue.empty))
@@ -202,7 +202,7 @@ def config_dispatchers(config: Config) -> List[DispatchAsync]:
 @trans.free.result(trans.st)
 @do(EitherState[PluginState[D, NP], str])
 def message_log() -> Do:
-    yield EitherState.inspect_f(__.message_log.traverse(encode_json_compat, Either))
+    yield EitherState.inspect_f(__.message_log.traverse(dump_json, Either))
 
 
 message_log_handler = RequestHandler.trans_function(message_log)('message_log', Full(), sync=True)
