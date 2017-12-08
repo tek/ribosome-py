@@ -12,27 +12,29 @@ from ribosome.plugin_state import PluginState, PluginStateHolder
 from ribosome.dispatch.data import Legacy, DispatchReturn, Internal, Trans, SendMessage, DispatchResult
 from ribosome.nvim.io import NvimIOState
 from ribosome.trans.message_base import Message
-from ribosome.dispatch.transform import AlgResultValidator
+from ribosome.dispatch.transform import TransValidator, validate_trans_action
 from ribosome.trans.send_message import send_message, transform_data_state
+from ribosome.trans.handler import FreeTransHandler
 
-# NP = TypeVar('NP', bound=NvimPlugin)
 NP = TypeVar('NP')
 D = TypeVar('D')
 DP = TypeVar('DP', bound=Algebra)
-Res = NvimIOState[PluginState[D, NP], DispatchResult]
+Res = NvimIOState[PluginState[D], DispatchResult]
+
+
+def execute_data_trans(handler: FreeTransHandler) -> Res:
+    return transform_data_state(validate_trans_action(handler.run()))
 
 
 def run_trans(trans: Trans, args: List[Any]) -> Res:
-    handler = trans.handler.dispatcher.handler
-    result = handler.run(args)
-    validator = AlgResultValidator(trans.name)
-    return transform_data_state(validator.validate(result))
+    handler = trans.handler.dispatcher.handler(*args)
+    return execute_data_trans(handler)
 
 
 def run_internal(trans: Trans, args: List[Any]) -> Res:
-    handler = trans.handler.dispatcher.handler
-    result = handler.run(args)
-    validator = AlgResultValidator(trans.name)
+    handler = trans.handler.dispatcher.handler(args)
+    result = handler.run()
+    validator = TransValidator(trans.name)
     return validator.validate(result)
 
 
@@ -55,7 +57,7 @@ class RunDispatchSync(RunDispatch):
     def __init__(self, args: List[Any]) -> None:
         self.args = args
 
-    @do(NvimIOState[PluginState[D, NP], DispatchResult])
+    @do(NvimIOState[PluginState[D], DispatchResult])
     def legacy(self, dispatch: Legacy) -> Do:
         plugin = yield NvimIOState.inspect(_.plugin)
         result = dispatch.handler.func(plugin, *self.args)
@@ -67,7 +69,7 @@ class RunDispatchAsync(RunDispatch):
     def __init__(self, args: List[Any]) -> None:
         self.args = args
 
-    @do(NvimIOState[PluginState[D, NP], DispatchResult])
+    @do(NvimIOState[PluginState[D], DispatchResult])
     def send_message(self, dispatch: SendMessage) -> Do:
         cmd_name = yield NvimIOState.inspect(__.config.vim_cmd_name(dispatch.handler))
         msg_e = cons_message(dispatch.msg, self.args, cmd_name, dispatch.method)
@@ -83,7 +85,7 @@ class DispatchJob(Generic[DP], Dat['DispatchJob']):
     def __init__(
             self,
             dispatches: Map[str, DP],
-            state: PluginStateHolder[D, NP],
+            state: PluginStateHolder[D],
             name: str,
             args: List[Any],
             sync: bool,

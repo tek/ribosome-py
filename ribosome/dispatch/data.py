@@ -1,5 +1,5 @@
 import abc
-from typing import TypeVar, Union, Any, Generic, Type
+from typing import TypeVar, Union, Any, Generic, Type, Callable
 
 from amino import List, Boolean, Nil, Maybe, Just, Nothing, IO, Either, Right, Left
 from amino.dat import Dat, ADT, DatMeta
@@ -11,14 +11,15 @@ from ribosome.request.handler.method import RpcMethod
 from ribosome.nvim import NvimIO
 from ribosome.nvim.io import NvimIOState
 from ribosome.trans.message_base import Message
+from ribosome.trans.effect import GatherIOs, GatherSubprocs
+from ribosome.trans.action import TransDo
 
 B = TypeVar('B')
 Meth = TypeVar('Meth', bound=RpcMethod)
-DP = TypeVar('DP', bound='Dispatch')
 D = TypeVar('D')
 
 
-class Dispatch(Generic[DP]):
+class Dispatch:
 
     @property
     def sync(self) -> Boolean:
@@ -37,11 +38,14 @@ class Dispatch(Generic[DP]):
         ...
 
 
-class DispatchSync(ADT['DispatchSync'], Dispatch['DispatchSync'], base=True):
+DP = TypeVar('DP', bound=Dispatch)
+
+
+class DispatchSync(ADT['DispatchSync'], Dispatch, base=True):
     pass
 
 
-class DispatchAsync(ADT['DispatchAsync'], Dispatch['DispatchAsync'], base=True):
+class DispatchAsync(ADT['DispatchAsync'], Dispatch, base=True):
     pass
 
 
@@ -186,7 +190,14 @@ class DispatchOutputAggregate(DispatchOutput):
         self.results = results
 
 
+class DispatchDo(DispatchOutput):
+
+    def __init__(self, trans: TransDo) -> None:
+        self.trans = trans
+
+
 A = TypeVar('A')
+R = TypeVar('R')
 I = TypeVar('I')
 
 
@@ -197,6 +208,10 @@ class DIO(Generic[I], ADT['DIO[I]'], base=True):
         return (
             Right(IODIO(io))
             if isinstance(io, IO) else
+            Right(GatherIOsDIO(io))
+            if isinstance(io, GatherIOs) else
+            Right(GatherSubprocsDIO(io))
+            if isinstance(io, GatherSubprocs) else
             Right(NvimIODIO(io))
             if isinstance(io, NvimIO) else
             Left(f'invalid type for DIO: {io}')
@@ -206,6 +221,18 @@ class DIO(Generic[I], ADT['DIO[I]'], base=True):
 class IODIO(Generic[A], DIO[IO[A]]):
 
     def __init__(self, io: IO[A]) -> None:
+        self.io = io
+
+
+class GatherIOsDIO(Generic[A], DIO[GatherIOs[A]]):
+
+    def __init__(self, io: GatherIOs[A]) -> None:
+        self.io = io
+
+
+class GatherSubprocsDIO(Generic[A, R], DIO[GatherSubprocs[A, R]]):
+
+    def __init__(self, io: GatherSubprocs[A, R]) -> None:
         self.io = io
 
 

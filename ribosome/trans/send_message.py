@@ -1,15 +1,19 @@
 import time
-from typing import TypeVar, Callable, Generator
+from typing import TypeVar, Callable
 
-from amino import __, Maybe, Boolean, _, List, Nil, L
-from amino.do import do
+import amino
+from amino import __, Maybe, Boolean, _, Nil, L, Try
+from amino.do import do, Do
 
 from ribosome.trans.message_base import Message, Sendable, Envelope
 from ribosome.logging import ribo_log
 from ribosome.plugin_state import PluginState, ComponentState, Components, TransState
 from ribosome.nvim.io import NvimIOState
-from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchErrors, DispatchOutputAggregate
-from ribosome.dispatch.transform import AlgHandlerJob
+from ribosome.dispatch.data import DispatchResult, DispatchError, DispatchOutputAggregate
+from ribosome.dispatch.transform import validate_trans_action
+from ribosome.dispatch.component import Component
+from ribosome.trans.handler import MessageTransHandler
+from ribosome.trans.legacy import TransitionFailed
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -41,13 +45,29 @@ def check_time(start_time: int, msg: Message, name: str) -> None:
     #     self._reports = self._reports.cat((msg, dur))
 
 
+def handler_exception(e: Exception, desc: str) -> NvimIOState[D, DispatchResult]:
+    if amino.development:
+        err = f'transitioning {desc}'
+        ribo_log.caught_exception(err, e)
+        raise TransitionFailed(str(e)) from e
+    return NvimIOState.pure(DispatchResult(DispatchError.cons(e), Nil))
+
+
+def try_handler(handler: Callable[[M], A], msg: M, desc: str) -> NvimIOState[D, DispatchResult]:
+    return Try(handler, msg).map(validate_trans_action).value_or(L(handler_exception)(_, desc))
+
+
+def execute_component_handler(component: Component, handler: MessageTransHandler, msg: M
+                              ) -> NvimIOState[D, DispatchResult]:
+    result = try_handler(L(handler.run)(component, _), msg, component.name)
+    # check_time(job.start_time, msg, component.name)
+    return result
+
+
 def process(component: ComponentState, msg: Message, prio: float) -> TransState:
     def execute(handler: Callable) -> TransState:
         ribo_log.debug(f'handling {msg} in {component.name}')
-        job = AlgHandlerJob(component.name, handler, msg)
-        result = job.run()
-        check_time(job.start_time, msg, component.name)
-        return result
+        return execute_component_handler(component.component, handler, msg)
     return resolve_handler(component, msg, prio) / execute | (lambda: internal(msg))
 
 
@@ -68,7 +88,7 @@ def send_envelope(components: Components, env: Envelope, prio: float) -> TransSt
 
 
 @do(TransState)
-def send_message1(components: Components, msg: M, prio: float) -> Generator:
+def send_message1(components: Components, msg: M, prio: float) -> Do:
     ''' send **msg** to all submachines, passing the transformed data from each machine to the next and accumulating
     published messages.
     '''
@@ -76,12 +96,12 @@ def send_message1(components: Components, msg: M, prio: float) -> Generator:
     yield send(components, msg, prio)
 
 
-def transform_data_state(st: NvimIOState[D, DispatchResult]) -> NvimIOState[PluginState[D, NP], DispatchResult]:
+def transform_data_state(st: NvimIOState[D, DispatchResult]) -> NvimIOState[PluginState[D], DispatchResult]:
     return st.transform_s(_.data, lambda r, s: r.copy(data=s))
 
 
-@do(NvimIOState[PluginState[D, NP], DispatchResult])
-def send_message(msg: M, prio: float=None) -> Generator:
+@do(NvimIOState[PluginState[D], DispatchResult])
+def send_message(msg: M, prio: float=None) -> Do:
     yield NvimIOState.modify(__.log_message(msg.msg))
     components = yield NvimIOState.inspect(_.components)
     yield transform_data_state(send_message1(components, msg, prio))

@@ -1,29 +1,33 @@
 from typing import TypeVar, Type, Callable, Any, Tuple, Generic
+from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
 import amino
-from amino import _, L, __, Try
+from amino import _, L, __, Try, IO, Lists, Either, List
 from amino.do import do, Do
 from amino.dispatch import dispatch_alg
 from amino.util.exception import format_exception
 from amino.algebra import Algebra
+from amino.io import IOException
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log, Logging
 from ribosome import NvimPlugin
 from ribosome.config import Config
-from ribosome.nvim.io import NvimIOState
-from ribosome.dispatch.run import DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch
+from ribosome.nvim.io import NS
+from ribosome.dispatch.run import DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch, execute_data_trans
 from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
                                     DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors,
-                                    NvimIODIO, DispatchOutputAggregate)
+                                    NvimIODIO, DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO)
 from ribosome.plugin_state import PluginState, PluginStateHolder
 from ribosome.trans.queue import PrioQueue
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.loop import process_message
 from ribosome.trans.send_message import send_message
-from ribosome.dispatch.transform import AlgResultValidator
+from ribosome.dispatch.transform import validate_trans_action
+from ribosome.trans.action import TransM, TransMPure, TransMBind
+from ribosome.trans.handler import TransComplete
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)
@@ -35,60 +39,95 @@ C = TypeVar('C', bound=Config)
 R = TypeVar('R')
 DP = TypeVar('DP', bound=Dispatch)
 RDP = TypeVar('RDP', bound=Algebra)
-Res = NvimIOState[PluginState[D, NP], DispatchResult]
+Res = NS[PluginState[D], DispatchResult]
+
+
+def gather_ios(ios: List[IO[A]], timeout: float) -> List[Either[IOException, A]]:
+    with ThreadPoolExecutor(thread_name_prefix='ribosome_dio') as executor:
+        futures = ios.map(lambda i: executor.submit(i.attempt_run))
+        completed, timed_out = wait(futures, timeout=timeout)
+        return Lists.wrap(completed).map(__.result(timeout=timeout))
 
 
 class ExecuteDispatchIO(Logging):
 
-    def iodio(self, io: IODIO[A]) -> NvimIOState[PluginState[D, NP], R]:
-        return NvimIOState.from_io(io.io)
+    def iodio(self, io: IODIO[A]) -> NS[PluginState[D], TransComplete]:
+        return NS.from_io(io.io)
 
-    def nvim_iodio(self, io: NvimIODIO[A]) -> NvimIOState[PluginState[D, NP], R]:
-        return NvimIOState.lift(io.io)
+    def gather_i_os_dio(self, io: GatherIOsDIO[A]) -> NS[PluginState[D], TransComplete]:
+        def gather() -> R:
+            gio = io.io
+            return gio.handle_result(gather_ios(gio.ios, gio.timeout))
+        return NS.from_io(IO.delay(gather))
+
+    def gather_subprocs_dio(self, io: GatherSubprocsDIO[A, TransComplete]) -> NS[PluginState[D], TransComplete]:
+        def gather() -> TransComplete:
+            gio = io.io
+            popens = gio.procs.map(__.execute(gio.timeout))
+            return gio.handle_result(gather_ios(popens, gio.timeout))
+        return NS.from_io(IO.delay(gather))
+
+    def nvim_iodio(self, io: NvimIODIO[A]) -> NS[PluginState[D], TransComplete]:
+        return NS.lift(io.io)
 
 
 execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
 
 
+@do(NS[PluginState[D], R])
+def run_trans_m(tr: TransM) -> Do:
+    if isinstance(tr, TransMPure):
+        result = yield execute_data_trans(tr.handler)
+        yield normalize_output(result)
+    elif isinstance(tr, TransMBind):
+        result = yield run_trans_m(tr.fa)
+        n = tr.f(result)
+        yield run_trans_m(n)
+
+
 class ExecuteDispatchOutput(Logging):
 
-    def dispatch_error(self, result: DispatchError) -> NvimIOState[PluginState[D, NP], R]:
-        io = result.exception / NvimIO.delay.exception | NvimIO.delay(lambda v: ribo_log.error(result.message))
-        return NvimIOState.lift(io)
+    def dispatch_error(self, result: DispatchError) -> NS[PluginState[D], R]:
+        io = result.exception / NvimIO.exception | NvimIO.delay(lambda v: ribo_log.error(result.message))
+        return NS.lift(io)
 
-    def dispatch_errors(self, result: DispatchErrors) -> NvimIOState[PluginState[D, NP], R]:
-        return result.errors.traverse(self.dispatch_error, NvimIOState)
+    def dispatch_errors(self, result: DispatchErrors) -> NS[PluginState[D], R]:
+        return result.errors.traverse(self.dispatch_error, NS)
 
-    def dispatch_return(self, result: DispatchReturn) -> NvimIOState[PluginState[D, NP], R]:
-        return NvimIOState.pure(result.value)
+    def dispatch_return(self, result: DispatchReturn) -> NS[PluginState[D], R]:
+        return NS.pure(result.value)
 
-    def dispatch_unit(self, result: DispatchUnit) -> NvimIOState[PluginState[D, NP], R]:
-        return NvimIOState.pure(0)
+    def dispatch_unit(self, result: DispatchUnit) -> NS[PluginState[D], R]:
+        return NS.pure(0)
 
-    @do(NvimIOState[PluginState[D, NP], R])
+    @do(NS[PluginState[D], R])
     def dispatch_io(self, result: DispatchIO) -> Do:
-        inner = yield execute_io(result.io)
-        validator = AlgResultValidator('execute result')
-        result1 = yield validator.validate(inner)
-        yield normalize_output(result1)
+        custom_executor = yield NS.inspect(_.dispatch_config.io_executor)
+        executor = custom_executor | (lambda: execute_io)
+        inner = yield executor(result.io)
+        result = yield validate_trans_action(TransComplete('io', inner))
+        yield normalize_output(result)
 
-    @do(NvimIOState[PluginState[D, NP], R])
+    @do(NS[PluginState[D], R])
     def dispatch_output_aggregate(self, result: DispatchOutputAggregate) -> Do:
-        yield result.results.traverse(normalize_output, NvimIOState)
+        yield result.results.traverse(normalize_output, NS)
         yield DispatchResult.unit_nio
+
+    def dispatch_do(self, result: DispatchDo) -> NS[PluginState[D], R]:
+        return run_trans_m(result.trans.action)
 
 
 execute_output = dispatch_alg(ExecuteDispatchOutput(), DispatchOutput, '')
 
 
-@do(NvimIOState[PluginState[D, NP], R])
+@do(NS[PluginState[D], R])
 def normalize_output(result: DispatchResult) -> Do:
-    yield NvimIOState.modify(__.enqueue(result.msgs))
+    yield NS.modify(__.enqueue(result.msgs))
     yield execute_output(result.output)
 
 
-@do(NvimIOState[PluginState[D, NP], R])
-def run_dispatch(action: Callable[[], NvimIOState[PluginState[D, NP], B]], unpack: Callable[[B], Res]) -> Do:
+@do(NS[PluginState[D], R])
+def run_dispatch(action: Callable[[], NS[PluginState[D], B]], unpack: Callable[[B], Res]) -> Do:
     response = yield action()
     result = yield unpack(response)
     yield normalize_output(result)
@@ -109,8 +148,8 @@ def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[R]], desc: str) 
 
 @do(NvimIO[R])
 def exclusive_dispatch(holder: PluginStateHolder,
-                       action: Callable[[], NvimIOState[PluginState[D, NP], B]],
-                       unpack: Callable[[B], NvimIOState[PluginState[D, NP], DispatchResult]],
+                       action: Callable[[], NS[PluginState[D], B]],
+                       unpack: Callable[[B], NS[PluginState[D], DispatchResult]],
                        desc: str) -> Do:
     return exclusive(holder, lambda: run_dispatch(action, unpack).run(holder.state), desc)
 
@@ -121,10 +160,10 @@ class DispatchRunner(Generic[RDP]):
     def cons(run: Type[RDP], dp: Type[DP]) -> 'DispatchRunner[RDP]':
         return DispatchRunner(lambda args: dispatch_alg(run(args), dp, '', invalid_dispatch))
 
-    def __init__(self, f: Callable[[tuple], Callable[[RDP], NvimIOState[PluginState[D, NP], DispatchOutput]]]) -> None:
+    def __init__(self, f: Callable[[tuple], Callable[[RDP], NS[PluginState[D], DispatchOutput]]]) -> None:
         self.f = f
 
-    def __call__(self, args: tuple) -> Callable[[RDP], NvimIOState[PluginState[D, NP], DispatchOutput]]:
+    def __call__(self, args: tuple) -> Callable[[RDP], NS[PluginState[D], DispatchOutput]]:
         return self.f(args)
 
 
@@ -133,13 +172,13 @@ async_runner = DispatchRunner.cons(RunDispatchAsync, DispatchAsync)
 
 
 def sync_sender(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> Callable[[], Res]:
-    def send() -> NvimIOState[PluginState[D, NP], DispatchResult]:
+    def send() -> NS[PluginState[D], DispatchResult]:
         return runner(job.args)(dispatch)
     return send
 
 
 def execute(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> NvimIO[Any]:
-    return exclusive_dispatch(job.state, sync_sender(job, dispatch, runner), NvimIOState.pure, dispatch.desc)
+    return exclusive_dispatch(job.state, sync_sender(job, dispatch, runner), NS.pure, dispatch.desc)
 
 
 def fork_job(f: Callable[[], NvimIO[None]], job: DispatchJob) -> NvimIO[None]:
@@ -166,20 +205,20 @@ def request_error(job: DispatchJob, exc: Exception) -> int:
     return 1
 
 
-def resend_send() -> NvimIOState[PluginState[D, NP], Tuple[PrioQueue[Message], DispatchResult]]:
-    return NvimIOState.inspect(lambda state: process_message(state.messages, send_message))
+def resend_send() -> NS[PluginState[D], Tuple[PrioQueue[Message], DispatchResult]]:
+    return NS.inspect(lambda state: process_message(state.messages, send_message))
 
 
-@do(NvimIOState[PluginState[D, NP], DispatchResult])
+@do(NS[PluginState[D], DispatchResult])
 def resend_unpack(result: Tuple[PrioQueue[Message], DispatchResult]) -> Do:
     messages, trs = result
-    yield NvimIOState.modify(__.copy(messages=messages))
+    yield NS.modify(__.copy(messages=messages))
     yield trs
 
 
-@do(NvimIO[PluginState[D, NP]])
+@do(NvimIO[PluginState[D]])
 def resend_loop(holder: PluginStateHolder) -> Do:
-    @do(NvimIO[PluginState[D, NP]])
+    @do(NvimIO[PluginState[D]])
     def loop() -> Do:
         messages = holder.messages.join_comma
         yield exclusive_dispatch(holder, resend_send, resend_unpack, f'resend {messages}')
@@ -187,8 +226,14 @@ def resend_loop(holder: PluginStateHolder) -> Do:
     yield loop() if holder.has_messages else NvimIO.pure(holder.state)
 
 
-@do(NvimIO[Any])
+@do(NvimIO[PluginState[D]])
 def execute_async_loop(job: DispatchJob, dispatch: DispatchAsync) -> Do:
+    yield execute(job, dispatch, async_runner)
+    yield resend_loop(job.state)
+
+
+@do(NvimIO[Any])
+def execute_sync_loop(job: DispatchJob, dispatch: DispatchAsync) -> Do:
     yield execute(job, dispatch, async_runner)
     yield resend_loop(job.state)
 

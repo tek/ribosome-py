@@ -2,16 +2,18 @@ import abc
 from pathlib import Path
 import shutil
 from contextlib import contextmanager
-from typing import Tuple, Awaitable, Any
+from typing import Tuple, Awaitable, Any, Generic, TypeVar
+from subprocess import PIPE, Popen
 
 import asyncio
-from asyncio.subprocess import PIPE
+from asyncio.subprocess import PIPE as APIPE
 
-from amino import Map, Future, __, Boolean, _, L, List, Maybe
+from amino import Map, Future, __, Boolean, _, L, List, Maybe, IO, Lists, do
 from amino.lazy import lazy
 from amino.either import Right, Left
 from amino.util.string import ToStr
 from amino.dat import Dat
+from amino.do import Do
 
 import ribosome
 from ribosome.logging import Logging
@@ -136,9 +138,9 @@ class ProcessExecutor(Logging, abc.ABC):
         return asyncio.create_subprocess_exec(
             job.exe,
             *job.args,
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE,
+            stdin=APIPE,
+            stdout=APIPE,
+            stderr=APIPE,
             cwd=str(job.cwd),
             loop=self.loop,
             **job.kw,
@@ -227,4 +229,46 @@ class NvimProcessExecutor(ProcessExecutor):
     def _main_event_loop(self):
         return self.vim.threadsafe_subprocess() if ribosome.in_vim else _dummy_ctx()
 
-__all__ = ('ProcessExecutor', 'Result', 'Job', 'NvimProcessExecutor')
+
+A = TypeVar('A')
+
+
+class SubprocessResult(Generic[A], Dat['SubprocessResult']):
+
+    def __init__(self, retval: int, stdout: List[str], stderr: List[str], data: A) -> None:
+        self.retval = retval
+        self.stdout = stdout
+        self.stderr = stderr
+        self.data = data
+
+    @property
+    def success(self) -> Boolean:
+        return Boolean(self.retval == 0)
+
+
+class Subprocess(Generic[A], Dat['Subprocess']):
+
+    @staticmethod
+    @do(IO[Tuple[int, List[str], List[str]]])
+    def popen(*args: str, timeout: float=None, stdin: int=PIPE, stdout: int=PIPE, stderr: int=PIPE, env: dict=dict(),
+              universal_newlines=True, **kw) -> Do:
+        pop = yield IO.delay(Popen, args, stdin=stdin, stdout=stdout, stderr=stderr, env=env,
+                             universal_newlines=universal_newlines, **kw)
+        out, err = yield IO.delay(pop.communicate, timeout=timeout)
+        yield IO.pure((-1 if pop.returncode is None else pop.returncode, Lists.lines(out), Lists.lines(err)))
+
+    def __init__(self, exe: Path, args: List[str], data: A) -> None:
+        self.exe = exe
+        self.args = args
+        self.data = data
+
+    @property
+    def args_tuple(self) -> tuple:
+        return tuple(self.args.cons(str(self.exe)))
+
+    @do(IO[SubprocessResult[A]])
+    def execute(self, timeout: float) -> Do:
+        retval, out, err = yield Subprocess.popen(*self.args_tuple, timeout=timeout)
+        yield IO.pure(SubprocessResult(retval, out, err, self.data))
+
+__all__ = ('ProcessExecutor', 'Result', 'Job', 'NvimProcessExecutor', 'Subprocess')

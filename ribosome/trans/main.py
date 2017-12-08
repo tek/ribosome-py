@@ -2,7 +2,7 @@ from typing import Callable, TypeVar, Type
 
 from amino import Lists
 from ribosome.trans.effect import (TransEffect, TransEffectUnit, TransEffectSingleMessage, TransEffectMessages,
-                                   TransEffectResult)
+                                   TransEffectResult, TransEffectDo)
 from ribosome.trans.handler import FreeTransHandler, MessageTransHandler
 from ribosome.dispatch.component import Component
 from ribosome.trans.message_base import default_prio, Message
@@ -58,5 +58,7 @@ class FreeTransCons:
     def result(self, *effects: TransEffect, prio: float=dp) -> FDecorator:
         return self.cons(*effects, TransEffectResult(), prio=prio)
 
+    def do(self, prio: float=dp) -> FDecorator:
+        return self.cons(TransEffectDo(), prio=prio)
 
 __all__ = ('MessageTransCons', 'FreeTransCons')

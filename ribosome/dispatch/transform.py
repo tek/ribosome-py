@@ -1,33 +1,22 @@
 import abc
-import time
-from typing import Any, TypeVar, Generic, Union
+from typing import TypeVar, Generic, Union
 
-import amino
-from amino import Maybe, _, List, Map, L, __, Nil, Either
+from amino import Maybe, List, __, Nil, Either, L, _
 from amino.state import StateT, MaybeState, EitherState, IdState
 from amino.id import Id
-from amino.util.string import blue, ToStr
 from amino.dispatch import dispatch_alg
 from amino.tc.base import TypeClass, F
-from amino.dat import Dat
+from amino.util.string import blue
 
 from ribosome.logging import Logging
-from ribosome.nvim.io import NvimIOState
+from ribosome.nvim.io import NvimIOState, NS
 from ribosome.nvim import NvimIO
-from ribosome.dispatch.data import DispatchResult, DispatchUnit, DispatchError, DispatchReturn, DispatchIO, DIO
-from ribosome.trans.action import Transit, Propagate, TransUnit, TransResult, TransFailure, TransAction, TransIO
+from ribosome.dispatch.data import (DispatchResult, DispatchUnit, DispatchError, DispatchReturn, DispatchIO, DIO,
+                                    DispatchDo)
+from ribosome.trans.action import (Transit, Propagate, TransUnit, TransResult, TransFailure, TransAction, TransIO,
+                                   TransDo)
 from ribosome.trans.message_base import Message
-from ribosome.trans.legacy import Handler, TransitionFailed
-
-
-class Handlers(Dat['Handlers']):
-
-    def __init__(self, prio: int, handlers: Map[type, Handler]) -> None:
-        self.prio = prio
-        self.handlers = handlers
-
-    def handler(self, msg):
-        return self.handlers.get(type(msg))
+from ribosome.trans.handler import TransComplete
 
 
 D = TypeVar('D')
@@ -72,23 +61,20 @@ class TransformNvimIOState(TransformTransState[NvimIO], tpe=NvimIOState):
         return st
 
 
-class AlgResultValidator(Logging):
+class TransValidator(Logging):
 
-    def __init__(self, desc: str) -> None:
-        self.desc = desc
-
-    @property
-    def validate(self) -> NvimIOState[D, DispatchResult]:
-        return dispatch_alg(self, TransAction, 'validate_')
+    def __init__(self, name: str) -> None:
+        self.name = name
 
     def failure(self, error: Union[str, Exception]) -> NvimIOState[D, DispatchResult]:
-        return NvimIOState.pure(DispatchResult(DispatchError.cons(error), Nil))
+        return NvimIOState.pure(DispatchResult(DispatchError.cons(f'trans {blue(self.name)}: {error}'), Nil))
 
     def validate_transit(self, action: Transit) -> NvimIOState[D, DispatchResult]:
+        def loop(tts: TransformTransState) -> NS[D, DispatchResult]:
+            return tts.run(action.trans).map(L(TransComplete)(self.name, _)).flat_map(validate_trans_action)
         return (
             TransformTransState.e_for(action.trans)
-            .map(__.run(action.trans))
-            .map(__.flat_map(self.validate))
+            .map(loop)
             .value_or(self.failure)
         )
 
@@ -108,49 +94,12 @@ class AlgResultValidator(Logging):
         output = DIO.cons(action.io).cata(DispatchError.cons, DispatchIO)
         return NvimIOState.pure(DispatchResult(output, Nil))
 
-
-class HandlerJob(Generic[D], Logging, ToStr):
-
-    def __init__(self, name: str, handler: Handler, msg: Message) -> None:
-        if not isinstance(handler, Handler):
-            raise 1
-        self.name = name
-        self.msg = msg
-        self.handler = handler
-        self.start_time = time.time()
-
-    @staticmethod
-    def from_handler(name: str, handler: Handler, msg: Message) -> 'HandlerJob[M, D]':
-        return AlgHandlerJob(name, handler, msg)
-
-    @abc.abstractmethod
-    def run(self) -> Any:
-        ...
-
-    @property
-    def trans_desc(self) -> str:
-        return blue(f'{self.name}.{self.handler.name}')
-
-    def _arg_desc(self) -> List[str]:
-        return List(str(self.msg))
+    def validate_trans_do(self, action: TransDo) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.pure(DispatchResult(DispatchDo(action), Nil))
 
 
-class AlgHandlerJob(HandlerJob):
+def validate_trans_action(tc: TransComplete) -> NS[D, DispatchResult]:
+    val = dispatch_alg(TransValidator(tc.name), TransAction, 'validate_')
+    return val(tc.action)
 
-    def run(self) -> NvimIOState[D, DispatchResult]:
-        try:
-            r = self.handler.run(self.msg)
-        except Exception as e:
-            return self.exception(e)
-        else:
-            return AlgResultValidator(self.trans_desc).validate(r)
-
-    def exception(self, e: Exception) -> StateT[Id, D, R]:
-        if amino.development:
-            err = f'transitioning {self.trans_desc}'
-            self.log.caught_exception(err, e)
-            raise TransitionFailed(str(e)) from e
-        return NvimIOState.pure(DispatchResult(DispatchError.cons(e), Nil))
-
-
-__all__ = ('Handlers', 'HandlerJob', 'AlgHandlerJob')
+__all__ = ('validate_trans_action',)

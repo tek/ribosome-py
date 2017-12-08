@@ -1,19 +1,25 @@
 import abc
 from typing import Callable, TypeVar, Type, Generic, Awaitable, Any
 
-from amino import Either, List, IO, L, _, Maybe
+from amino import Either, List, IO, L, _, Maybe, __
 from amino.state import StateT
 from amino.util.string import red, green
 from amino.dispatch import dispatch_alg
+from amino.dat import Dat
+from amino.tc.functor import Functor
+from amino.tc.base import Implicits
 
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO
 from ribosome.trans.action import (TransStep, TransEffectError, Lift, Propagate, Strict, TransUnit, TransResult,
-                                   TransAction, Transit, TransFailure, TransIO)
+                                   TransAction, Transit, TransFailure, TransIO, TransM, TransDo)
 from ribosome.trans.message_base import Sendable, Messages
 from ribosome.trans.messages import Error, Nop, CoroutineAlg
+from ribosome.process import Subprocess, SubprocessResult
 
 D = TypeVar('D')
+A = TypeVar('A')
+B = TypeVar('B')
 R = TypeVar('R')
 N = TypeVar('N')
 G = TypeVar('G')
@@ -56,6 +62,7 @@ class TransEffectMaybe(Generic[R], TransEffect[Maybe[R]]):
         return Lift(nested | Propagate.one(Nop()))
 
 
+# FIXME use TransEffectError, not Error?
 class TransEffectEither(Generic[R], TransEffect[Either[str, R]]):
 
     @property
@@ -101,6 +108,58 @@ class TransEffectIO(Generic[R], TransEffect[IO[R]]):
     def extract(self, data: IO[R], tail: List[TransEffect], in_state: bool) -> TransStep:
         io = cont(tail, False, data.map) | data
         return Lift(TransIO(io.map(L(lift)(_, in_state))))
+
+
+class GatherIOs(Generic[A], Dat['GatherIOs'], Implicits, implicits=True, auto=True):
+
+    def __init__(self, ios: List[IO[A]], handle_result: Callable[[List[A]], TransAction], timeout: float=None
+                 ) -> None:
+        self.ios = ios
+        self.handle_result = handle_result
+        self.timeout = timeout
+
+
+class GatherIOsFunctor(Functor, tpe=GatherIOs):
+
+    def map(self, fa: GatherIOs[A], f: Callable[[A], B]) -> None:
+        return GatherIOs(fa.ios.map(__.map(f)), fa.handle_result, fa.timeout)
+
+
+class TransEffectGatherIOs(TransEffect[GatherIOs]):
+
+    @property
+    def tpe(self) -> Type[GatherIOs]:
+        return GatherIOs
+
+    def extract(self, data: GatherIOs, tail: List[TransEffect], in_state: bool) -> TransStep:
+        def handle_result(a: List[A]) -> TransAction:
+            handled = data.handle_result(a)
+            result = cont(tail, False, lambda f: f(handled)) | handled
+            return lift(result, in_state)
+        return Lift(TransIO(data.copy(handle_result=handle_result)))
+
+
+class GatherSubprocs(Generic[A, R], Dat['GatherSubprocs'], Implicits, implicits=True, auto=True):
+
+    def __init__(self, procs: List[Subprocess[A]], handle_result: Callable[[SubprocessResult[A]], R],
+                 timeout: float=None) -> None:
+        self.procs = procs
+        self.handle_result = handle_result
+        self.timeout = timeout
+
+
+class TransEffectGatherSubprocs(TransEffect[GatherSubprocs]):
+
+    @property
+    def tpe(self) -> Type[GatherSubprocs]:
+        return GatherSubprocs
+
+    def extract(self, data: GatherSubprocs, tail: List[TransEffect], in_state: bool) -> TransStep:
+        def handle_result(a: List[A]) -> TransAction:
+            handled = data.handle_result(a)
+            result = cont(tail, False, lambda f: f(handled)) | handled
+            return lift(result, in_state)
+        return Lift(TransIO(data.copy(handle_result=handle_result)))
 
 
 class TransEffectNvimIO(Generic[R], TransEffect[NvimIO[R]]):
@@ -164,11 +223,21 @@ class TransEffectUnit(TransEffect[None]):
 class TransEffectResult(TransEffect[Any]):
 
     @property
-    def tpe(self) -> Type[Sendable]:
+    def tpe(self) -> Type[Any]:
         return object
 
     def extract(self, data: object, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
         return Lift(TransResult(data)) if tail.empty else TransEffectError('cannot apply trans effects to result')
+
+
+class TransEffectDo(TransEffect[TransM]):
+
+    @property
+    def tpe(self) -> Type[TransM]:
+        return TransM
+
+    def extract(self, data: TransM[A], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+        return Lift(TransDo(data)) if tail.empty else TransEffectError('cannot apply trans effects to TransM[A]')
 
 
 class Lifter(Logging):

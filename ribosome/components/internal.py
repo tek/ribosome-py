@@ -10,7 +10,7 @@ from ribosome.trans.messages import Nop, Done, Quit, Stop, CoroutineAlg, SubProc
 from ribosome.trans.api import trans
 from ribosome.dispatch.component import Component
 from ribosome.trans.message_base import pmessage, json_pmessage, Message, ToMachine
-from ribosome.dispatch.transform import AlgResultValidator
+from ribosome.dispatch.transform import TransValidator
 
 Callback = pmessage('Callback', 'func')
 EnvelopeOld = pmessage('EnvelopeOld', 'message', 'to')
@@ -50,7 +50,7 @@ class InternalC(Component):
         async def run_coro_alg() -> None:
             res = await self.msg.coro
             trans_desc = blue(f'{self.name}.message_couroutine_alg')
-            return Just(AlgResultValidator(trans_desc).validate(res, self.data))
+            return Just(TransValidator(trans_desc).validate(res, self.data))
         return run_coro_alg()
 
     @trans.msg.one(SubProcessAsync)

@@ -1,6 +1,7 @@
 from typing import Generator, Union, Type
 
-from amino import Try, _, L, Either, List, Left, do, Right, curried, Boolean
+from amino import Try, _, Either, List, Left, do, Right, curried
+from amino.mod import cls_from_module
 
 from ribosome.logging import Logging, ribo_log
 from ribosome.nvim import NvimIO
@@ -39,8 +40,8 @@ class ComponentResolver(Logging):
         auto = f'{self.config.name}.components.{name}'
         return (
             self.declared_component(name)
-            .accum_error_f(lambda: self.component_from_exports(auto))
-            .accum_error_f(lambda: self.component_from_exports(name))
+            .accum_error_f(lambda: self.component_from_exports(auto).lmap(List))
+            .accum_error_f(lambda: self.component_from_exports(name).lmap(List))
             .flat_map(self.inst_auto(name, vim))
         )
 
@@ -51,14 +52,10 @@ class ComponentResolver(Logging):
             .to_either(List(f'no auto component defined for `{name}`'))
         )
 
-    @do(Either[List[str], Component])
+    @do(Either[str, Component])
     def component_from_exports(self, mod: str) -> Generator:
-        exports = yield Either.exports(mod).lmap(List)
-        yield (
-            exports.find(L(Boolean.issubclass)(_, Component))
-            .to_either(f'none of `{mod}.__all__` is a `Component`: {exports}')
-            .lmap(List)
-        )
+        mod = yield Either.import_module(mod)
+        yield cls_from_module(mod, Component)
 
     @curried
     def inst_auto(self, name: str, vim: NvimFacade, plug: Union[str, Type]) -> Either[str, Component]:

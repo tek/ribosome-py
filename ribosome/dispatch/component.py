@@ -1,4 +1,5 @@
 from amino import _, L, List, Left, Right, Map, __
+from amino.util.string import ToStr
 
 from ribosome.util.callback import VimCallback, parse_callback_spec
 
@@ -46,10 +47,13 @@ class ComponentHelpers:
                 Right(tpe.from_opt(o)))
 
 
-class Component(ComponentHelpers):
+class Component(ComponentHelpers, ToStr):
 
     def __init__(self, name: str) -> None:
         self.name = name
+
+    def _arg_desc(self) -> List[str]:
+        return List()
 
     # @handle(UpdateRecord)
     # def message_update_record(self):

@@ -732,7 +732,7 @@ class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
         return decode(
             Boolean.isinstance(data, ExtType)
             .m(lambda: self.rpc_types.lift(data.code)) /
-            (lambda A: A(self, (data.code, data.data))) |
+            (lambda A: A(self.vim, (data.code, data.data))) |
             data
         )
 

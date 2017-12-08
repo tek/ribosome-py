@@ -3,10 +3,9 @@ from typing import Callable, Type, TypeVar, Generic, Generator
 
 from amino import List, Either, __, Left, Eval
 from amino.util.string import ToStr
-from amino.do import do
+from amino.do import do, Do
 
-from ribosome.nvim import NvimIO
-from ribosome.nvim.components import NvimComponent
+from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.logging import Logging
 
 A = TypeVar('A', contravariant=True)
@@ -55,7 +54,7 @@ class StrictSetting(Generic[A, B], PluginSetting[B]):
     @property
     def value(self) -> NvimIO[Either[str, B]]:
         @do(Either[str, B])
-        def read(v: NvimComponent) -> Generator:
+        def read(v: NvimFacade) -> Do:
             vars = v.vars
             getter = vars.p if self.prefix else vars
             raw = yield vars.typed(self.tpe, getter(self.name))

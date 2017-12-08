@@ -2,10 +2,10 @@ import abc
 import functools
 import time
 import inspect
-from typing import Optional, Any, TypeVar, Type, Callable, Generic
+from typing import Optional, Any, TypeVar, Type, Generic
 from types import FunctionType, SimpleNamespace
 
-from amino import Map, List, Empty, Just, __, L, Maybe, _, Lists, Nothing
+from amino import Map, Just, L, Maybe, _, Lists, Nothing
 from amino.dat import Dat, DatMeta
 from amino.util.ast import synth_init
 
@@ -76,7 +76,8 @@ def message_definition_module() -> Optional[str]:
 def pmessage(_name: str, *fields: str, mod: str=None, **kw: Any) -> Type[M]:
     module = mod or message_definition_module()
     params = Map(Lists.wrap(fields).apzip(lambda a: Any))
-    return MsgMeta(_name, (Msg,), dict(__module__=module), **params, **kw)
+    ns = MsgMeta.__prepare__(_name, (Msg,), glob=dict(__module__=module), **params, **kw)
+    return MsgMeta(_name, (Msg,), ns, **kw)
 
 
 def json_pmessage(name, *fields, mod=None, **kw):
@@ -145,4 +146,4 @@ class Messages(abc.ABC):
 Messages.register(Message)
 Messages.register(Envelope)
 
-__all__ = ('pmessage', 'json_pmessage', 'Publish')
+__all__ = ('pmessage', 'json_pmessage', 'Sendable', 'Message', 'Msg', 'Envelope', 'ToMachine', 'Messages')

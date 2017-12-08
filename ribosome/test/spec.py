@@ -1,7 +1,8 @@
 from typing import Callable, Any, Optional
 from contextlib import contextmanager
 
-from amino import List, Map
+from amino import List, Map, Boolean, Maybe, Just
+from amino.util.fun import format_funcall
 
 from ribosome.nvim import Buffer, Tab, Window
 from ribosome import NvimFacade
@@ -47,9 +48,6 @@ class MockNvimComponent(object):
     def tab(self):
         return MockTab(self.vim, None, self.prefix)
 
-    def cmd(self, *a, **kw):
-        pass
-
 
 class MockTab(MockNvimComponent, Tab):
     pass
@@ -65,19 +63,27 @@ class MockBuffer(MockNvimComponent, Buffer):
 
 class MockNvim:
 
+    def __init__(self, responses: Callable[[str], Any]) -> None:
+        self.responses = responses
+
     @property
     def types(self) -> Map[str, type]:
         return Map()
 
     def command(self, cmdline: str, **kw: Any) -> Any:
-        return 0
+        return self.responses(cmdline).get_or_fail(f'no response recorded for command {cmdline}')
+
+    def call(self, name: str, *a: Any, **kw: Any) -> Any:
+        rep = format_funcall(name, a, kw)
+        return self.responses(name).get_or_fail(f'no response recorded for call {rep}')
 
 
 class MockNvimFacade(MockNvimComponent, NvimFacade):
 
-    def __init__(self, prefix: str='ribosome', vars: dict=dict()) -> None:
+    def __init__(self, prefix: str='ribosome', vars: dict=dict(),
+                 responses: Callable[[str], Maybe[Any]]=lambda a: Just(0)) -> None:
         MockNvimComponent.__init__(self, prefix, vars)
-        self.vim = MockNvim()
+        self.vim = MockNvim(responses)
         self.target = self.vim
 
     @property
@@ -96,5 +102,8 @@ class MockNvimFacade(MockNvimComponent, NvimFacade):
 
     def reload_windows(self):
         pass
+
+    def function_exists(self, name: str) -> Boolean:
+        return self.vim.responses(name).present
 
 __all__ = ('MockNvimFacade',)

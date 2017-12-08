@@ -8,7 +8,7 @@ from kallikrein.matchers.either import be_right
 from ribosome.trans.api import trans
 from ribosome.trans.message_base import pmessage
 from ribosome.trans.action import Transit, Propagate
-from ribosome.dispatch.transform import AlgResultValidator
+from ribosome.dispatch.transform import TransValidator
 from ribosome.dispatch.data import DispatchResult, DispatchIO
 from ribosome.trans.handler import MessageTransHandler
 
@@ -30,8 +30,8 @@ class HandlerSpec:
     '''
 
     @property
-    def validator(self) -> AlgResultValidator:
-        return AlgResultValidator('desc')
+    def validator(self) -> TransValidator:
+        return TransValidator('desc')
 
     def run(self, f: MessageTransHandler) -> Maybe[Msg2]:
         res = self.validator.validate(f.run(Msg1()))

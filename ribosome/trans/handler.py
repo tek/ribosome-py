@@ -1,58 +1,79 @@
-from typing import Callable, TypeVar, Type, Generic
+from typing import Callable, TypeVar, Type, Generic, Any
 
 from amino import List, Lists
 from amino.dat import Dat
 
 from ribosome.trans.effect import TransEffect, cont, lift
-from ribosome.trans.action import TransAction
+from ribosome.trans.action import TransAction, TransM, TransMPure
 from ribosome.trans.message_base import Message
-from ribosome.trans.legacy import Handler
+from ribosome.dispatch.component import Component
 
 D = TypeVar('D')
 M = TypeVar('M', bound=Message)
 R = TypeVar('R')
 O = TypeVar('O')
+A = TypeVar('A')
+B = TypeVar('B')
 
 
-def extract(output: O, effects: List[TransEffect]) -> TransAction:
+class TransComplete(Dat['TransComplete']):
+
+    def __init__(self, name: str, action: TransAction) -> None:
+        self.name = name
+        self.action = action
+
+
+def extract(name: str, output: O, effects: List[TransEffect]) -> TransComplete:
     trans_result = cont(effects, False, lambda f: f(output)) | output
-    return lift(trans_result, False)
+    return TransComplete(name, lift(trans_result, False))
 
 
-class MessageTransHandler(Generic[M, D], Dat['MessageTransHandler[M, D]'], Handler):
+class TransHandler:
+    pass
+
+
+class MessageTransHandler(Generic[M, D], Dat['MessageTransHandler[M, D]'], TransHandler):
 
     @staticmethod
-    def create(fun: Callable[[M], R], msg: Type[M], effects: List[TransEffect], prio: float) -> 'Handler[M, D, R]':
+    def create(fun: Callable[[M], R], msg: Type[M], effects: List[TransEffect], prio: float) -> 'TransHandler':
         name = fun.__name__
-        return MessageTransHandler(name, fun, msg, prio, effects)
+        return MessageTransHandler(name, fun, msg, effects, prio)
 
-    def __init__(self, name: str, fun: Callable[[M], R], message: Type[M], prio: float,
-                 effects: List[TransEffect]) -> None:
+    def __init__(self, name: str, fun: Callable[[M], R], message: Type[M], effects: List[TransEffect], prio: float
+                 ) -> None:
         self.name = name
         self.message = message
         self.fun = fun
         self.prio = prio
         self.effects = effects
 
-    def run(self, msg: M) -> TransAction:
-        return extract(self.fun(msg), Lists.wrap(self.effects))
+    def run(self, component: Component, msg: M) -> TransAction:
+        return extract(self.name, self.fun(component, msg), Lists.wrap(self.effects))
 
 
-class FreeTransHandler(Generic[D, R], Dat['FreeTransHandler[M, D]'], Handler):
+class FreeTransHandler(Generic[D, R], Dat['FreeTransHandler[M, D]'], TransHandler):
 
     @staticmethod
-    def create(fun: Callable[..., R], effects: List[TransEffect], prio: float) -> 'Handler[D, R]':
+    def create(fun: Callable[..., R], effects: List[TransEffect], prio: float) -> 'TransHandler':
         name = fun.__name__
-        return FreeTransHandler(name, fun, prio, effects)
+        return FreeTransHandler(name, fun, (), effects, prio)
 
-    def __init__(self, name: str, fun: Callable[..., R], prio: float, effects: List[TransEffect]) -> None:
+    def __init__(self, name: str, fun: Callable[..., R], args: tuple, effects: List[TransEffect], prio: float) -> None:
         self.name = name
         self.fun = fun
-        self.prio = prio
+        self.args = args
         self.effects = effects
+        self.prio = prio
 
-    def run(self, args: tuple) -> TransAction:
-        return extract(self.fun(*args), Lists.wrap(self.effects))
+    def __call__(self, *args: Any) -> 'FreeTransHandler':
+        return self.copy(args=args)
+
+    def run(self) -> TransAction:
+        return extract(self.name, self.fun(*self.args), Lists.wrap(self.effects))
+
+    @property
+    def m(self) -> TransM:
+        return TransMPure(self)
 
 
 __all__ = ('MessageTransHandler', 'FreeTransHandler')

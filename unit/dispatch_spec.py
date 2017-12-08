@@ -6,7 +6,7 @@ from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.length import have_length
 
 from amino.test.spec import SpecBase
-from amino import Lists, Map, List, Nothing, _, IO, __
+from amino import Lists, Map, List, Nothing, _, IO, __, Right
 from amino.boolean import true
 from amino.dat import Dat
 
@@ -52,30 +52,30 @@ class M4(Msg): pass
 class P(Component):
 
     @trans.msg.one(M1)
-    def m1(self) -> Message:
+    def m1(self, msg: M1) -> Message:
         return M2()
 
     @trans.msg.unit(M2)
-    def m2(self) -> None:
+    def m2(self, msg: M2) -> None:
         return None
 
     @trans.msg.one(M3, trans.io)
-    def m3(self) -> IO[Message]:
+    def m3(self, msg: M3) -> IO[Message]:
         return IO.pure(M4())
 
 
 class Q(Component):
 
     @trans.msg.one(M1)
-    def m1(self) -> str:
+    def m1(self, msg: M1) -> str:
         return M2()
 
     @trans.msg.unit(M2)
-    def m2(self) -> None:
+    def m2(self, msg: M2) -> None:
         return None
 
     @trans.msg.one(M3, trans.io)
-    def m3(self) -> IO[Message]:
+    def m3(self, msg: M3) -> IO[Message]:
         return IO.pure(m1)
 
 
@@ -128,14 +128,14 @@ config = Config.cons(
     ),
     state_ctor=HsData,
 )
-host_conf = host_config(config, HS, True)
+host_conf = host_config(config, Right(HS), True)
 
 
 def init(name: str, *comps: str, args=()) -> Tuple[NvimFacade, PluginState, DispatchJob, Dispatch]:
     vim = MockNvimFacade(prefix='hs', vars=dict(hs_components=Lists.wrap(comps)))
     state = init_state(host_conf).unsafe(vim)
     holder = PluginStateHolder.cons(state)
-    job = dispatch_job(vim, True, host_conf.async_dispatch, holder, name, (args,))
+    job = dispatch_job(True, host_conf.async_dispatch, holder, name, host_conf.config.prefix, (args,))
     return vim, state, job, job.dispatches.lift(job.name).get_or_fail('no matching dispatch')
 
 

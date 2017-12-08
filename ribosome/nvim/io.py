@@ -7,17 +7,18 @@ from threading import Thread
 
 from fn.recur import tco
 
-from amino.tc.base import ImplicitInstances, F
+from amino.tc.base import ImplicitInstances, F, TypeClass, tc_prop
 from amino.lazy import lazy
 from amino.tc.monad import Monad
-from amino import Either, __, IO, Maybe, Left, Eval, L, List, Nothing, Right, Lists, _, Just
-from amino.state import tcs, StateT, IdState
+from amino import Either, __, IO, Maybe, Left, Eval, L, List, Nothing, Right, Lists, _, Just, options
+from amino.state import tcs, StateT, State
 from amino.func import CallByName
 from amino.do import do
 from amino.io import safe_fmt
 from amino.util.string import ToStr
 from amino.util.fun import lambda_str
 from amino.util.exception import sanitize_tb, format_exception
+from amino.dat import ADT
 
 from ribosome.nvim.components import NvimFacade
 
@@ -81,8 +82,31 @@ class NvimIOInstances(ImplicitInstances):
         return Map({Monad: NvimIOMonad()})
 
 
+class NResult(Generic[A], ADT['NvimIOResult[A]']):
+    pass
+
+
+class NSuccess(Generic[A], NResult[A]):
+
+    def __init__(self, value: A) -> None:
+        self.value = value
+
+
+class NError(Generic[A], NResult[A]):
+
+    def __init__(self, error: str) -> None:
+        self.error = error
+
+
+class NFatal(Generic[A], NResult[A]):
+
+    def __init__(self, exception: Exception) -> None:
+        self.exception = exception
+
+
 # TODO make this an ADT, create NvimIOFailed that circumvents exception throwing
 class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
+    debug = options.io_debug.exists
 
     @staticmethod
     def wrap_either(f: Callable[[NvimFacade], Either[B, A]]) -> 'NvimIO[A]':
@@ -121,6 +145,10 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
         return NvimIO.exception(Exception(msg))
 
     @staticmethod
+    def error(msg: str) -> 'NvimIO[A]':
+        return NvimIOError(msg)
+
+    @staticmethod
     def from_io(io: IO[A]) -> 'NvimIO[A]':
         return NvimIO.delay(lambda a: io.attempt.get_or_raise())
 
@@ -157,7 +185,7 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
         ...
 
     def __init__(self) -> None:
-        self.stack = inspect.stack() if IO.debug else []
+        self.stack = inspect.stack() if NvimIO.debug else []
 
     def flat_map(self, f: Callable[[A], 'NvimIO[B]'], ts: Maybe[Eval[str]]=Nothing, fs: Maybe[Eval[str]]=Nothing
                  ) -> 'NvimIO[B]':
@@ -187,11 +215,27 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
                 return False, t
         return run(self)
 
-    def attempt(self, vim: NvimFacade) -> Either[NvimIOException, A]:
+    def compute_result(self, vim: NvimFacade) -> NResult[A]:
+        try:
+            return NSuccess(self.run(vim))
+        except NvimIOException as e:
+            return NFatal(e)
+
+    def result(self, vim: NvimFacade) -> NResult[A]:
+        return (
+            NError(self.error)
+            if isinstance(self, NvimIOError) else
+            self.compute_result(vim)
+        )
+
+    def either(self, vim: NvimFacade) -> Either[NvimIOException, A]:
         try:
             return Right(self.run(vim))
         except NvimIOException as e:
             return Left(e)
+
+    def attempt(self, vim: NvimFacade) -> Either[NvimIOException, A]:
+        return self.either(vim)
 
     def with_stack(self, s: typing.List[inspect.FrameInfo]) -> 'IO[A]':
         self.stack = s
@@ -285,6 +329,24 @@ class Pure(Generic[A], NvimIO[A]):
         return Suspend(g, (ts & fs).map2('{}.{}'.format))
 
 
+class NvimIOError(Generic[A], NvimIO[A]):
+
+    def __init__(self, error: str) -> None:
+        self.error = error
+
+    def _arg_desc(self) -> List[str]:
+        return List(str(self.value))
+
+    def lambda_str(self) -> Eval[str]:
+        return Eval.later(lambda: f'NvimIOError({self.error})')
+
+    def _flat_map(self, f: Callable[[A], NvimIO[B]], ts: Eval[str], fs: Eval[str]) -> NvimIO[B]:
+        return self
+
+    def step1(self, vim: NvimFacade) -> NvimIO[A]:
+        return self
+
+
 class NvimIOMonad(Monad[NvimIO]):
 
     def pure(self, a: A) -> NvimIO[A]:
@@ -304,14 +366,50 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
         return NvimIOState.lift(NvimIO.delay(f))
 
     @staticmethod
+    def delay(f: Callable[[NvimFacade], A]) -> 'NvimIOState[S, A]':
+        return NvimIOState.lift(NvimIO.delay(f))
+
+    @staticmethod
+    def suspend(f: Callable[[NvimFacade], NvimIO[A]]) -> 'NvimIOState[S, A]':
+        return NvimIOState.lift(NvimIO.suspend(f))
+
+    @staticmethod
     def from_io(io: IO[A]) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO.wrap_either(lambda v: io.attempt))
 
     @staticmethod
-    def from_id(st: IdState[S, A]) -> 'NvimIOState[S, A]':
+    def from_id(st: State[S, A]) -> 'NvimIOState[S, A]':
         return st.transform_f(NvimIOState, lambda s: NvimIO.pure(s.value))
+
+    @staticmethod
+    def from_either(e: Either[str, A]) -> 'NvimIOState[S, A]':
+        return NvimIOState.lift(NvimIO.from_either(e))
+
+    @staticmethod
+    def failed(e: str) -> 'NvimIOState[S, A]':
+        return NvimIOState.lift(NvimIO.failed(e))
+
+    @staticmethod
+    def error(e: str) -> 'NvimIOState[S, A]':
+        return NvimIOState.lift(NvimIO.error(e))
 
 
 tcs(NvimIO, NvimIOState)  # type: ignore
 
-__all__ = ('NvimIO', 'NvimIOState')
+NS = NvimIOState
+
+
+class ToNvimStateIO(TypeClass):
+
+    @abc.abstractproperty
+    def nvim(self) -> NS:
+        ...
+
+
+class IdStateToNvimStateIO(ToNvimStateIO, tpe=State):
+
+    @tc_prop
+    def nvim(self, fa: State[S, A]) -> NS:
+        return NvimIOState.from_id(fa)
+
+__all__ = ('NvimIO', 'NvimIOState', 'NS')
