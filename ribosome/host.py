@@ -94,19 +94,23 @@ def request_handler(vim: NvimFacade,
                     sync: bool,
                     dispatches: Map[str, RDP],
                     state: PluginStateHolder[D],
-                    config: Config) -> Callable[[str, tuple], Any]:
+                    config: DispatchConfig) -> Callable[[str, tuple], Any]:
     sync_prefix = '' if sync else 'a'
     def handle(name: str, args: tuple) -> Do:
-        job = dispatch_job(sync, dispatches, state, name, config.prefix, args)
-        amino_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
-        result = (
-            execute_dispatch_job(job)
-            .attempt(vim)
-            .value_or(L(request_error)(job, _))
-        )
-        if sync:
-            ribo_log.debug(f'request `{job.name}` completed: {result}')
-        return vim.encode_vim_data(result)
+        try:
+            job = dispatch_job(sync, dispatches, state, name, config.prefix, args)
+            amino_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
+            result = (
+                execute_dispatch_job(job)
+                .attempt(vim)
+                .value_or(L(request_error)(job, _))
+            )
+            if sync:
+                ribo_log.debug(f'request `{job.name}` completed: {result}')
+            return vim.encode_vim_data(result)
+        except Exception as e:
+            amino_log.caught_exception(f'dispatching request: {name}({args})', e)
+            ribo_log.error(f'fatal error dispatching request {name}({args})')
     return handle
 
 
