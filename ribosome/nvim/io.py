@@ -83,7 +83,10 @@ class NvimIOInstances(ImplicitInstances):
 
 
 class NResult(Generic[A], ADT['NvimIOResult[A]']):
-    pass
+
+    @abc.abstractproperty
+    def to_either(self) -> Either[str, A]:
+        ...
 
 
 class NSuccess(Generic[A], NResult[A]):
@@ -91,17 +94,29 @@ class NSuccess(Generic[A], NResult[A]):
     def __init__(self, value: A) -> None:
         self.value = value
 
+    @property
+    def to_either(self) -> Either[str, A]:
+        return Right(self.value)
+
 
 class NError(Generic[A], NResult[A]):
 
     def __init__(self, error: str) -> None:
         self.error = error
 
+    @property
+    def to_either(self) -> Either[str, A]:
+        return Left(self.error)
+
 
 class NFatal(Generic[A], NResult[A]):
 
     def __init__(self, exception: Exception) -> None:
         self.exception = exception
+
+    @property
+    def to_either(self) -> Either[str, A]:
+        return Left(self.error)
 
 
 # TODO make this an ADT, create NvimIOFailed that circumvents exception throwing
@@ -110,7 +125,7 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
 
     @staticmethod
     def wrap_either(f: Callable[[NvimFacade], Either[B, A]]) -> 'NvimIO[A]':
-        return NvimIO.delay(lambda a: f(a).get_or_raise())
+        return NvimIO.suspend(lambda a: f(a).cata(NvimIO.error, NvimIO.pure))
 
     @staticmethod
     def from_either(e: Either[str, A]) -> 'NvimIO[A]':
@@ -209,28 +224,23 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
         def run(t: Union[A, 'NvimIO[A]']) -> Union[Tuple[bool, A], Tuple[bool, Tuple[Union[A, 'NvimIO[A]']]]]:
             if isinstance(t, Pure):
                 return True, (t.value,)
-            elif isinstance(t, NvimIO):
+            elif isinstance(t, (Suspend, BindSuspend)):
                 return True, (t.step(vim),)
+            elif isinstance(t, NvimIOError):
+                return False, NError(t.error)
             else:
-                return False, t
+                return False, NSuccess(t)
         return run(self)
 
-    def compute_result(self, vim: NvimFacade) -> NResult[A]:
+    def result(self, vim: NvimFacade) -> NResult[A]:
         try:
-            return NSuccess(self.run(vim))
+            return self.run(vim)
         except NvimIOException as e:
             return NFatal(e)
 
-    def result(self, vim: NvimFacade) -> NResult[A]:
-        return (
-            NError(self.error)
-            if isinstance(self, NvimIOError) else
-            self.compute_result(vim)
-        )
-
     def either(self, vim: NvimFacade) -> Either[NvimIOException, A]:
         try:
-            return Right(self.run(vim))
+            return self.run(vim).to_either
         except NvimIOException as e:
             return Left(e)
 
@@ -242,7 +252,7 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
         return self
 
     def unsafe(self, vim: NvimFacade) -> A:
-        return self.attempt(vim).get_or_raise()
+        return self.either(vim).get_or_raise()
 
     def recover(self, f: Callable[[Exception], B]) -> 'NvimIO[B]':
         return NvimIO.delay(self.attempt).map(__.value_or(f))
@@ -354,9 +364,6 @@ class NvimIOMonad(Monad[NvimIO]):
 
     def flat_map(self, fa: NvimIO[A], f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
         return fa.flat_map(f)
-
-    def map(self, fa: NvimIO[A], f: Callable[[A], B]) -> NvimIO[B]:
-        return NvimIO.delay(lambda a: f(fa.run(a)))
 
 
 class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
