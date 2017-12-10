@@ -64,18 +64,24 @@ def ribosome_file_logging(name: str, file_kw: dict=dict()) -> logging.Handler:
     return amino_root_file_logging(**kw)
 
 
-def nvim_logging(vim: 'ribosome.NvimFacade', level: int=logging.INFO, file_kw: dict=dict()) -> logging.Handler:
+def ribosome_envvar_file_logging() -> None:
+    fmt = options.file_log_fmt.value / (lambda fmt: dict(fmt=fmt)) | dict()
+    options.ribo_log_file.value % (lambda f: amino_root_file_logging(logfile=Path(f), level=TEST, **fmt))
+
+
+def ribosome_nvim_handler(vim: 'ribosome.NvimFacade') -> None:
+    handler = NvimHandler(vim)
+    handler.addFilter(nvim_filter)
+    ribosome_root_logger.addHandler(handler)
+    init_loglevel(handler, VERBOSE)
+
+
+def nvim_logging(vim: 'ribosome.NvimFacade', file_kw: dict=dict()) -> logging.Handler:
     global _nvim_logging_initialized
     if not _nvim_logging_initialized:
-        if level is None and not amino.development:
-            level = logging.INFO
-        handler = NvimHandler(vim)
-        handler.addFilter(nvim_filter)
-        ribosome_root_logger.addHandler(handler)
-        init_loglevel(handler, VERBOSE)
+        ribosome_nvim_handler(vim)
         _nvim_logging_initialized = True
-        fmt = options.file_log_fmt.value / (lambda fmt: dict(fmt=fmt)) | dict()
-        options.ribo_log_file.value % (lambda f: amino_root_file_logging(logfile=Path(f), level=TEST, **fmt))
+        ribosome_envvar_file_logging()
         return ribosome_file_logging(vim.prefix, file_kw)
 
 
