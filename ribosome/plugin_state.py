@@ -84,6 +84,14 @@ class DispatchConfig(Dat['DispatchConfig']):
         self.config = config
         self.io_executor = io_executor
 
+    @property
+    def name(self) -> str:
+        return self.config.name
+
+    @property
+    def prefix(self) -> str:
+        return self.config.prefix
+
 
 class PluginState(Generic[D], Dat['PluginState']):
 
