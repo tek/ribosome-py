@@ -5,7 +5,7 @@ from ribosome.plugin_state import PluginState, PluginStateHolder
 
 from toolz import assoc
 
-from amino import Lists, Left, Map
+from amino import Lists, Left, Map, Just
 from amino.boolean import true
 from amino.dat import Dat
 from ribosome.dispatch.run import DispatchJob
@@ -27,7 +27,7 @@ class DispatchHelper(Dat['DispatchHelper']):
             config: Config,
             *comps: str,
             vars: dict=dict(),
-            responses: Map[str, Any]=Map(),
+            responses: Callable[[str], Map[str, Any]]=lambda a: Just(0),
             io_executor: Callable[[DIO], NS[PluginState[D], TransComplete]]=None,
     ) -> 'DispatchHelper':
         hc = host_config(config, Left('spec'), true, io_executor)
