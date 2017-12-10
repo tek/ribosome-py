@@ -103,10 +103,12 @@ class PluginState(Generic[D], Dat['PluginState']):
             components: List[Component],
             messages: PrioQueue[Message],
             message_log: List[Message]=Nil,
+            trans_log: List[str]=Nil,
             log_handler: Maybe[logging.Handler]=Nothing,
     ) -> 'PluginState':
         component_state = Components(components / ComponentState.cons)
-        return PluginState(dispatch_config, data, plugin, component_state, messages, message_log, log_handler)
+        return PluginState(dispatch_config, data, plugin, component_state, messages, message_log, trans_log,
+                           log_handler)
 
     def __init__(
             self,
@@ -116,6 +118,7 @@ class PluginState(Generic[D], Dat['PluginState']):
             components: List[ComponentState],
             messages: PrioQueue[Message],
             message_log: List[Message],
+            trans_log: List[str],
             log_handler: Maybe[logging.Handler],
     ) -> None:
         self.dispatch_config = dispatch_config
@@ -124,6 +127,7 @@ class PluginState(Generic[D], Dat['PluginState']):
         self.components = components
         self.messages = messages
         self.message_log = message_log
+        self.trans_log = trans_log
         self.log_handler = log_handler
 
     def enqueue(self, messages: List[Sendable]) -> 'PluginState[D]':
