@@ -439,7 +439,13 @@ class AutoPluginIntegrationSpec(Generic[Settings, D], VimIntegrationSpec):
 
     def start_plugin(self) -> None:
         stderr_handler_name = 'RibosomeSpecStderr'
-        stderr_handler_body = '''echo 'error starting rpc job on channel ' . a:id . ': ' . string(a:data)'''
+        stderr_handler_body = '''
+        let err = substitute(join(a:data, '\r'), '"', '\\"', 'g')
+        python3 import amino
+        python3 from ribosome.logging import ribosome_envvar_file_logging
+        python3 ribosome_envvar_file_logging()
+        execute 'python3 amino.amino_log.error(f"""error starting rpc job on channel ' . a:id . ':\r' . err . '""")'
+        '''
         self.vim.define_function(stderr_handler_name, List('id', 'data', 'event'), stderr_handler_body)
         cmd = f'from ribosome.host import start_module; start_module({self.module()!r})'
         args = ['python3', '-c', cmd]
