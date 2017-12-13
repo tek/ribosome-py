@@ -85,7 +85,7 @@ class NvimIOInstances(ImplicitInstances):
 class NResult(Generic[A], ADT['NvimIOResult[A]']):
 
     @abc.abstractproperty
-    def to_either(self) -> Either[str, A]:
+    def to_either(self) -> Either[Exception, A]:
         ...
 
 
@@ -95,7 +95,7 @@ class NSuccess(Generic[A], NResult[A]):
         self.value = value
 
     @property
-    def to_either(self) -> Either[str, A]:
+    def to_either(self) -> Either[Exception, A]:
         return Right(self.value)
 
 
@@ -105,8 +105,8 @@ class NError(Generic[A], NResult[A]):
         self.error = error
 
     @property
-    def to_either(self) -> Either[str, A]:
-        return Left(self.error)
+    def to_either(self) -> Either[Exception, A]:
+        return Left(Exception(self.error))
 
 
 class NFatal(Generic[A], NResult[A]):
@@ -115,7 +115,7 @@ class NFatal(Generic[A], NResult[A]):
         self.exception = exception
 
     @property
-    def to_either(self) -> Either[str, A]:
+    def to_either(self) -> Either[Exception, A]:
         return Left(self.error)
 
 
@@ -153,7 +153,7 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
 
     @staticmethod
     def exception(exc: Exception) -> 'NvimIO[A]':
-        return NvimIO.from_either(Left(exc))
+        return NvimIOFatal(exc)
 
     @staticmethod
     def failed(msg: str) -> 'NvimIO[A]':
@@ -176,6 +176,10 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
         def g(vim: NvimFacade) -> A:
             return Pure(f(vim, *a, **kw))
         return Suspend(g, safe_fmt(f, ('vim',) + a, kw))
+
+    @staticmethod
+    def simple_effect(f: Callable[..., None], *a, **kw) -> 'NvimIO[None]':
+        return NvimIO.delay(lambda v: f(*a, **kw))
 
     @staticmethod
     def suspend(f: Callable[..., 'NvimIO[A]'], *a: Any, **kw: Any) -> 'NvimIO[A]':
@@ -228,6 +232,8 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
                 return True, (t.step(vim),)
             elif isinstance(t, NvimIOError):
                 return False, NError(t.error)
+            elif isinstance(t, NvimIOFatal):
+                return False, NFatal(t.exception)
             else:
                 return False, NSuccess(t)
         return run(self)
@@ -257,6 +263,7 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
     def recover(self, f: Callable[[Exception], B]) -> 'NvimIO[B]':
         return NvimIO.delay(self.attempt).map(__.value_or(f))
 
+    # FIXME use NResult
     @do('NvimIO[A]')
     def ensure(self, f: Callable[[Either[Exception, A]], 'NvimIO[None]']) -> Generator:
         result = yield NvimIO.delay(self.attempt)
@@ -274,6 +281,9 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
 
     def error_effect(self, f: Callable[[Exception], None]) -> 'NvimIO[A]':
         return self.ensure(lambda a: NvimIO.delay(lambda v: a.leffect(f)))
+
+    def error_effect_f(self, f: Callable[[Exception], 'NvimIO[None]']) -> 'NvimIO[A]':
+        return self.ensure(lambda a: NvimIO.suspend(lambda v: a.cata(f, NvimIO.pure)))
 
 
 class Suspend(Generic[A], NvimIO[A]):
@@ -345,10 +355,28 @@ class NvimIOError(Generic[A], NvimIO[A]):
         self.error = error
 
     def _arg_desc(self) -> List[str]:
-        return List(str(self.value))
+        return List(str(self.error))
 
     def lambda_str(self) -> Eval[str]:
         return Eval.later(lambda: f'NvimIOError({self.error})')
+
+    def _flat_map(self, f: Callable[[A], NvimIO[B]], ts: Eval[str], fs: Eval[str]) -> NvimIO[B]:
+        return self
+
+    def step1(self, vim: NvimFacade) -> NvimIO[A]:
+        return self
+
+
+class NvimIOFatal(Generic[A], NvimIO[A]):
+
+    def __init__(self, exception: Exception) -> None:
+        self.exception = exception
+
+    def _arg_desc(self) -> List[str]:
+        return List(str(self.exception))
+
+    def lambda_str(self) -> Eval[str]:
+        return Eval.later(lambda: f'NvimIOFatal({self.exception})')
 
     def _flat_map(self, f: Callable[[A], NvimIO[B]], ts: Eval[str], fs: Eval[str]) -> NvimIO[B]:
         return self
