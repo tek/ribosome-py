@@ -1,8 +1,10 @@
-import abc
-from typing import Callable, TypeVar, Generic, Union, Any, Optional
+from typing import Callable, TypeVar, Generic, Union, Any, Optional, Type
 
-from amino import List, Nil, Maybe, Map
+from amino import List, Nil, Maybe, Map, Either, Right, do, Do
 from amino.dat import Dat
+from amino.json.encoder import Encoder, json_object_with_type
+from amino.json.data import JsonError, Json, JsonScalar
+from amino.json.decoder import Decoder, decode
 
 from ribosome.nvim import NvimIO
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
@@ -95,6 +97,21 @@ class SimpleData(Dat['SimpleData'], Data):
 
     def __init__(self, config: Config) -> None:
         super().__init__(config)
+
+
+class ConfigEncoder(Encoder[Config], tpe=Config):
+
+    def encode(self, a: Config) -> Either[JsonError, Map]:
+        return Right(json_object_with_type(Map(name=JsonScalar(a.name)), Config))
+
+
+class ConfigDecoder(Decoder[Config], tpe=Config):
+
+    @do(Either[JsonError, Config])
+    def decode(self, tpe: Type[Config], data: Json) -> Do:
+        f = yield data.field('name')
+        name = yield decode(f)
+        yield Right(Config.cons(name))
 
 
 __all__ = ('Config', 'Data', 'SimpleData')
