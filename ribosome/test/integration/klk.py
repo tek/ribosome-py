@@ -113,6 +113,9 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
         seen = lambda: self.message_log() / __.filter_type(tpe)
         return later(kf(seen).must(be_right(have_length(count))), **kw)
 
+    def seen_trans(self, name: str, **kw) -> Expectation:
+        return later(kf(self.trans_log).must(be_right(contain(name))), **kw)
+
     def var_is(self, name: str, value: Any) -> Expectation:
         return kf(self.vim.vars, name).must(be_right(value))
 

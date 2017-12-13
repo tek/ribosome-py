@@ -5,26 +5,24 @@ from neovim.msgpack_rpc import MsgpackStream, AsyncSession, Session
 from neovim.api import Nvim
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 from neovim.msgpack_rpc.event_loop.uv import UvEventLoop
+from neovim import attach
 
-from amino import Either, _, L, Maybe, amino_log, Logger, __, Path, Map, List, Boolean, Nil, Just
+from amino import Either, _, L, Maybe, amino_log, Logger, __, Path, Map, List, Boolean, Nil, Just, env
 from amino.either import ImportFailure
 from amino.func import Val
 from amino.logging import amino_root_file_logging
 from amino.do import do, Do
 from amino.dat import Dat
 from amino.algebra import Algebra
-from amino.state import EitherState, MaybeState
-from amino.json import dump_json
 from amino.boolean import false
 from amino.util.string import decode
 from amino.mod import instance_from_module, cls_from_module
 
 from ribosome import NvimPlugin
 from ribosome import options
-from ribosome.components.scratch import Mapping
 from ribosome.config import Config
 from ribosome.dispatch.data import Legacy, SendMessage, Trans, Internal, DispatchSync, DispatchAsync, Dispatch, DIO
-from ribosome.dispatch.execute import execute_dispatch_job, request_error, execute_io
+from ribosome.dispatch.execute import execute_dispatch_job, request_result
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.dispatch.run import DispatchJob
 from ribosome.logging import ribo_log, nvim_logging
@@ -33,13 +31,11 @@ from ribosome.plugin import plugin_class_from_config
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.request.handler.dispatcher import MsgDispatcher
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.request.handler.prefix import Full
 from ribosome.request.rpc import rpc_handler_functions, define_handlers, RpcHandlerSpec
-from ribosome.trans.api import trans
-from ribosome.trans.messages import ShowLogInfo, UpdateState, Quit, Stage1
 from ribosome.trans.queue import PrioQueue
 from ribosome.nvim.io import NS
 from ribosome.trans.handler import TransComplete
+from ribosome.trans.internal import internal_dispatchers
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 NP = TypeVar('NP', bound=NvimPlugin)
@@ -75,7 +71,11 @@ class HostConfig(Dat['HostConfig']):
 
     @property
     def specs(self) -> List[RpcHandlerSpec]:
-        return self.dispatch / __.spec(self.config.name, self.config.prefix)
+        return self.dispatch / __.spec(self.name, self.config.config.prefix)
+
+    @property
+    def distinct_specs(self) -> List[RpcHandlerSpec]:
+        return self.specs.distinct_by(lambda s: s.rpc_method('test'))
 
 
 def dispatch_job(sync: bool,
@@ -100,11 +100,7 @@ def request_handler(vim: NvimFacade,
         try:
             job = dispatch_job(sync, dispatches, state, name, config.prefix, args)
             amino_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
-            result = (
-                execute_dispatch_job(job)
-                .attempt(vim)
-                .value_or(L(request_error)(job, _))
-            )
+            result = request_result(job, execute_dispatch_job(job).result(vim))
             if sync:
                 ribo_log.debug(f'request `{job.name}` completed: {result}')
             return vim.encode_vim_data(result)
@@ -121,15 +117,17 @@ def init_state(host_config: HostConfig) -> Do:
     components = yield ComponentResolver(dispatch_config.config).run
     plugin = yield NvimIO.delay(host_config.plugin_class)
     log_handler = yield NvimIO.delay(nvim_logging)
-    yield NvimIO.pure(PluginState.cons(dispatch_config, data, plugin, components, PrioQueue.empty, Nil, Just(log_handler)))
+    yield NvimIO.pure(PluginState.cons(dispatch_config, data, plugin, components, log_handler=Just(log_handler)))
 
 
 # TODO can vim be injected into each request handling process?
+# irrelevant if separate channel for NvimFacade is possible
 @do(NvimIO[int])
 def run_session(session: Session, host_config: HostConfig) -> Do:
-    yield define_handlers(host_config.specs, host_config.name, host_config.name)
+    yield define_handlers(host_config.distinct_specs, host_config.name, host_config.name)
     state = yield init_state(host_config)
-    holder = PluginStateHolder.cons(state)
+    holder = PluginStateHolder.concurrent(state)
+    ribo_log.debug(f'running session with state {state}')
     yield NvimIO.delay(
         lambda vim:
         session.run(
@@ -140,7 +138,14 @@ def run_session(session: Session, host_config: HostConfig) -> Do:
     yield NvimIO.pure(0)
 
 
+def no_listen_address(err: Exception) -> None:
+    raise Exception('could not connect to the vim server from within the host')
+
+
 def run_loop(session: Session, prefix: str, host_config: HostConfig) -> int:
+    # sock = env['NVIM_LISTEN_ADDRESS'].value_or(no_listen_address)
+    # nvim = attach('socket', path=sock)
+    # vim = NvimFacade(nvim, host_config.name)
     vim = NvimFacade(Nvim.from_session(session), host_config.name)
     return run_session(session, host_config).attempt(vim).get_or_raise()
 
@@ -187,40 +192,6 @@ def config_dispatchers(config: Config) -> List[DispatchAsync]:
         )
         return tpe(handler)
     return config.request_handlers.handlers.map2(choose)
-
-
-@trans.free.result(trans.st)
-@do(EitherState[PluginState[D], str])
-def message_log() -> Do:
-    yield EitherState.inspect_f(__.message_log.traverse(dump_json, Either))
-
-
-@trans.free.unit(trans.st)
-def set_log_level(self, level: str) -> None:
-    handler = yield MaybeState.inspect_f(_.file_log_handler)
-    handler.setLevel(level)
-
-
-# TODO change remaining handlers to trans
-message_log_handler = RequestHandler.trans_function(message_log)('message_log', Full(), internal=True, sync=True)
-set_log_level_handler = RequestHandler.trans_function(set_log_level)(prefix=Full(), internal=True)
-show_log_info_handler = RequestHandler.msg_cmd(ShowLogInfo)('show_log_info', prefix=Full(), internal=True)
-update_state_handler = RequestHandler.json_msg_cmd(UpdateState)('update_state', prefix=Full())
-mapping_handler = RequestHandler.msg_fun(Mapping)('mapping', prefix=Full())
-stage_1_handler = RequestHandler.msg_cmd(Stage1)('stage_1', prefix=Full())
-quit_handler = RequestHandler.msg_cmd(Quit)(prefix=Full())
-
-
-def internal_dispatchers(config: Config) -> List[Dispatch]:
-    return List(
-        Internal(message_log_handler),
-        Internal(set_log_level_handler),
-        SendMessage(show_log_info_handler),
-        SendMessage(update_state_handler),
-        SendMessage(mapping_handler),
-        SendMessage(stage_1_handler),
-        SendMessage(quit_handler),
-    )
 
 
 def host_config_1(
@@ -279,7 +250,6 @@ def exception(e: Exception, desc: str) -> int:
 
 
 def start_config_stage_1(mod: ModuleType) -> int:
-    nvim_log()
     plugin_cls = plugin_cls_from_module(mod)
     return config_from_module(mod).cata(error, L(start_config_stage_2)(plugin_cls, _))
 

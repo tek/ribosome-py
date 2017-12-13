@@ -10,32 +10,42 @@ from ribosome.logging import Logging
 from ribosome.request.args import ArgValidator, ParamsSpec
 from ribosome.plugin_state import PluginState, PluginStateHolder
 from ribosome.dispatch.data import Legacy, DispatchReturn, Internal, Trans, SendMessage, DispatchResult
-from ribosome.nvim.io import NvimIOState
+from ribosome.nvim.io import NS
 from ribosome.trans.message_base import Message
-from ribosome.dispatch.transform import TransValidator, validate_trans_action
+from ribosome.dispatch.transform import validate_trans_action
 from ribosome.trans.send_message import send_message, transform_data_state
 from ribosome.trans.handler import FreeTransHandler
 
 NP = TypeVar('NP')
 D = TypeVar('D')
 DP = TypeVar('DP', bound=Algebra)
-Res = NvimIOState[PluginState[D], DispatchResult]
+Res = NS[PluginState[D], DispatchResult]
+
+
+def log_trans(trans: FreeTransHandler) -> Res:
+    return NS.modify(__.log_trans(trans.name))
+
+
+def execute_trans(handler: FreeTransHandler) -> NS[D, DispatchResult]:
+    return validate_trans_action(handler.run())
 
 
 def execute_data_trans(handler: FreeTransHandler) -> Res:
-    return transform_data_state(validate_trans_action(handler.run()))
+    return transform_data_state(execute_trans(handler))
 
 
-def run_trans(trans: Trans, args: List[Any]) -> Res:
+@do(Res)
+def run_trans(trans: Trans, args: List[Any]) -> Do:
     handler = trans.handler.dispatcher.handler(*args)
-    return execute_data_trans(handler)
+    yield log_trans(trans)
+    yield execute_data_trans(handler)
 
 
-def run_internal(trans: Trans, args: List[Any]) -> Res:
-    handler = trans.handler.dispatcher.handler(args)
-    result = handler.run()
-    validator = TransValidator(trans.name)
-    return validator.validate(result)
+@do(Res)
+def run_internal(trans: Trans, args: List[Any]) -> Do:
+    handler = trans.handler.dispatcher.handler(*args)
+    yield log_trans(trans)
+    yield execute_trans(handler)
 
 
 def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str) -> Either[str, Message]:
@@ -57,11 +67,11 @@ class RunDispatchSync(RunDispatch):
     def __init__(self, args: List[Any]) -> None:
         self.args = args
 
-    @do(NvimIOState[PluginState[D], DispatchResult])
+    @do(NS[PluginState[D], DispatchResult])
     def legacy(self, dispatch: Legacy) -> Do:
-        plugin = yield NvimIOState.inspect(_.plugin)
+        plugin = yield NS.inspect(_.plugin)
         result = dispatch.handler.func(plugin, *self.args)
-        yield NvimIOState.pure((DispatchResult(DispatchReturn(result), Nil)))
+        yield NS.pure((DispatchResult(DispatchReturn(result), Nil)))
 
 
 class RunDispatchAsync(RunDispatch):
@@ -69,9 +79,9 @@ class RunDispatchAsync(RunDispatch):
     def __init__(self, args: List[Any]) -> None:
         self.args = args
 
-    @do(NvimIOState[PluginState[D], DispatchResult])
+    @do(NS[PluginState[D], DispatchResult])
     def send_message(self, dispatch: SendMessage) -> Do:
-        cmd_name = yield NvimIOState.inspect(__.config.vim_cmd_name(dispatch.handler))
+        cmd_name = yield NS.inspect(__.config.vim_cmd_name(dispatch.handler))
         msg_e = cons_message(dispatch.msg, self.args, cmd_name, dispatch.method)
         yield msg_e.cata(DispatchResult.error_nio, send_message)
 

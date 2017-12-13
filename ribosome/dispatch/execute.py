@@ -3,6 +3,8 @@ from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
+import greenlet
+
 import amino
 from amino import _, L, __, Try, IO, Lists, Either, List
 from amino.do import do, Do
@@ -15,7 +17,7 @@ from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log, Logging
 from ribosome import NvimPlugin
 from ribosome.config import Config
-from ribosome.nvim.io import NS
+from ribosome.nvim.io import NS, NResult, NSuccess, NError, NFatal
 from ribosome.dispatch.run import DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch, execute_data_trans
 from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
                                     DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors,
@@ -44,8 +46,12 @@ Res = NS[PluginState[D], DispatchResult]
 
 def gather_ios(ios: List[IO[A]], timeout: float) -> List[Either[IOException, A]]:
     with ThreadPoolExecutor(thread_name_prefix='ribosome_dio') as executor:
+        ribo_log.debug(f'executing ios {ios}')
         futures = ios.map(lambda i: executor.submit(i.attempt_run))
         completed, timed_out = wait(futures, timeout=timeout)
+        ribo_log.debug(f'completed ios {completed}')
+        if timed_out:
+            ribo_log.debug(f'ios timed out: {timed_out}')
         return Lists.wrap(completed).map(__.result(timeout=timeout))
 
 
@@ -61,6 +67,7 @@ class ExecuteDispatchIO(Logging):
         return NS.from_io(IO.delay(gather))
 
     def gather_subprocs_dio(self, io: GatherSubprocsDIO[A, TransComplete]) -> NS[PluginState[D], TransComplete]:
+        ribo_log.debug(f'gathering {io}')
         def gather() -> TransComplete:
             gio = io.io
             popens = gio.procs.map(__.execute(gio.timeout))
@@ -133,15 +140,12 @@ def run_dispatch(action: Callable[[], NS[PluginState[D], B]], unpack: Callable[[
     yield normalize_output(result)
 
 
-# FIXME check how long-running messages can be handled; timeout for acquire is 10s
 def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[R]], desc: str) -> NvimIO[R]:
-    def release(error: Any) -> None:
-        holder.release()
-    yield NvimIO.delay(lambda v: holder.acquire())
+    yield holder.acquire()
     ribo_log.debug(f'exclusive: {desc}')
-    state, response = yield f().error_effect(release)
+    state, response = yield f().error_effect_f(holder.release)
     yield NvimIO.delay(lambda v: holder.update(state))
-    yield NvimIO.delay(release)
+    yield holder.release()
     ribo_log.debug(f'release: {desc}')
     yield NvimIO.pure(response)
 
@@ -181,11 +185,13 @@ def execute(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> Nvim
     return exclusive_dispatch(job.state, sync_sender(job, dispatch, runner), NS.pure, dispatch.desc)
 
 
+def run_forked_job(vim: NvimFacade, f: Callable[[], NvimIO[None]], job: DispatchJob) -> None:
+    request_result(job, Try(f).value_or(NvimIO.exception).result(vim))
+    ribo_log.debug(f'async job {job.name} completed')
+
+
 def fork_job(f: Callable[[], NvimIO[None]], job: DispatchJob) -> NvimIO[None]:
-    def run(vim: NvimFacade) -> None:
-        (Try(f) // __.attempt(vim)).leffect(L(request_error)(job, _))
-        ribo_log.debug(f'async job {job.name} completed')
-    return NvimIO.fork(run)
+    return NvimIO.fork(L(run_forked_job)(_, f, job))
 
 
 @do(NvimIO)
@@ -195,14 +201,38 @@ def execute_sync(job: DispatchJob, dispatch: DispatchSync) -> Do:
     yield NvimIO.pure(response)
 
 
-def request_error(job: DispatchJob, exc: Exception) -> int:
-    sync_prefix = '' if job.sync else 'a'
-    desc = f'{sync_prefix}sync request {job.name}({job.args}) to `{job.plugin_name}`'
-    tb = format_exception(exc).join_lines
-    ribo_log.error(f'fatal error in {desc}')
-    exc_logger = ribo_log.error if amino.development else ribo_log.debug
-    exc_logger(f'{desc} failed:\n{tb}')
-    return 1
+class RequestResult:
+
+    @property
+    def sync_prefix(self) -> str:
+        return '' if self.job.sync else 'a'
+
+    @property
+    def desc(self) -> str:
+        return f'{self.sync_prefix}sync request {self.job.name}({self.job.args}) to `{self.job.plugin_name}`'
+
+    def __init__(self, job: DispatchJob) -> None:
+        self.job = job
+
+    def n_success(self, result: NSuccess) -> Any:
+        return result.value
+
+    def n_error(self, result: NError) -> Any:
+        ribo_log.error(result.error)
+        return 1
+
+    def n_fatal(self, result: NFatal) -> Any:
+        exc = result.exception
+        tb = format_exception(exc).join_lines
+        desc = self.desc
+        ribo_log.error(f'fatal error in {desc}')
+        ribo_log.debug(f'{desc} failed:\n{tb}')
+        return 2
+
+
+def request_result(job: DispatchJob, result: NResult) -> None:
+    handler: Callable[[NResult], Any] = dispatch_alg(RequestResult(job), NResult)
+    return handler(result)
 
 
 def resend_send() -> NS[PluginState[D], Tuple[PrioQueue[Message], DispatchResult]]:
@@ -238,14 +268,27 @@ def execute_sync_loop(job: DispatchJob, dispatch: DispatchAsync) -> Do:
     yield resend_loop(job.state)
 
 
+def execute_in_greenlet(vim: NvimFacade, job: DispatchJob, dispatch: DispatchAsync) -> None:
+    # current = greenlet.getcurrent()
+    # gr = greenlet.greenlet(lambda: run_forked_job(vim, lambda: execute_async_loop(job, dispatch), job))
+    v = run_forked_job(vim, lambda: execute_async_loop(job, dispatch), job)
+    job.state.dispatch_complete(dispatch)
+    return v
+    # ribo_log.debug(f'executing {dispatch.desc} in greenlet')
+    # result = gr.switch()
+    # ribo_log.debug(f'finished greenlet execution of {dispatch.desc}')
+    # return result
+
+
 def execute_async(job: DispatchJob, dispatch: DispatchAsync) -> NvimIO[None]:
-    return fork_job(lambda: execute_async_loop(job, dispatch), job)
+    return NvimIO.delay(execute_in_greenlet, job, dispatch)
+    # return fork_job(lambda: execute_async_loop(job, dispatch), job)
 
 
 @do(NvimIO[Any])
 def execute_dispatch_job(job: DispatchJob) -> Do:
     dispatch = yield NvimIO.from_maybe(job.dispatches.lift(job.name), 'no handler')
-    relay = execute_sync if dispatch.sync else execute_async
+    relay = execute_sync if job.sync else execute_async
     yield relay(job, dispatch)
 
 

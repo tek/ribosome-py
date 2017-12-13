@@ -255,12 +255,16 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def message_log(self) -> Either[str, List[Message]]:
         return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
 
+    def trans_log(self) -> Either[str, List[Message]]:
+        return self.vim.call(f'{self.plugin_name}TransLog') // decode_json
+
     @property
     def state(self) -> Any:
         def error(err: JsonError) -> None:
-            self.log.error(f'{err.desc}: {err.data}')
+            self.log.error(f'{err.error}: {err.data}')
             raise err.error
-        return self.vim.call(f'{self.plugin_prefix}State').flat_map(decode_json).value_or(error)
+        response = self.vim.call(f'{self.plugin_prefix}State').get_or_raise()
+        return decode_json(response).value_or(error)
 
     @abc.abstractproperty
     def plugin_prefix(self) -> str:
@@ -440,11 +444,11 @@ class AutoPluginIntegrationSpec(Generic[Settings, D], VimIntegrationSpec):
     def start_plugin(self) -> None:
         stderr_handler_name = 'RibosomeSpecStderr'
         stderr_handler_body = '''
-        let err = substitute(join(a:data, '\r'), '"', '\\"', 'g')
+        let err = substitute(join(a:data, '\\r'), '"', '\\"', 'g')
         python3 import amino
         python3 from ribosome.logging import ribosome_envvar_file_logging
         python3 ribosome_envvar_file_logging()
-        execute 'python3 amino.amino_log.error(f"""error starting rpc job on channel ' . a:id . ':\r' . err . '""")'
+        execute 'python3 amino.amino_log.error(f"""error starting rpc job on channel ' . a:id . ':\\r' . err . '""")'
         '''
         self.vim.define_function(stderr_handler_name, List('id', 'data', 'event'), stderr_handler_body)
         cmd = f'from ribosome.host import start_module; start_module({self.module()!r})'

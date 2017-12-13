@@ -1,21 +1,26 @@
+import abc
 import inspect
 import logging
-from typing import TypeVar, Generic, Type, Any, Callable
+from typing import TypeVar, Generic, Type, Any, Callable, Optional
 from threading import Lock
+
+import greenlet
 
 import toolz
 
-from amino import Map, List, Boolean, Nil, Either, _, Lists, Maybe, Nothing
+from amino import Map, List, Boolean, Nil, Either, _, Lists, Maybe, Nothing, Try, do, Do
 from amino.dat import Dat
 from amino.func import flip
 
 from ribosome.trans.message_base import Message, Sendable, Envelope
 from ribosome.dispatch.component import Component
 from ribosome.nvim.io import NvimIOState, NS
-from ribosome.dispatch.data import DispatchResult, DIO
+from ribosome.dispatch.data import DispatchResult, DIO, Dispatch
 from ribosome.trans.queue import PrioQueue
 from ribosome.trans.legacy import Handler
 from ribosome.trans.handler import TransHandler, TransComplete
+from ribosome.nvim import NvimIO
+from ribosome.logging import Logging
 
 D = TypeVar('D')
 TransState = NvimIOState[D, DispatchResult]
@@ -101,7 +106,7 @@ class PluginState(Generic[D], Dat['PluginState']):
             data: D,
             plugin: Any,
             components: List[Component],
-            messages: PrioQueue[Message],
+            messages: PrioQueue[Message]=PrioQueue.empty,
             message_log: List[Message]=Nil,
             trans_log: List[str]=Nil,
             log_handler: Maybe[logging.Handler]=Nothing,
@@ -143,6 +148,9 @@ class PluginState(Generic[D], Dat['PluginState']):
     def log_message(self, msg: Message) -> 'PluginState[D]':
         return self.log_messages(List(msg))
 
+    def log_trans(self, trans: str) -> 'PluginState[D]':
+        return self.append1.trans_log(trans)
+
     @property
     def has_messages(self) -> Boolean:
         return not self.messages.empty
@@ -163,25 +171,34 @@ class PluginState(Generic[D], Dat['PluginState']):
         return self.components.by_name(name)
 
 
-class PluginStateHolder(Generic[D], Dat['PluginStateHolder']):
+class PluginStateHolder(Generic[D], Dat['PluginStateHolder'], Logging):
 
     @staticmethod
-    def cons(state: PluginState[D], log_handler: logging.Handler=None) -> 'PluginStateHolder':
-        return PluginStateHolder(state, Lock(), Maybe.check(log_handler))
+    def concurrent(state: PluginState[D], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
+        return ConcurrentPluginStateHolder(state, Maybe.check(log_handler), Lock(), False)
 
-    def __init__(self, state: PluginState[D], lock: Lock, log_handler: Maybe[logging.Handler]=Nothing) -> None:
+    @staticmethod
+    def strict(state: PluginState[D], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
+        return StrictPluginStateHolder(state, log_handler)
+
+    def __init__(self, state: PluginState[D], log_handler: Maybe[logging.Handler]=Nothing) -> None:
         self.state = state
-        self.lock = lock
         self.log_handler = log_handler
 
     def update(self, state: PluginState[D]) -> None:
         self.state = state
 
-    def acquire(self) -> None:
-        self.lock.acquire(timeout=10.0)
+    @abc.abstractmethod
+    def acquire(self) -> NvimIO[None]:
+        ...
 
-    def release(self) -> None:
-        self.lock.release()
+    @abc.abstractmethod
+    def release(self, error: Optional[Exception]=None) -> NvimIO[None]:
+        ...
+
+    @abc.abstractmethod
+    def dispatch_complete(self, dispatch: Dispatch) -> NvimIO[None]:
+        ...
 
     @property
     def has_messages(self) -> Boolean:
@@ -194,6 +211,77 @@ class PluginStateHolder(Generic[D], Dat['PluginStateHolder']):
     @property
     def messages(self) -> List[Message]:
         return self.state.unwrapped_messages
+
+
+class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
+
+    def __init__(
+            self,
+            state: PluginState[D],
+            log_handler: Maybe[logging.Handler],
+            lock: Lock,
+            running: Boolean,
+    ) -> None:
+        super().__init__(state, log_handler)
+        self.lock = lock
+        self.running = running
+        self.waiting_greenlet = None
+
+    def _set_waiting_greenlet(self) -> None:
+        self.waiting_greenlet = greenlet.getcurrent()
+
+    def _unset_waiting_greenlet(self, error: Exception=None) -> None:
+        if error:
+            self.log.caught_exception(f'switching to parent greenlet in `acquire`', error)
+        gr = self.waiting_greenlet
+        self.waiting_greenlet = None
+        return gr
+
+    # FIXME if an async request arrives while another async dispatch is executing, will it behave similarly?
+    # If so, this needs multiple waiting greenlets.
+    # If not, the parent switch (and overwriting of `waiting_greenlet`) may not be done.
+    @do(NvimIO[None])
+    def acquire(self) -> Do:
+        '''acquire the state lock that prevents multiple dispatches from updating the state asynchronously.
+        If the lock is already acquired, an async dispatch is currently executing while another (sync or async) has been
+        requested. In order not to block on requests to vim from the running dispatch, the greenlet that was started by
+        the vim session must be suspended, giving control back to the running async dispatch at the point where the vim
+        request was made.
+        '''
+        def switch() -> None:
+            self.log.debug(f'acquire: switching to running dispatch')
+            self._set_waiting_greenlet()
+            Try(self.waiting_greenlet.parent.switch).leffect(self._unset_waiting_greenlet)
+        if self.running:
+            yield NvimIO.simple_effect(switch)
+        yield NvimIO.simple_effect(self.lock.acquire)
+        yield NvimIO.simple_effect(setattr, self, 'running', True)
+
+    @do(NvimIO[None])
+    def release(self, error: Optional[Exception]=None) -> Do:
+        yield NvimIO.simple_effect(setattr, self, 'running', False)
+        yield NvimIO.simple_effect(Try, self.lock.release)
+        if error:
+            self.log.debug(f'released lock due to error: {error}')
+            yield NvimIO.exception(error)
+
+    def dispatch_complete(self, dispatch: Dispatch) -> None:
+        '''switch back to the dispatch that was suspended in `acquire` while the dispatch executing this method was
+        running.
+        '''
+        if self.waiting_greenlet is not None:
+            self.log.debug('release: switching to waiting dispatch')
+            self._unset_waiting_greenlet().switch()
+
+
+class StrictPluginStateHolder(Generic[D], PluginStateHolder[D]):
+    pass
+
+    def acquire(self) -> NvimIO[None]:
+        return NvimIO.pure(None)
+
+    def release(self, error: Optional[Exception]=None) -> NvimIO[None]:
+        return NvimIO.pure(None)
 
 
 __all__ = ('ComponentState', 'PluginState', 'PluginStateHolder', 'Components')

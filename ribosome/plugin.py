@@ -104,8 +104,8 @@ class NvimStatePluginMeta(NvimPluginMeta):
 
 class NvimStatePlugin(NvimPlugin, metaclass=NvimStatePluginMeta):
 
-    def state_data(self) -> str:
-        return self.state().data.json.value_or(lambda a: f'could not serialize state: {a}')
+    # def state_data(self) -> str:
+    #     return self.state().data.json.value_or(lambda a: f'could not serialize state: {a}')
 
     def plug_command(self, plug_name: str, cmd_name: str, *args: str) -> None:
         self.state().plug_command(plug_name, cmd_name, args)
@@ -194,7 +194,7 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
 
 def setup_state_plugin(cls: Type[NSP], name: str, prefix: str, debug: bool) -> None:
     help = Helpers(cls, name, prefix)
-    help.short_handler('state', function, cls.state_data)
+    # help.short_handler('state', function, cls.state_data)
     # help.json_msg_cmd('update_state', UpdateState)
     help.short_handler('plug', command, cls.plug_command)
     # if debug:
