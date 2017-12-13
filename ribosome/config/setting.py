@@ -1,7 +1,7 @@
 import abc
 from typing import Callable, Type, TypeVar, Generic, Generator
 
-from amino import List, Either, __, Left, Eval
+from amino import List, Either, __, Left, Eval, _, Right
 from amino.util.string import ToStr
 from amino.do import do, Do
 
@@ -22,6 +22,10 @@ class PluginSetting(Generic[B], Logging, ToStr):
     def default_e(self) -> Either[str, B]:
         ...
 
+    @abc.abstractmethod
+    def update(self, value: B) -> NvimIO[None]:
+        ...
+
     @property
     def value_or_default(self) -> NvimIO[B]:
         @do(NvimIO[B])
@@ -40,7 +44,7 @@ class StrictSetting(Generic[A, B], PluginSetting[B]):
             help: str,
             prefix: bool,
             tpe: Type[A],
-            ctor: Callable[[A], B],
+            ctor: Callable[[A], Either[str, B]],
             default: Either[str, B],
     ) -> None:
         self.name = name
@@ -51,13 +55,18 @@ class StrictSetting(Generic[A, B], PluginSetting[B]):
         self.ctor = ctor
         self.default = default
 
+    def _arg_desc(self) -> List[str]:
+        return List(self.name, str(self.prefix), str(self.tpe))
+
     @property
     def value(self) -> NvimIO[Either[str, B]]:
         @do(Either[str, B])
         def read(v: NvimFacade) -> Do:
-            vars = v.vars
-            getter = vars.p if self.prefix else vars
-            raw = yield vars.typed(self.tpe, getter(self.name))
+            self.log.debug(f'request variable `{self.name}`')
+            getter = v.sync_vars.p if self.prefix else v.sync_vars.get
+            untyped = getter(self.name)
+            raw = yield v.sync_vars.typed(self.tpe, untyped)
+            self.log.debug(f'variable `{self.name}`: {raw}')
             yield self.ctor(raw)
         return NvimIO.delay(read)
 
@@ -68,8 +77,8 @@ class StrictSetting(Generic[A, B], PluginSetting[B]):
     def default_e(self) -> Either[str, B]:
         return self.default
 
-    def _arg_desc(self) -> List[str]:
-        return List(self.name, str(self.prefix), str(self.tpe))
+    def update(self, value: B) -> NvimIO[None]:
+        return NvimIO.delay(__.sync_vars.set_p(self.name, value))
 
 
 class EvalSetting(Generic[B], PluginSetting[B]):
@@ -94,6 +103,9 @@ class EvalSetting(Generic[B], PluginSetting[B]):
     @property
     def default_e(self) -> Either[str, B]:
         return self.default
+
+    def update(self, value: B) -> NvimIO[None]:
+        return NvimIO.pure(None)
 
 
 def setting_ctor(tpe: Type[A], ctor: Callable[[A], B]) -> Callable[[str, str, str, bool, B], PluginSetting[B]]:
