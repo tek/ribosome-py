@@ -1,5 +1,4 @@
 import re
-import typing
 from typing import TypeVar, Callable, Any, Union, Optional, Generic, Type
 from pathlib import Path
 import threading
@@ -29,7 +28,6 @@ from amino.lazy import lazy
 from amino.io import IOException
 from amino.util.numeric import parse_int
 from amino.dat import Dat
-from amino.dispatch import dispatch_with
 
 import ribosome
 from ribosome.logging import Logging
@@ -86,8 +84,16 @@ class NvimComponent(Generic[R], Logging):
         return '{}({}, {})'.format(self.__class__.__name__, self.prefix, n)
 
     @property
-    def vars(self) -> 'AsyncVimProxy[Vars]':
+    def async_vars(self) -> 'AsyncVimProxy[Vars]':
         return AsyncVimProxy(self._vars, self)
+
+    @property
+    def sync_vars(self) -> 'Vars':
+        return self._vars
+
+    @property
+    def vars(self) -> 'AsyncVimProxy[Vars]':
+        return self.async_vars
 
     @property
     def options(self) -> 'AsyncVimProxy[Options]':
@@ -780,7 +786,7 @@ class AsyncVimProxy(Generic[A]):
             return getattr(self._target, name)
 
     def async_relay(self, name):
-        if (hasattr(self._target_tpe, name)):
+        if hasattr(self._target_tpe, name):
             attr = getattr(self._target_tpe, name)
             if isinstance(attr, FunctionType):
                 return AsyncVimCallProxy(self._target, self._vim, name)
@@ -828,6 +834,9 @@ class OptVar(Logging, abc.ABC):
             return Left(msg)
         else:
             return Right(decode(v))
+
+    def get(self, name: str) -> Either[str, Any]:
+        return self(name)
 
     def set(self, name: str, value: A) -> None:
         self.log.debug('setting {} {} to \'{}\''.format(self._desc, name, value))
@@ -1062,5 +1071,6 @@ class Syntax(Logging):
     def highlight(self, group, *a, **kw):
         c = 'highlight {} {}'.format(group, self._opts(*a, **kw))
         self.target.cmd(c)
+
 
 __all__ = ('NvimFacade', 'HasNvim')
