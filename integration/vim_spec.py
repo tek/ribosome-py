@@ -1,4 +1,4 @@
-from amino import Right, List, __, Map
+from amino import Right, List, __, Map, Either
 
 from ribosome.test.integration.klk import later
 
@@ -16,11 +16,11 @@ class VimSpec(IntegrationSpecBase):
     '''
 
     @property
-    def _prefix(self):
+    def _prefix(self) -> str:
         return 'ribosome'
 
     @property
-    def plugin_class(self):
+    def plugin_class(self) -> Either[str, type]:
         return Right(FacadeTestPlugin)
 
     def vars(self) -> Expectation:

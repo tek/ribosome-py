@@ -112,6 +112,10 @@ class RpcHandlerSpec(Dat['RpcHandlerSpec']):
     def def_cmd(self) -> str:
         ...
 
+    @abc.abstractproperty
+    def undef_cmdline(self) -> str:
+        ...
+
     def __init__(self, sync: Boolean, name: str, opts: dict, method: str, prefix: Boolean) -> None:
         self.sync = sync
         self.name = name
@@ -140,10 +144,6 @@ class RpcHandlerSpec(Dat['RpcHandlerSpec']):
             method=self.method,
             prefix=int(self.prefix.value),
         )
-
-    @abc.abstractproperty
-    def undef_cmdline(self) -> str:
-        ...
 
 
 class RpcCommandArgs:

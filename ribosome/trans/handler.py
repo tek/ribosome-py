@@ -1,3 +1,4 @@
+import abc
 from typing import Callable, TypeVar, Type, Generic, Any
 
 from amino import List, Lists
@@ -28,8 +29,11 @@ def extract(name: str, output: O, effects: List[TransEffect]) -> TransComplete:
     return TransComplete(name, lift(trans_result, False))
 
 
-class TransHandler:
-    pass
+class TransHandler(abc.ABC):
+
+    @abc.abstractmethod
+    def __call__(self, *args: Any) -> 'TransHandler':
+        ...
 
 
 class MessageTransHandler(Generic[M, D], Dat['MessageTransHandler[M, D]'], TransHandler):
@@ -49,6 +53,9 @@ class MessageTransHandler(Generic[M, D], Dat['MessageTransHandler[M, D]'], Trans
 
     def run(self, component: Component, msg: M) -> TransAction:
         return extract(self.name, self.fun(component, msg), Lists.wrap(self.effects))
+
+    def __call__(self, *args: Any) -> 'MessageTransHandler':
+        return self
 
 
 class FreeTransHandler(Generic[D, R], Dat['FreeTransHandler[M, D]'], TransHandler):
