@@ -3,10 +3,7 @@ from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
-import greenlet
-
-import amino
-from amino import _, L, __, Try, IO, Lists, Either, List
+from amino import _, __, Try, IO, Lists, Either, List, Nil
 from amino.do import do, Do
 from amino.dispatch import dispatch_alg
 from amino.util.exception import format_exception
@@ -18,7 +15,8 @@ from ribosome.logging import ribo_log, Logging
 from ribosome import NvimPlugin
 from ribosome.config import Config
 from ribosome.nvim.io import NS, NResult, NSuccess, NError, NFatal
-from ribosome.dispatch.run import DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch, execute_data_trans
+from ribosome.dispatch.run import (DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch, execute_data_trans,
+                                   log_trans)
 from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
                                     DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors,
                                     NvimIODIO, DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO)
@@ -84,6 +82,7 @@ execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
 @do(NS[PluginState[D], R])
 def run_trans_m(tr: TransM) -> Do:
     if isinstance(tr, TransMPure):
+        yield log_trans(tr.handler)
         result = yield execute_data_trans(tr.handler)
         yield normalize_output(result)
     elif isinstance(tr, TransMBind):
@@ -190,14 +189,12 @@ def run_forked_job(vim: NvimFacade, f: Callable[[], NvimIO[None]], job: Dispatch
     ribo_log.debug(f'async job {job.name} completed')
 
 
-def fork_job(f: Callable[[], NvimIO[None]], job: DispatchJob) -> NvimIO[None]:
-    return NvimIO.fork(L(run_forked_job)(_, f, job))
-
-
+# FIXME replace `fork_job` with `Nvim.async_call`
 @do(NvimIO)
 def execute_sync(job: DispatchJob, dispatch: DispatchSync) -> Do:
     response = yield execute(job, dispatch, sync_runner)
-    yield fork_job(lambda: resend_loop(job.state), job)
+    # yield NvimIO.delay(lambda v: v.vim.async_call(lambda: run_forked_job(v, lambda: resend_loop(job.state), job)))
+    # yield fork_job(lambda: resend_loop(job.state), job)
     yield NvimIO.pure(response)
 
 
@@ -230,7 +227,7 @@ class RequestResult:
         return 2
 
 
-def request_result(job: DispatchJob, result: NResult) -> None:
+def request_result(job: DispatchJob, result: NResult) -> int:
     handler: Callable[[NResult], Any] = dispatch_alg(RequestResult(job), NResult)
     return handler(result)
 
@@ -268,21 +265,13 @@ def execute_sync_loop(job: DispatchJob, dispatch: DispatchAsync) -> Do:
     yield resend_loop(job.state)
 
 
-def execute_in_greenlet(vim: NvimFacade, job: DispatchJob, dispatch: DispatchAsync) -> None:
-    # current = greenlet.getcurrent()
-    # gr = greenlet.greenlet(lambda: run_forked_job(vim, lambda: execute_async_loop(job, dispatch), job))
-    v = run_forked_job(vim, lambda: execute_async_loop(job, dispatch), job)
-    job.state.dispatch_complete(dispatch)
-    return v
-    # ribo_log.debug(f'executing {dispatch.desc} in greenlet')
-    # result = gr.switch()
-    # ribo_log.debug(f'finished greenlet execution of {dispatch.desc}')
-    # return result
-
-
+@do(NvimIO)
 def execute_async(job: DispatchJob, dispatch: DispatchAsync) -> NvimIO[None]:
-    return NvimIO.delay(execute_in_greenlet, job, dispatch)
-    # return fork_job(lambda: execute_async_loop(job, dispatch), job)
+    result = yield Try(execute_async_loop, job, dispatch).value_or(NvimIO.exception)
+    # output = request_result(job, result)
+    ribo_log.debug(f'async job {job.name} completed')
+    yield NvimIO.from_io(job.state.dispatch_complete(dispatch))
+    yield NvimIO.pure(result)
 
 
 @do(NvimIO[Any])

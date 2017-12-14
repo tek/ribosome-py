@@ -178,7 +178,7 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
         return Suspend(g, safe_fmt(f, ('vim',) + a, kw))
 
     @staticmethod
-    def simple_effect(f: Callable[..., None], *a, **kw) -> 'NvimIO[None]':
+    def simple(f: Callable[..., A], *a, **kw) -> 'NvimIO[A]':
         return NvimIO.delay(lambda v: f(*a, **kw))
 
     @staticmethod

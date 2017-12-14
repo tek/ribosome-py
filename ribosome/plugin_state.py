@@ -8,7 +8,7 @@ import greenlet
 
 import toolz
 
-from amino import Map, List, Boolean, Nil, Either, _, Lists, Maybe, Nothing, Try, do, Do
+from amino import Map, List, Boolean, Nil, Either, _, Lists, Maybe, Nothing, Try, do, Do, IO
 from amino.dat import Dat
 from amino.func import flip
 
@@ -197,7 +197,7 @@ class PluginStateHolder(Generic[D], Dat['PluginStateHolder'], Logging):
         ...
 
     @abc.abstractmethod
-    def dispatch_complete(self, dispatch: Dispatch) -> NvimIO[None]:
+    def dispatch_complete(self, dispatch: Dispatch) -> IO[None]:
         ...
 
     @property
@@ -253,25 +253,28 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
             self._set_waiting_greenlet()
             Try(self.waiting_greenlet.parent.switch).leffect(self._unset_waiting_greenlet)
         if self.running:
-            yield NvimIO.simple_effect(switch)
-        yield NvimIO.simple_effect(self.lock.acquire)
-        yield NvimIO.simple_effect(setattr, self, 'running', True)
+            yield NvimIO.simple(switch)
+        yield NvimIO.simple(self.lock.acquire)
+        yield NvimIO.simple(setattr, self, 'running', True)
 
     @do(NvimIO[None])
     def release(self, error: Optional[Exception]=None) -> Do:
-        yield NvimIO.simple_effect(setattr, self, 'running', False)
-        yield NvimIO.simple_effect(Try, self.lock.release)
+        yield NvimIO.simple(setattr, self, 'running', False)
+        yield NvimIO.simple(Try, self.lock.release)
         if error:
             self.log.debug(f'released lock due to error: {error}')
             yield NvimIO.exception(error)
 
-    def dispatch_complete(self, dispatch: Dispatch) -> None:
+    @do(IO[None])
+    def dispatch_complete(self, dispatch: Dispatch) -> Do:
         '''switch back to the dispatch that was suspended in `acquire` while the dispatch executing this method was
         running.
         '''
         if self.waiting_greenlet is not None:
             self.log.debug('release: switching to waiting dispatch')
-            self._unset_waiting_greenlet().switch()
+            gr = yield IO.delay(self._unset_waiting_greenlet)
+            yield IO.delay(gr.switch)
+        yield IO.pure(None)
 
 
 class StrictPluginStateHolder(Generic[D], PluginStateHolder[D]):
@@ -282,6 +285,9 @@ class StrictPluginStateHolder(Generic[D], PluginStateHolder[D]):
 
     def release(self, error: Optional[Exception]=None) -> NvimIO[None]:
         return NvimIO.pure(None)
+
+    def dispatch_complete(self, dispatch: Dispatch) -> IO[None]:
+        return IO.pure(None)
 
 
 __all__ = ('ComponentState', 'PluginState', 'PluginStateHolder', 'Components')
