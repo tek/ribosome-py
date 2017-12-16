@@ -3,8 +3,8 @@ import subprocess
 from subprocess import PIPE
 from typing import TypeVar
 
-from amino.util.string import blue
 from amino import Just, Maybe, __, _
+from amino.string.hues import blue
 
 from ribosome.trans.messages import Nop, Done, Quit, Stop, CoroutineAlg, SubProcessAsync, Fork, Coroutine
 from ribosome.trans.api import trans

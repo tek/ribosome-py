@@ -3,11 +3,11 @@ from typing import Callable, TypeVar, Type, Generic, Awaitable, Any
 
 from amino import Either, List, IO, L, _, Maybe, __
 from amino.state import StateT
-from amino.util.string import red, green
 from amino.dispatch import dispatch_alg
 from amino.dat import Dat
 from amino.tc.functor import Functor
 from amino.tc.base import Implicits
+from amino.string.hues import red, green
 
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO

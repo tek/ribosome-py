@@ -3,7 +3,7 @@ from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
-from amino import _, __, Try, IO, Lists, Either, List, Nil
+from amino import _, __, Try, IO, Lists, Either, List
 from amino.do import do, Do
 from amino.dispatch import dispatch_alg
 from amino.util.exception import format_exception

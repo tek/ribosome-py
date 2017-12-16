@@ -13,13 +13,13 @@ setup(
     url='https://github.com/tek/ribosome',
     packages=find_packages(exclude=['unit', 'unit.*']),
     install_requires=[
-        'amino==13.0.0a1',
+        'amino==13.0.0a2',
         'neovim~=0.1.13',
         'pyuv~=1.4.0',
     ],
     tests_require=[
         'libtmux~=0.7.4',
-        'kallikrein~=0.21.0',
+        'kallikrein~=0.22.0a',
     ],
     entry_points={
         'console_scripts': [

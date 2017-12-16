@@ -6,7 +6,7 @@ from amino.state import StateT, MaybeState, EitherState, IdState
 from amino.id import Id
 from amino.dispatch import dispatch_alg
 from amino.tc.base import TypeClass, F
-from amino.util.string import blue
+from amino.string.hues import blue
 
 from ribosome.logging import Logging
 from ribosome.nvim.io import NvimIOState, NS

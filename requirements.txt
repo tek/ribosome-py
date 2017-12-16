@@ -1,5 +1,5 @@
-amino~=12.5.0
+amino~=13.0.0a
 neovim~=0.1.13
 pyuv~=1.4.0
 libtmux~=0.7.4
-kallikrein~=0.21.0
+kallikrein~=0.22.0a
