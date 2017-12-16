@@ -71,7 +71,7 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
 
     @property
     def options(self) -> Map[str, Any]:
-        return self.extra_options ** Map(sync=self.sync)
+        return self.extra_options ** Map(sync=self.sync) ** self.dispatcher.rpc_options
 
     @property
     def method_str(self) -> str:

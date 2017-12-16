@@ -95,7 +95,7 @@ class HsData(Dat['HsData'], Data):
 
 
 @trans.free.one()
-def trans_free() -> Message:
+def trans_free(a: int, b: str='b') -> Message:
     return m1
 
 
@@ -134,7 +134,7 @@ host_conf = host_config(config, Right(HS), True)
 def init(name: str, *comps: str, args=()) -> Tuple[NvimFacade, PluginState, DispatchJob, Dispatch]:
     vim = MockNvimFacade(prefix='hs', vars=dict(hs_components=Lists.wrap(comps)))
     state = init_state(host_conf).unsafe(vim)
-    holder = PluginStateHolder.cons(state)
+    holder = PluginStateHolder.strict(state)
     job = dispatch_job(True, host_conf.async_dispatch, holder, name, host_conf.config.prefix, (args,))
     return vim, state, job, job.dispatches.lift(job.name).get_or_fail('no matching dispatch')
 
@@ -190,7 +190,7 @@ class DispatchSpec(SpecBase):
         return k(result).must(be_right(DispatchError(err, Nothing)))
 
     def trans_free(self) -> Expectation:
-        state, result = run('hs:command:trfree', 'p', 'q')
+        state, result = run('hs:command:trfree', 'p', 'q', args=('x',))
         return k(state.message_log) == List()
 
     def io(self) -> Expectation:

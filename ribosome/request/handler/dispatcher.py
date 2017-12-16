@@ -1,13 +1,14 @@
 import abc
 from typing import Callable, Type, Generic, Any, TypeVar
 
-from amino import List, Nil, Boolean
+from amino import List, Nil, Boolean, Map
 from amino.util.string import snake_case
 from amino.algebra import Algebra
 
 from ribosome.logging import Logging
 from ribosome.trans.handler import FreeTransHandler
 from ribosome.trans.message_base import Message
+from ribosome.request.args import ParamsSpec
 
 B = TypeVar('B')
 D = TypeVar('D')
@@ -24,9 +25,17 @@ class RequestDispatcher(Algebra, Logging, base=True):
     def name(self) -> str:
         ...
 
+    @abc.abstractproperty
+    def params_spec(self) -> Map[str, Any]:
+        ...
+
     @property
     def allow_sync(self) -> Boolean:
         return Boolean.isinstance(self, SyncRequestDispatcher)
+
+    @property
+    def rpc_options(self) -> Map[str, Any]:
+        return Map(nargs=self.params_spec.nargs.for_vim)
 
 
 class SyncRequestDispatcher(RequestDispatcher):
@@ -53,6 +62,10 @@ class MsgDispatcher(Generic[M], AsyncRequestDispatcher):
     def name(self) -> str:
         return snake_case(self.msg.__name__)
 
+    @property
+    def params_spec(self) -> ParamsSpec:
+        return ParamsSpec.from_function(self.msg)
+
 
 class TransDispatcher(Generic[B], SyncRequestDispatcher):
 
@@ -70,6 +83,10 @@ class TransDispatcher(Generic[B], SyncRequestDispatcher):
     def name(self) -> str:
         return self.handler.name
 
+    @property
+    def params_spec(self) -> ParamsSpec:
+        return ParamsSpec.from_function(self.handler.fun)
+
 
 class FunctionDispatcher(SyncRequestDispatcher):
 
@@ -86,6 +103,10 @@ class FunctionDispatcher(SyncRequestDispatcher):
     @property
     def name(self) -> str:
         return snake_case(self.fun.__name__)
+
+    @property
+    def params_spec(self) -> ParamsSpec:
+        return ParamsSpec.from_function(self.fun)
 
 
 __all__ = ('RequestDispatcher', 'SyncRequestDispatcher', 'AsyncRequestDispatcher', 'MsgDispatcher', 'TransDispatcher',

@@ -22,8 +22,8 @@ DP = TypeVar('DP', bound=Algebra)
 Res = NS[PluginState[D], DispatchResult]
 
 
-def log_trans(trans: FreeTransHandler) -> Res:
-    return NS.modify(__.log_trans(trans.name))
+def log_trans(trans: FreeTransHandler) -> NS[PluginState[D], None]:
+    return NS.pure(None) if trans.name in ('trans_log', 'pure') else NS.modify(__.log_trans(trans.name))
 
 
 def execute_trans(handler: FreeTransHandler) -> NS[D, DispatchResult]:
