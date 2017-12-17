@@ -64,7 +64,7 @@ class MsgDispatcher(Generic[M], AsyncRequestDispatcher):
 
     @property
     def params_spec(self) -> ParamsSpec:
-        return ParamsSpec.from_function(self.msg)
+        return ParamsSpec.from_type(self.msg)
 
 
 class TransDispatcher(Generic[B], SyncRequestDispatcher):

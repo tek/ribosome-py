@@ -7,21 +7,30 @@ from amino.dat import Dat
 from ribosome.request.nargs import Nargs
 
 
+def cons_params_spec(fun: Callable[..., Any]) -> None:
+    argspec = inspect.getfullargspec(fun)
+    annotations = Map(argspec.annotations)
+    params = Lists.wrap(argspec.args)
+    defaults = Lists.wrap(argspec.defaults or ())
+    method = Boolean(params.head.contains('self'))
+    param_count = params.length - method.to_int
+    min = param_count - defaults.length
+    max = (~Boolean(argspec.varargs or argspec.varkw)).m(param_count)
+    nargs = Nargs.cons(min, max)
+    types = params.traverse(annotations.lift, Maybe) | Nil
+    return ParamsSpec(nargs, min, max, method, types)
+
+
 class ParamsSpec(Dat['ParamsSpec']):
 
     @staticmethod
     def from_function(fun: Callable[..., Any]) -> 'ParamsSpec':
-        argspec = inspect.getfullargspec(fun)
-        params = Lists.wrap(argspec.args)
-        defaults = Lists.wrap(argspec.defaults or ())
-        annos = Map(argspec.annotations)
-        method = Boolean(params.head.contains('self'))
-        param_count = params.length - method.to_int
-        min = param_count - defaults.length
-        max = (~Boolean(argspec.varargs or argspec.varkw)).m(param_count)
-        nargs = Nargs.cons(min, max)
-        types = params.traverse(annos.lift, Maybe) | Nil
-        return ParamsSpec(nargs, min, max, method, types)
+        f = getattr(fun, '__wrapped__', fun)
+        return cons_params_spec(f)
+
+    @staticmethod
+    def from_type(tpe: type) -> 'ParamsSpec':
+        return cons_params_spec(tpe.__init__)
 
     def __init__(self, nargs: Nargs, min: int, max: Maybe[int], method: Boolean, types: List[type]) -> None:
         self.nargs = nargs

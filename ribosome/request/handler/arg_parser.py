@@ -1,7 +1,7 @@
 import abc
 from typing import Any
 
-from amino import List, Either, Right
+from amino import List, Either, Right, __, Map
 from amino.json.decoder import decode_json_type
 
 from ribosome.request.args import ParamsSpec
@@ -29,9 +29,9 @@ class JsonArgParser(ArgParser):
         def parse(start: int) -> Either[str, List[Any]]:
             strict = args[:start]
             json_args = args[start:].join_tokens
-            tpe = self.params_spec.types.last | dict
+            tpe = self.params_spec.types.last | (lambda: Map)
             return decode_json_type(json_args, tpe) / strict.cat
-        return args.index_of('{') / parse | Right(args)
+        return args.index_where(__.startswith('{')) / parse | Right(args)
 
 
 __all__ = ('ArgParser', 'TokenArgParser', 'JsonArgParser')

@@ -20,7 +20,7 @@ Coroutine = pmessage('Coroutine', 'coro')
 CoroutineAlg = pmessage('CoroutineAlg', 'coro')
 TransitionException = pmessage('TransitionException', 'context', 'exc')
 UpdateRecord = json_pmessage('UpdateRecord', 'tpe', 'name')
-UpdateState = json_pmessage('UpdateState', 'tpe', 'name')
+UpdateComponentState = json_pmessage('UpdateComponentState', 'tpe', 'name')
 Stage1 = pmessage('Stage1')
 Stage2 = pmessage('Stage2')
 Stage3 = pmessage('Stage3')
@@ -48,4 +48,5 @@ class Error(Message['Error'], LogError):
 
 __all__ = ('Nop', 'Stop', 'Quit', 'Done', 'Done', 'PlugCommand', 'Info', 'ShowLogInfo', 'RunIOsParallel',
            'RunCorosParallel', 'SubProcessSync', 'SubProcessAsync', 'Fork', 'Error', 'Warning', 'Debug', 'Coroutine',
-           'CoroutineAlg', 'TransitionException', 'UpdateRecord', 'UpdateState', 'Stage1', 'Stage2', 'Stage3', 'Stage4')
+           'CoroutineAlg', 'TransitionException', 'UpdateRecord', 'UpdateComponentState', 'Stage1', 'Stage2', 'Stage3',
+           'Stage4')
