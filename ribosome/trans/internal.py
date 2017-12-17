@@ -1,11 +1,14 @@
 from typing import TypeVar, Any
 
-from amino.state import EitherState, MaybeState, State
-from amino import do, Do, __, Either, _, List, Map, Maybe, Lists, Just
+from amino.state import EitherState, MaybeState
+
+from lenses import UnboundLens
+from amino import do, Do, __, Either, _, List, Map, Maybe, Lists, Just, Regex, L
 from amino.json import dump_json
 from amino.boolean import true
 from amino.dat import Dat
 from amino.lenses.lens import lens
+from amino.regex import Match
 
 from ribosome.trans.api import trans
 from ribosome.plugin_state import PluginState
@@ -60,10 +63,27 @@ class UpdateQuery(Dat['UpdateQuery']):
         self.patch = patch
 
 
+find_rex = Regex(r'(?P<id>\w+)\((?P<key>\w+)=(?P<value>\w+)\)')
+
+
+@do(Maybe[UnboundLens])
+def find_lens(z: UnboundLens, m: Match) -> Do:
+    id, key, value = yield m.all_groups('id', 'key', 'value').to_maybe
+    yield Just(z.getattr_(id).each_().filter_(lambda a: Maybe.getattr(a, key).contains(value)))
+
+
+# TODO `Regex.match_as(tpe)` that constructs a `Dat` from the `Match`
+def lens_step(z: UnboundLens, s: str) -> Maybe[UnboundLens]:
+    return find_rex.match(s) / L(find_lens)(z, _) | (lambda: Maybe.getattr(z, s))
+
+
+def mk_lens(query: str) -> UnboundLens:
+    return Lists.split(query, '.').fold_m(Just(lens))(lens_step)
+
+
 @do(MaybeState[D, None])
 def patch_update(query: PatchQuery) -> Do:
-    l = Lists.split(query.query, '.').fold_m(Just(lens))(Maybe.getattr)
-    lns = yield MaybeState.lift(l)
+    lns = yield MaybeState.lift(mk_lens(query.query))
     yield MaybeState.modify(lns.modify(__.typed_copy(**query.data)))
 
 
