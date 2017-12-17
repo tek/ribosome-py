@@ -12,6 +12,8 @@ from ribosome.request.handler.dispatcher import RequestDispatcher, MsgDispatcher
 from ribosome.request.handler.prefix import PrefixStyle, Short
 from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod, AutocmdMethod
 from ribosome.trans.message_base import Message
+from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
+from ribosome.request.args import ParamsSpec
 
 B = TypeVar('B')
 D = TypeVar('D')
@@ -31,6 +33,7 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
             prefix: PrefixStyle,
             internal: Boolean,
             sync: Boolean,
+            json: Boolean,
             extra_options: Map[str, Any],
     ) -> None:
         self.method = method
@@ -39,6 +42,7 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
         self.prefix = prefix
         self.internal = internal
         self.sync = sync
+        self.json = json
         self.extra_options = extra_options
 
     @staticmethod
@@ -52,10 +56,6 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
     @staticmethod
     def msg_autocmd(msg: Type[M]) -> 'RequestHandlerBuilder':
         return RequestHandlerBuilder(AutocmdMethod(), MsgDispatcher(msg))
-
-    @staticmethod
-    def json_msg_cmd(msg: Type[M]) -> 'RequestHandlerBuilder':
-        return RequestHandlerBuilder(CmdMethod(), MsgDispatcher(msg))
 
     @staticmethod
     def trans_cmd(func: Callable[..., B]) -> 'RequestHandlerBuilder':
@@ -89,6 +89,10 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
     def legacy(self) -> bool:
         return isinstance(self.dispatcher, MsgDispatcher)
 
+    def parser(self, params_spec: ParamsSpec) -> ArgParser:
+        tpe = JsonArgParser if self.json else TokenArgParser
+        return tpe(params_spec)
+
 
 class RequestHandlerBuilder(Generic[Meth, DP]):
 
@@ -102,10 +106,11 @@ class RequestHandlerBuilder(Generic[Meth, DP]):
             prefix: PrefixStyle=Short(),
             internal: Boolean=false,
             sync: Boolean=false,
-            **options: Any
+            json: Boolean=false,
+            **options: Any,
     ) -> RequestHandler:
         name1 = name or self.dispatcher.name
-        return RequestHandler(self.method, self.dispatcher, name1, prefix, internal, sync, Map(options))
+        return RequestHandler(self.method, self.dispatcher, name1, prefix, internal, sync, json, Map(options))
 
 
 class RequestHandlers(ToStr):

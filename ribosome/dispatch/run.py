@@ -36,9 +36,11 @@ def execute_data_trans(handler: FreeTransHandler) -> Res:
 
 @do(Res)
 def run_trans(trans: Trans, args: List[Any]) -> Do:
-    handler = trans.handler.dispatcher.handler(*args)
+    dispatcher = trans.handler.dispatcher
+    handler = dispatcher.handler
+    parsed_args = yield NS.from_either(trans.handler.parser(dispatcher.params_spec).parse(args))
     yield log_trans(trans)
-    yield execute_data_trans(handler)
+    yield execute_data_trans(handler(*parsed_args))
 
 
 @do(Res)
@@ -50,7 +52,7 @@ def run_internal(trans: Trans, args: List[Any]) -> Do:
 
 def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str) -> Either[str, Message]:
     validator = ArgValidator(ParamsSpec.from_function(tpe.__init__))
-    return Right(tpe(*args)) if validator.validate(args) else Left(validator.error(args, method, cmd_name))
+    return Right(tpe(*args)) if validator.validate(len(args)) else Left(validator.error(args, method, cmd_name))
 
 
 class RunDispatch(Generic[D, NP], Logging):

@@ -85,7 +85,7 @@ class TransDispatcher(Generic[B], SyncRequestDispatcher):
 
     @property
     def params_spec(self) -> ParamsSpec:
-        return ParamsSpec.from_function(self.handler.fun)
+        return self.handler.params_spec
 
 
 class FunctionDispatcher(SyncRequestDispatcher):

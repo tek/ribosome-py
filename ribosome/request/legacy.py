@@ -110,6 +110,6 @@ class LegacyRequestHandler(Logging, metaclass=abc.ABCMeta):
 
     @property
     def spec(self) -> RequestHandler:
-        return RequestHandler(self.method, self.dispatcher, self.name, Plain(), false, true, self.kw)
+        return RequestHandler(self.method, self.dispatcher, self.name, Plain(), false, true, false, self.kw)
 
 __all__ = ('LegacyRequestHandler',)

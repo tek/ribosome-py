@@ -1,7 +1,7 @@
 import inspect
 from typing import Callable, Any
 
-from amino import Maybe, _, Just, Boolean, Lists, Nothing
+from amino import Maybe, _, Just, Boolean, Lists, Nothing, Either, L, List, Nil, Map
 from amino.dat import Dat
 
 from ribosome.request.nargs import Nargs
@@ -14,18 +14,21 @@ class ParamsSpec(Dat['ParamsSpec']):
         argspec = inspect.getfullargspec(fun)
         params = Lists.wrap(argspec.args)
         defaults = Lists.wrap(argspec.defaults or ())
+        annos = Map(argspec.annotations)
         method = Boolean(params.head.contains('self'))
         param_count = params.length - method.to_int
         min = param_count - defaults.length
         max = (~Boolean(argspec.varargs or argspec.varkw)).m(param_count)
         nargs = Nargs.cons(min, max)
-        return ParamsSpec(nargs, min, max, method)
+        types = params.traverse(annos.lift, Maybe) | Nil
+        return ParamsSpec(nargs, min, max, method, types)
 
-    def __init__(self, nargs: Nargs, min: int, max: Maybe[int], method: Boolean) -> None:
+    def __init__(self, nargs: Nargs, min: int, max: Maybe[int], method: Boolean, types: List[type]) -> None:
         self.nargs = nargs
         self.min = min
         self.max = max
         self.method = method
+        self.types = types
 
     @property
     def exact_count(self) -> Maybe[int]:
@@ -45,12 +48,11 @@ class ArgValidator(Dat['ArgValidator']):
     def max(self) -> Maybe[int]:
         return self.spec.max
 
-    def validate(self, args: tuple) -> Boolean:
-        l = len(args)
-        return self.min <= l and not self.max.exists(_ < l)
+    def validate(self, count: int) -> Boolean:
+        return Boolean(self.min <= count and not self.max.exists(_ < count))
 
-    def error(self, args: tuple, desc: str, vim_name: str) -> str:
-        return f'argument count for {desc} `{vim_name}` is {len(args)}, must be {self.count_spec} ({args})'
+    def error(self, args: tuple, desc: str, name: str) -> str:
+        return f'argument count for {desc} `{name}` is {len(args)}, must be {self.count_spec} ({args})'
 
     @property
     def count_spec(self) -> str:
@@ -62,5 +64,8 @@ class ArgValidator(Dat['ArgValidator']):
                 f'at least {self.min}'
             )
         )
+
+    def either(self, args: tuple, desc: str, name: str) -> Either[str, None]:
+        return self.validate(len(args)).e(L(self.error)(args, desc, name), None)
 
 __all__ = ('ArgValidator', 'ParamsSpec')

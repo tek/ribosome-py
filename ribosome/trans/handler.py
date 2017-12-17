@@ -1,13 +1,14 @@
 import abc
 from typing import Callable, TypeVar, Type, Generic, Any
 
-from amino import List, Lists
+from amino import List, Lists, L, _
 from amino.dat import Dat
 
 from ribosome.trans.effect import TransEffect, cont, lift
-from ribosome.trans.action import TransAction, TransM, TransMPure
+from ribosome.trans.action import TransAction, TransM, TransMPure, TransFailure
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.component import Component
+from ribosome.request.args import ArgValidator, ParamsSpec
 
 D = TypeVar('D')
 M = TypeVar('M', bound=Message)
@@ -61,7 +62,7 @@ class MessageTransHandler(Generic[M, D], Dat['MessageTransHandler[M, D]'], Trans
 class FreeTransHandler(Generic[D, R], Dat['FreeTransHandler[M, D]'], TransHandler):
 
     @staticmethod
-    def create(fun: Callable[..., R], effects: List[TransEffect], prio: float) -> 'TransHandler':
+    def create(fun: Callable[..., R], effects: List[TransEffect], prio: float) -> 'FreeTransHandler':
         name = fun.__name__
         return FreeTransHandler(name, fun, (), effects, prio)
 
@@ -75,12 +76,20 @@ class FreeTransHandler(Generic[D, R], Dat['FreeTransHandler[M, D]'], TransHandle
     def __call__(self, *args: Any) -> 'FreeTransHandler':
         return self.copy(args=args)
 
-    def run(self) -> TransAction:
-        return extract(self.name, self.fun(*self.args), Lists.wrap(self.effects))
+    def execute(self) -> TransAction:
+        val = ArgValidator(self.params_spec)
+        return val.either(self.args, 'trans', self.name).bimap(TransFailure, lambda a: self.fun(*self.args))
+
+    def run(self) -> TransComplete:
+        return self.execute().cata(L(TransComplete)(self.name, _), L(extract)(self.name, _, Lists.wrap(self.effects)))
 
     @property
     def m(self) -> TransM:
         return TransMPure(self)
+
+    @property
+    def params_spec(self) -> ParamsSpec:
+        return ParamsSpec.from_function(self.fun)
 
 
 __all__ = ('MessageTransHandler', 'FreeTransHandler')

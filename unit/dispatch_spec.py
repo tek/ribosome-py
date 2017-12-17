@@ -8,7 +8,7 @@ from kallikrein.matchers.length import have_length
 from amino.test.spec import SpecBase
 from amino import Lists, Map, List, Nothing, _, IO, __, Right
 from amino.boolean import true
-from amino.dat import Dat
+from amino.dat import Dat, ADT
 
 from ribosome.test.spec import MockNvimFacade
 from ribosome.config import Config, Data
@@ -115,6 +115,19 @@ def trans_data() -> NvimIOState[HsData, None]:
     return NvimIOState.modify(__.set.counter(23))
 
 
+class JData(ADT['JData']):
+
+    def __init__(self, number: int, name: str, items: List[str]) -> None:
+        self.number = number
+        self.name = name
+        self.items = items
+
+
+@trans.free.result()
+def trans_json(a: int, b: str, data: JData) -> int:
+    return data.number + a
+
+
 config = Config.cons(
     'hs',
     components=Map(p=P, q=Q),
@@ -125,6 +138,7 @@ config = Config.cons(
         RequestHandler.trans_cmd(trans_io)('trio'),
         RequestHandler.trans_function(trans_internal)('int', internal=true),
         RequestHandler.trans_function(trans_data)('dat'),
+        RequestHandler.trans_cmd(trans_json)('json', json=true),
     ),
     state_ctor=HsData,
 )
@@ -162,6 +176,7 @@ class DispatchSpec(SpecBase):
     aggregate IO results from multiple components $multi_io
     work on PluginState in internal trans $internal
     modify the state data $data
+    json command args $json
     '''
 
     def handlers(self) -> Expectation:
@@ -208,5 +223,11 @@ class DispatchSpec(SpecBase):
     def data(self) -> Expectation:
         state, result = run('hs:function:dat')
         return k(state.data.counter) == 23
+
+    def json(self) -> Expectation:
+        js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
+        state, result = run('hs:command:json', args=(7, 'one', *Lists.split(js, ' ')))
+        return k(result) == 9
+
 
 __all__ = ('DispatchSpec',)
