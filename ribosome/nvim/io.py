@@ -5,14 +5,12 @@ import typing
 from typing import TypeVar, Callable, Any, Generic, Generator, Union, Tuple
 from threading import Thread
 
-from fn.recur import tco
-
 from amino.tc.base import ImplicitInstances, F, TypeClass, tc_prop
 from amino.lazy import lazy
 from amino.tc.monad import Monad
 from amino import Either, __, IO, Maybe, Left, Eval, L, List, Nothing, Right, Lists, _, Just, options
 from amino.state import tcs, StateT, State
-from amino.func import CallByName
+from amino.func import CallByName, tailrec
 from amino.do import do
 from amino.io import safe_fmt
 from amino.util.string import ToStr
@@ -224,7 +222,7 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
             raise NvimIOException(self.lambda_str().evaluate(), self.stack, e)
 
     def run(self, vim: NvimFacade) -> A:
-        @tco
+        @tailrec
         def run(t: Union[A, 'NvimIO[A]']) -> Union[Tuple[bool, A], Tuple[bool, Tuple[Union[A, 'NvimIO[A]']]]]:
             if isinstance(t, Pure):
                 return True, (t.value,)
