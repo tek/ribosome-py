@@ -262,7 +262,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def state(self) -> Any:
         def error(err: JsonError) -> None:
             self.log.error(f'{err.error}: {err.data}')
-            raise err.error
+            raise err.exception
         response = self.vim.call(f'{self.plugin_prefix}State').get_or_raise()
         return decode_json(response).value_or(error)
 
