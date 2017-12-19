@@ -9,6 +9,7 @@ from amino.test.spec import SpecBase
 from amino import Lists, Map, List, Nothing, _, IO, __, Right
 from amino.boolean import true
 from amino.dat import Dat, ADT
+from amino.state import State
 
 from ribosome.test.spec import MockNvimFacade
 from ribosome.config import Config, Data
@@ -128,6 +129,11 @@ def trans_json(a: int, b: str, data: JData) -> int:
     return data.number + a
 
 
+@trans.free.unit(trans.st)
+def vim_enter() -> State[HsData, None]:
+    return State.modify(__.copy(counter=19))
+
+
 config = Config.cons(
     'hs',
     components=Map(p=P, q=Q),
@@ -139,6 +145,7 @@ config = Config.cons(
         RequestHandler.trans_function(trans_internal)('int', internal=true),
         RequestHandler.trans_function(trans_data)('dat'),
         RequestHandler.trans_cmd(trans_json)('json', json=true),
+        RequestHandler.trans_autocmd(vim_enter)(),
     ),
     state_ctor=HsData,
 )
@@ -177,6 +184,7 @@ class DispatchSpec(SpecBase):
     work on PluginState in internal trans $internal
     modify the state data $data
     json command args $json
+    run an autocmd $autocmd
     '''
 
     def handlers(self) -> Expectation:
@@ -228,6 +236,10 @@ class DispatchSpec(SpecBase):
         js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
         state, result = run('hs:command:json', args=(7, 'one', *Lists.split(js, ' ')))
         return k(result) == 9
+
+    def autocmd(self) -> Expectation:
+        state, result = run('hs:autocmd:vim_enter')
+        return k(state.data.counter) == 19
 
 
 __all__ = ('DispatchSpec',)

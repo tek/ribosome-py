@@ -65,6 +65,10 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
     def trans_function(func: Callable[..., B]) -> 'RequestHandlerBuilder':
         return RequestHandlerBuilder(FunctionMethod(), TransDispatcher(func))
 
+    @staticmethod
+    def trans_autocmd(func: Callable[..., B]) -> 'RequestHandlerBuilder':
+        return RequestHandlerBuilder(AutocmdMethod(), TransDispatcher(func))
+
     @property
     def allow_sync(self) -> Boolean:
         return self.dispatcher.allow_sync
