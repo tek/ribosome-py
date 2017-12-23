@@ -426,6 +426,14 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
     def error(e: str) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO.error(e))
 
+    @staticmethod
+    def inspect_either(f: Callable[[S], Either[str, A]]) -> 'NvimIOState[S, A]':
+        return NvimIOState.inspect_f(lambda s: NvimIO.from_either(f(s)))
+
+    @staticmethod
+    def call(name: str, *args: Any, **kw: Any) -> 'NvimIOState[S, A]':
+        return NS.delay(__.call(name, *args, **kw))
+
 
 tcs(NvimIO, NvimIOState)  # type: ignore
 
