@@ -32,7 +32,6 @@ from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.request.handler.dispatcher import MsgDispatcher
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.rpc import rpc_handler_functions, define_handlers, RpcHandlerSpec
-from ribosome.trans.queue import PrioQueue
 from ribosome.nvim.io import NS
 from ribosome.trans.handler import TransComplete
 from ribosome.trans.internal import internal_dispatchers
@@ -51,13 +50,9 @@ class HostConfig(Dat['HostConfig']):
 
     def __init__(
             self,
-            sync_dispatch: Map[str, DispatchSync],
-            async_dispatch: Map[str, DispatchAsync],
             config: DispatchConfig,
             plugin_class: Maybe[Type[NP]],
     ) -> None:
-        self.sync_dispatch = sync_dispatch
-        self.async_dispatch = async_dispatch
         self.config = config
         self.plugin_class = plugin_class
 
@@ -67,15 +62,15 @@ class HostConfig(Dat['HostConfig']):
 
     @property
     def dispatch(self) -> List[Dispatch]:
-        return self.sync_dispatch.v + self.async_dispatch.v
+        return self.config.dispatch
 
     @property
     def specs(self) -> List[RpcHandlerSpec]:
-        return self.dispatch / __.spec(self.name, self.config.config.prefix)
+        return self.config.specs
 
     @property
     def distinct_specs(self) -> List[RpcHandlerSpec]:
-        return self.specs.distinct_by(lambda s: s.rpc_method('test'))
+        return self.config.distinct_specs
 
 
 def dispatch_job(sync: bool,
@@ -131,8 +126,8 @@ def run_session(session: Session, host_config: HostConfig) -> Do:
     yield NvimIO.delay(
         lambda vim:
         session.run(
-            request_handler(vim, True, host_config.sync_dispatch, holder, host_config.config),
-            request_handler(vim, False, host_config.async_dispatch, holder, host_config.config)
+            request_handler(vim, True, host_config.config.sync_dispatch, holder, host_config.config),
+            request_handler(vim, False, host_config.config.async_dispatch, holder, host_config.config)
         )
     )
     yield NvimIO.pure(0)
@@ -207,8 +202,8 @@ def host_config_1(
     with_method = lambda ds: Map(ds.map(lambda d: (d.spec(config.name, config.prefix).rpc_method(name), d)))
     dispatches = int_dispatchers + cfg_dispatchers + cls_dispatchers
     sync_dispatch, async_dispatch = dispatches.filter(_.sync), dispatches.filter(_.async)
-    dispatch_config = DispatchConfig.cons(config, io_executor)
-    return HostConfig(with_method(sync_dispatch), with_method(async_dispatch), dispatch_config, cls)
+    dispatch_config = DispatchConfig.cons(config, with_method(sync_dispatch), with_method(async_dispatch), io_executor)
+    return HostConfig(dispatch_config, cls)
 
 
 class SyntheticPlugin:

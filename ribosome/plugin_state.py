@@ -8,19 +8,20 @@ import greenlet
 
 import toolz
 
-from amino import Map, List, Boolean, Nil, Either, _, Lists, Maybe, Nothing, Try, do, Do, IO
+from amino import Map, List, Boolean, Nil, Either, _, Lists, Maybe, Nothing, Try, do, Do, IO, __
 from amino.dat import Dat
 from amino.func import flip
 
 from ribosome.trans.message_base import Message, Sendable, Envelope
 from ribosome.dispatch.component import Component
 from ribosome.nvim.io import NvimIOState, NS
-from ribosome.dispatch.data import DispatchResult, DIO, Dispatch
+from ribosome.dispatch.data import DispatchResult, DIO, Dispatch, DispatchSync, DispatchAsync
 from ribosome.trans.queue import PrioQueue
 from ribosome.trans.legacy import Handler
 from ribosome.trans.handler import TransHandler, TransComplete
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
+from ribosome.request.rpc import RpcHandlerSpec
 
 D = TypeVar('D')
 TransState = NvimIOState[D, DispatchResult]
@@ -77,16 +78,22 @@ class DispatchConfig(Dat['DispatchConfig']):
     @staticmethod
     def cons(
             config: 'ribosome.config.Config',
+            sync_dispatch: Map[str, DispatchSync]=Map(),
+            async_dispatch: Map[str, DispatchAsync]=Map(),
             io_executor: Callable[[DIO], NS['PluginState[D]', TransComplete]]=None,
     ) -> 'DispatchConfig':
-        return DispatchConfig(config, Maybe.optional(io_executor))
+        return DispatchConfig(config, sync_dispatch, async_dispatch, Maybe.optional(io_executor))
 
     def __init__(
             self,
             config: 'ribosome.config.Config',
+            sync_dispatch: Map[str, DispatchSync],
+            async_dispatch: Map[str, DispatchAsync],
             io_executor: Maybe[Callable[[DIO], NS['PluginState[D]', TransComplete]]]
     ) -> None:
         self.config = config
+        self.sync_dispatch = sync_dispatch
+        self.async_dispatch = async_dispatch
         self.io_executor = io_executor
 
     @property
@@ -96,6 +103,18 @@ class DispatchConfig(Dat['DispatchConfig']):
     @property
     def prefix(self) -> str:
         return self.config.prefix
+
+    @property
+    def dispatch(self) -> List[Dispatch]:
+        return self.sync_dispatch.v + self.async_dispatch.v
+
+    @property
+    def specs(self) -> List[RpcHandlerSpec]:
+        return self.dispatch / __.spec(self.name, self.config.prefix)
+
+    @property
+    def distinct_specs(self) -> List[RpcHandlerSpec]:
+        return self.specs.distinct_by(lambda s: s.rpc_method('test'))
 
 
 class PluginState(Generic[D], Dat['PluginState']):

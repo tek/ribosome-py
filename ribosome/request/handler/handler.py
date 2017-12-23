@@ -1,6 +1,6 @@
 from typing import Callable, Type, Generic, Any, TypeVar
 
-from amino import List, Lists, Map, _, Boolean
+from amino import List, Lists, Map, _, Boolean, __
 from amino.func import flip
 from amino.util.string import ToStr, camelcase
 from amino.dat import ADT
@@ -128,6 +128,9 @@ class RequestHandlers(ToStr):
 
     def _arg_desc(self) -> List[str]:
         return List(str(self.handlers))
+
+    def rpc_specs(self, name: str, prefix: str) -> List[RpcHandlerSpec]:
+        return self.handlers.v / __.spec(name, prefix)
 
 
 __all__ = ('RequestHandler', 'RequestHandlers')

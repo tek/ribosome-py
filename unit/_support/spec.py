@@ -6,10 +6,10 @@ from amino.test.spec_spec import Spec as SpecBase
 
 class Spec(SpecBase):
 
-    def setup(self, *a, **kw):
+    def setup(self):
         amino.development = True
         amino_stdout_logging()
-        super(Spec, self).setup(*a, **kw)
+        super().setup()
 
 
 __all__ = ('Spec',)

@@ -18,6 +18,7 @@ from ribosome.trans.messages import ShowLogInfo, UpdateComponentState, Quit
 from ribosome.components.scratch import Mapping
 from ribosome.config import Config
 from ribosome.dispatch.data import Dispatch, Internal, SendMessage, Trans
+from ribosome import ribo_log
 
 D = TypeVar('D')
 
@@ -45,9 +46,9 @@ def state_data() -> str:
     return EitherState.inspect_f(lambda s: dump_json(s.data))
 
 
-@trans.free.result()
-def rpc_handlers() -> None:
-    pass
+@trans.free.result(trans.st)
+def rpc_handlers() -> EitherState[D, str]:
+    return EitherState.inspect_f(lambda s: dump_json(s.dispatch_config.distinct_specs))
 
 
 class PatchQuery(Dat['PatchQuery']):

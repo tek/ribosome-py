@@ -60,8 +60,8 @@ class NvimPlugin(NvimPluginBase, metaclass=NvimPluginMeta):
     def quit(self) -> None:
         pass
 
-    def rpc_handlers(self) -> List[str]:
-        return rpc_handlers_json(type(self))
+    # def rpc_handlers(self) -> List[str]:
+    #     return rpc_handlers_json(type(self))
 
     def set_log_level(self, level: str) -> None:
         self.file_log_handler.setLevel(level)
@@ -186,7 +186,7 @@ def setup_plugin(cls: Type[NvimPlugin], name: str, prefix: str, debug: bool) -> 
     # help.name_handler('stage_3', command, cls.stage_3, sync=True)
     # help.name_handler('stage_4', command, cls.stage_4, sync=True)
     # help.name_handler('quit', command, cls.quit, sync=True)
-    help.name_handler('rpc_handlers', function, cls.rpc_handlers, sync=True)
+    # help.name_handler('rpc_handlers', function, cls.rpc_handlers, sync=True)
     help.name_handler('append_python_path', function, cls.append_python_path)
     help.name_handler('show_python_path', function, cls.show_python_path)
     help.name_handler('send', function, cls.send_message)

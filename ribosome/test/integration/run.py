@@ -43,7 +43,7 @@ class DispatchHelper(Dat['DispatchHelper']):
 
     def dispatch(self, name: str, args: tuple) -> Tuple[DispatchJob, Dispatch]:
         holder = PluginStateHolder.strict(self.state)
-        job = dispatch_job(True, self.host_conf.async_dispatch, holder, name, self.state.config.prefix, (args,))
+        job = dispatch_job(True, self.host_conf.config.async_dispatch, holder, name, self.state.config.prefix, (args,))
         return job, job.dispatches.lift(job.name).get_or_fail('no matching dispatch')
 
     def sender(self, name: str, args: tuple=(), sync: bool=True) -> Callable[[], Res]:

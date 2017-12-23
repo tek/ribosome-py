@@ -3,7 +3,7 @@ import inspect
 from types import FunctionType
 from typing import TypeVar, Callable, Union, Any, Dict, Generator
 
-from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean, _, L, __
+from amino import Map, Maybe, Lists, List, Either, Just, Nothing, do, Boolean, _, L, __, Do
 from amino.util.string import camelcaseify, ToStr
 from amino.list import Nil
 from amino.dat import Dat
@@ -62,7 +62,7 @@ class RpcHandlerSpec(Dat['RpcHandlerSpec']):
 
     @staticmethod
     @do(Maybe['RpcHandlerSpec'])
-    def from_spec(spec: Dict[str, Any], method: str, prefix: bool) -> Generator:
+    def from_spec(spec: Dict[str, Any], method: str, prefix: bool) -> Do:
         m = Map(spec)
         ctors = Map(command=RpcCommandSpec, function=RpcFunctionSpec, autocmd=RpcAutocommandSpec)
         tpe = yield m.lift('type')
@@ -87,7 +87,7 @@ class RpcHandlerSpec(Dat['RpcHandlerSpec']):
 
     @staticmethod
     @do('Maybe[RpcHandlerSpec]')
-    def decode(data: dict) -> Generator:
+    def decode(data: dict) -> Do:
         m = Map(data)
         method, prefix = yield m.get_all('method', 'prefix')
         yield RpcHandlerSpec.from_spec(m, method, prefix)

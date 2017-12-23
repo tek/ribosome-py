@@ -10,6 +10,7 @@ from ribosome.nvim import NvimIO
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import PluginSettings
 from ribosome.dispatch.run import DispatchJob
+from ribosome.request.rpc import RpcHandlerSpec
 
 A = TypeVar('A', contravariant=True)
 B = TypeVar('B')
@@ -77,6 +78,10 @@ class Config(Generic[Settings, D], Dat['Config[Settings, D]']):
 
     def vim_cmd_name(self, handler: RequestHandler) -> str:
         return handler.vim_cmd_name(self.name, self.prefix)
+
+    @property
+    def rpc_specs(self) -> List[RpcHandlerSpec]:
+        return self.request_handlers.rpc_specs(self.name, self.prefix)
 
 
 class Data:
