@@ -77,6 +77,9 @@ class MockNvim:
         rep = format_funcall(name, a, kw)
         return self.responses(name).get_or_fail(f'no response recorded for call {rep}')
 
+    def async_call(self, f: Callable[['MockNvim'], None]) -> None:
+        pass
+
 
 class MockNvimFacade(MockNvimComponent, NvimFacade):
 
