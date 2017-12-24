@@ -14,11 +14,10 @@ from ribosome.trans.api import trans
 from ribosome.plugin_state import PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
-from ribosome.trans.messages import ShowLogInfo, UpdateComponentState, Quit
+from ribosome.trans.messages import ShowLogInfo, UpdateComponentState
 from ribosome.components.scratch import Mapping
 from ribosome.config import Config
 from ribosome.dispatch.data import Dispatch, Internal, SendMessage, Trans
-from ribosome import ribo_log
 
 D = TypeVar('D')
 
@@ -106,7 +105,6 @@ show_log_info_handler = RequestHandler.msg_cmd(ShowLogInfo)(prefix=Full(), inter
 update_state_handler = RequestHandler.trans_cmd(update_state)(json=true)
 update_component_state_handler = RequestHandler.msg_cmd(UpdateComponentState)(json=true)
 mapping_handler = RequestHandler.msg_fun(Mapping)(prefix=Full())
-quit_handler = RequestHandler.msg_cmd(Quit)(prefix=Full())
 state_handler = RequestHandler.trans_function(state_data)(name='state', internal=true, sync=true)
 rpc_handlers_handler = RequestHandler.trans_function(rpc_handlers)(internal=true, sync=true, prefix=Full())
 poll_handler = RequestHandler.trans_cmd(poll)(prefix=Full())
@@ -121,7 +119,6 @@ def internal_dispatchers(config: Config) -> List[Dispatch]:
         Trans(update_state_handler),
         SendMessage(update_component_state_handler),
         SendMessage(mapping_handler),
-        # SendMessage(quit_handler),
         Internal(state_handler),
         Internal(rpc_handlers_handler),
         Trans(poll_handler),

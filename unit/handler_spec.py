@@ -8,9 +8,9 @@ from kallikrein.matchers.either import be_right
 from ribosome.trans.api import trans
 from ribosome.trans.message_base import pmessage
 from ribosome.trans.action import Transit, Propagate
-from ribosome.dispatch.transform import TransValidator
+from ribosome.dispatch.transform import TransValidator, validate_trans_complete
 from ribosome.dispatch.data import DispatchResult, DispatchIO
-from ribosome.trans.handler import MessageTransHandler
+from ribosome.trans.handler import MessageTransHandler, TransComplete
 
 from amino import Right, IO, _, Either, Id, Maybe
 from amino.state import IdState, StateT
@@ -29,24 +29,24 @@ class HandlerSpec:
     lift single message in state $single_st
     '''
 
-    @property
-    def validator(self) -> TransValidator:
-        return TransValidator('desc')
+    def validate(self, action: TransComplete) -> TransValidator:
+        return validate_trans_complete(action)
 
     def run(self, f: MessageTransHandler) -> Maybe[Msg2]:
-        res = self.validator.validate(f.run(Msg1()))
+        res = self.validate(f.run(None, Msg1()))
         return k(res.run_a(None).attempt(None) / _.msgs // _.head).must(be_just(have_type(Msg2)))
 
     def eso(self) -> Expectation:
         @trans.msg.one(Msg1, trans.e, trans.st, trans.io)
-        def f(msg: Msg1) -> Either[str, StateT[Id, int, IO[Msg2]]]:
+        def f(self, msg: Msg1) -> Either[str, StateT[Id, int, IO[Msg2]]]:
             return Right(IdState.pure(IO.pure(Msg2())))
-        res = f.run(Msg1())
-        s = self.validator.validate(res)
+        res = f.run(None, Msg1())
+        s = self.validate(res)
         valid = s.run_a(None).attempt(None)
+        action = res.action
         return (
-            k(res).must(have_type(Transit)) &
-            k(res.trans).must(have_type(StateT)) &
+            k(action).must(have_type(Transit)) &
+            k(action.trans).must(have_type(StateT)) &
             k(valid).must(be_right(have_type(DispatchResult))) &
             k(valid / _.output).must(be_right(have_type(DispatchIO))) &
             k(valid / _.output.io.io // _.attempt).must(be_right(Propagate.one(Msg2())))
@@ -54,19 +54,19 @@ class HandlerSpec:
 
     def se(self) -> Expectation:
         @trans.msg.one(Msg1, trans.st, trans.e)
-        def f(msg) -> StateT[Id, int, Either[str, Msg2]]:
+        def f(self, msg: Msg1) -> StateT[Id, int, Either[str, Msg2]]:
             return IdState.pure(Right(Msg2()))
         return self.run(f)
 
     def single(self) -> Expectation:
         @trans.msg.one(Msg1, trans.e)
-        def f(msg) -> Either[str, Msg2]:
+        def f(self, msg: Msg1) -> Either[str, Msg2]:
             return Right(Msg2())
         return self.run(f)
 
     def single_st(self) -> Expectation:
         @trans.msg.one(Msg1, trans.e, trans.st)
-        def f(msg) -> Either[str, StateT[Id, int, Msg2]]:
+        def f(self, msg: Msg1) -> Either[str, StateT[Id, int, Msg2]]:
             return Right(IdState.pure(Msg2()))
         return self.run(f)
 

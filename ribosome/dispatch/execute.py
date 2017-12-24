@@ -26,7 +26,7 @@ from ribosome.trans.queue import PrioQueue
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.loop import process_message
 from ribosome.trans.send_message import send_message
-from ribosome.dispatch.transform import validate_trans_action
+from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.trans.action import TransM, TransMPure, TransMBind, LogMessage, Info, Error
 from ribosome.trans.handler import TransComplete
 
@@ -124,7 +124,7 @@ class ExecuteDispatchOutput(Logging):
         custom_executor = yield NS.inspect(_.dispatch_config.io_executor)
         executor = custom_executor | (lambda: execute_io)
         inner = yield executor(result.io)
-        result = yield validate_trans_action(TransComplete('io', inner))
+        result = yield validate_trans_complete(TransComplete('io', inner))
         yield normalize_output(result)
 
     @do(NS[PluginState[D], R])

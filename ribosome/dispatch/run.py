@@ -12,7 +12,7 @@ from ribosome.plugin_state import PluginState, PluginStateHolder
 from ribosome.dispatch.data import Legacy, DispatchReturn, Internal, Trans, SendMessage, DispatchResult
 from ribosome.nvim.io import NS
 from ribosome.trans.message_base import Message
-from ribosome.dispatch.transform import validate_trans_action
+from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.trans.send_message import send_message, transform_data_state
 from ribosome.trans.handler import FreeTransHandler
 
@@ -27,7 +27,7 @@ def log_trans(trans: FreeTransHandler) -> NS[PluginState[D], None]:
 
 
 def execute_trans(handler: FreeTransHandler) -> NS[D, DispatchResult]:
-    return validate_trans_action(handler.run())
+    return validate_trans_complete(handler.run())
 
 
 def execute_data_trans(handler: FreeTransHandler) -> Res:

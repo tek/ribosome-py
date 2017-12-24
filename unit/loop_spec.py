@@ -15,7 +15,7 @@ from ribosome.dispatch.loop import process_message
 from ribosome.trans.message_base import Msg, Message
 from ribosome.trans.queue import PrioQueue
 from ribosome.trans.send_message import send_message
-from ribosome.plugin_state import PluginState
+from ribosome.plugin_state import PluginState, DispatchConfig
 from ribosome.trans.api import trans
 from ribosome.dispatch.data import DispatchResult, DispatchUnit
 from ribosome.nvim.io import NvimIOState
@@ -30,7 +30,7 @@ class Msg2(Msg): pass
 class Comp1(Component):
 
     @trans.msg.one(Msg1, trans.m)
-    def msg1(self) -> None:
+    def msg1(self, msg: Msg1) -> None:
         return Just(Msg2())
 
 
@@ -55,8 +55,9 @@ class LoopSpec(SpecBase):
         return k(result.msgs.head).must(be_just(b))
 
     def send_message(self) -> Expectation:
-        d = SimpleData(config=Config.cons('test'))
-        state = PluginState.cons(d, None, List(Comp1('comp1')), PrioQueue.empty)
+        config = Config.cons('test')
+        d = SimpleData(config=config)
+        state = PluginState.cons(DispatchConfig.cons(config), d, None, List(Comp1('comp1')), messages=PrioQueue.empty)
         a = Msg1()
         r = send_message(a).run_a(state).unsafe(vim)
         return k(r.output.results.head // _.msgs.head / _.msg).must(be_just(have_type(Msg2)))

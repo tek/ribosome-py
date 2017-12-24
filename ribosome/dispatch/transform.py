@@ -1,7 +1,7 @@
 import abc
 from typing import TypeVar, Generic, Union
 
-from amino import Maybe, List, __, Nil, Either, L, _
+from amino import Maybe, List, Nil, Either, L, _
 from amino.state import StateT, MaybeState, EitherState, IdState
 from amino.id import Id
 from amino.dispatch import dispatch_alg
@@ -71,7 +71,7 @@ class TransValidator(Logging):
 
     def validate_transit(self, action: Transit) -> NvimIOState[D, DispatchResult]:
         def loop(tts: TransformTransState) -> NS[D, DispatchResult]:
-            return tts.run(action.trans).map(L(TransComplete)(self.name, _)).flat_map(validate_trans_action)
+            return tts.run(action.trans).map(L(TransComplete)(self.name, _)).flat_map(validate_trans_complete)
         return (
             TransformTransState.e_for(action.trans)
             .map(loop)
@@ -101,8 +101,13 @@ class TransValidator(Logging):
         return NvimIOState.pure(DispatchResult(DispatchLog(action.message), Nil))
 
 
-def validate_trans_action(tc: TransComplete) -> NS[D, DispatchResult]:
-    val = dispatch_alg(TransValidator(tc.name), TransAction, 'validate_')
-    return val(tc.action)
+def validate_trans_action(name: str, action: TransAction) -> NS[D, DispatchResult]:
+    val = dispatch_alg(TransValidator(name), TransAction, 'validate_')
+    return val(action)
 
-__all__ = ('validate_trans_action',)
+
+def validate_trans_complete(tc: TransComplete) -> NS[D, DispatchResult]:
+    return validate_trans_action(tc.name, tc.action)
+
+
+__all__ = ('validate_trans_complete', 'validate_trans_complete')

@@ -10,7 +10,7 @@ from ribosome.logging import ribo_log
 from ribosome.plugin_state import PluginState, ComponentState, Components, TransState
 from ribosome.nvim.io import NvimIOState
 from ribosome.dispatch.data import DispatchResult, DispatchError, DispatchOutputAggregate
-from ribosome.dispatch.transform import validate_trans_action
+from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.dispatch.component import Component
 from ribosome.trans.handler import MessageTransHandler
 from ribosome.trans.legacy import TransitionFailed
@@ -54,7 +54,7 @@ def handler_exception(e: Exception, desc: str) -> NvimIOState[D, DispatchResult]
 
 
 def try_handler(handler: Callable[[M], A], msg: M, desc: str) -> NvimIOState[D, DispatchResult]:
-    return Try(handler, msg).map(validate_trans_action).value_or(L(handler_exception)(_, desc))
+    return Try(handler, msg).map(validate_trans_complete).value_or(L(handler_exception)(_, desc))
 
 
 def execute_component_handler(component: Component, handler: MessageTransHandler, msg: M

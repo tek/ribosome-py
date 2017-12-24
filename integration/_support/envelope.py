@@ -1,9 +1,10 @@
 from amino import Map, List
 from ribosome.config import Config, RequestHandler
-from ribosome.trans.message_base import Message
-from ribosome.trans.messages import Stage1
+from ribosome.trans.message_base import Message, pmessage
 from ribosome.trans.api import trans
 from ribosome.dispatch.component import Component
+
+Stage1 = pmessage('Stage1')
 
 
 class Pub(Message['Pub']):
@@ -53,39 +54,39 @@ class S3(Message['S3']):
 class P(Component):
 
     @trans.msg.unit(Stage1)
-    def stage_1(self) -> None:
+    def stage_1(self, msg: Stage1) -> None:
         pass
 
     @trans.msg.one(Target)
-    def target(self) -> Message:
+    def target(self, msg: Target) -> Message:
         return T1().to('q')
 
     @trans.msg.one(T1)
-    def t1(self) -> Message:
+    def t1(self, msg: T1) -> Message:
         return T2()
 
     @trans.msg.multi(Seq)
-    def seq(self) -> List[Message]:
+    def seq(self, msg: Seq) -> List[Message]:
         return List(S1().at(1), S2().at(0.1))
 
 
 class Q(Component):
 
     @trans.msg.one(P1)
-    def p1(self) -> Message:
+    def p1(self, msg: P1) -> Message:
         return P2()
 
     @trans.msg.one(T1)
-    def t1(self) -> Message:
+    def t1(self, msg: T1) -> Message:
         return T3()
 
     @trans.msg.one(S2)
-    def s1(self) -> Message:
+    def s1(self, msg: S2) -> Message:
         return S3().at(0.6)
 
 
-@trans.msg.one(Pub)
-def pub(msg: Pub) -> Message:
+@trans.free.one()
+def pub() -> Message:
     return P1()
 
 
@@ -93,9 +94,9 @@ config = Config.cons(
     name='envl',
     components=Map(p=P, q=Q),
     request_handlers=List(
-        RequestHandler.trans_cmd(pub)('pub'),
-        RequestHandler.msg_cmd(Target)('target'),
-        RequestHandler.msg_cmd(Seq)('Seq'),
+        RequestHandler.trans_cmd(pub)(),
+        RequestHandler.msg_cmd(Target)(),
+        RequestHandler.msg_cmd(Seq)(),
     ),
     core_components=List('p', 'q')
 )

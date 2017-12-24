@@ -12,7 +12,7 @@ from amino.do import do
 from ribosome.trans.message_base import _message_attr, Message, default_prio, _prio_attr, _dyn_attr
 
 from ribosome.logging import Logging
-from ribosome.trans.messages import Error, Debug, Coroutine
+from ribosome.trans.messages import Debug, Coroutine
 
 A = TypeVar('A')
 
@@ -68,61 +68,61 @@ class Handler:
     pass
 
 
-class LegacyHandler(Generic[M, D, R], Handler, Logging, ToStr):
+# class LegacyHandler(Generic[M, D, R], Handler, Logging, ToStr):
 
-    def __init__(self, name: str, fun: Callable[[D, M], R], message: Type[M], prio: float, dyn: bool) -> None:
-        self.name = name
-        self.message = message
-        self.fun = fun
-        self.prio = prio
-        self.dyn = dyn
+#     def __init__(self, name: str, fun: Callable[[D, M], R], message: Type[M], prio: float, dyn: bool) -> None:
+#         self.name = name
+#         self.message = message
+#         self.fun = fun
+#         self.prio = prio
+#         self.dyn = dyn
 
-    @staticmethod
-    def attrs(fun: Callable) -> Tuple[str, Type[M], float, bool]:
-        name = fun.__name__
-        msg = getattr(fun, _message_attr, None)
-        prio = getattr(fun, _prio_attr, default_prio)
-        dyn = getattr(fun, _dyn_attr, False)
-        return name, msg, prio, dyn
+#     @staticmethod
+#     def attrs(fun: Callable) -> Tuple[str, Type[M], float, bool]:
+#         name = fun.__name__
+#         msg = getattr(fun, _message_attr, None)
+#         prio = getattr(fun, _prio_attr, default_prio)
+#         dyn = getattr(fun, _dyn_attr, False)
+#         return name, msg, prio, dyn
 
-    @staticmethod
-    def create(fun: Callable[[D, M], R]) -> 'LegacyHandler[M, D, R]':
-        name, msg, prio, dyn = LegacyHandler.attrs(fun)
-        tpe = CoroHandler if iscoroutinefunction(fun) else DynHandler  # if dyn else TransHandler
-        return tpe(name, fun, msg, prio, dyn)
+#     @staticmethod
+#     def create(fun: Callable[[D, M], R]) -> 'LegacyHandler[M, D, R]':
+#         name, msg, prio, dyn = LegacyHandler.attrs(fun)
+#         tpe = CoroHandler if iscoroutinefunction(fun) else DynHandler  # if dyn else TransHandler
+#         return tpe(name, fun, msg, prio, dyn)
 
-    @abc.abstractmethod
-    def execute(self, data: D, msg: M) -> R:
-        ...
+#     @abc.abstractmethod
+#     def execute(self, data: D, msg: M) -> R:
+#         ...
 
-    @abc.abstractmethod
-    def run(self, data: D, msg: M) -> R:
-        ...
+#     @abc.abstractmethod
+#     def run(self, data: D, msg: M) -> R:
+#         ...
 
-    def _arg_desc(self) -> List[str]:
-        return List(self.name, str(self.message), str(self.fun))
-
-
-class DynHandler(Generic[M, D], LegacyHandler[M, D, DynTrans]):
-
-    def run(self, data, msg) -> DynTrans:
-        return _recover_error(self, self.execute(data, msg))
-
-    def execute(self, data, msg) -> DynTrans:
-        return self.fun(data, msg)
+#     def _arg_desc(self) -> List[str]:
+#         return List(self.name, str(self.message), str(self.fun))
 
 
-class CoroHandler(LegacyHandler):
+# class DynHandler(Generic[M, D], LegacyHandler[M, D, DynTrans]):
 
-    def run(self, data, msg) -> Maybe[Coroutine]:
-        return Maybe(Coroutine(self.fun(data, msg)))
+#     def run(self, data, msg) -> DynTrans:
+#         return _recover_error(self, self.execute(data, msg))
 
-    def execute(self, data, msg) -> Maybe[Coroutine]:
-        ...
+#     def execute(self, data, msg) -> DynTrans:
+#         return self.fun(data, msg)
 
 
-class CoroExecutionHandler(DynHandler):
-    pass
+# class CoroHandler(LegacyHandler):
+
+#     def run(self, data, msg) -> Maybe[Coroutine]:
+#         return Maybe(Coroutine(self.fun(data, msg)))
+
+#     def execute(self, data, msg) -> Maybe[Coroutine]:
+#         ...
+
+
+# class CoroExecutionHandler(DynHandler):
+#     pass
 
 
 class TransitionLogMeta(DatMeta):

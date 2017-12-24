@@ -4,31 +4,8 @@ from kallikrein import k, Expectation
 from kallikrein.matchers import equal
 from kallikrein.matchers.maybe import be_just
 
-from amino.util.string import camelcase
-
-from ribosome.request.legacy import LegacyRequestHandler
-from ribosome.trans.message_base import pmessage
 from ribosome.request.args import ArgValidator, ParamsSpec
 from ribosome.request.nargs import NargsZero, NargsOne, NargsPlus
-from ribosome.request.handler.dispatcher import RequestDispatcher
-
-BasicMessage = pmessage('BasicMessage', 'a', 'b', opt_fields=(('c', 1), ('d', 2)))
-JsonMessage = pmessage('JsonMessage', 'a', 'b')
-
-
-class RH(LegacyRequestHandler):
-
-    @property
-    def desc(self):
-        return 'req_test'
-
-    @property
-    def dispatcher(self) -> RequestDispatcher:
-        ...
-
-    @property
-    def method(self) -> str:
-        'telepathy'
 
 
 def check_args(fun: Callable, name: str=None) -> None:
@@ -71,7 +48,6 @@ class ArgValidatorSpec:
 
 class RequestHandlerSpec:
     '''request handlers
-    command name $name
     zero parameters $none
     one parameter $one
     one optional parameter $one_opt
@@ -82,15 +58,6 @@ class RequestHandlerSpec:
     varargs $var
     '''
 
-    def name(self) -> Expectation:
-        def cmd_name(a, b, c=2):
-            pass
-        other_name = 'other_name'
-        return (
-            k(RH(cmd_name).vim_name).must(equal('CmdName')) &
-            k(RH(cmd_name, name=other_name).vim_name).must(equal(camelcase(other_name)))
-        )
-
     def none(self) -> Expectation:
         def fun():
             pass
@@ -99,8 +66,8 @@ class RequestHandlerSpec:
         return (
             k(params.min).must(equal(0)) &
             k(params.max).must(be_just(0)) &
-            k(v.validate([])).true &
-            k(v.validate([1])).false
+            k(v.validate(0)).true &
+            k(v.validate(1)).false
         )
 
     def one(self) -> Expectation:
@@ -111,9 +78,9 @@ class RequestHandlerSpec:
         return (
             k(params.min).must(equal(1)) &
             k(params.max).must(be_just(1)) &
-            k(v.validate([])).false &
-            k(v.validate([1])).true &
-            k(v.validate([1, 2])).false
+            k(v.validate(0)).false &
+            k(v.validate(1)).true &
+            k(v.validate(2)).false
         )
 
     def one_opt(self) -> Expectation:
@@ -124,9 +91,9 @@ class RequestHandlerSpec:
         return (
             k(params.min).must(equal(0)) &
             k(params.max).must(be_just(1)) &
-            k(v.validate([])).true &
-            k(v.validate([1])).true &
-            k(v.validate([1, 2])).false
+            k(v.validate(0)).true &
+            k(v.validate(1)).true &
+            k(v.validate(2)).false
         )
 
     def two(self) -> Expectation:
@@ -137,10 +104,10 @@ class RequestHandlerSpec:
         return (
             k(params.min).must(equal(2)) &
             k(params.max).must(be_just(2)) &
-            k(v.validate([])).false &
-            k(v.validate([1])).false &
-            k(v.validate([1, 2])).true &
-            k(v.validate([1, 2, 3])).false
+            k(v.validate(0)).false &
+            k(v.validate(1)).false &
+            k(v.validate(2)).true &
+            k(v.validate(3)).false
         )
 
     def two_one_opt(self) -> Expectation:
@@ -151,10 +118,10 @@ class RequestHandlerSpec:
         return (
             k(params.min).must(equal(1)) &
             k(params.max).must(be_just(2)) &
-            k(v.validate([])).false &
-            k(v.validate([1])).true &
-            k(v.validate([1, 2])).true &
-            k(v.validate([1, 2, 3])).false
+            k(v.validate(0)).false &
+            k(v.validate(1)).true &
+            k(v.validate(2)).true &
+            k(v.validate(3)).false
         )
 
     def two_opt(self) -> Expectation:
@@ -165,10 +132,10 @@ class RequestHandlerSpec:
         return (
             k(params.min).must(equal(0)) &
             k(params.max).must(be_just(2)) &
-            k(v.validate([])).true &
-            k(v.validate([1])).true &
-            k(v.validate([1, 2])).true &
-            k(v.validate([1, 2, 3])).false
+            k(v.validate(0)).true &
+            k(v.validate(1)).true &
+            k(v.validate(2)).true &
+            k(v.validate(3)).false
         )
 
     def six(self) -> Expectation:
@@ -179,10 +146,10 @@ class RequestHandlerSpec:
         return (
             k(params.min).must(equal(6)) &
             k(params.max).must(be_just(6)) &
-            k(v.validate([])).false &
-            k(v.validate([1])).false &
-            k(v.validate([1, 2, 3, 4, 5, 6])).true &
-            k(v.validate([1, 2, 3, 4, 5, 6, 7])).false
+            k(v.validate(0)).false &
+            k(v.validate(1)).false &
+            k(v.validate(6)).true &
+            k(v.validate(7)).false
         )
 
     def var(self) -> Expectation:
@@ -193,10 +160,10 @@ class RequestHandlerSpec:
         return (
             k(params.min).must(equal(1)) &
             k(params.max).must(~be_just) &
-            k(v.validate([])).false &
-            k(v.validate([1])).true &
-            k(v.validate([1, 2])).true &
-            k(v.validate([1, 2, 3])).true
+            k(v.validate(0)).false &
+            k(v.validate(1)).true &
+            k(v.validate(2)).true &
+            k(v.validate(3)).true
         )
 
 __all__ = ('RequestHandlerSpec',)

@@ -58,6 +58,10 @@ class MessageTransHandler(Generic[M, D], Dat['MessageTransHandler[M, D]'], Trans
     def __call__(self, *args: Any) -> 'MessageTransHandler':
         return self
 
+    @property
+    def params_spec(self) -> ParamsSpec:
+        return ParamsSpec.from_type(self.message)
+
 
 class FreeTransHandler(Generic[D, R], Dat['FreeTransHandler[M, D]'], TransHandler):
 

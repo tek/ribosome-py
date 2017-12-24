@@ -38,6 +38,6 @@ class EnvelopeSpec(AutoPluginIntegrationKlkSpec):
         self.vim.cmd_once_defined('EnvlStage1')
         self.cmd_sync('EnvlSeq')
         self.seen_message(S3)
-        return k(self.message_log() / __.drop(2)).must(be_right(List(S2(), S3(), S1())))
+        return k(self.message_log() / __.drop(1)).must(be_right(List(S2(), S3(), S1())))
 
 __all__ = ('EnvelopeSpec',)

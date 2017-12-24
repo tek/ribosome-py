@@ -7,6 +7,10 @@ from amino.json.decoder import decode_json_type
 from ribosome.request.args import ParamsSpec
 
 
+def starts_with_brace(data: Any) -> bool:
+    return isinstance(data, str) and data.startswith('{')
+
+
 class ArgParser(abc.ABC):
 
     def __init__(self, params_spec: ParamsSpec) -> None:
@@ -31,7 +35,7 @@ class JsonArgParser(ArgParser):
             json_args = args[start:].join_tokens
             tpe = self.params_spec.types.last | (lambda: Map)
             return decode_json_type(json_args, tpe) / strict.cat
-        return args.index_where(__.startswith('{')) / parse | Right(args)
+        return args.index_where(starts_with_brace) / parse | Right(args)
 
 
 __all__ = ('ArgParser', 'TokenArgParser', 'JsonArgParser')

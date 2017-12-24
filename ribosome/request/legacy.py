@@ -95,8 +95,8 @@ class LegacyRequestHandler(Logging, metaclass=abc.ABCMeta):
         args = argl.head | List()
         bang = argl.lift(1).contains(1)
         validator = ArgValidator(self.params_spec)
-        if validator.validate(args):
-            return self._call_fun(obj, *args, bang=bang)
+        if validator.validate(len(args)):
+            return self._call_fun(obj, args, bang=bang)
         else:
             return validator.error(args, self.desc, self.vim_name)
 

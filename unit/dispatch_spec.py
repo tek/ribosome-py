@@ -156,7 +156,7 @@ def init(name: str, *comps: str, args=()) -> Tuple[NvimFacade, PluginState, Disp
     vim = MockNvimFacade(prefix='hs', vars=dict(hs_components=Lists.wrap(comps)))
     state = init_state(host_conf).unsafe(vim)
     holder = PluginStateHolder.strict(state)
-    job = dispatch_job(True, host_conf.async_dispatch, holder, name, host_conf.config.prefix, (args,))
+    job = dispatch_job(True, host_conf.config.async_dispatch, holder, name, host_conf.config.prefix, (args,))
     return vim, state, job, job.dispatches.lift(job.name).get_or_fail('no matching dispatch')
 
 
@@ -195,8 +195,8 @@ class DispatchSpec(SpecBase):
     def legacy(self) -> Expectation:
         vim = MockNvimFacade()
         state = init_state(host_conf).unsafe(vim)
-        holder = PluginStateHolder.cons(state)
-        handler = request_handler(vim, True, host_conf.sync_dispatch, holder, config)
+        holder = PluginStateHolder.strict(state)
+        handler = request_handler(vim, True, host_conf.config.sync_dispatch, holder, config)
         return kf(handler, 'hs:command:Hs', ((),)) == specimen
 
     def send_message(self) -> Expectation:
