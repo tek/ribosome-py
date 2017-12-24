@@ -94,6 +94,11 @@ def update_state(query: UpdateQuery) -> Do:
     yield query.patch / patch_update | MaybeState.pure(None)
 
 
+@trans.free.unit()
+def poll() -> None:
+    pass
+
+
 message_log_handler = RequestHandler.trans_function(message_log)(prefix=Full(), internal=true, sync=true)
 trans_log_handler = RequestHandler.trans_function(trans_log)(prefix=Full(), internal=true, sync=true)
 set_log_level_handler = RequestHandler.trans_function(set_log_level)(prefix=Full(), internal=true)
@@ -104,6 +109,7 @@ mapping_handler = RequestHandler.msg_fun(Mapping)(prefix=Full())
 quit_handler = RequestHandler.msg_cmd(Quit)(prefix=Full())
 state_handler = RequestHandler.trans_function(state_data)(name='state', internal=true, sync=true)
 rpc_handlers_handler = RequestHandler.trans_function(rpc_handlers)(internal=true, sync=true, prefix=Full())
+poll_handler = RequestHandler.trans_cmd(poll)(prefix=Full())
 
 
 def internal_dispatchers(config: Config) -> List[Dispatch]:
@@ -115,9 +121,10 @@ def internal_dispatchers(config: Config) -> List[Dispatch]:
         Trans(update_state_handler),
         SendMessage(update_component_state_handler),
         SendMessage(mapping_handler),
-        SendMessage(quit_handler),
+        # SendMessage(quit_handler),
         Internal(state_handler),
         Internal(rpc_handlers_handler),
+        Trans(poll_handler),
     )
 
 
