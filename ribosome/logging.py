@@ -1,4 +1,3 @@
-import os
 import logging
 from typing import TypeVar, Callable
 
@@ -8,7 +7,7 @@ import amino
 from amino.lazy import lazy
 import amino.logging
 from amino.logging import (amino_logger, init_loglevel, amino_root_file_logging, DDEBUG, print_log_info, VERBOSE,
-                           LazyRecord, TEST)
+                           LazyRecord, TEST, log_stamp)
 from amino import Path, Logger
 
 import ribosome  # noqa
@@ -56,7 +55,7 @@ def ribosome_file_logging(name: str, file_kw: dict=dict()) -> logging.Handler:
         if options.development and options.spec else
         options.file_log_level.value | logging.DEBUG
     )
-    logfile = Path(f'{prefix_path}_ribo_{name}_{os.getpid()}')
+    logfile = Path(f'{prefix_path}_ribo_{name}_{log_stamp()}')
     kw = merge(
         file_kw,
         dict(level=level, logfile=logfile)
