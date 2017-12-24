@@ -1,4 +1,5 @@
 import abc
+import queue
 import inspect
 import logging
 from typing import TypeVar, Generic, Type, Any, Callable, Optional
@@ -248,21 +249,21 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
         super().__init__(state, log_handler)
         self.lock = lock
         self.running = running
-        self.waiting_greenlet = None
+        self.waiting_greenlets = queue.Queue()
 
-    def _set_waiting_greenlet(self) -> None:
-        self.waiting_greenlet = greenlet.getcurrent()
+    def _enqueue_greenlet(self) -> None:
+        self.waiting_greenlets.put(greenlet.getcurrent())
 
-    def _unset_waiting_greenlet(self, error: Exception=None) -> None:
+    def _pop_greenlet(self, error: Exception=None) -> None:
         if error:
             self.log.caught_exception(f'switching to parent greenlet in `acquire`', error)
-        gr = self.waiting_greenlet
-        self.waiting_greenlet = None
+        gr = self.waiting_greenlets.get()
+        self.waiting_greenlets.task_done()
         return gr
 
     # FIXME if an async request arrives while another async dispatch is executing, will it behave similarly?
     # If so, this needs multiple waiting greenlets.
-    # If not, the parent switch (and overwriting of `waiting_greenlet`) may not be done.
+    # If not, the parent switch (and overwriting of `waiting_greenlets`) may not be done.
     @do(NvimIO[None])
     def acquire(self) -> Do:
         '''acquire the state lock that prevents multiple dispatches from updating the state asynchronously.
@@ -273,8 +274,8 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
         '''
         def switch() -> None:
             self.log.debug(f'acquire: switching to running dispatch')
-            self._set_waiting_greenlet()
-            Try(self.waiting_greenlet.parent.switch).leffect(self._unset_waiting_greenlet)
+            self._enqueue_greenlet()
+            Try(lambda: greenlet.getcurrent().parent.switch()).leffect(self._pop_greenlet)
         if self.running:
             yield NvimIO.simple(switch)
         yield NvimIO.simple(self.lock.acquire)
@@ -293,9 +294,9 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
         '''switch back to the dispatch that was suspended in `acquire` while the dispatch executing this method was
         running.
         '''
-        if self.waiting_greenlet is not None:
+        if not self.waiting_greenlets.empty():
             self.log.debug('release: switching to waiting dispatch')
-            gr = yield IO.delay(self._unset_waiting_greenlet)
+            gr = yield IO.delay(self._pop_greenlet)
             yield IO.delay(gr.switch)
         yield IO.pure(None)
 
