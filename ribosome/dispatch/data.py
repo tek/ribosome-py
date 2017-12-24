@@ -12,7 +12,7 @@ from ribosome.nvim import NvimIO
 from ribosome.nvim.io import NvimIOState
 from ribosome.trans.message_base import Message
 from ribosome.trans.effect import GatherIOs, GatherSubprocs
-from ribosome.trans.action import TransDo
+from ribosome.trans.action import TransDo, TransLog
 
 B = TypeVar('B')
 Meth = TypeVar('Meth', bound=RpcMethod)
@@ -193,6 +193,12 @@ class DispatchOutputAggregate(DispatchOutput):
 class DispatchDo(DispatchOutput):
 
     def __init__(self, trans: TransDo) -> None:
+        self.trans = trans
+
+
+class DispatchLog(DispatchOutput):
+
+    def __init__(self, trans: TransLog) -> None:
         self.trans = trans
 
 

@@ -22,6 +22,7 @@ from ribosome.trans.handler import TransHandler, TransComplete
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec
+from ribosome.trans.action import LogMessage
 
 D = TypeVar('D')
 TransState = NvimIOState[D, DispatchResult]
@@ -129,10 +130,11 @@ class PluginState(Generic[D], Dat['PluginState']):
             message_log: List[Message]=Nil,
             trans_log: List[str]=Nil,
             log_handler: Maybe[logging.Handler]=Nothing,
+            logger: Maybe[Callable[[LogMessage], 'NS[PluginState[D], None]']]=Nothing,
     ) -> 'PluginState':
         component_state = Components(components / ComponentState.cons)
         return PluginState(dispatch_config, data, plugin, component_state, messages, message_log, trans_log,
-                           log_handler)
+                           log_handler, logger)
 
     def __init__(
             self,
@@ -144,6 +146,7 @@ class PluginState(Generic[D], Dat['PluginState']):
             message_log: List[Message],
             trans_log: List[str],
             log_handler: Maybe[logging.Handler],
+            logger: Maybe[Callable[[LogMessage], 'NS[PluginState[D], None]']],
     ) -> None:
         self.dispatch_config = dispatch_config
         self.data = data
@@ -153,6 +156,7 @@ class PluginState(Generic[D], Dat['PluginState']):
         self.message_log = message_log
         self.trans_log = trans_log
         self.log_handler = log_handler
+        self.logger = logger
 
     def enqueue(self, messages: List[Sendable]) -> 'PluginState[D]':
         envelopes = messages / Envelope.from_sendable

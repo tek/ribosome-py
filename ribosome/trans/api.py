@@ -1,7 +1,7 @@
 from ribosome.trans.effect import (TransEffect, TransEffectMaybe, TransEffectEither, TransEffectStateT, TransEffectIO,
                                    TransEffectNvimIO, TransEffectCoro, TransEffectSingleMessage, TransEffectMessages,
                                    TransEffectUnit, TransEffectResult, TransEffectGatherIOs, TransEffectDo,
-                                   TransEffectGatherSubprocs)
+                                   TransEffectGatherSubprocs, TransEffectLog)
 from ribosome.trans.main import FreeTransCons, MessageTransCons
 
 
@@ -19,6 +19,7 @@ class TransApi:
     none: TransEffect = TransEffectUnit()
     result: TransEffect = TransEffectResult()
     do: TransEffect = TransEffectDo()
+    log: TransEffect = TransEffectLog()
     free: FreeTransCons = FreeTransCons()
     msg: MessageTransCons = MessageTransCons()
 

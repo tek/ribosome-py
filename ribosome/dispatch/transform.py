@@ -12,9 +12,9 @@ from ribosome.logging import Logging
 from ribosome.nvim.io import NvimIOState, NS
 from ribosome.nvim import NvimIO
 from ribosome.dispatch.data import (DispatchResult, DispatchUnit, DispatchError, DispatchReturn, DispatchIO, DIO,
-                                    DispatchDo)
+                                    DispatchDo, DispatchLog)
 from ribosome.trans.action import (Transit, Propagate, TransUnit, TransResult, TransFailure, TransAction, TransIO,
-                                   TransDo)
+                                   TransDo, TransLog)
 from ribosome.trans.message_base import Message
 from ribosome.trans.handler import TransComplete
 
@@ -96,6 +96,9 @@ class TransValidator(Logging):
 
     def validate_trans_do(self, action: TransDo) -> NvimIOState[D, DispatchResult]:
         return NvimIOState.pure(DispatchResult(DispatchDo(action), Nil))
+
+    def validate_trans_log(self, action: TransLog) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.pure(DispatchResult(DispatchLog(action.message), Nil))
 
 
 def validate_trans_action(tc: TransComplete) -> NS[D, DispatchResult]:

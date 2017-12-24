@@ -1,5 +1,7 @@
+import abc
 from typing import TypeVar, Generic, Any, Callable
 from types import SimpleNamespace
+from logging import INFO, ERROR
 
 from amino import Either, List, Id, Maybe, Nil
 from amino.state import StateT
@@ -8,9 +10,9 @@ from amino.algebra import AlgebraMeta
 from amino.dat import ADT, ADTMeta
 from amino.tc.base import Implicits, ImplicitsMeta
 from amino.tc.monad import Monad
+from amino.logging import LogError
 
 from ribosome.trans.message_base import Sendable, Message
-from ribosome.trans.messages import Error
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -88,7 +90,7 @@ class Propagate(TransAction):
 
     @staticmethod
     def from_either(res: Either[str, TransAction]) -> TransAction:
-        return res.value_or(lambda a: Propagate.one(Error(a)))
+        return res.value_or(lambda a: TransFailure(a))
 
     def _arg_desc(self) -> List[str]:
         return self.messages / str
@@ -130,6 +132,49 @@ class TransDo(TransAction):
 
     def __init__(self, action: TransM) -> None:
         self.action = action
+
+
+class LogMessage(ADT['LogMessage']):
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+    @abc.abstractproperty
+    def level(self) -> int:
+        ...
+
+
+class Info(LogMessage):
+
+    @property
+    def level(self) -> int:
+        return INFO
+
+
+class Error(LogMessage, LogError):
+
+    def __init__(self, message: str, prefix: str='') -> None:
+        super().__init__(message)
+        self.prefix = prefix
+
+    @property
+    def level(self) -> int:
+        return ERROR
+
+    @property
+    def full(self) -> str:
+        pre = f'{self.prefix}: ' if self.prefix else ''
+        return f'{pre}{self.message}'
+
+    @property
+    def short(self) -> str:
+        return self.message
+
+
+class TransLog(TransAction):
+
+    def __init__(self, message: LogMessage) -> None:
+        self.message = message
 
 
 class TransStep(Generic[R], ToStr, metaclass=AlgebraMeta, base=True):

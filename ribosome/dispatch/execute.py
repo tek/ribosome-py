@@ -19,14 +19,15 @@ from ribosome.dispatch.run import (DispatchJob, RunDispatchSync, RunDispatchAsyn
                                    log_trans)
 from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
                                     DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors,
-                                    NvimIODIO, DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO)
+                                    NvimIODIO, DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO,
+                                    DispatchLog)
 from ribosome.plugin_state import PluginState, PluginStateHolder
 from ribosome.trans.queue import PrioQueue
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.loop import process_message
 from ribosome.trans.send_message import send_message
 from ribosome.dispatch.transform import validate_trans_action
-from ribosome.trans.action import TransM, TransMPure, TransMBind
+from ribosome.trans.action import TransM, TransMPure, TransMBind, LogMessage, Info, Error
 from ribosome.trans.handler import TransComplete
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
@@ -91,6 +92,18 @@ def run_trans_m(tr: TransM) -> Do:
         yield run_trans_m(n)
 
 
+class DispatchLogger:
+
+    def info(self, msg: Info) -> NS[D, None]:
+        return NS.delay(lambda v: ribo_log.info(msg.message))
+
+    def error(self, msg: Error) -> NS[D, None]:
+        return NS.delay(lambda v: ribo_log.error(msg))
+
+
+dispatch_log = dispatch_alg(DispatchLogger(), LogMessage)
+
+
 class ExecuteDispatchOutput(Logging):
 
     def dispatch_error(self, result: DispatchError) -> NS[PluginState[D], R]:
@@ -121,6 +134,12 @@ class ExecuteDispatchOutput(Logging):
 
     def dispatch_do(self, result: DispatchDo) -> NS[PluginState[D], R]:
         return run_trans_m(result.trans.action)
+
+    @do(NS[PluginState[D], R])
+    def dispatch_log(self, result: DispatchLog) -> Do:
+        custom_logger = yield NS.inspect(_.logger)
+        logger = custom_logger | (lambda: dispatch_log)
+        yield logger(result.trans)
 
 
 execute_output = dispatch_alg(ExecuteDispatchOutput(), DispatchOutput, '')

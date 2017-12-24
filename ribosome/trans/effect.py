@@ -12,9 +12,9 @@ from amino.string.hues import red, green
 from ribosome.logging import Logging
 from ribosome.nvim import NvimIO
 from ribosome.trans.action import (TransStep, TransEffectError, Lift, Propagate, Strict, TransUnit, TransResult,
-                                   TransAction, Transit, TransFailure, TransIO, TransM, TransDo)
+                                   TransAction, Transit, TransFailure, TransIO, TransM, TransDo, LogMessage, TransLog)
 from ribosome.trans.message_base import Sendable, Messages
-from ribosome.trans.messages import Error, Nop, CoroutineAlg
+from ribosome.trans.messages import Nop, CoroutineAlg
 from ribosome.process import Subprocess, SubprocessResult
 
 D = TypeVar('D')
@@ -62,7 +62,6 @@ class TransEffectMaybe(Generic[R], TransEffect[Maybe[R]]):
         return Lift(nested | Propagate.one(Nop()))
 
 
-# FIXME use TransEffectError, not Error?
 class TransEffectEither(Generic[R], TransEffect[Either[str, R]]):
 
     @property
@@ -71,7 +70,7 @@ class TransEffectEither(Generic[R], TransEffect[Either[str, R]]):
 
     def extract(self, data: Either[str, R], tail: List[TransEffect], in_state: bool) -> TransStep:
         nested = data.map(lambda a: cont(tail, in_state, lambda run: Lift(run(a))) | a)
-        return Lift(nested.value_or(L(Error)(_) >> Propagate.one))
+        return nested.cata(TransEffectError, Lift)
 
 
 class TransEffectStateT(Generic[G, D, R], TransEffect[StateT[G, D, R]]):
@@ -236,8 +235,18 @@ class TransEffectDo(TransEffect[TransM]):
     def tpe(self) -> Type[TransM]:
         return TransM
 
-    def extract(self, data: TransM[A], tail: List[TransEffect], in_state: bool) -> Either[R, N]:
-        return Lift(TransDo(data)) if tail.empty else TransEffectError('cannot apply trans effects to TransM[A]')
+    def extract(self, data: TransM[A], tail: List[TransEffect], in_state: bool) -> TransStep:
+        return Lift(TransDo(data)) if tail.empty else TransEffectError('cannot apply trans effects to TransM')
+
+
+class TransEffectLog(TransEffect[LogMessage]):
+
+    @property
+    def tpe(self) -> Type[LogMessage]:
+        return LogMessage
+
+    def extract(self, data: LogMessage, tail: List[TransEffect], in_state: bool) -> TransStep:
+        return Lift(TransLog(data)) if tail.empty else TransEffectError('cannot apply trans effects to LogMessage')
 
 
 class Lifter(Logging):
