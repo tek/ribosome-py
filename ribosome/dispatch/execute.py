@@ -12,7 +12,6 @@ from amino.io import IOException
 
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log, Logging
-from ribosome import NvimPlugin
 from ribosome.config import Config
 from ribosome.nvim.io import NS, NResult, NSuccess, NError, NFatal
 from ribosome.dispatch.run import (DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch, execute_data_trans,
@@ -31,7 +30,6 @@ from ribosome.trans.action import TransM, TransMPure, TransMBind, LogMessage, In
 from ribosome.trans.handler import TransComplete
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
-NP = TypeVar('NP', bound=NvimPlugin)
 D = TypeVar('D')
 AS = TypeVar('AS')
 A = TypeVar('A', bound=AS)

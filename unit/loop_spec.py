@@ -57,7 +57,7 @@ class LoopSpec(SpecBase):
     def send_message(self) -> Expectation:
         config = Config.cons('test')
         d = SimpleData(config=config)
-        state = PluginState.cons(DispatchConfig.cons(config), d, None, List(Comp1('comp1')), messages=PrioQueue.empty)
+        state = PluginState.cons(DispatchConfig.cons(config), d, List(Comp1('comp1')), messages=PrioQueue.empty)
         a = Msg1()
         r = send_message(a).run_a(state).unsafe(vim)
         return k(r.output.results.head // _.msgs.head / _.msg).must(be_just(have_type(Msg2)))

@@ -5,39 +5,34 @@ from neovim.msgpack_rpc import MsgpackStream, AsyncSession, Session
 from neovim.api import Nvim
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 from neovim.msgpack_rpc.event_loop.uv import UvEventLoop
-from neovim import attach
 
-from amino import Either, _, L, Maybe, amino_log, Logger, __, Path, Map, List, Boolean, Nil, Just, env
+from amino import Either, _, L, amino_log, Logger, __, Path, Map, List, Boolean, Nil, Just
 from amino.either import ImportFailure
-from amino.func import Val
 from amino.logging import amino_root_file_logging
 from amino.do import do, Do
 from amino.dat import Dat
 from amino.algebra import Algebra
 from amino.boolean import false
 from amino.util.string import decode
-from amino.mod import instance_from_module, cls_from_module
+from amino.mod import instance_from_module
 
-from ribosome import NvimPlugin
 from ribosome import options
 from ribosome.config import Config
-from ribosome.dispatch.data import Legacy, SendMessage, Trans, Internal, DispatchSync, DispatchAsync, Dispatch, DIO
+from ribosome.dispatch.data import SendMessage, Trans, Internal, DispatchAsync, Dispatch, DIO
 from ribosome.dispatch.execute import execute_dispatch_job, request_result
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.dispatch.run import DispatchJob
 from ribosome.logging import ribo_log, nvim_logging
 from ribosome.nvim import NvimFacade, NvimIO
-from ribosome.plugin import plugin_class_from_config
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.request.handler.dispatcher import MsgDispatcher
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.request.rpc import rpc_handler_functions, define_handlers, RpcHandlerSpec
+from ribosome.request.rpc import define_handlers, RpcHandlerSpec
 from ribosome.nvim.io import NS
 from ribosome.trans.handler import TransComplete
 from ribosome.trans.internal import internal_dispatchers
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
-NP = TypeVar('NP', bound=NvimPlugin)
 D = TypeVar('D')
 B = TypeVar('B')
 C = TypeVar('C', bound=Config)
@@ -51,10 +46,8 @@ class HostConfig(Dat['HostConfig']):
     def __init__(
             self,
             config: DispatchConfig,
-            plugin_class: Maybe[Type[NP]],
     ) -> None:
         self.config = config
-        self.plugin_class = plugin_class
 
     @property
     def name(self) -> str:
@@ -110,9 +103,8 @@ def init_state(host_config: HostConfig) -> Do:
     dispatch_config = host_config.config
     data = dispatch_config.config.state()
     components = yield ComponentResolver(dispatch_config.config).run
-    plugin = yield NvimIO.delay(host_config.plugin_class)
     log_handler = yield NvimIO.delay(nvim_logging)
-    yield NvimIO.pure(PluginState.cons(dispatch_config, data, plugin, components, log_handler=Just(log_handler)))
+    yield NvimIO.pure(PluginState.cons(dispatch_config, data, components, log_handler=Just(log_handler)))
 
 
 # TODO can vim be injected into each request handling process?
@@ -153,10 +145,6 @@ def start_host(prefix: str, host_config: HostConfig) -> int:
     return run_loop(session(), prefix, host_config)
 
 
-def plugin_cls_from_module(mod: ModuleType) -> Either[str, Type[NP]]:
-    return cls_from_module(mod, NvimPlugin)
-
-
 def config_from_module(mod: ModuleType) -> Either[str, Type[C]]:
     return instance_from_module(mod, Config)
 
@@ -170,10 +158,6 @@ def nvim_log() -> Logger:
         NvimFacade.stdio_with_logging('ribosome_start_host')
         log_initialized = True
     return ribo_log
-
-
-def plugin_class_dispatchers(cls: Type[NP]) -> List[DispatchSync]:
-    return rpc_handler_functions(cls) / Legacy
 
 
 def config_dispatchers(config: Config) -> List[DispatchAsync]:
@@ -191,19 +175,17 @@ def config_dispatchers(config: Config) -> List[DispatchAsync]:
 
 def host_config_1(
         config: Config,
-        cls: Type[NP],
         debug: Boolean,
         io_executor: Callable[[DIO], NS[PluginState[D], TransComplete]]=None,
 ) -> HostConfig:
     name = config.name
-    cls_dispatchers = plugin_class_dispatchers(cls)
     cfg_dispatchers = config_dispatchers(config)
     int_dispatchers = internal_dispatchers(config)
     with_method = lambda ds: Map(ds.map(lambda d: (d.spec(config.name, config.prefix).rpc_method(name), d)))
-    dispatches = int_dispatchers + cfg_dispatchers + cls_dispatchers
+    dispatches = int_dispatchers + cfg_dispatchers
     sync_dispatch, async_dispatch = dispatches.filter(_.sync), dispatches.filter(_.async)
     dispatch_config = DispatchConfig.cons(config, with_method(sync_dispatch), with_method(async_dispatch), io_executor)
-    return HostConfig(dispatch_config, cls)
+    return HostConfig(dispatch_config)
 
 
 class SyntheticPlugin:
@@ -212,19 +194,16 @@ class SyntheticPlugin:
 
 def host_config(
         config: Config,
-        plugin_mixin: Either[str, Type[NP]],
         debug: Boolean=false,
         io_executor: Callable[[DIO], NS[PluginState[D], TransComplete]]=None,
 ) -> HostConfig:
-    sup = plugin_mixin | Val(SyntheticPlugin)
-    cls = plugin_class_from_config(config, sup, debug)
-    return host_config_1(config, cls, debug, io_executor)
+    return host_config_1(config, debug, io_executor)
 
 
-def start_config_stage_2(sup: Either[str, Type[NP]], config: Config) -> int:
+def start_config_stage_2(config: Config) -> int:
     debug = options.development.exists
     amino_log.debug(f'starting plugin from {config}, debug: {debug}')
-    return start_host(config.name, host_config(config, sup, debug))
+    return start_host(config.name, host_config(config, debug))
 
 
 def error(msg: str) -> int:
@@ -245,8 +224,7 @@ def exception(e: Exception, desc: str) -> int:
 
 
 def start_config_stage_1(mod: ModuleType) -> int:
-    plugin_cls = plugin_cls_from_module(mod)
-    return config_from_module(mod).cata(error, L(start_config_stage_2)(plugin_cls, _))
+    return config_from_module(mod).cata(error, start_config_stage_2)
 
 
 def setup_log() -> None:

@@ -104,17 +104,22 @@ class RequestHandlerBuilder(Generic[Meth, DP]):
         self.method = method
         self.dispatcher = dispatcher
 
+    @property
+    def sync_default(self) -> Boolean:
+        return Boolean.isinstance(self.method, FunctionMethod)
+
     def __call__(
             self,
             name: str=None,
             prefix: PrefixStyle=Short(),
             internal: Boolean=false,
-            sync: Boolean=false,
+            sync: Boolean=None,
             json: Boolean=false,
             **options: Any,
     ) -> RequestHandler:
         name1 = name or self.dispatcher.name
-        return RequestHandler(self.method, self.dispatcher, name1, prefix, internal, sync, json, Map(options))
+        sync1 = self.sync_default if sync is None else sync
+        return RequestHandler(self.method, self.dispatcher, name1, prefix, internal, sync1, json, Map(options))
 
 
 class RequestHandlers(ToStr):

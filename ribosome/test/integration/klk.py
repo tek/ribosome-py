@@ -17,7 +17,7 @@ from kallikrein.matchers.either import be_right
 from kallikrein.matchers.typed import have_type
 
 from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationSpec, ExternalIntegrationSpec,
-                                            PluginIntegrationSpec, AutoPluginIntegrationSpec)
+                                            AutoPluginIntegrationSpec)
 from ribosome.nvim.components import Buffer
 from ribosome.trans.message_base import Message
 from ribosome.config import PluginSettings
@@ -147,10 +147,6 @@ class ExternalIntegrationKlkSpec(ExternalIntegrationSpec, VimIntegrationKlkHelpe
     pass
 
 
-class PluginIntegrationKlkSpec(PluginIntegrationSpec, VimIntegrationKlkHelpers):
-    pass
-
-
 Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D')
 
@@ -160,4 +156,4 @@ class AutoPluginIntegrationKlkSpec(Generic[Settings, D], AutoPluginIntegrationSp
     pass
 
 __all__ = ('VimIntegrationKlkHelpers', 'VimIntegrationKlkSpec', 'ExternalIntegrationKlkSpec',
-           'PluginIntegrationKlkSpec', 'AutoPluginIntegrationKlkSpec')
+           'AutoPluginIntegrationKlkSpec')

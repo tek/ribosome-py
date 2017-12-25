@@ -18,6 +18,20 @@ Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D', bound='SimpleData')
 
 
+class ComponentConfig(Dat['ComponentConfig']):
+
+    @staticmethod
+    def cons(
+            name: str,
+            request_handlers: List[RequestHandler]=Nil,
+    ) -> 'Config[Settings, D]':
+        return Config(name, RequestHandlers.cons(*request_handlers))
+
+    def __init__(self, name: str, request_handlers: RequestHandlers) -> None:
+        self.name = name
+        self.request_handlers = request_handlers
+
+
 class Config(Generic[Settings, D], Dat['Config[Settings, D]']):
 
     @staticmethod

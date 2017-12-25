@@ -69,4 +69,5 @@ def unite_plugin(pname: str) -> Callable[[type], type]:
         return cls
     return decorator
 
+
 __all__ = ('mk_unite_candidates', 'mk_unite_action', 'unite_plugin')

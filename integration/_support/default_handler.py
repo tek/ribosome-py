@@ -9,14 +9,14 @@ class_name = 'ZeeKlass'
 
 
 @trans.free.result()
-def test_path(self) -> str:
+def test_path() -> str:
     return Either.import_name('pkg', class_name).map(lambda a: a.__name__).value_or('failed')
 
 
 config = Config.cons(
     'plug',
     request_handlers=List(
-        RequestHandler.trans_function(test_path)(prefix=Plain()),
+        RequestHandler.trans_function(test_path)(prefix=Plain(), sync=True),
     )
 )
 

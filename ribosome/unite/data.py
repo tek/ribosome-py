@@ -8,8 +8,10 @@ from ribosome.nvim.components import Syntax
 from amino import List, Map, _, L, Maybe, IO, __, Nil
 
 
-class UniteMessage(Message, varargs='unite_args'):
-    pass
+class UniteMessage(Message):
+
+    def __init__(self, *unite_args: str) -> None:
+        self.unite_args = unite_args
 
 UniteSyntax = pmessage('UniteSyntax', 'source')
 
@@ -142,5 +144,4 @@ class UniteKind(UniteEntity):
         actions = self.actions.map(self._action).mk_string(', ')
         return self._templ.format(name=self.name, actions=actions, default=self.default)
 
-__all__ = ('UniteMessage', 'UniteEntity', 'UniteSource', 'UniteKind',
-           'UniteSyntax')
+__all__ = ('UniteMessage', 'UniteEntity', 'UniteSource', 'UniteKind', 'UniteSyntax')

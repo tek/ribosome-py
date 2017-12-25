@@ -9,14 +9,14 @@ from functools import wraps
 from threading import Thread
 from datetime import datetime
 from contextlib import contextmanager
-from typing import Any, Callable, Generic, TypeVar, Type
+from typing import Any, Callable, Generic, TypeVar
 
 import neovim
 from neovim.api import Nvim
 
-from amino import List, Either, Left, __, env, Path, Lists, _, Map
+from amino import List, Either, __, env, Path, Lists, Map
 from amino.lazy import lazy
-from amino.test import fixture_path, temp_dir, temp_file
+from amino.test import fixture_path, temp_dir
 from amino.test.path import base_dir, pkg_dir
 from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase, default_timeout
 from amino.util.string import camelcase
@@ -25,14 +25,9 @@ from amino.json.data import JsonError
 
 import ribosome
 from ribosome.logging import Logging
-from ribosome import NvimFacade, NvimPlugin
-from ribosome.nvim import AsyncVimProxy
-from ribosome.test.fixtures import rplugin_template
-from ribosome.request.rpc import rpc_handlers, RpcHandlerSpec
+from ribosome.nvim import AsyncVimProxy, NvimFacade
 from ribosome.trans.message_base import Message
 from ribosome.config import PluginSettings
-
-A = TypeVar('A', bound=NvimPlugin)
 
 
 def wait_for(cond: Callable[[], bool], timeout: float=None, intval: float=0.1) -> bool:
@@ -353,63 +348,6 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
         self.root.sub.cat(self.root) % __.report()
 
 
-class PluginIntegrationSpec(Generic[A], VimIntegrationSpec):
-
-    def setup(self) -> None:
-        self.log_format = '{message}'
-        super().setup()
-
-    @property
-    def autostart_plugin(self) -> bool:
-        return True
-
-    def _post_start_neovim(self) -> None:
-        super()._post_start_neovim()
-        if self.autostart_plugin:
-            self._setup_handlers()
-
-    def _setup_handlers(self) -> None:
-        rp_path = self.rplugin_path.get_or_raise()
-        rp_handlers = self.handlers(rp_path).get_or_raise()
-        self.vim.call(
-            'remote#host#RegisterPlugin',
-            'python3',
-            str(rp_path),
-            rp_handlers / _.encode,
-        )
-
-    @property
-    def plugin_class(self) -> Either[str, Type[A]]:
-        name = self.__class__.__name__
-        e = 'property {}.plugin_class must return amino.Right(YourPluginClass)'
-        return Left(e.format(name))
-
-    @property
-    def plugin_name(self) -> str:
-        return camelcase(self.plugin_class.get_or_raise().name)
-
-    @property
-    def plugin_prefix(self) -> str:
-        return camelcase(self.plugin_class.get_or_raise().prefix)
-
-    @property
-    def rplugin_path(self) -> Either[str, Path]:
-        return self.plugin_class / self._auto_rplugin
-
-    def handlers(self, rp_path: Path) -> Either[str, List[dict]]:
-        return Either.import_from_file(rp_path, 'SpecPlugin') / self._auto_handlers
-
-    def _auto_handlers(self, cls) -> List[RpcHandlerSpec]:
-        return rpc_handlers(cls)
-
-    def _auto_rplugin(self, cls):
-        mod = cls.__module__
-        name = cls.__name__
-        rp_path = temp_file('ribosome', 'spec', 'spec_plugin.py')
-        rp_path.write_text(rplugin_template.format(plugin_module=mod, plugin_class=name))
-        return rp_path
-
-
 Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D')
 
@@ -463,4 +401,4 @@ class AutoPluginIntegrationSpec(Generic[Settings, D], VimIntegrationSpec):
         self.send_json(dump_json(msg).get_or_raise())
 
 
-__all__ = ('VimIntegrationSpec', 'ExternalIntegrationSpec', 'PluginIntegrationSpec')
+__all__ = ('VimIntegrationSpec', 'ExternalIntegrationSpec', 'AutoPluginIntegrationSpec')

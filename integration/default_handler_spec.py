@@ -12,7 +12,7 @@ from integration._support.default_handler import class_name
 
 class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[PluginSettings, SimpleData]):
     '''
-    # append a directory to the plugin's `sys.path` $append_path
+    append a directory to the plugin's `sys.path` $append_path
     '''
 
     @property

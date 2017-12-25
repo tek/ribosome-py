@@ -1,9 +1,10 @@
-from typing import TypeVar, Any
+import sys
+from typing import TypeVar, Any, Iterable
 
 from amino.state import EitherState, MaybeState
 
 from lenses import UnboundLens
-from amino import do, Do, __, Either, _, List, Map, Maybe, Lists, Just, Regex, L
+from amino import do, Do, __, Either, _, List, Map, Maybe, Lists, Just, Regex, L, IO
 from amino.json import dump_json
 from amino.boolean import true
 from amino.dat import Dat
@@ -98,6 +99,16 @@ def poll() -> None:
     pass
 
 
+@trans.free.unit(trans.io)
+def append_python_path(path: str) -> IO[None]:
+    return IO.delay(sys.path.append, path)
+
+
+@trans.free.result()
+def show_python_path() -> Iterable[str]:
+    return sys.path
+
+
 message_log_handler = RequestHandler.trans_function(message_log)(prefix=Full(), internal=true, sync=true)
 trans_log_handler = RequestHandler.trans_function(trans_log)(prefix=Full(), internal=true, sync=true)
 set_log_level_handler = RequestHandler.trans_function(set_log_level)(prefix=Full(), internal=true)
@@ -108,6 +119,8 @@ mapping_handler = RequestHandler.msg_fun(Mapping)(prefix=Full())
 state_handler = RequestHandler.trans_function(state_data)(name='state', internal=true, sync=true)
 rpc_handlers_handler = RequestHandler.trans_function(rpc_handlers)(internal=true, sync=true, prefix=Full())
 poll_handler = RequestHandler.trans_cmd(poll)(prefix=Full())
+append_python_path_handler = RequestHandler.trans_function(append_python_path)(prefix=Full())
+show_python_path_handler = RequestHandler.trans_function(show_python_path)(prefix=Full())
 
 
 def internal_dispatchers(config: Config) -> List[Dispatch]:
@@ -122,6 +135,8 @@ def internal_dispatchers(config: Config) -> List[Dispatch]:
         Internal(state_handler),
         Internal(rpc_handlers_handler),
         Trans(poll_handler),
+        Trans(append_python_path_handler),
+        Trans(show_python_path_handler),
     )
 
 

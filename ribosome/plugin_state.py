@@ -125,7 +125,6 @@ class PluginState(Generic[D], Dat['PluginState']):
     def cons(
             dispatch_config: DispatchConfig,
             data: D,
-            plugin: Any,
             components: List[Component],
             messages: PrioQueue[Message]=PrioQueue.empty,
             message_log: List[Message]=Nil,
@@ -134,14 +133,13 @@ class PluginState(Generic[D], Dat['PluginState']):
             logger: Maybe[Callable[[LogMessage], 'NS[PluginState[D], None]']]=Nothing,
     ) -> 'PluginState':
         component_state = Components(components / ComponentState.cons)
-        return PluginState(dispatch_config, data, plugin, component_state, messages, message_log, trans_log,
+        return PluginState(dispatch_config, data, component_state, messages, message_log, trans_log,
                            log_handler, logger)
 
     def __init__(
             self,
             dispatch_config: DispatchConfig,
             data: D,
-            plugin: Any,
             components: List[ComponentState],
             messages: PrioQueue[Message],
             message_log: List[Message],
@@ -151,7 +149,6 @@ class PluginState(Generic[D], Dat['PluginState']):
     ) -> None:
         self.dispatch_config = dispatch_config
         self.data = data
-        self.plugin = plugin
         self.components = components
         self.messages = messages
         self.message_log = message_log

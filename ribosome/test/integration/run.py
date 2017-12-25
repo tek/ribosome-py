@@ -30,7 +30,7 @@ class DispatchHelper(Dat['DispatchHelper']):
             responses: Callable[[str], Map[str, Any]]=lambda a: Just(0),
             io_executor: Callable[[DIO], NS[PluginState[D], TransComplete]]=None,
     ) -> 'DispatchHelper':
-        hc = host_config(config, Left('spec'), true, io_executor)
+        hc = host_config(config, true, io_executor)
         comps_var = (f'{config.name}_components', Lists.wrap(comps))
         vim = MockNvimFacade(prefix=config.name, vars=assoc(vars, *comps_var), responses=responses)
         state = init_state(hc).unsafe(vim)

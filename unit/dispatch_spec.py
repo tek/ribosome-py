@@ -6,7 +6,7 @@ from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.length import have_length
 
 from amino.test.spec import SpecBase
-from amino import Lists, Map, List, Nothing, _, IO, __, Right
+from amino import Lists, Map, List, Nothing, _, IO, __
 from amino.boolean import true
 from amino.dat import Dat, ADT
 from amino.state import State
@@ -80,14 +80,6 @@ class Q(Component):
         return IO.pure(m1)
 
 
-class HS:
-    prefix = 'hs'
-
-    @command(sync=True)
-    def hs(self, *args) -> str:
-        return specimen
-
-
 class HsData(Dat['HsData'], Data):
 
     def __init__(self, config: Config, counter: int=7) -> None:
@@ -149,7 +141,7 @@ config = Config.cons(
     ),
     state_ctor=HsData,
 )
-host_conf = host_config(config, Right(HS), True)
+host_conf = host_config(config, True)
 
 
 def init(name: str, *comps: str, args=()) -> Tuple[NvimFacade, PluginState, DispatchJob, Dispatch]:
@@ -175,7 +167,6 @@ def run(name: str, *comps: str, args=(), sync=True) -> Tuple[PluginState, Dispat
 class DispatchSpec(SpecBase):
     '''
     resolve component handlers $handlers
-    send a request to a legacy handler with @command decorator $legacy
     send a message $send_message
     error when arguments don't match a message constructor $msg_arg_error
     run a free trans function that returns a message $trans_free
@@ -191,13 +182,6 @@ class DispatchSpec(SpecBase):
         vim = MockNvimFacade(prefix='hs', vars=dict(hs_components=List('p', 'q')))
         components = ComponentResolver(config).run.unsafe(vim)
         return k(components.head / handlers).must(be_just(have_length(3)))
-
-    def legacy(self) -> Expectation:
-        vim = MockNvimFacade()
-        state = init_state(host_conf).unsafe(vim)
-        holder = PluginStateHolder.strict(state)
-        handler = request_handler(vim, True, host_conf.config.sync_dispatch, holder, config)
-        return kf(handler, 'hs:command:Hs', ((),)) == specimen
 
     def send_message(self) -> Expectation:
         args = (27, specimen)
