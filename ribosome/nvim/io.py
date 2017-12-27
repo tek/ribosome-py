@@ -114,10 +114,9 @@ class NFatal(Generic[A], NResult[A]):
 
     @property
     def to_either(self) -> Either[Exception, A]:
-        return Left(self.error)
+        return Left(self.exception)
 
 
-# TODO make this an ADT, create NvimIOFailed that circumvents exception throwing
 class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
     debug = options.io_debug.exists
 

@@ -37,6 +37,10 @@ class RequestDispatcher(Algebra, Logging, base=True):
     def rpc_options(self) -> Map[str, Any]:
         return Map(nargs=self.params_spec.nargs.for_vim)
 
+    @property
+    def is_msg(self) -> Boolean:
+        return isinstance(self, MsgDispatcher)
+
 
 class SyncRequestDispatcher(RequestDispatcher):
     pass

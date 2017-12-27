@@ -1,80 +1,84 @@
-from amino import _, L, List, Left, Right, Map, __
-from amino.util.string import ToStr
+from typing import TypeVar, Callable, Generic
 
-from ribosome.util.callback import VimCallback, parse_callback_spec
+import toolz
+
+from amino import Map, List, Either, _, Nil, Maybe, I
+from amino.dat import Dat
+from amino.func import flip
+
+from ribosome.nvim.io import NS
+from ribosome.dispatch.data import DispatchResult
+from ribosome.trans.handler import TransHandler
+from ribosome.request.handler.handler import RequestHandler, RequestHandlers
+
+D = TypeVar('D')
+C = TypeVar('C')
+TransState = NS[D, DispatchResult]
 
 
-class ComponentHelpers:
+class Handlers(Dat['Handlers']):
 
-    @property
-    def options(self):
-        return Map()
+    def __init__(self, prio: int, handlers: Map[type, TransHandler]) -> None:
+        self.prio = prio
+        self.handlers = handlers
 
-    def _callback_errors(self, spec, cb):
-        def log(s, e):
-            self.log.error('failed to parse callback \'{}\': {}'.format(s, e))
-        (spec.zip(cb)).map2(lambda s, c: c.lmap(L(log)(s, _)))
+    def handler(self, msg):
+        return self.handlers.get(type(msg))
 
-    def _inst_callback(self, name, target):
-        t = target or self.vim
-        return (name(t)
-                if isinstance(name, type) and issubclass(name, VimCallback)
-                else name)
 
-    def _inst_callbacks(self, spec, target, special):
-        cb = (
-            spec /
-            L(parse_callback_spec)(_, special) /
-            __.flat_map(__.func(self.vim))
+def message_handlers(handlers: List[TransHandler]) -> Map[float, Handlers]:
+    def create(prio, h):
+        h = List.wrap(h).apzip(_.message).map2(flip)
+        return prio, Handlers(prio, Map(h))
+    return Map(toolz.groupby(_.prio, handlers)).map(create)
+
+
+class ComponentData(Generic[D, C], Dat['ComponentData[D, C]']):
+
+    def __init__(self, main: D, comp: C) -> None:
+        self.main = main
+        self.comp = comp
+
+
+C = TypeVar('C', bound=ComponentData)
+
+
+class Component(Generic[D, C], Dat['Component']):
+
+    @staticmethod
+    def cons(
+            name: str,
+            request_handlers: List[RequestHandler]=Nil,
+            handlers: List[TransHandler]=Nil,
+            state_ctor: Callable[[], C]=None,
+    ) -> 'Component[D]':
+        hs = message_handlers(handlers)
+        return Component(
+            name,
+            RequestHandlers.cons(*request_handlers),
+            hs,
+            state_ctor or (lambda: None),
         )
-        self._callback_errors(spec, cb)
-        return cb.filter(_.is_right).join / L(self._inst_callback)(_, target)
 
-    def _callback(self, name, target=None, special=Map()):
-        spec = self.options.get(name).o(self.vim.vars.p(name))
-        return self._inst_callbacks(spec, target, special)
-
-    def _callbacks(self, name, target=None, special=Map()):
-        var = self.vim.vars.pl(name) | List()
-        opt = self.options.get(name) | List()
-        return self._inst_callbacks(var + opt, target, special)
-
-    def _from_opt(self, tpe, **strict):
-        o = self.options ** Map(strict)
-        missing = tpe.mandatory_fields.k.filter_not(o.has_key)
-        msg = 'cannot create {} without params: {}'
-        return (Left(msg.format(tpe, missing)) if missing else
-                Right(tpe.from_opt(o)))
-
-
-class Component(ComponentHelpers, ToStr):
-
-    def __init__(self, name: str) -> None:
+    def __init__(self,
+                 name: str,
+                 request_handlers: RequestHandlers,
+                 handlers: Map[float, Handlers],
+                 state_ctor: Maybe[Callable[[D], C]],
+                 ) -> None:
         self.name = name
-
-    def _arg_desc(self) -> List[str]:
-        return List()
-
-    # @handle(UpdateRecord)
-    # def message_update_record(self):
-    #     return (
-    #         self.record_lens(self.msg.tpe, self.msg.name) /
-    #         __.modify(__.update_from_opt(self.msg.options)) /
-    #         self.with_sub
-    #     )
-
-    # def record_lens(self, tpe, name) -> Maybe[Lens]:
-    #     return Nothing
-
-    # @trans.msg.unit(UpdateState, trans.st)
-    # @do(State[Data, None])
-    # def message_update_state(self) -> Generator:
-    #     mod = __.update_from_opt(self.msg.options)
-    #     l = yield self.state_lens(self.msg.tpe, self.msg.name)
-    #     yield State.modify(lambda s: l.map(__.modify(mod)) | s)
-
-    # def state_lens(self, tpe: str, name: str) -> State[Data, Maybe[Lens]]:
-    #     return State.pure(Nothing)
+        self.request_handlers = request_handlers
+        self.handlers = handlers
+        self.state_ctor = state_ctor
 
 
-__all__ = ('Component',)
+class Components(Dat['Components']):
+
+    def __init__(self, all: List[Component]) -> None:
+        self.all = all
+
+    def by_name(self, name: str) -> Either[str, Component]:
+        return self.all.find(_.name == name).to_either(f'no component named {name}')
+
+
+__all__ = ('Component', 'Components')

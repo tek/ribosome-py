@@ -7,7 +7,6 @@ from amino.dat import Dat
 from ribosome.trans.effect import TransEffect, cont, lift
 from ribosome.trans.action import TransAction, TransM, TransMPure, TransFailure
 from ribosome.trans.message_base import Message
-from ribosome.dispatch.component import Component
 from ribosome.request.args import ArgValidator, ParamsSpec
 
 D = TypeVar('D')
@@ -52,8 +51,8 @@ class MessageTransHandler(Generic[M, D], Dat['MessageTransHandler[M, D]'], Trans
         self.prio = prio
         self.effects = effects
 
-    def run(self, component: Component, msg: M) -> TransAction:
-        return extract(self.name, self.fun(component, msg), Lists.wrap(self.effects))
+    def run(self, msg: M) -> TransAction:
+        return extract(self.name, self.fun(msg), Lists.wrap(self.effects))
 
     def __call__(self, *args: Any) -> 'MessageTransHandler':
         return self

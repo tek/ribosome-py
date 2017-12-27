@@ -1,7 +1,6 @@
 from kallikrein import Expectation
 
-from ribosome.plugin import PluginSettings
-from ribosome.config import SimpleData
+from ribosome.config import SimpleData, PluginSettings
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 
 from integration._support.autocmd import val

@@ -130,9 +130,9 @@ class RpcHandlerSpec(Dat['RpcHandlerSpec']):
     def rpc_function(self) -> str:
         return 'rpcrequest' if self.sync else 'rpcnotify'
 
-    def rpc_method(self, prefix: str) -> str:
-        pre = f'{prefix}:' if self.prefix else ''
-        return f'{pre}{self.method}'
+    @property
+    def rpc_method(self) -> str:
+        return self.method
 
     @property
     def encode(self) -> dict:
@@ -278,15 +278,15 @@ def handler_function1(method_name: str, fun: FunctionType, name: str, prefix: st
     return Maybe.getattr(fun, 'spec') / __.spec(name, prefix) / L(RpcHandlerFunction)(fun, _)
 
 
-def register_handler_args(host: str, spec: RpcHandlerSpec, plugin_file: str) -> List[str]:
+def register_handler_args(host: str, spec: RpcHandlerSpec) -> List[str]:
     fun_prefix = camelcaseify(spec.tpe)
     return List(f'remote#define#{fun_prefix}OnHost', host, spec.rpc_method, spec.sync, spec.name, spec.opts)
 
 
-def define_handler_native(vim: NvimFacade, host: str, spec: RpcHandlerSpec, plugin_file: str
+def define_handler_native(vim: NvimFacade, host: str, spec: RpcHandlerSpec
                           ) -> Either[Exception, None]:
     ribo_log.debug1(lambda: f'defining {spec} on {host}')
-    args = register_handler_args(host, spec, plugin_file)
+    args = register_handler_args(host, spec)
     return vim.call(*args)
 
 
@@ -301,53 +301,52 @@ def quote(a: str) -> str:
     return f"'{a}'"
 
 
-def define_handler_cmd(rhs_f: Callable[[str], str], channel: int, spec: RpcHandlerSpec, plugin_file: str) -> List[str]:
+def define_handler_cmd(rhs_f: Callable[[str], str], channel: int, spec: RpcHandlerSpec) -> List[str]:
     ribo_log.debug1(lambda: f'defining {spec} on channel {channel}')
     fun = spec.rpc_function
-    method = spec.rpc_method(plugin_file)
-    args = spec.rpc_args.cons(quote(method)).join_comma
+    args = spec.rpc_args.cons(quote(spec.rpc_method)).join_comma
     rpc_call = f'{fun}({channel}, {args})'
     rhs = rhs_f(rpc_call)
     return List(spec.def_cmd) + spec.rpc_opts_pre + List(spec.name) + spec.rpc_opts_post + List(rhs)
 
 
-def define_handler_io(rhs: Callable[[str], str], channel: int, spec: RpcHandlerSpec, plugin_file: str
+def define_handler_io(rhs: Callable[[str], str], channel: int, spec: RpcHandlerSpec
                       ) -> NvimIO[DefinedHandler]:
-    tokens = define_handler_cmd(rhs, channel, spec, plugin_file)
+    tokens = define_handler_cmd(rhs, channel, spec)
     return NvimIO.cmd_sync(tokens.join_tokens).replace(DefinedHandler(spec, channel))
 
 
-def define_function(channel: int, spec: RpcHandlerSpec, plugin_file: str) -> NvimIO[DefinedHandler]:
-    return define_handler_io(lambda call: f'(...)\nreturn {call}\nendfunction', channel, spec, plugin_file)
+def define_function(channel: int, spec: RpcHandlerSpec) -> NvimIO[DefinedHandler]:
+    return define_handler_io(lambda call: f'(...)\nreturn {call}\nendfunction', channel, spec)
 
 
-def define_command(channel: int, spec: RpcHandlerSpec, plugin_file: str) -> NvimIO[DefinedHandler]:
-    return define_handler_io(lambda a: f'call {a}', channel, spec, plugin_file)
+def define_command(channel: int, spec: RpcHandlerSpec) -> NvimIO[DefinedHandler]:
+    return define_handler_io(lambda a: f'call {a}', channel, spec)
 
 
 @do(NvimIO[DefinedHandler])
-def define_autocmd(channel: int, spec: RpcHandlerSpec, plugin_name: str, plugin_file: str) -> Generator:
+def define_autocmd(channel: int, spec: RpcHandlerSpec, plugin_name: str) -> Generator:
     yield NvimIO.cmd_sync(f'augroup {plugin_name}')
-    result = yield define_handler_io(lambda a: f'call {a}', channel, spec, plugin_file)
+    result = yield define_handler_io(lambda a: f'call {a}', channel, spec)
     yield NvimIO.cmd_sync(f'augroup end')
     yield NvimIO.pure(result)
 
 
-def define_handler(channel: int, spec: RpcHandlerSpec, plugin_name: str, plugin_file: str) -> NvimIO[DefinedHandler]:
+def define_handler(channel: int, spec: RpcHandlerSpec, plugin_name: str) -> NvimIO[DefinedHandler]:
     if spec.tpe == 'function':
-        return define_function(channel, spec, plugin_file)
+        return define_function(channel, spec)
     elif spec.tpe == 'command':
-        return define_command(channel, spec, plugin_file)
+        return define_command(channel, spec)
     elif spec.tpe == 'autocmd':
-        return define_autocmd(channel, spec, plugin_name, plugin_file)
+        return define_autocmd(channel, spec, plugin_name)
     else:
         return NvimIO.failed(f'invalid type for {spec}')
 
 
 @do(NvimIO[List[DefinedHandler]])
-def define_handlers(specs: List[RpcHandlerSpec], plugin_name: str, plugin_file: str) -> Generator:
+def define_handlers(specs: List[RpcHandlerSpec], plugin_name: str) -> Generator:
     channel = yield NvimIO.delay(_.channel_id)
-    yield specs.traverse(L(define_handler)(channel, _, plugin_name, plugin_file), NvimIO)
+    yield specs.traverse(L(define_handler)(channel, _, plugin_name), NvimIO)
 
 
 def rpc_handlers(plugin_class: type) -> List[RpcHandlerSpec]:

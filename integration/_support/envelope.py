@@ -2,7 +2,7 @@ from amino import Map, List
 from ribosome.config import Config, RequestHandler
 from ribosome.trans.message_base import Message, pmessage
 from ribosome.trans.api import trans
-from ribosome.dispatch.component import Component
+from ribosome.dispatch.component import Component, Component
 
 Stage1 = pmessage('Stage1')
 
@@ -51,38 +51,30 @@ class S3(Message['S3']):
     pass
 
 
-class P(Component):
+@trans.msg.one(Target)
+def p_target(msg: Target) -> Message:
+    return T1().to('q')
 
-    @trans.msg.unit(Stage1)
-    def stage_1(self, msg: Stage1) -> None:
-        pass
+@trans.msg.one(T1)
+def p_t1(msg: T1) -> Message:
+    return T2()
 
-    @trans.msg.one(Target)
-    def target(self, msg: Target) -> Message:
-        return T1().to('q')
-
-    @trans.msg.one(T1)
-    def t1(self, msg: T1) -> Message:
-        return T2()
-
-    @trans.msg.multi(Seq)
-    def seq(self, msg: Seq) -> List[Message]:
-        return List(S1().at(1), S2().at(0.1))
+@trans.msg.multi(Seq)
+def p_seq(msg: Seq) -> List[Message]:
+    return List(S1().at(1), S2().at(0.1))
 
 
-class Q(Component):
+@trans.msg.one(P1)
+def q_p1(msg: P1) -> Message:
+    return P2()
 
-    @trans.msg.one(P1)
-    def p1(self, msg: P1) -> Message:
-        return P2()
+@trans.msg.one(T1)
+def q_t1(msg: T1) -> Message:
+    return T3()
 
-    @trans.msg.one(T1)
-    def t1(self, msg: T1) -> Message:
-        return T3()
-
-    @trans.msg.one(S2)
-    def s1(self, msg: S2) -> Message:
-        return S3().at(0.6)
+@trans.msg.one(S2)
+def q_s1(msg: S2) -> Message:
+    return S3().at(0.6)
 
 
 @trans.free.one()
@@ -90,9 +82,11 @@ def pub() -> Message:
     return P1()
 
 
+p = Component.cons('p', handlers=List(p_target, p_t1, p_seq))
+q = Component.cons('q', handlers=List(q_p1, q_t1, q_s1))
 config = Config.cons(
     name='envl',
-    components=Map(p=P, q=Q),
+    components=Map(p=p, q=q),
     request_handlers=List(
         RequestHandler.trans_cmd(pub)(),
         RequestHandler.msg_cmd(Target)(),

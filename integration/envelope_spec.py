@@ -40,4 +40,5 @@ class EnvelopeSpec(AutoPluginIntegrationKlkSpec):
         self.seen_message(S3)
         return k(self.message_log() / __.drop(1)).must(be_right(List(S2(), S3(), S1())))
 
+
 __all__ = ('EnvelopeSpec',)

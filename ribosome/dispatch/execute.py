@@ -3,7 +3,7 @@ from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
-from amino import _, __, Try, IO, Lists, Either, List
+from amino import _, __, Try, IO, Lists, Either, List, L, Nil
 from amino.do import do, Do
 from amino.dispatch import dispatch_alg
 from amino.util.exception import format_exception
@@ -20,7 +20,7 @@ from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit,
                                     DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors,
                                     NvimIODIO, DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO,
                                     DispatchLog)
-from ribosome.plugin_state import PluginState, PluginStateHolder
+from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliaton
 from ribosome.trans.queue import PrioQueue
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.loop import process_message
@@ -178,12 +178,12 @@ class DispatchRunner(Generic[RDP]):
 
     @staticmethod
     def cons(run: Type[RDP], dp: Type[DP]) -> 'DispatchRunner[RDP]':
-        return DispatchRunner(lambda args: dispatch_alg(run(args), dp, '', invalid_dispatch))
+        return DispatchRunner(lambda args: dispatch_alg(run(args), dp, '', L(invalid_dispatch)(run, _)))
 
     def __init__(self, f: Callable[[tuple], Callable[[RDP], NS[PluginState[D], DispatchOutput]]]) -> None:
         self.f = f
 
-    def __call__(self, args: tuple) -> Callable[[RDP], NS[PluginState[D], DispatchOutput]]:
+    def __call__(self, args: List[Any]) -> Callable[[RDP], NS[PluginState[D], DispatchOutput]]:
         return self.f(args)
 
 
@@ -191,14 +191,30 @@ sync_runner = DispatchRunner.cons(RunDispatchSync, DispatchSync)
 async_runner = DispatchRunner.cons(RunDispatchAsync, DispatchAsync)
 
 
-def sync_sender(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> Callable[[], Res]:
+def sync_sender(args: List[Any], aff: DispatchAffiliaton[DP], runner: DispatchRunner[RDP]) -> Callable[[], Res]:
     def send() -> NS[PluginState[D], DispatchResult]:
-        return runner(job.args)(dispatch)
+        return runner(args)(aff.dispatch, aff)
     return send
 
 
-def execute(job: DispatchJob, dispatch: DP, runner: DispatchRunner[RDP]) -> NvimIO[Any]:
-    return exclusive_dispatch(job.state, sync_sender(job, dispatch, runner), NS.pure, dispatch.desc)
+def async_sender(args: List[Any],
+                 dispatches: List[DispatchAffiliaton[DP]],
+                 runner: DispatchRunner[RDP]) -> Callable[[], Res]:
+    def send() -> NS[PluginState[D], DispatchResult]:
+        r = runner(args)
+        return (
+            dispatches.traverse(lambda a: r(a.dispatch, a), NS) /
+            DispatchOutputAggregate /
+            L(DispatchResult)(_, Nil)
+        )
+    return send
+
+
+def execute(state: PluginStateHolder[D],
+            args: List[Any],
+            dispatch: DispatchAffiliaton[DP],
+            runner: DispatchRunner[RDP]) -> NvimIO[Any]:
+    return exclusive_dispatch(state, sync_sender(args, dispatch, runner), NS.pure, dispatch.desc)
 
 
 def run_forked_job(vim: NvimFacade, f: Callable[[], NvimIO[None]], job: DispatchJob) -> None:
@@ -206,12 +222,20 @@ def run_forked_job(vim: NvimFacade, f: Callable[[], NvimIO[None]], job: Dispatch
     ribo_log.debug(f'async job {job.name} completed')
 
 
-# FIXME replace `fork_job` with `Nvim.async_call`
+def sync_dispatch(job: DispatchRunner) -> Either[str, DispatchSync]:
+    name = job.name
+    return job.state.state.dispatch_config.sync_dispatch.lift(name).to_either(f'no sync dispatch for {name}')
+
+
+def async_dispatches(job: DispatchRunner) -> Either[str, List[DispatchAsync]]:
+    name = job.name
+    return job.state.state.dispatch_config.async_dispatch.lift(name).to_either(f'no sync dispatch for {name}')
+
+
 @do(NvimIO)
-def execute_sync(job: DispatchJob, dispatch: DispatchSync) -> Do:
-    response = yield execute(job, dispatch, sync_runner)
-    # yield NvimIO.delay(lambda v: v.vim.async_call(lambda: run_forked_job(v, lambda: resend_loop(job.state), job)))
-    # yield fork_job(lambda: resend_loop(job.state), job)
+def execute_sync(job: DispatchJob) -> Do:
+    dispatch = yield NvimIO.from_either(sync_dispatch(job))
+    response = yield execute(job.state, job.args, dispatch, sync_runner)
     yield NvimIO.pure(response)
 
 
@@ -271,31 +295,24 @@ def resend_loop(holder: PluginStateHolder) -> Do:
 
 
 @do(NvimIO[PluginState[D]])
-def execute_async_loop(job: DispatchJob, dispatch: DispatchAsync) -> Do:
-    yield execute(job, dispatch, async_runner)
-    yield resend_loop(job.state)
-
-
-@do(NvimIO[Any])
-def execute_sync_loop(job: DispatchJob, dispatch: DispatchAsync) -> Do:
-    yield execute(job, dispatch, async_runner)
+def execute_async_loop(job: DispatchJob, dispatches: List[DispatchAsync]) -> Do:
+    yield dispatches.traverse(L(execute)(job.state, job.args, _, async_runner), NvimIO)
     yield resend_loop(job.state)
 
 
 @do(NvimIO)
-def execute_async(job: DispatchJob, dispatch: DispatchAsync) -> NvimIO[None]:
-    result = yield Try(execute_async_loop, job, dispatch).value_or(NvimIO.exception)
-    # output = request_result(job, result)
+def execute_async(job: DispatchJob) -> NvimIO[None]:
+    dispatches = yield NvimIO.from_either(async_dispatches(job))
+    result = yield Try(execute_async_loop, job, dispatches).value_or(NvimIO.exception)
     ribo_log.debug(f'async job {job.name} completed')
-    yield NvimIO.from_io(job.state.dispatch_complete(dispatch))
+    yield NvimIO.from_io(job.state.dispatch_complete())
     yield NvimIO.pure(result)
 
 
 @do(NvimIO[Any])
 def execute_dispatch_job(job: DispatchJob) -> Do:
-    dispatch = yield NvimIO.from_maybe(job.dispatches.lift(job.name), 'no handler')
     relay = execute_sync if job.sync else execute_async
-    yield relay(job, dispatch)
+    yield relay(job)
 
 
 __all__ = ('execute_dispatch_job', 'execute_async_loop', 'execute_sync', 'execute')

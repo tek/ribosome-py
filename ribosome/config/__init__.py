@@ -1,6 +1,6 @@
 from typing import Callable, TypeVar, Generic, Union, Any, Optional, Type
 
-from amino import List, Nil, Maybe, Map, Either, Right, do, Do
+from amino import List, Nil, Maybe, Map, Either, Right, do, Do, _, __
 from amino.dat import Dat
 from amino.json.encoder import Encoder, json_object_with_type
 from amino.json.data import JsonError, Json, JsonScalar
@@ -11,25 +11,12 @@ from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import PluginSettings
 from ribosome.dispatch.run import DispatchJob
 from ribosome.request.rpc import RpcHandlerSpec
+from ribosome.trans.internal import internal
 
 A = TypeVar('A', contravariant=True)
 B = TypeVar('B')
 Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D', bound='SimpleData')
-
-
-class ComponentConfig(Dat['ComponentConfig']):
-
-    @staticmethod
-    def cons(
-            name: str,
-            request_handlers: List[RequestHandler]=Nil,
-    ) -> 'Config[Settings, D]':
-        return Config(name, RequestHandlers.cons(*request_handlers))
-
-    def __init__(self, name: str, request_handlers: RequestHandlers) -> None:
-        self.name = name
-        self.request_handlers = request_handlers
 
 
 class Config(Generic[Settings, D], Dat['Config[Settings, D]']):
@@ -53,11 +40,11 @@ class Config(Generic[Settings, D], Dat['Config[Settings, D]']):
         return Config(
             name,
             prefix or name,
-            components,
+            components + ('internal', internal),
             state_ctor or SimpleData,
             settings or PluginSettings(name=name),
             RequestHandlers.cons(*request_handlers),
-            core_components,
+            core_components.cons('internal'),
             default_components,
             Maybe.optional(request_dispatcher),
         )

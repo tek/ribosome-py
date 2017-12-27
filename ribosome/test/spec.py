@@ -65,6 +65,7 @@ class MockNvim:
 
     def __init__(self, responses: Callable[[str], Any]) -> None:
         self.responses = responses
+        self.channel_id = 1
 
     @property
     def types(self) -> Map[str, type]:

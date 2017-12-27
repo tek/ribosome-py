@@ -1,31 +1,25 @@
-from typing import Tuple, Callable
-
-from kallikrein import Expectation, kf, k
+from kallikrein import Expectation, k
 from kallikrein.matchers.either import be_right
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.length import have_length
+from kallikrein.matchers.typed import have_type
 
 from amino.test.spec import SpecBase
-from amino import Lists, Map, List, Nothing, _, IO, __
+from amino import Lists, Map, List, Nothing, _, IO, __, Right
 from amino.boolean import true
 from amino.dat import Dat, ADT
 from amino.state import State
 
-from ribosome.test.spec import MockNvimFacade
 from ribosome.config import Config, Data
-from ribosome import command
 from ribosome.trans.message_base import Msg, Message
 from ribosome.dispatch.component import Component
 from ribosome.trans.api import trans
-from ribosome.plugin_state import PluginStateHolder, handlers, PluginState
+from ribosome.plugin_state import PluginState, DispatchConfig
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.dispatch.data import DispatchError, Dispatch, DispatchResult
-from ribosome.host import host_config, request_handler, init_state, dispatch_job
-from ribosome.dispatch.execute import execute_async_loop, run_dispatch, sync_sender, sync_runner, async_runner
+from ribosome.dispatch.data import DispatchError, DispatchOutputAggregate
 from ribosome.nvim.io import NvimIOState
 from ribosome.dispatch.resolve import ComponentResolver
-from ribosome.nvim import NvimFacade
-from ribosome.dispatch.run import DispatchJob
+from ribosome.test.integration.run import DispatchHelper
 
 
 specimen = Lists.random_string()
@@ -50,34 +44,34 @@ class M3(Msg): pass
 class M4(Msg): pass
 
 
-class P(Component):
-
-    @trans.msg.one(M1)
-    def m1(self, msg: M1) -> Message:
-        return M2()
-
-    @trans.msg.unit(M2)
-    def m2(self, msg: M2) -> None:
-        return None
-
-    @trans.msg.one(M3, trans.io)
-    def m3(self, msg: M3) -> IO[Message]:
-        return IO.pure(M4())
+@trans.msg.one(M1)
+def p_m1(msg: M1) -> Message:
+    return M2()
 
 
-class Q(Component):
+@trans.msg.unit(M2)
+def p_m2(msg: M2) -> None:
+    return None
 
-    @trans.msg.one(M1)
-    def m1(self, msg: M1) -> str:
-        return M2()
 
-    @trans.msg.unit(M2)
-    def m2(self, msg: M2) -> None:
-        return None
+@trans.msg.one(M3, trans.io)
+def p_m3(msg: M3) -> IO[Message]:
+    return IO.pure(M4())
 
-    @trans.msg.one(M3, trans.io)
-    def m3(self, msg: M3) -> IO[Message]:
-        return IO.pure(m1)
+
+@trans.msg.one(M1)
+def q_m1(msg: M1) -> str:
+    return M2()
+
+
+@trans.msg.unit(M2)
+def q_m2(msg: M2) -> None:
+    return None
+
+
+@trans.msg.one(M3, trans.io)
+def q_m3(msg: M3) -> IO[Message]:
+    return IO.pure(m1)
 
 
 class HsData(Dat['HsData'], Data):
@@ -126,6 +120,22 @@ def vim_enter() -> State[HsData, None]:
     return State.modify(__.copy(counter=19))
 
 
+P = Component.cons(
+    'p',
+    handlers=List(
+        p_m1,
+        p_m2,
+        p_m3,
+    )
+)
+Q = Component.cons(
+    'q',
+    handlers=List(
+        q_m1,
+        q_m2,
+        q_m3,
+    )
+)
 config = Config.cons(
     'hs',
     components=Map(p=P, q=Q),
@@ -141,26 +151,7 @@ config = Config.cons(
     ),
     state_ctor=HsData,
 )
-host_conf = host_config(config, True)
-
-
-def init(name: str, *comps: str, args=()) -> Tuple[NvimFacade, PluginState, DispatchJob, Dispatch]:
-    vim = MockNvimFacade(prefix='hs', vars=dict(hs_components=Lists.wrap(comps)))
-    state = init_state(host_conf).unsafe(vim)
-    holder = PluginStateHolder.strict(state)
-    job = dispatch_job(True, host_conf.config.async_dispatch, holder, name, host_conf.config.prefix, (args,))
-    return vim, state, job, job.dispatches.lift(job.name).get_or_fail('no matching dispatch')
-
-
-def sender(name: str, *comps: str, args=(), sync=True) -> Tuple[PluginState, NvimFacade, Callable]:
-    vim, state, job, dispatch = init(name, *comps, args=args)
-    runner = sync_runner if sync else async_runner
-    return state, vim, sync_sender(job, dispatch, runner)
-
-
-def run(name: str, *comps: str, args=(), sync=True) -> Tuple[PluginState, DispatchResult]:
-    state, vim, send = sender(name, *comps, args=args, sync=sync)
-    return run_dispatch(send, NvimIOState.pure).run(state).unsafe(vim)
+dispatch_conf = DispatchConfig.cons(config)
 
 
 # TODO test free trans function with invalid arg count
@@ -179,50 +170,60 @@ class DispatchSpec(SpecBase):
     '''
 
     def handlers(self) -> Expectation:
-        vim = MockNvimFacade(prefix='hs', vars=dict(hs_components=List('p', 'q')))
-        components = ComponentResolver(config).run.unsafe(vim)
-        return k(components.head / handlers).must(be_just(have_length(3)))
+        components = ComponentResolver(config, Right(List('p', 'q'))).run.get_or_raise()
+        return k(components.lift(1) // _.handlers.v.head / _.handlers).must(be_just(have_length(3)))
 
     def send_message(self) -> Expectation:
+        helper = DispatchHelper.cons(config, 'p', 'q')
         args = (27, specimen)
-        vim, state, job, dispatch = init('hs:command:muh', 'p', 'q', args=args)
-        result = execute_async_loop(job, dispatch).unsafe(vim)
+        result = helper.loop('command:muh', args=args, sync=False).unsafe(helper.vim)
         return k(result.message_log) == List(M1(*args), M2(), M2())
 
     def msg_arg_error(self) -> Expectation:
-        name, args = 'hs:command:muh', (specimen,)
-        state, vim, send = sender(name, 'p', args=args, sync=False)
-        result = send().run_a(state).attempt(vim) / _.output
-        err = f'argument count for command `HsMuh` is 1, must be exactly 2 ([{specimen}])'
-        return k(result).must(be_right(DispatchError(err, Nothing)))
+        helper = DispatchHelper.cons(config, 'p')
+        name, args = 'command:muh', (specimen,)
+        send = helper.sender(name, args=args, sync=False)
+        result = send().run_a(helper.state).attempt(helper.vim) / _.output
+        err = f'''argument count for command `HsMuh` is 1, must be exactly 2 ([{specimen}])'''
+        return (
+            k(result).must(be_right(have_type(DispatchOutputAggregate))) &
+            k(result / _.results // __.head.to_either('left') / _.output).must(be_right(DispatchError(err, Nothing)))
+        )
 
     def trans_free(self) -> Expectation:
-        state, result = run('hs:command:trfree', 'p', 'q', args=('x',))
+        helper = DispatchHelper.cons(config, 'p', 'q')
+        state, result = helper.unsafe_run('command:trfree', args=('x',))
         return k(state.message_log) == List()
 
     def io(self) -> Expectation:
-        state, result = run('hs:command:trio')
+        helper = DispatchHelper.cons(config)
+        state, result = helper.unsafe_run('command:trio')
         return k(state.messages.items.head / _[1] / _.message).must(be_just(m1))
 
     def multi_io(self) -> Expectation:
-        state, result = run('hs:command:meh', 'p', 'q', sync=False)
+        helper = DispatchHelper.cons(config, 'p', 'q')
+        state, result = helper.unsafe_run('command:meh', sync=False)
         return k(state.unwrapped_messages) == List(m1, M4())
 
     def internal(self) -> Expectation:
-        state, result = run('hs:function:int')
+        helper = DispatchHelper.cons(config)
+        state, result = helper.unsafe_run('function:int')
         return k(result) == state.name
 
     def data(self) -> Expectation:
-        state, result = run('hs:function:dat')
+        helper = DispatchHelper.cons(config)
+        state, result = helper.unsafe_run('function:dat')
         return k(state.data.counter) == 23
 
     def json(self) -> Expectation:
+        helper = DispatchHelper.cons(config)
         js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
-        state, result = run('hs:command:json', args=(7, 'one', *Lists.split(js, ' ')))
+        state, result = helper.unsafe_run('command:json', args=(7, 'one', *Lists.split(js, ' ')))
         return k(result) == 9
 
     def autocmd(self) -> Expectation:
-        state, result = run('hs:autocmd:vim_enter')
+        helper = DispatchHelper.cons(config)
+        state, result = helper.unsafe_run('autocmd:vim_enter')
         return k(state.data.counter) == 19
 
 

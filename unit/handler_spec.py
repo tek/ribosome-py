@@ -33,14 +33,14 @@ class HandlerSpec:
         return validate_trans_complete(action)
 
     def run(self, f: MessageTransHandler) -> Maybe[Msg2]:
-        res = self.validate(f.run(None, Msg1()))
+        res = self.validate(f.run(Msg1()))
         return k(res.run_a(None).attempt(None) / _.msgs // _.head).must(be_just(have_type(Msg2)))
 
     def eso(self) -> Expectation:
         @trans.msg.one(Msg1, trans.e, trans.st, trans.io)
-        def f(self, msg: Msg1) -> Either[str, StateT[Id, int, IO[Msg2]]]:
+        def f(msg: Msg1) -> Either[str, StateT[Id, int, IO[Msg2]]]:
             return Right(IdState.pure(IO.pure(Msg2())))
-        res = f.run(None, Msg1())
+        res = f.run(Msg1())
         s = self.validate(res)
         valid = s.run_a(None).attempt(None)
         action = res.action
@@ -54,19 +54,19 @@ class HandlerSpec:
 
     def se(self) -> Expectation:
         @trans.msg.one(Msg1, trans.st, trans.e)
-        def f(self, msg: Msg1) -> StateT[Id, int, Either[str, Msg2]]:
+        def f(msg: Msg1) -> StateT[Id, int, Either[str, Msg2]]:
             return IdState.pure(Right(Msg2()))
         return self.run(f)
 
     def single(self) -> Expectation:
         @trans.msg.one(Msg1, trans.e)
-        def f(self, msg: Msg1) -> Either[str, Msg2]:
+        def f(msg: Msg1) -> Either[str, Msg2]:
             return Right(Msg2())
         return self.run(f)
 
     def single_st(self) -> Expectation:
         @trans.msg.one(Msg1, trans.e, trans.st)
-        def f(self, msg: Msg1) -> Either[str, StateT[Id, int, Msg2]]:
+        def f(msg: Msg1) -> Either[str, StateT[Id, int, Msg2]]:
             return Right(IdState.pure(Msg2()))
         return self.run(f)
 

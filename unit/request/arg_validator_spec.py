@@ -17,6 +17,14 @@ def check_args(fun: Callable, name: str=None) -> None:
 class ArgValidatorSpec:
     '''request arg validation
     parameter count $nargs
+    zero parameters $none
+    one parameter $one
+    one optional parameter $one_opt
+    two parameters $two
+    two parameters, one optional $two_one_opt
+    two optional parameters $two_opt
+    six parameters $six
+    varargs $var
     '''
 
     def nargs(self) -> Expectation:
@@ -45,18 +53,6 @@ class ArgValidatorSpec:
             check(more, NargsPlus(), 'at least 3')
         )
 
-
-class RequestHandlerSpec:
-    '''request handlers
-    zero parameters $none
-    one parameter $one
-    one optional parameter $one_opt
-    two parameters $two
-    two parameters, one optional $two_one_opt
-    two optional parameters $two_opt
-    six parameters $six
-    varargs $var
-    '''
 
     def none(self) -> Expectation:
         def fun():
@@ -166,4 +162,5 @@ class RequestHandlerSpec:
             k(v.validate(3)).true
         )
 
-__all__ = ('RequestHandlerSpec',)
+
+__all__ = ('ArgValidatorSpec',)

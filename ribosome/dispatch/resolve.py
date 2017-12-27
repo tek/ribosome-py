@@ -1,19 +1,16 @@
-from typing import Generator, Union, Type
-
-from amino import Try, _, Either, List, Left, do, Right, curried
-from amino.mod import cls_from_module
+from amino import _, Either, List, Left, do, Right, curried, Do
+from amino.mod import instance_from_module
 
 from ribosome.logging import Logging, ribo_log
-from ribosome.nvim import NvimIO
-from ribosome import NvimFacade
 from ribosome.config import Config
 from ribosome.dispatch.component import Component
 
 
 class ComponentResolver(Logging):
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, user_components: Either[str, List[str]]) -> None:
         self.config = config
+        self.user_components = user_components
 
     @property
     def name(self) -> str:
@@ -29,20 +26,13 @@ class ComponentResolver(Logging):
         errors = mods.filter(_.is_left) / _.value
         return mods.find(_.is_right) | Left(errors)
 
-    def inst_component(self, mod):
-        return (
-            Try(getattr(mod, 'Component'), self.vim, self)
-            if hasattr(mod, 'Component')
-            else Left('module does not define class `Component`')
-        )
-
-    def extra_component(self, name: str, vim: NvimFacade) -> Either[List[str], Component]:
+    def extra_component(self, name: str) -> Either[List[str], Component]:
         auto = f'{self.config.name}.components.{name}'
         return (
             self.declared_component(name)
             .accum_error_f(lambda: self.component_from_exports(auto).lmap(List))
             .accum_error_f(lambda: self.component_from_exports(name).lmap(List))
-            .flat_map(self.inst_auto(name, vim))
+            .flat_map(self.check_component(name))
         )
 
     def declared_component(self, name: str) -> Either[List[str], Component]:
@@ -53,45 +43,40 @@ class ComponentResolver(Logging):
         )
 
     @do(Either[str, Component])
-    def component_from_exports(self, mod: str) -> Generator:
+    def component_from_exports(self, mod: str) -> Do:
         mod = yield Either.import_module(mod)
-        yield cls_from_module(mod, Component)
+        yield instance_from_module(mod, Component)
 
     @curried
-    def inst_auto(self, name: str, vim: NvimFacade, plug: Union[str, Type]) -> Either[str, Component]:
+    def check_component(self, name: str, plug: Component) -> Either[str, Component]:
         return (
-            Right(plug(name))
-            if isinstance(plug, type) and issubclass(plug, Component) else
-            Left(List(f'invalid tpe for auto component: {plug}'))
+            Right(plug)
+            if isinstance(plug, Component) else
+            Left(List(f'invalid type for auto component: {plug}'))
         )
 
-    @property
-    @do(NvimIO[List[str]])
-    def components(self) -> Generator:
-        from_user = yield self.config.settings.components.value
-        additional = from_user | self.config.default_components
+    def components(self) -> List[str]:
+        additional = self.user_components | self.config.default_components
         components = self.config.core_components + additional
         ribo_log.debug(f'starting {self.config} with components {components}')
-        yield NvimIO.pure(components)
+        return components
 
-    def create_components(self, name: str) -> NvimIO[List[Component]]:
+    def create_components(self, name: str) -> Either[str, List[Component]]:
         def report(errs):
             msg = 'invalid {} component module "{}": {}'
             self.log.error(msg.format(self.name, name, errs))
-        return NvimIO.delay(
-            lambda v:
-            (self.find_component(name) // self.inst_component)
+        return (
+            self.find_component(name)
             .lmap(List)
-            .accum_error_f(lambda: self.extra_component(name, v))
+            .accum_error_f(lambda: self.extra_component(name))
             .leffect(report)
         )
 
     @property
-    @do(NvimIO[List[Component]])
-    def run(self) -> Generator:
-        comp = yield self.components
-        sub = yield comp.traverse(self.create_components, NvimIO)
-        yield NvimIO.from_either(sub.sequence(Either))
+    def run(self) -> Either[str, List[Component]]:
+        comp = self.components()
+        sub = comp / self.create_components
+        return sub.sequence(Either)
 
 
 __all__ = ('ComponentResolver',)

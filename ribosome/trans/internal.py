@@ -4,7 +4,7 @@ from typing import TypeVar, Any, Iterable
 from amino.state import EitherState, MaybeState
 
 from lenses import UnboundLens
-from amino import do, Do, __, Either, _, List, Map, Maybe, Lists, Just, Regex, L, IO
+from amino import do, Do, __, Either, _, List, Map, Maybe, Lists, Just, Regex, L, IO, Nil
 from amino.json import dump_json
 from amino.boolean import true
 from amino.dat import Dat
@@ -17,8 +17,9 @@ from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
 from ribosome.trans.messages import ShowLogInfo, UpdateComponentState
 from ribosome.components.scratch import Mapping
-from ribosome.config import Config
 from ribosome.dispatch.data import Dispatch, Internal, SendMessage, Trans
+from ribosome.nvim.io import NS
+from ribosome.dispatch.component import Component
 
 D = TypeVar('D')
 
@@ -85,13 +86,27 @@ def mk_lens(query: str) -> UnboundLens:
 @do(MaybeState[D, None])
 def patch_update(query: PatchQuery) -> Do:
     lns = yield MaybeState.lift(mk_lens(query.query))
-    yield MaybeState.modify(lns.modify(__.typed_copy(**query.data)))
+    lns1 = lens.main & lns
+    yield MaybeState.modify(lns1.modify(__.typed_copy(**query.data)))
 
 
 @trans.free.unit(trans.st)
 @do(MaybeState[D, None])
 def update_state(query: UpdateQuery) -> Do:
     yield query.patch / patch_update | MaybeState.pure(None)
+
+
+@do(MaybeState[D, None])
+def patch_update_component(comp: str, query: PatchQuery) -> Do:
+    lns = yield MaybeState.lift(mk_lens(query.query))
+    lns1 = lens.component_data.GetItem(comp) & lns
+    yield MaybeState.modify(lns1.modify(__.typed_copy(**query.data)))
+
+
+@trans.free.unit(trans.st)
+@do(MaybeState[D, None])
+def update_component_state(comp: str, query: UpdateQuery) -> Do:
+    yield query.patch / L(patch_update_component)(comp, _) | MaybeState.pure(None)
 
 
 @trans.free.unit()
@@ -109,35 +124,52 @@ def show_python_path() -> Iterable[str]:
     return sys.path
 
 
+@trans.free.unit(trans.st)
+@do(NS[PluginState[D], None])
+def enable_components(*names: str) -> Do:
+    from ribosome.dispatch.update import update_rpc
+    comps = (
+        yield NS.inspect_either(
+            __.config.components.lift_all(*names).to_either(f'couldn\'t find some components: {names}'))
+    )
+    yield NS.modify(lens.components.all.modify(__.add(comps)))
+    yield update_rpc()
+
+
 message_log_handler = RequestHandler.trans_function(message_log)(prefix=Full(), internal=true, sync=true)
 trans_log_handler = RequestHandler.trans_function(trans_log)(prefix=Full(), internal=true, sync=true)
 set_log_level_handler = RequestHandler.trans_function(set_log_level)(prefix=Full(), internal=true)
 show_log_info_handler = RequestHandler.msg_cmd(ShowLogInfo)(prefix=Full(), internal=true)
 update_state_handler = RequestHandler.trans_cmd(update_state)(json=true)
-update_component_state_handler = RequestHandler.msg_cmd(UpdateComponentState)(json=true)
+update_component_state_handler = RequestHandler.trans_cmd(update_component_state)(internal=true, json=true)
 mapping_handler = RequestHandler.msg_fun(Mapping)(prefix=Full())
 state_handler = RequestHandler.trans_function(state_data)(name='state', internal=true, sync=true)
 rpc_handlers_handler = RequestHandler.trans_function(rpc_handlers)(internal=true, sync=true, prefix=Full())
 poll_handler = RequestHandler.trans_cmd(poll)(prefix=Full())
 append_python_path_handler = RequestHandler.trans_function(append_python_path)(prefix=Full())
 show_python_path_handler = RequestHandler.trans_function(show_python_path)(prefix=Full())
+enable_components_handler = RequestHandler.trans_cmd(enable_components)(prefix=Full(), internal=true)
 
 
-def internal_dispatchers(config: Config) -> List[Dispatch]:
-    return List(
-        Internal(message_log_handler),
-        Internal(trans_log_handler),
-        Internal(set_log_level_handler),
-        SendMessage(show_log_info_handler),
-        Trans(update_state_handler),
-        SendMessage(update_component_state_handler),
-        SendMessage(mapping_handler),
-        Internal(state_handler),
-        Internal(rpc_handlers_handler),
-        Trans(poll_handler),
-        Trans(append_python_path_handler),
-        Trans(show_python_path_handler),
-    )
+internal = Component.cons(
+    'internal',
+    request_handlers=List(
+        message_log_handler,
+        trans_log_handler,
+        set_log_level_handler,
+        show_log_info_handler,
+        update_state_handler,
+        update_component_state_handler,
+        mapping_handler,
+        state_handler,
+        rpc_handlers_handler,
+        poll_handler,
+        append_python_path_handler,
+        show_python_path_handler,
+        enable_components_handler,
+    ),
+    handlers=Nil,
+)
 
 
-__all__ = ('internal_dispatchers',)
+__all__ = ('internal',)

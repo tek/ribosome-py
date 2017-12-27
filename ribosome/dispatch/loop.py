@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0xf5f7bde2
+# __coconut_hash__ = 0xa37e3ee0
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -18,26 +18,13 @@ _coconut_sys.path.remove(_coconut_file_path)
 
 from typing import TypeVar
 
-from amino import Just
-from amino import Nothing
 from amino import Right
 from amino import Left
-from amino import L
-from amino import _
-from amino import __
 from amino import Nil
-from amino.state import EvalState
-from amino.state import EvalState
-from amino.do import do
 
-from ribosome.logging import ribo_log
-from ribosome.plugin_state import ComponentState
-from ribosome.plugin_state import PluginState
-from ribosome.plugin_state import TransState
-from ribosome.nvim.io import NvimIOState
+from ribosome.nvim.io import NS
 from ribosome.dispatch.data import DispatchResult
 from ribosome.dispatch.data import DispatchUnit
-from ribosome.trans.message_base import Message
 from ribosome.trans.queue import PrioQueue
 
 A = TypeVar('A')
@@ -45,7 +32,7 @@ D = TypeVar('D')
 
 
 @_coconut_tco
-def process_message(messages: 'PrioQueue[A]', send: '_coconut.typing.Callable[[A], NvimIOState[D, DispatchResult]]') -> '(PrioQueue[A], NvimIOState[D, DispatchResult])':
+def process_message(messages: 'PrioQueue[A]', send: '_coconut.typing.Callable[[A], NS[D, DispatchResult]]') -> '(PrioQueue[A], NS[D, DispatchResult])':
     def process1(*_coconut_match_to_args, **_coconut_match_to_kwargs):
         _coconut_match_check = False
         if (_coconut.len(_coconut_match_to_args) == 1) and (_coconut.isinstance(_coconut_match_to_args[0], Right)) and (_coconut.len(_coconut_match_to_args[0]) == 1) and (_coconut.isinstance(_coconut_match_to_args[0][0], _coconut.abc.Sequence)) and (_coconut.len(_coconut_match_to_args[0][0]) == 2) and (_coconut.isinstance(_coconut_match_to_args[0][0][0], _coconut.abc.Sequence)) and (_coconut.len(_coconut_match_to_args[0][0][0]) == 2):
@@ -69,10 +56,10 @@ def process_message(messages: 'PrioQueue[A]', send: '_coconut.typing.Callable[[A
             if not _coconut_match_to_kwargs:
                 _coconut_match_check = True
         if not _coconut_match_check:
-            _coconut_match_err = _coconut_MatchError("pattern-matching failed for " "'def process1(Left(err)) = messages, NvimIOState.pure(DispatchResult(DispatchUnit(), Nil))'" " in " + _coconut.repr(_coconut.repr(_coconut_match_to_args)))
-            _coconut_match_err.pattern = 'def process1(Left(err)) = messages, NvimIOState.pure(DispatchResult(DispatchUnit(), Nil))'
+            _coconut_match_err = _coconut_MatchError("pattern-matching failed for " "'def process1(Left(err)) = messages, NS.pure(DispatchResult(DispatchUnit(), Nil))'" " in " + _coconut.repr(_coconut.repr(_coconut_match_to_args)))
+            _coconut_match_err.pattern = 'def process1(Left(err)) = messages, NS.pure(DispatchResult(DispatchUnit(), Nil))'
             _coconut_match_err.value = _coconut_match_to_args
             raise _coconut_match_err
 
-        return messages, NvimIOState.pure(DispatchResult(DispatchUnit(), Nil))
+        return messages, NS.pure(DispatchResult(DispatchUnit(), Nil))
     return _coconut_tail_call(process1, messages.get)

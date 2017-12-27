@@ -54,6 +54,10 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
         return RequestHandlerBuilder(FunctionMethod(), MsgDispatcher(msg))
 
     @staticmethod
+    def msg_function(msg: Type[M]) -> 'RequestHandlerBuilder':
+        return RequestHandlerBuilder(FunctionMethod(), MsgDispatcher(msg))
+
+    @staticmethod
     def msg_autocmd(msg: Type[M]) -> 'RequestHandlerBuilder':
         return RequestHandlerBuilder(AutocmdMethod(), MsgDispatcher(msg))
 
@@ -96,6 +100,10 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
     def parser(self, params_spec: ParamsSpec) -> ArgParser:
         tpe = JsonArgParser if self.json else TokenArgParser
         return tpe(params_spec)
+
+    @property
+    def msg(self) -> Boolean:
+        return self.dispatcher.is_msg
 
 
 class RequestHandlerBuilder(Generic[Meth, DP]):
