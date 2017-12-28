@@ -14,10 +14,12 @@ from ribosome.host import init_state, dispatch_job
 from ribosome.dispatch.execute import (sync_runner, async_runner, sync_sender, run_dispatch, Res, execute_async_loop,
                                        async_sender)
 from ribosome.nvim.io import NvimIOState, NS
-from ribosome.config import Config
+from ribosome.config.config import Config
 from ribosome.trans.handler import TransComplete
+from ribosome.config.settings import Settings
 
 D = TypeVar('D')
+S = TypeVar('S', bound=Settings)
 
 
 class DispatchHelper(Dat['DispatchHelper']):
@@ -28,7 +30,7 @@ class DispatchHelper(Dat['DispatchHelper']):
             *comps: str,
             vars: dict=dict(),
             responses: Callable[[str], Map[str, Any]]=lambda a: Just(0),
-            io_executor: Callable[[DIO], NS[PluginState[D], TransComplete]]=None,
+            io_executor: Callable[[DIO], NS[PluginState[S, D], TransComplete]]=None,
     ) -> 'DispatchHelper':
         dc = DispatchConfig.cons(config, io_executor=io_executor)
         comps_var = (f'{config.name}_components', Lists.wrap(comps))

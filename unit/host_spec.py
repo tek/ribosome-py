@@ -7,18 +7,17 @@ from amino.lenses.lens import lens
 from amino.dat import Dat
 
 from ribosome.test.integration.run import DispatchHelper
-from ribosome.config import Config, Data
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.trans.api import trans
 from ribosome.trans.message_base import Msg
 from ribosome.dispatch.component import Component, ComponentData
 from ribosome.host import request_handler
+from ribosome.config.config import Config
 
 
-class HSData(Dat['HSData'], Data):
+class HSData(Dat['HSData']):
 
-    def __init__(self, config: Config, counter: int=1) -> None:
-        self.config = config
+    def __init__(self, counter: int=1) -> None:
         self.counter = counter
 
 

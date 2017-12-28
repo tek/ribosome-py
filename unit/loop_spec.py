@@ -7,8 +7,6 @@ from kallikrein.matchers.typed import have_type
 from amino import List, Just, _
 from amino.test.spec import SpecBase
 
-from ribosome.config import SimpleData, Config
-
 from ribosome.test.spec import MockNvimFacade
 from ribosome.dispatch.component import Component
 from ribosome.dispatch.loop import process_message
@@ -19,6 +17,7 @@ from ribosome.plugin_state import PluginState, DispatchConfig
 from ribosome.trans.api import trans
 from ribosome.dispatch.data import DispatchResult, DispatchUnit
 from ribosome.nvim.io import NvimIOState
+from ribosome.config.config import Config, SimpleData
 
 
 class Msg1(Msg): pass
@@ -42,7 +41,7 @@ class LoopSpec(SpecBase):
     '''
 
     def prio(self) -> Expectation:
-        d = SimpleData(config=Config.cons('test'))
+        d = SimpleData()
         a = Msg1()
         b = Msg2()
         messages = PrioQueue.empty.put_default(a).put(b, 0.1)
@@ -54,7 +53,7 @@ class LoopSpec(SpecBase):
 
     def send_message(self) -> Expectation:
         config = Config.cons('test')
-        d = SimpleData(config=config)
+        d = SimpleData()
         state = PluginState.cons(DispatchConfig.cons(config), d, List(Component.cons('comp1', handlers=List(msg1))),
                                  messages=PrioQueue.empty)
         a = Msg1()

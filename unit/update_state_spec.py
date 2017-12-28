@@ -2,8 +2,8 @@ from kallikrein import k, Expectation
 from kallikrein.matchers.maybe import be_just
 
 from ribosome.test.integration.run import DispatchHelper
-from ribosome.config import Config, Data
 from ribosome.dispatch.component import Component
+from ribosome.config.config import Config
 
 from amino.test.spec import SpecBase
 from amino.dat import Dat
@@ -34,18 +34,17 @@ class D1(Dat['D1']):
 items = List(Item('first', 4), Item('second', 7))
 
 
-class USData(Dat['USData'], Data):
+class USData(Dat['USData']):
 
     @staticmethod
-    def cons(config: Config) -> 'USData':
-        return USData(config, D1(D2('value', items)))
+    def cons() -> 'USData':
+        return USData(D1(D2('value', items)))
 
-    def __init__(self, config: Config, d: D1) -> None:
-        self.config = config
+    def __init__(self, d: D1) -> None:
         self.d = d
 
 
-class C1Data(Dat['C1Data'], Data):
+class C1Data(Dat['C1Data']):
 
     @staticmethod
     def cons() -> 'C1Data':

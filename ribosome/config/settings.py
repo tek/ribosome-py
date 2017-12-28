@@ -42,7 +42,7 @@ def state_dir_with_name(state_dir: PluginSetting[Path], proteome_name: PluginSet
     yield NvimIO.pure(path)
 
 
-class PluginSettings(ToStr, Logging):
+class Settings(ToStr, Logging):
 
     def __init__(self, name: str, state_dir_help: str=state_dir_help_default) -> None:
         self.name = name
@@ -79,5 +79,5 @@ path_map_setting = setting_ctor(dict, lambda a: Try(Map, a).valmap(lambda b: Pat
 bool_setting = setting_ctor(int, lambda a: Right(Boolean(a)))
 
 
-__all__ = ('PluginSettings', 'str_setting', 'float_setting', 'list_setting', 'path_setting', 'path_list_setting',
+__all__ = ('Settings', 'str_setting', 'float_setting', 'list_setting', 'path_setting', 'path_list_setting',
            'map_setting', 'path_map_setting', 'bool_setting')

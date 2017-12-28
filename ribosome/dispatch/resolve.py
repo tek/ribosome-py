@@ -1,8 +1,8 @@
-from amino import _, Either, List, Left, do, Right, curried, Do
+from amino import Either, List, Left, do, Right, curried, Do
 from amino.mod import instance_from_module
 
 from ribosome.logging import Logging, ribo_log
-from ribosome.config import Config
+from ribosome.config.config import Config
 from ribosome.dispatch.component import Component
 
 
@@ -16,18 +16,25 @@ class ComponentResolver(Logging):
     def name(self) -> str:
         return self.config.name
 
-    def find_component(self, name: str) -> Either[List[str], Component]:
-        mods = List(
-            Either.import_module(name),
-            Either.import_module(f'{self.name}.components.{name}'),
-            Either.import_module(f'{self.name}.plugins.{name}'),
-        )
-        # TODO .traverse(_.swap).swap
-        errors = mods.filter(_.is_left) / _.value
-        return mods.find(_.is_right) | Left(errors)
+    @property
+    def run(self) -> Either[str, List[Component]]:
+        return self.components.traverse(self.create_components, Either)
 
-    def extra_component(self, name: str) -> Either[List[str], Component]:
-        auto = f'{self.config.name}.components.{name}'
+    @property
+    def components(self) -> List[str]:
+        additional = self.user_components | self.config.default_components
+        components = self.config.core_components + additional
+        ribo_log.debug(f'starting {self.config} with components {components}')
+        return components
+
+    def create_components(self, name: str) -> Either[str, List[Component]]:
+        def report(errs: List[str]):
+            msg = 'invalid {} component module "{}": {}'
+            self.log.error(msg.format(self.name, name, errs))
+        return self.resolve_name(name).leffect(report)
+
+    def resolve_name(self, name: str) -> Either[List[str], Component]:
+        auto = f'{self.name}.components.{name}'
         return (
             self.declared_component(name)
             .accum_error_f(lambda: self.component_from_exports(auto).lmap(List))
@@ -54,29 +61,6 @@ class ComponentResolver(Logging):
             if isinstance(plug, Component) else
             Left(List(f'invalid type for auto component: {plug}'))
         )
-
-    def components(self) -> List[str]:
-        additional = self.user_components | self.config.default_components
-        components = self.config.core_components + additional
-        ribo_log.debug(f'starting {self.config} with components {components}')
-        return components
-
-    def create_components(self, name: str) -> Either[str, List[Component]]:
-        def report(errs):
-            msg = 'invalid {} component module "{}": {}'
-            self.log.error(msg.format(self.name, name, errs))
-        return (
-            self.find_component(name)
-            .lmap(List)
-            .accum_error_f(lambda: self.extra_component(name))
-            .leffect(report)
-        )
-
-    @property
-    def run(self) -> Either[str, List[Component]]:
-        comp = self.components()
-        sub = comp / self.create_components
-        return sub.sequence(Either)
 
 
 __all__ = ('ComponentResolver',)

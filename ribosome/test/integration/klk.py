@@ -20,7 +20,7 @@ from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationS
                                             AutoPluginIntegrationSpec)
 from ribosome.nvim.components import Buffer
 from ribosome.trans.message_base import Message
-from ribosome.config import PluginSettings
+from ribosome.config.settings import Settings
 
 
 def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> Expectation:
@@ -147,11 +147,11 @@ class ExternalIntegrationKlkSpec(ExternalIntegrationSpec, VimIntegrationKlkHelpe
     pass
 
 
-Settings = TypeVar('Settings', bound=PluginSettings)
 D = TypeVar('D')
+S = TypeVar('S', bound=Settings)
 
 
-class AutoPluginIntegrationKlkSpec(Generic[Settings, D], AutoPluginIntegrationSpec[Settings, D],
+class AutoPluginIntegrationKlkSpec(Generic[S, D], AutoPluginIntegrationSpec[S, D],
                                    VimIntegrationKlkHelpers):
     pass
 

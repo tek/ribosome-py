@@ -14,7 +14,7 @@ from amino.algebra import Algebra
 from amino.util.string import decode
 from amino.mod import instance_from_module
 
-from ribosome.config import Config
+from ribosome.config.config import Config
 from ribosome.dispatch.data import Dispatch
 from ribosome.dispatch.execute import execute_dispatch_job, request_result
 from ribosome.dispatch.run import DispatchJob
@@ -22,6 +22,7 @@ from ribosome.logging import ribo_log, nvim_logging
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.dispatch.update import update_rpc
+from ribosome.config.settings import Settings
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
@@ -30,6 +31,7 @@ C = TypeVar('C', bound=Config)
 R = TypeVar('R')
 DP = TypeVar('DP', bound=Dispatch)
 RDP = TypeVar('RDP', bound=Algebra)
+S = TypeVar('S', bound=Settings)
 
 
 def dispatch_job(state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> DispatchJob:
@@ -59,7 +61,7 @@ def request_handler(
     return handle
 
 
-@do(NvimIO[PluginState[D]])
+@do(NvimIO[PluginState[S, D]])
 def init_state(dispatch_config: DispatchConfig) -> Do:
     data = dispatch_config.config.state()
     log_handler = yield NvimIO.delay(nvim_logging)

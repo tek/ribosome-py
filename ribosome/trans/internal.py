@@ -15,23 +15,24 @@ from ribosome.trans.api import trans
 from ribosome.plugin_state import PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
-from ribosome.trans.messages import ShowLogInfo, UpdateComponentState
+from ribosome.trans.messages import ShowLogInfo
 from ribosome.components.scratch import Mapping
-from ribosome.dispatch.data import Dispatch, Internal, SendMessage, Trans
 from ribosome.nvim.io import NS
 from ribosome.dispatch.component import Component
+from ribosome.config.settings import Settings
 
 D = TypeVar('D')
+S = TypeVar('S', bound=Settings)
 
 
 @trans.free.result(trans.st)
-@do(EitherState[PluginState[D], str])
+@do(EitherState[PluginState[S, D], str])
 def message_log() -> Do:
     yield EitherState.inspect_f(__.message_log.traverse(dump_json, Either))
 
 
 @trans.free.result(trans.st)
-@do(EitherState[PluginState[D], str])
+@do(EitherState[PluginState[S, D], str])
 def trans_log() -> Do:
     yield EitherState.inspect_f(lambda s: dump_json(s.trans_log))
 
@@ -125,7 +126,7 @@ def show_python_path() -> Iterable[str]:
 
 
 @trans.free.unit(trans.st)
-@do(NS[PluginState[D], None])
+@do(NS[PluginState[S, D], None])
 def enable_components(*names: str) -> Do:
     from ribosome.dispatch.update import update_rpc
     comps = (

@@ -27,7 +27,7 @@ import ribosome
 from ribosome.logging import Logging
 from ribosome.nvim import AsyncVimProxy, NvimFacade
 from ribosome.trans.message_base import Message
-from ribosome.config import PluginSettings
+from ribosome.config.settings import Settings
 
 
 def wait_for(cond: Callable[[], bool], timeout: float=None, intval: float=0.1) -> bool:
@@ -348,7 +348,7 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
         self.root.sub.cat(self.root) % __.report()
 
 
-Settings = TypeVar('Settings', bound=PluginSettings)
+Settings = TypeVar('S', bound=Settings)
 D = TypeVar('D')
 
 

@@ -4,7 +4,7 @@ from amino.test.spec import SpecBase
 from amino import List, Map
 
 from ribosome.test.integration.run import DispatchHelper
-from ribosome.config import Config
+from ribosome.config.config import Config
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.trans.api import trans
 from ribosome.trans.message_base import Msg
@@ -70,14 +70,8 @@ config = Config.cons(
 
 class ComponentSpec(SpecBase):
     '''
-    test $test
     enable a component $enable_component
     '''
-
-    def test(self) -> Expectation:
-        helper = DispatchHelper.cons(config)
-        helper.loop('function:test', args=(5,)).unsafe(helper.vim)
-        return k(1) == 1
 
     def enable_component(self) -> Expectation:
         helper = DispatchHelper.cons(config)

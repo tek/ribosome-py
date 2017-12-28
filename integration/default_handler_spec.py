@@ -4,13 +4,14 @@ from kallikrein.matchers import contain
 
 from amino.test import temp_dir
 
-from ribosome.config import PluginSettings, SimpleData
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
+from ribosome.config.settings import Settings
+from ribosome.config.config import SimpleData
 
 from integration._support.default_handler import class_name
 
 
-class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[PluginSettings, SimpleData]):
+class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[Settings, SimpleData]):
     '''
     append a directory to the plugin's `sys.path` $append_path
     '''

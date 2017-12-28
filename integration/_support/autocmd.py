@@ -2,10 +2,11 @@ from amino import Map, __, List
 
 from ribosome.trans.message_base import pmessage
 from ribosome.trans.api import trans
-from ribosome.config import RequestHandler, Config
 from ribosome.nvim import NvimIO
 from ribosome.dispatch.component import Component
 from ribosome.request.handler.prefix import Plain, Full
+from ribosome.request.handler.handler import RequestHandler
+from ribosome.config.config import Config
 
 Msg1 = pmessage('Msg1')
 Msg2 = pmessage('Msg2')

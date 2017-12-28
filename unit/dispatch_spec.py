@@ -10,7 +10,6 @@ from amino.boolean import true
 from amino.dat import Dat, ADT
 from amino.state import State
 
-from ribosome.config import Config, Data
 from ribosome.trans.message_base import Msg, Message
 from ribosome.dispatch.component import Component
 from ribosome.trans.api import trans
@@ -20,6 +19,7 @@ from ribosome.dispatch.data import DispatchError, DispatchOutputAggregate
 from ribosome.nvim.io import NvimIOState
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.test.integration.run import DispatchHelper
+from ribosome.config.config import Config
 
 
 specimen = Lists.random_string()
@@ -74,10 +74,9 @@ def q_m3(msg: M3) -> IO[Message]:
     return IO.pure(m1)
 
 
-class HsData(Dat['HsData'], Data):
+class HsData(Dat['HsData']):
 
-    def __init__(self, config: Config, counter: int=7) -> None:
-        super().__init__(config)
+    def __init__(self, counter: int=7) -> None:
         self.counter = counter
 
 

@@ -1,6 +1,6 @@
 from amino import Either, List
 
-from ribosome.config import Config
+from ribosome.config.config import Config
 from ribosome.trans.api import trans
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Plain

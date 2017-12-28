@@ -18,17 +18,19 @@ from ribosome.trans.handler import FreeTransHandler
 from ribosome.dispatch.component import ComponentData
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.dispatcher import RequestDispatcher
+from ribosome.config.settings import Settings
 
 NP = TypeVar('NP')
 D = TypeVar('D')
 DP = TypeVar('DP', bound=Dispatch)
-Res = NS[PluginState[D], DispatchResult]
-S = TypeVar('S')
+S = TypeVar('S', bound=Settings)
+Res = NS[PluginState[S, D], DispatchResult]
+St = TypeVar('St')
 C = TypeVar('C')
-DST = Callable[[NS[S, C]], NS[PluginState[D], C]]
+DST = Callable[[NS[St, C]], NS[PluginState[St, D], C]]
 
 
-def log_trans(trans: FreeTransHandler) -> NS[PluginState[D], None]:
+def log_trans(trans: FreeTransHandler) -> NS[PluginState[S, D], None]:
     return NS.pure(None) if trans.name in ('trans_log', 'pure') else NS.modify(__.log_trans(trans.name))
 
 
@@ -46,11 +48,11 @@ class DataStateTransformer:
         return transform_data_state
 
     def component_dispatch(self, aff: ComponentDispatch[DP]) -> DST:
-        def get(r: PluginState[D]) -> ComponentData[D, C]:
+        def get(r: PluginState[S, D]) -> ComponentData[D, C]:
             return ComponentData(r.data, r.component_data.lift(aff.name).get_or_else(aff.state_ctor()))
-        def put(r: PluginState[D], s: ComponentData[D, C]) -> PluginState[D]:
+        def put(r: PluginState[S, D], s: ComponentData[D, C]) -> PluginState[S, D]:
             return r.update_component_data(aff.name, s.comp).copy(data=s.main)
-        def transform(st: NS[S, C]) -> NS[PluginState[D], C]:
+        def transform(st: NS[St, C]) -> NS[PluginState[S, D], C]:
             return st.transform_s(get, put)
         return transform
 
@@ -59,14 +61,14 @@ data_state_transformer = dispatch_alg(DataStateTransformer(), DispatchAffiliaton
 
 
 def parse_args(handler: RequestHandler, dispatcher: RequestDispatcher, args: List[Any]) -> NS[D, List[Any]]:
-    return NS.from_either(handler.parser(dispatcher.params_spec).parse(args))
+    return handler.parser(dispatcher.params_spec).parse(args)
 
 
 @do(Res)
 def setup_trans(aff: DispatchAffiliaton[Dispatch], args: List[Any]) -> Do:
     trans = aff.dispatch
     dispatcher = trans.handler.dispatcher
-    parsed_args = yield parse_args(trans.handler, dispatcher, args)
+    parsed_args = yield NS.from_either(parse_args(trans.handler, dispatcher, args))
     yield log_trans(trans)
     yield NS.pure(dispatcher.handler(*parsed_args))
 
@@ -103,7 +105,7 @@ class RunDispatchSync(RunDispatch):
     def __init__(self, args: List[Any]) -> None:
         self.args = args
 
-    @do(NS[PluginState[D], DispatchResult])
+    @do(NS[PluginState[S, D], DispatchResult])
     def legacy(self, dispatch: Legacy, aff: DispatchAffiliaton[Legacy]) -> Do:
         plugin = yield NS.inspect(_.plugin)
         result = dispatch.handler.func(plugin, *self.args)
@@ -115,7 +117,7 @@ class RunDispatchAsync(RunDispatch):
     def __init__(self, args: List[Any]) -> None:
         self.args = args
 
-    @do(NS[PluginState[D], DispatchResult])
+    @do(NS[PluginState[S, D], DispatchResult])
     def send_message(self, dispatch: SendMessage, aff: DispatchAffiliaton[SendMessage]) -> Do:
         cmd_name = yield NS.inspect(__.config.vim_cmd_name(dispatch.handler))
         msg_e = cons_message(dispatch.msg, self.args, cmd_name, dispatch.method)

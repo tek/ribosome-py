@@ -1,5 +1,5 @@
 from amino import Map, List
-from ribosome.config import Config, RequestHandler
+from ribosome.config.config import Config, RequestHandler
 from ribosome.trans.message_base import Message, pmessage
 from ribosome.trans.api import trans
 from ribosome.dispatch.component import Component, Component

@@ -8,14 +8,16 @@ from amino.func import flip
 from ribosome.nvim.io import NS
 from ribosome.plugin_state import PluginState, DispatchAffiliaton, RootDispatch, ComponentDispatch, Syncs, Asyncs
 from ribosome.dispatch.resolve import ComponentResolver
-from ribosome.config import Config
+from ribosome.config.config import Config
 from ribosome.dispatch.data import DispatchAsync, SendMessage, Internal, Trans, Dispatch
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.dispatch.component import Components, Component
 from ribosome.request.rpc import define_handlers
+from ribosome.config.settings import Settings
 
 D = TypeVar('D')
 DP = TypeVar('DP', bound=Dispatch)
+S = TypeVar('S', bound=Settings)
 
 
 def choose_dispatch(handler: RequestHandler) -> DispatchAsync:
@@ -42,7 +44,7 @@ def component_dispatches(component: Component) -> List[DispatchAffiliaton[Dispat
                                                                                           component.state_ctor)
 
 
-def dispatches(state: PluginState[D]) -> Tuple[Syncs, Asyncs]:
+def dispatches(state: PluginState[S, D]) -> Tuple[Syncs, Asyncs]:
     config = state.config
     cfg_dispatches = config_dispatches(config)
     compo_dispatches = state.components.all // component_dispatches
@@ -55,7 +57,7 @@ def dispatches(state: PluginState[D]) -> Tuple[Syncs, Asyncs]:
     )
 
 
-@do(State[PluginState[D], None])
+@do(State[PluginState[S, D], None])
 def update_components(from_user: Either[str, List[str]]) -> Do:
     config = yield State.inspect(_.config)
     components = yield State.lift(ComponentResolver(config, from_user).run)
@@ -66,13 +68,13 @@ def update_components(from_user: Either[str, List[str]]) -> Do:
 
 
 # TODO finish
-@do(NS[PluginState[D], None])
+@do(NS[PluginState[S, D], None])
 def undef_handlers() -> Do:
     handlers = yield NS.inspect(_.dispatch_config.rpc_handlers)
     return handlers
 
 
-@do(NS[PluginState[D], None])
+@do(NS[PluginState[S, D], None])
 def update_rpc() -> Do:
     config = yield NS.inspect(_.config)
     yield undef_handlers()
