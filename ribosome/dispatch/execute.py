@@ -24,7 +24,7 @@ from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffili
 from ribosome.trans.queue import PrioQueue
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.loop import process_message
-from ribosome.trans.send_message import send_message
+from ribosome.trans.send_message import send_message, transform_data_state
 from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.trans.action import TransM, TransMPure, TransMBind, LogMessage, Info, Error
 from ribosome.trans.handler import TransComplete
@@ -82,7 +82,7 @@ execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
 def run_trans_m(tr: TransM) -> Do:
     if isinstance(tr, TransMPure):
         yield log_trans(tr.handler)
-        result = yield execute_data_trans(tr.handler)
+        result = yield execute_data_trans(transform_data_state, tr.handler)
         yield normalize_output(result)
     elif isinstance(tr, TransMBind):
         result = yield run_trans_m(tr.fa)

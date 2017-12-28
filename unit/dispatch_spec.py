@@ -155,6 +155,7 @@ dispatch_conf = DispatchConfig.cons(config)
 
 
 # TODO test free trans function with invalid arg count
+# TODO test TransM
 class DispatchSpec(SpecBase):
     '''
     resolve component handlers $handlers
