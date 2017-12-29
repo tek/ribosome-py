@@ -78,7 +78,10 @@ class StrictSetting(Generic[A, B], PluginSetting[B]):
         return self.default
 
     def update(self, value: B) -> NvimIO[None]:
-        return NvimIO.delay(__.sync_vars.set_p(self.name, value))
+        def write(v: NvimFacade) -> NvimIO[None]:
+            setter = v.sync_vars.set_p if self.prefix else v.sync_vars.set
+            setter(self.name, value)
+        return NvimIO.delay(write)
 
 
 class EvalSetting(Generic[B], PluginSetting[B]):
