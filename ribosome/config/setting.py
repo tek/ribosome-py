@@ -1,7 +1,7 @@
 import abc
 from typing import Callable, Type, TypeVar, Generic, Generator
 
-from amino import List, Either, __, Left, Eval, _, Right
+from amino import List, Either, __, Left, Eval
 from amino.util.string import ToStr
 from amino.do import do, Do
 
@@ -12,7 +12,7 @@ A = TypeVar('A', contravariant=True)
 B = TypeVar('B')
 
 
-class PluginSetting(Generic[B], Logging, ToStr):
+class Setting(Generic[B], Logging, ToStr):
 
     @abc.abstractproperty
     def value(self) -> NvimIO[Either[str, B]]:
@@ -35,7 +35,7 @@ class PluginSetting(Generic[B], Logging, ToStr):
         return run()
 
 
-class StrictSetting(Generic[A, B], PluginSetting[B]):
+class StrictSetting(Generic[A, B], Setting[B]):
 
     def __init__(
             self,
@@ -84,7 +84,7 @@ class StrictSetting(Generic[A, B], PluginSetting[B]):
         return NvimIO.delay(write)
 
 
-class EvalSetting(Generic[B], PluginSetting[B]):
+class EvalSetting(Generic[B], Setting[B]):
 
     def __init__(
             self,
@@ -111,11 +111,11 @@ class EvalSetting(Generic[B], PluginSetting[B]):
         return NvimIO.pure(None)
 
 
-def setting_ctor(tpe: Type[A], ctor: Callable[[A], B]) -> Callable[[str, str, str, bool, B], PluginSetting[B]]:
+def setting_ctor(tpe: Type[A], ctor: Callable[[A], B]) -> Callable[[str, str, str, bool, B], Setting[B]]:
     def setting(name: str, desc: str, help: str, prefix: bool, default: Either[str, B]=Left('no default specified')
-                ) -> PluginSetting[B]:
+                ) -> Setting[B]:
         return StrictSetting(name, desc, help, prefix, tpe, ctor, default)
     return setting
 
 
-__all__ = ('PluginSetting', 'StrictSetting', 'EvalSetting', 'setting_ctor')
+__all__ = ('Setting', 'StrictSetting', 'EvalSetting', 'setting_ctor')

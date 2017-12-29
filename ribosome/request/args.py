@@ -18,7 +18,8 @@ def cons_params_spec(fun: Callable[..., Any]) -> None:
     max = (~Boolean(argspec.varargs or argspec.varkw)).m(param_count)
     nargs = Nargs.cons(min, max)
     types = params.traverse(annotations.lift, Maybe) | Nil
-    return ParamsSpec(nargs, min, max, method, types)
+    rettype = getattr(fun, 'tpe', annotations.lift('return') | None)
+    return ParamsSpec(nargs, min, max, method, types, rettype)
 
 
 class ParamsSpec(Dat['ParamsSpec']):
@@ -32,12 +33,19 @@ class ParamsSpec(Dat['ParamsSpec']):
     def from_type(tpe: type) -> 'ParamsSpec':
         return cons_params_spec(tpe.__init__)
 
-    def __init__(self, nargs: Nargs, min: int, max: Maybe[int], method: Boolean, types: List[type]) -> None:
+    def __init__(self,
+                 nargs: Nargs,
+                 min: int,
+                 max: Maybe[int],
+                 method: Boolean,
+                 types: List[type],
+                 rettype: type) -> None:
         self.nargs = nargs
         self.min = min
         self.max = max
         self.method = method
         self.types = types
+        self.rettype = rettype
 
     @property
     def exact_count(self) -> Maybe[int]:

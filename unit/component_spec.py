@@ -19,22 +19,22 @@ class TM(Msg):
 
 @trans.msg.unit(TM)
 def core_test(msg: TM) -> None:
-    print('core')
+    pass
 
 
 @trans.msg.unit(TM)
 def extra_test(msg: TM) -> None:
-    print('extra')
+    pass
 
 
 @trans.free.unit()
 def core_fun(a: int) -> None:
-    print('core_fun')
+    pass
 
 
 @trans.free.unit()
 def extra_fun(a: int) -> None:
-    print('test_fun')
+    pass
 
 
 core = Component.cons(

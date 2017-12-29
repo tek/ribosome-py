@@ -98,11 +98,11 @@ class ConfigDecoder(Decoder[Config], tpe=Config):
         yield Right(Config.cons(name))
 
 
-class Data(Generic[S, D], Dat['Data[S, D]']):
+class Resources(Generic[S, D], Dat['Resources[S, D]']):
 
     def __init__(self, settings: S, data: D) -> None:
         self.settings = settings
         self.data = data
 
 
-__all__ = ('Config', 'SimpleData')
+__all__ = ('Config', 'SimpleData', 'Resources')

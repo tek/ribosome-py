@@ -29,12 +29,12 @@ class TM(Msg):
 
 @trans.msg.unit(TM)
 def core_test(msg: TM) -> None:
-    print('core')
+    pass
 
 
 @trans.msg.unit(TM)
 def extra_test(msg: TM) -> None:
-    print('extra')
+    pass
 
 
 @trans.free.unit(trans.st)

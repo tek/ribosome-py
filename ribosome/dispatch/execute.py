@@ -14,8 +14,8 @@ from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.logging import ribo_log, Logging
 from ribosome.config.config import Config
 from ribosome.nvim.io import NS, NResult, NSuccess, NError, NFatal
-from ribosome.dispatch.run import (DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch, execute_data_trans,
-                                   log_trans)
+from ribosome.dispatch.run import (DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch, log_trans,
+                                   execute_trans)
 from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
                                     DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors,
                                     NvimIODIO, DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO,
@@ -84,7 +84,7 @@ execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
 def run_trans_m(tr: TransM) -> Do:
     if isinstance(tr, TransMPure):
         yield log_trans(tr.handler)
-        result = yield execute_data_trans(transform_data_state, tr.handler)
+        result = yield transform_data_state(execute_trans(tr.handler))
         yield normalize_output(result)
     elif isinstance(tr, TransMBind):
         result = yield run_trans_m(tr.fa)

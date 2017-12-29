@@ -1,10 +1,9 @@
-import abc
-from typing import TypeVar, Union, Any, Generic, Type, Callable
+from typing import TypeVar, Union, Any, Generic, Type
 
 from amino import List, Boolean, Nil, Maybe, Just, Nothing, IO, Either, Right, Left
 from amino.dat import Dat, ADT, DatMeta
 
-from ribosome.request.rpc import RpcHandlerFunction, RpcHandlerSpec
+from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.dispatcher import TransDispatcher
 from ribosome.request.handler.method import RpcMethod
@@ -21,6 +20,9 @@ D = TypeVar('D')
 
 class Dispatch:
 
+    def __init__(self, handler: RequestHandler) -> None:
+        self.handler = handler
+
     @property
     def sync(self) -> Boolean:
         return Boolean.isinstance(self, DispatchSync)
@@ -29,13 +31,16 @@ class Dispatch:
     def async(self) -> Boolean:
         return Boolean.isinstance(self, DispatchAsync)
 
-    @abc.abstractmethod
-    def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
-        ...
+    @property
+    def name(self) -> str:
+        return self.handler.name
 
-    @abc.abstractproperty
-    def desc(self) -> str:
-        ...
+    def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
+        return self.handler.spec(name, prefix)
+
+    @property
+    def method(self) -> str:
+        return self.handler.method.method
 
 
 DP = TypeVar('DP', bound=Dispatch)
@@ -49,72 +54,21 @@ class DispatchAsync(ADT['DispatchAsync'], Dispatch, base=True):
     pass
 
 
-class Legacy(DispatchSync):
-
-    def __init__(self, handler: RpcHandlerFunction) -> None:
-        self.handler = handler
-
-    def _arg_desc(self) -> List[str]:
-        return List(str(self.handler))
-
-    @property
-    def sync(self) -> Boolean:
-        return self.handler.spec.sync
-
-    def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
-        return self.handler.spec
-
-    @property
-    def desc(self) -> str:
-        return f'legacy `{self.handler}`'
-
-
 class SendMessage(DispatchAsync):
-
-    def __init__(self, handler: RequestHandler) -> None:
-        self.handler = handler
-
-    def _arg_desc(self) -> List[str]:
-        return List(self.name, str(self.handler))
-
-    @property
-    def name(self) -> str:
-        return self.handler.name
-
-    @property
-    def sync(self) -> Boolean:
-        return self.handler.sync
-
-    def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
-        return self.handler.spec(name, prefix)
-
-    @property
-    def msg(self) -> Type[Message]:
-        return self.handler.dispatcher.msg
-
-    @property
-    def method(self) -> str:
-        return self.handler.method.method
 
     @property
     def desc(self) -> str:
         return f'send `{self.msg.__name__}`'
+
+    @property
+    def msg(self) -> Type[Message]:
+        return self.handler.dispatcher.msg
 
 
 class Trans(Generic[Meth, B], DispatchSync, DispatchAsync):
 
     def __init__(self, handler: RequestHandler[Meth, TransDispatcher[B]]) -> None:
         self.handler = handler
-
-    def _arg_desc(self) -> List[str]:
-        return List(self.name, str(self.handler))
-
-    def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
-        return self.handler.spec(name, prefix)
-
-    @property
-    def name(self) -> str:
-        return self.handler.name
 
     @property
     def desc(self) -> str:
@@ -126,19 +80,19 @@ class Internal(Generic[Meth, B], DispatchSync, DispatchAsync):
     def __init__(self, handler: RequestHandler[Meth, TransDispatcher[B]]) -> None:
         self.handler = handler
 
-    def _arg_desc(self) -> List[str]:
-        return List(str(self.handler))
-
-    def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
-        return self.handler.spec(name, prefix)
-
-    @property
-    def name(self) -> str:
-        return self.handler.name
-
     @property
     def desc(self) -> str:
         return f'internal `{self.name}`'
+
+
+class ResourcesState(Generic[Meth, B], DispatchSync, DispatchAsync):
+
+    def __init__(self, handler: RequestHandler[Meth, TransDispatcher[B]]) -> None:
+        self.handler = handler
+
+    @property
+    def desc(self) -> str:
+        return f'resources `{self.name}`'
 
 
 class DispatchOutput(ADT, base=True): pass

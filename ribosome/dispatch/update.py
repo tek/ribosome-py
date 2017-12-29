@@ -9,7 +9,7 @@ from ribosome.nvim.io import NS
 from ribosome.plugin_state import PluginState, DispatchAffiliaton, RootDispatch, ComponentDispatch, Syncs, Asyncs
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.config.config import Config
-from ribosome.dispatch.data import DispatchAsync, SendMessage, Internal, Trans, Dispatch
+from ribosome.dispatch.data import DispatchAsync, SendMessage, Internal, Trans, Dispatch, ResourcesState
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.dispatch.component import Components, Component
 from ribosome.request.rpc import define_handlers
@@ -26,6 +26,8 @@ def choose_dispatch(handler: RequestHandler) -> DispatchAsync:
         if handler.msg else
         Internal
         if handler.internal else
+        ResourcesState
+        if handler.resources else
         Trans
     )
     return tpe(handler)

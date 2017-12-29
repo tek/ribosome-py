@@ -1,6 +1,6 @@
 from typing import TypeVar, Any, Generic, Type, Callable
 
-from amino import List, Boolean, Nil, Either, Left, Right, __, _
+from amino import List, Boolean, Nil, Either, Left, Right, __, _, L
 from amino.dat import Dat
 from amino.do import do, Do
 from amino.dispatch import dispatch_alg
@@ -9,7 +9,8 @@ from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.args import ArgValidator, ParamsSpec
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliaton, RootDispatch, ComponentDispatch
-from ribosome.dispatch.data import Legacy, DispatchReturn, Internal, Trans, SendMessage, DispatchResult, Dispatch
+from ribosome.dispatch.data import (DispatchReturn, Internal, Trans, SendMessage, DispatchResult, Dispatch,
+                                    ResourcesState)
 from ribosome.nvim.io import NS
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.transform import validate_trans_complete
@@ -19,6 +20,7 @@ from ribosome.dispatch.component import ComponentData
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.dispatcher import RequestDispatcher
 from ribosome.config.settings import Settings
+from ribosome.config.config import Resources
 
 NP = TypeVar('NP')
 D = TypeVar('D')
@@ -36,10 +38,6 @@ def log_trans(trans: FreeTransHandler) -> NS[PluginState[S, D], None]:
 
 def execute_trans(handler: FreeTransHandler) -> NS[D, DispatchResult]:
     return validate_trans_complete(handler.run())
-
-
-def execute_data_trans(trans_state: DST, handler: FreeTransHandler) -> Res:
-    return trans_state(execute_trans(handler))
 
 
 class DataStateTransformer:
@@ -77,13 +75,25 @@ def setup_trans(aff: DispatchAffiliaton[Dispatch], args: List[Any]) -> Do:
 def run_trans(aff: DispatchAffiliaton[Trans], args: List[Any]) -> Do:
     handler = yield setup_trans(aff, args)
     trans_state = data_state_transformer(aff)
-    yield execute_data_trans(trans_state, handler)
+    yield trans_state(execute_trans(handler))
 
 
 @do(Res)
 def run_internal(aff: DispatchAffiliaton[Internal], args: List[Any]) -> Do:
     handler = yield setup_trans(aff, args)
     yield execute_trans(handler)
+
+
+def trans_resources_state(settings: S, st: NS[Resources[S, St], C]) -> NS[St, C]:
+    return st.transform_s(L(Resources)(settings, _), lambda r, s: s.data)
+
+
+@do(Res)
+def run_resources(aff: DispatchAffiliaton[ResourcesState], args: List[Any]) -> Do:
+    handler = yield setup_trans(aff, args)
+    trans_state = data_state_transformer(aff)
+    settings = yield NS.inspect(_.settings)
+    yield trans_state(trans_resources_state(settings, execute_trans(handler)))
 
 
 def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str) -> Either[str, Message]:
@@ -99,17 +109,14 @@ class RunDispatch(Generic[D, NP], Logging):
     def trans(self, dispatch: Trans, aff: DispatchAffiliaton[Trans]) -> Res:
         return run_trans(aff, self.args)
 
+    def resources_state(self, dispatch: ResourcesState, aff: DispatchAffiliaton[ResourcesState]) -> Res:
+        return run_resources(aff, self.args)
+
 
 class RunDispatchSync(RunDispatch):
 
     def __init__(self, args: List[Any]) -> None:
         self.args = args
-
-    @do(NS[PluginState[S, D], DispatchResult])
-    def legacy(self, dispatch: Legacy, aff: DispatchAffiliaton[Legacy]) -> Do:
-        plugin = yield NS.inspect(_.plugin)
-        result = dispatch.handler.func(plugin, *self.args)
-        yield NS.pure((DispatchResult(DispatchReturn(result), Nil)))
 
 
 class RunDispatchAsync(RunDispatch):

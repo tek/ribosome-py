@@ -1,10 +1,11 @@
-from typing import Callable, Type, Generic, Any, TypeVar
+from typing import Callable, Type, Generic, Any, TypeVar, Tuple
 
-from amino import List, Lists, Map, _, Boolean, __
+from amino import List, Lists, Map, _, Boolean, __, Maybe, Nothing
 from amino.func import flip
 from amino.util.string import ToStr, camelcase
 from amino.dat import ADT
 from amino.boolean import false
+from amino.state import StateT
 
 from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.logging import Logging
@@ -14,6 +15,7 @@ from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod
 from ribosome.trans.message_base import Message
 from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
 from ribosome.request.args import ParamsSpec
+from ribosome import ribo_log
 
 B = TypeVar('B')
 D = TypeVar('D')
@@ -32,6 +34,7 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
             name: str,
             prefix: PrefixStyle,
             internal: Boolean,
+            resources: Boolean,
             sync: Boolean,
             json: Boolean,
             extra_options: Map[str, Any],
@@ -41,6 +44,7 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
         self.name = name
         self.prefix = prefix
         self.internal = internal
+        self.resources = resources
         self.sync = sync
         self.json = json
         self.extra_options = extra_options
@@ -106,6 +110,19 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
         return self.dispatcher.is_msg
 
 
+def trans_style(meth: RpcMethod, dispatcher: RequestDispatcher) -> Tuple[Boolean, Boolean]:
+    from ribosome.plugin_state import PluginState
+    from ribosome.config.config import Resources
+    tpe = dispatcher.params_spec.rettype
+    state_type = (
+        Maybe.getattr(tpe, '__args__') / Lists.wrap // _.head
+        if tpe is not None and issubclass(tpe, StateT)
+        else Nothing
+    )
+    is_state = lambda st: state_type.exists(lambda t: issubclass(t, st))
+    return is_state(PluginState), is_state(Resources)
+
+
 class RequestHandlerBuilder(Generic[Meth, DP]):
 
     def __init__(self, method: Meth, dispatcher: DP) -> None:
@@ -121,13 +138,26 @@ class RequestHandlerBuilder(Generic[Meth, DP]):
             name: str=None,
             prefix: PrefixStyle=Short(),
             internal: Boolean=false,
+            resources: Boolean=false,
             sync: Boolean=None,
             json: Boolean=false,
             **options: Any,
     ) -> RequestHandler:
         name1 = name or self.dispatcher.name
         sync1 = self.sync_default if sync is None else sync
-        return RequestHandler(self.method, self.dispatcher, name1, prefix, internal, sync1, json, Map(options))
+        internal1, resources1 = (internal, resources) if internal or resources else trans_style(self.method,
+                                                                                                self.dispatcher)
+        return RequestHandler(
+            self.method,
+            self.dispatcher,
+            name1,
+            prefix,
+            internal1,
+            resources1,
+            sync1,
+            json,
+            Map(options),
+        )
 
 
 class RequestHandlers(ToStr):

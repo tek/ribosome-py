@@ -9,7 +9,7 @@ from amino.do import do
 
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
-from ribosome.config.setting import PluginSetting, EvalSetting, setting_ctor
+from ribosome.config.setting import Setting, EvalSetting, setting_ctor
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -33,8 +33,8 @@ def project_name_from_path() -> Generator:
 
 
 @do(NvimIO[Either[str, Path]])
-def state_dir_with_name(state_dir: PluginSetting[Path], proteome_name: PluginSetting[str],
-                        session_name: PluginSetting[str]) -> Generator:
+def state_dir_with_name(state_dir: Setting[Path], proteome_name: Setting[str],
+                        session_name: Setting[str]) -> Generator:
     base = yield state_dir.value_or_default
     pro_name = yield proteome_name.value
     sess_name = yield session_name.value
@@ -57,8 +57,8 @@ class Settings(ToStr, Logging):
             Eval.always(lambda: state_dir_with_name(self.state_dir, self.proteome_name, self.session_name))
         )
 
-    def all(self) -> Map[str, PluginSetting]:
-        settings = inspect.getmembers(self, L(isinstance)(_, PluginSetting))
+    def all(self) -> Map[str, Setting]:
+        settings = inspect.getmembers(self, L(isinstance)(_, Setting))
         return Map(Lists.wrap(settings).map(_[1]).apzip(_.name).map2(flip))
 
     def _arg_desc(self) -> List[str]:
@@ -70,6 +70,7 @@ def path_list(data: list) -> Either[str, List[Path]]:
 
 
 str_setting = setting_ctor(str, lambda a: Right(a))
+int_setting = setting_ctor(int, lambda a: Right(a))
 float_setting = setting_ctor(float, lambda a: Right(a))
 list_setting = setting_ctor(list, cast(Callable[[Iterable[A]], Either[str, List[B]]], (lambda a: Right(Lists.wrap(a)))))
 path_setting = setting_ctor(str, (lambda a: Try(Path, a)))
