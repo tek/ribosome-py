@@ -14,25 +14,48 @@ from ribosome.dispatch.component import Component, Components
 from ribosome.nvim.io import NvimIOState, NS
 from ribosome.dispatch.data import DispatchResult, DIO, Dispatch, DispatchSync, DispatchAsync
 from ribosome.trans.queue import PrioQueue
-from ribosome.trans.handler import TransComplete
+from ribosome.trans.handler import TransComplete, FreeTransHandler
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
 from ribosome.trans.action import LogMessage
 from ribosome.config.settings import Settings
-from ribosome.config.config import Config
+from ribosome.config.config import Config, Resources
 
 D = TypeVar('D')
 C = TypeVar('C')
 DP = TypeVar('DP', bound=Dispatch)
 TransState = NvimIOState[D, DispatchResult]
 S = TypeVar('S', bound=Settings)
+CC = TypeVar('CC')
 
 
-class DispatchAffiliaton(Generic[DP], ADT['DispatchAffiliaton[DP]']):
+class DispatchAffiliation(ADT['DispatchAffiliation']):
 
-    def __init__(self, dispatch: DP) -> None:
+    @property
+    def is_component(self) -> Boolean:
+        return Boolean.isinstance(self, ComponentDispatch)
+
+
+class RootDispatch(DispatchAffiliation):
+    pass
+
+
+class ComponentDispatch(DispatchAffiliation):
+
+    def __init__(self, component: Component) -> None:
+        self.component = component
+
+    @property
+    def name(self) -> str:
+        return self.component.name
+
+
+class AffiliatedDispatch(Generic[DP], Dat['AffiliatedDispatch[DP]']):
+
+    def __init__(self, dispatch: DP, aff: DispatchAffiliation) -> None:
         self.dispatch = dispatch
+        self.aff = aff
 
     @property
     def sync(self) -> Boolean:
@@ -47,30 +70,18 @@ class DispatchAffiliaton(Generic[DP], ADT['DispatchAffiliaton[DP]']):
         return self.dispatch.desc
 
 
-class RootDispatch(Generic[DP], DispatchAffiliaton[DP]):
-    pass
+Syncs = Map[str, AffiliatedDispatch[DispatchSync]]
+Asyncs = Map[str, List[AffiliatedDispatch[DispatchAsync]]]
 
 
-class ComponentDispatch(Generic[DP], DispatchAffiliaton[DP]):
-
-    def __init__(self, name: str, dispatch: DP, state_ctor: Callable[[], C]) -> None:
-        self.name = name
-        self.state_ctor = state_ctor
-        super().__init__(dispatch)
-
-
-Syncs = Map[str, DispatchAffiliaton[DispatchSync]]
-Asyncs = Map[str, List[DispatchAffiliaton[DispatchAsync]]]
-
-
-class DispatchConfig(Generic[S, D], Dat['DispatchConfig']):
+class DispatchConfig(Generic[S, D, CC], Dat['DispatchConfig']):
 
     @staticmethod
     def cons(
-            config: Config[S, D],
+            config: Config[S, D, CC],
             sync_dispatch: Syncs=Map(),
             async_dispatch: Asyncs=Map(),
-            io_executor: Callable[[DIO], NS['PluginState[S, D]', TransComplete]]=None,
+            io_executor: Callable[[DIO], NS['PluginState[S, D, CC]', TransComplete]]=None,
             rpc_handlers: List[DefinedHandler]=Nil,
     ) -> 'DispatchConfig':
         return DispatchConfig(config, sync_dispatch, async_dispatch, Maybe.optional(io_executor), rpc_handlers)
@@ -80,7 +91,7 @@ class DispatchConfig(Generic[S, D], Dat['DispatchConfig']):
             config: 'ribosome.config.Config',
             sync_dispatch: Map[str, DispatchSync],
             async_dispatch: Map[str, List[DispatchAsync]],
-            io_executor: Maybe[Callable[[DIO], NS['PluginState[S, D]', TransComplete]]],
+            io_executor: Maybe[Callable[[DIO], NS['PluginState[S, D, CC]', TransComplete]]],
             rpc_handlers: List[DefinedHandler],
     ) -> None:
         self.config = config
@@ -110,34 +121,34 @@ class DispatchConfig(Generic[S, D], Dat['DispatchConfig']):
         return self.specs.distinct_by(_.rpc_method)
 
 
-class PluginState(Generic[S, D], Dat['PluginState']):
+class PluginState(Generic[S, D, CC], Dat['PluginState']):
 
     @staticmethod
     def cons(
-            dispatch_config: DispatchConfig[S, D],
+            dispatch_config: DispatchConfig[S, D, CC],
             data: D,
             components: List[Component],
             messages: PrioQueue[Message]=PrioQueue.empty,
             message_log: List[Message]=Nil,
             trans_log: List[str]=Nil,
             log_handler: Maybe[logging.Handler]=Nothing,
-            logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D], None]']]=Nothing,
+            logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D, CC], None]']]=Nothing,
             component_data: Map[str, Any]=Map(),
     ) -> 'PluginState':
-        component_state = Components(components)
-        return PluginState(dispatch_config, data, component_state, messages, message_log, trans_log,
-                           log_handler, logger, component_data)
+        components = Components.cons(components, dispatch_config.config.component_config_type)
+        return PluginState(dispatch_config, data, components, messages, message_log, trans_log, log_handler, logger,
+                           component_data)
 
     def __init__(
             self,
-            dispatch_config: DispatchConfig,
+            dispatch_config: DispatchConfig[S, D, CC],
             data: D,
             components: Components,
             messages: PrioQueue[Message],
             message_log: List[Message],
             trans_log: List[str],
             log_handler: Maybe[logging.Handler],
-            logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D], None]']],
+            logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D, CC], None]']],
             component_data: Map[str, Any],
     ) -> None:
         self.dispatch_config = dispatch_config
@@ -150,20 +161,20 @@ class PluginState(Generic[S, D], Dat['PluginState']):
         self.logger = logger
         self.component_data = component_data
 
-    def enqueue(self, messages: List[Sendable]) -> 'PluginState[S, D]':
+    def enqueue(self, messages: List[Sendable]) -> 'PluginState[S, D, CC]':
         envelopes = messages / Envelope.from_sendable
         return self.copy(messages=envelopes.fold_left(self.messages)(lambda q, m: q.put(m, m.prio)))
 
-    def update(self, data: D) -> 'PluginState[S, D]':
+    def update(self, data: D) -> 'PluginState[S, D, CC]':
         return self.copy(data=data)
 
-    def log_messages(self, msgs: List[Message]) -> 'PluginState[S, D]':
+    def log_messages(self, msgs: List[Message]) -> 'PluginState[S, D, CC]':
         return self.append.message_log(msgs)
 
-    def log_message(self, msg: Message) -> 'PluginState[S, D]':
+    def log_message(self, msg: Message) -> 'PluginState[S, D, CC]':
         return self.log_messages(List(msg))
 
-    def log_trans(self, trans: str) -> 'PluginState[S, D]':
+    def log_trans(self, trans: str) -> 'PluginState[S, D, CC]':
         return self.append1.trans_log(trans)
 
     @property
@@ -182,7 +193,6 @@ class PluginState(Generic[S, D], Dat['PluginState']):
     def settings(self) -> S:
         return self.config.settings
 
-
     @property
     def name(self) -> str:
         return self.config.name
@@ -190,25 +200,39 @@ class PluginState(Generic[S, D], Dat['PluginState']):
     def component(self, name: str) -> Either[str, Component]:
         return self.components.by_name(name)
 
-    def update_component_data(self, name: str, new: Any) -> 'PluginState[S, D]':
+    def data_for(self, component: Component) -> Any:
+        return self.component_data.lift(component.name) | component.state_ctor
+
+    def data_by_name(self, name: str) -> Either[str, Any]:
+        return self.component(name) / self.data_for
+
+    def update_component_data(self, name: str, new: Any) -> 'PluginState[S, D, CC]':
         return self.mod.component_data(__.cat((name, new)))
+
+    @property
+    def resources(self) -> Resources[S, D, CC]:
+        return Resources(self.data, self.settings, self.components)
+
+    def reaffiliate(self, handler: FreeTransHandler) -> DispatchAffiliation:
+        c = self.components.for_handler(handler)
+        return c.cata(ComponentDispatch, RootDispatch())
 
 
 class PluginStateHolder(Generic[D], Dat['PluginStateHolder'], Logging):
 
     @staticmethod
-    def concurrent(state: PluginState[S, D], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
+    def concurrent(state: PluginState[S, D, CC], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
         return ConcurrentPluginStateHolder(state, Maybe.check(log_handler), Lock(), False)
 
     @staticmethod
-    def strict(state: PluginState[S, D], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
+    def strict(state: PluginState[S, D, CC], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
         return StrictPluginStateHolder(state, log_handler)
 
-    def __init__(self, state: PluginState[S, D], log_handler: Maybe[logging.Handler]=Nothing) -> None:
+    def __init__(self, state: PluginState[S, D, CC], log_handler: Maybe[logging.Handler]=Nothing) -> None:
         self.state = state
         self.log_handler = log_handler
 
-    def update(self, state: PluginState[S, D]) -> None:
+    def update(self, state: PluginState[S, D, CC]) -> None:
         self.state = state
 
     @abc.abstractmethod
@@ -240,7 +264,7 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
 
     def __init__(
             self,
-            state: PluginState[S, D],
+            state: PluginState[S, D, CC],
             log_handler: Maybe[logging.Handler],
             lock: Lock,
             running: Boolean,

@@ -1,11 +1,12 @@
 import abc
 from typing import Callable, TypeVar, Type, Generic, Any
 
-from amino import List, Lists, L, _
+from amino import List, Lists, L, _, Boolean
 from amino.dat import Dat
+from amino.boolean import false, true
 
 from ribosome.trans.effect import TransEffect, cont, lift
-from ribosome.trans.action import TransAction, TransM, TransMPure, TransFailure
+from ribosome.trans.action import TransAction, TransM, TransMPure, TransFailure, TransMSwitch
 from ribosome.trans.message_base import Message
 from ribosome.request.args import ArgValidator, ParamsSpec
 
@@ -62,19 +63,40 @@ class MessageTransHandler(Generic[M, D], Dat['MessageTransHandler[M, D]'], Trans
         return ParamsSpec.from_type(self.message)
 
 
+# TODO rename to FreeTrans and MessageTrans
 class FreeTransHandler(Generic[D, R], Dat['FreeTransHandler[M, D]'], TransHandler):
 
     @staticmethod
-    def create(fun: Callable[..., R], effects: List[TransEffect], prio: float) -> 'FreeTransHandler':
+    def create(
+            fun: Callable[..., R],
+            effects: List[TransEffect],
+            prio: float,
+            resources: Boolean=false,
+            internal: Boolean=false,
+            component: Boolean=true,
+    ) -> 'FreeTransHandler':
         name = fun.__name__
-        return FreeTransHandler(name, fun, (), effects, prio)
+        return FreeTransHandler(name, fun, (), effects, prio, resources, internal, component)
 
-    def __init__(self, name: str, fun: Callable[..., R], args: tuple, effects: List[TransEffect], prio: float) -> None:
+    def __init__(
+            self,
+            name: str,
+            fun: Callable[..., R],
+            args: tuple,
+            effects: List[TransEffect],
+            prio: float,
+            resources: Boolean,
+            internal: Boolean,
+            component: Boolean,
+    ) -> None:
         self.name = name
         self.fun = fun
         self.args = args
         self.effects = effects
         self.prio = prio
+        self.resources = resources
+        self.internal = internal
+        self.component = component
 
     def __call__(self, *args: Any) -> 'FreeTransHandler':
         return self.copy(args=args)
@@ -89,6 +111,10 @@ class FreeTransHandler(Generic[D, R], Dat['FreeTransHandler[M, D]'], TransHandle
     @property
     def m(self) -> TransM:
         return TransMPure(self)
+
+    @property
+    def switch(self) -> TransM:
+        return TransMSwitch(self)
 
     @property
     def params_spec(self) -> ParamsSpec:

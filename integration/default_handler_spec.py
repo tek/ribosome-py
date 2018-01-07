@@ -6,12 +6,12 @@ from amino.test import temp_dir
 
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 from ribosome.config.settings import Settings
-from ribosome.config.config import SimpleData
+from ribosome.config.config import NoData
 
 from integration._support.default_handler import class_name
 
 
-class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[Settings, SimpleData]):
+class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
     '''
     append a directory to the plugin's `sys.path` $append_path
     '''

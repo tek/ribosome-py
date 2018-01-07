@@ -16,10 +16,11 @@ from ribosome.trans.api import trans
 from ribosome.plugin_state import PluginState, DispatchConfig
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.dispatch.data import DispatchError, DispatchOutputAggregate
-from ribosome.nvim.io import NvimIOState
+from ribosome.nvim.io import NS
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.config.config import Config
+from ribosome.dispatch.execute import dispatch_state
 
 
 specimen = Lists.random_string()
@@ -92,13 +93,13 @@ def trans_io() -> IO[Message]:
 
 # TODO allow args here
 @trans.free.result(trans.st)
-def trans_internal() -> NvimIOState[PluginState, str]:
-    return NvimIOState.inspect(_.name)
+def trans_internal() -> NS[PluginState, str]:
+    return NS.inspect(_.name)
 
 
 @trans.free.unit(trans.st)
-def trans_data() -> NvimIOState[HsData, None]:
-    return NvimIOState.modify(__.set.counter(23))
+def trans_data() -> NS[HsData, None]:
+    return NS.modify(__.set.counter(23))
 
 
 class JData(ADT['JData']):
@@ -143,7 +144,7 @@ config = Config.cons(
         RequestHandler.msg_cmd(M3)('meh'),
         RequestHandler.trans_cmd(trans_free)('trfree'),
         RequestHandler.trans_cmd(trans_io)('trio'),
-        RequestHandler.trans_function(trans_internal)('int', internal=true),
+        RequestHandler.trans_function(trans_internal)('int'),
         RequestHandler.trans_function(trans_data)('dat'),
         RequestHandler.trans_cmd(trans_json)('json', json=true),
         RequestHandler.trans_autocmd(vim_enter)(),
@@ -182,8 +183,9 @@ class DispatchSpec(SpecBase):
     def msg_arg_error(self) -> Expectation:
         helper = DispatchHelper.cons(config, 'p')
         name, args = 'command:muh', (specimen,)
+        job, dispatch = helper.dispatch_job(name, args, False)
         send = helper.sender(name, args=args, sync=False)
-        result = send().run_a(helper.state).attempt(helper.vim) / _.output
+        result = send().run_a(dispatch_state(helper.state, dispatch)).attempt(helper.vim) / _.output
         err = f'''argument count for command `HsMuh` is 1, must be exactly 2 ([{specimen}])'''
         return (
             k(result).must(be_right(have_type(DispatchOutputAggregate))) &
@@ -193,27 +195,27 @@ class DispatchSpec(SpecBase):
     def trans_free(self) -> Expectation:
         helper = DispatchHelper.cons(config, 'p', 'q')
         state, result = helper.unsafe_run('command:trfree', args=('x',))
-        return k(state.message_log) == List()
+        return k(state.state.message_log) == List()
 
     def io(self) -> Expectation:
         helper = DispatchHelper.cons(config)
         state, result = helper.unsafe_run('command:trio')
-        return k(state.messages.items.head / _[1] / _.message).must(be_just(m1))
+        return k(state.state.messages.items.head / _[1] / _.message).must(be_just(m1))
 
     def multi_io(self) -> Expectation:
         helper = DispatchHelper.cons(config, 'p', 'q')
         state, result = helper.unsafe_run('command:meh', sync=False)
-        return k(state.unwrapped_messages) == List(m1, M4())
+        return k(state.state.unwrapped_messages) == List(m1, M4())
 
     def internal(self) -> Expectation:
         helper = DispatchHelper.cons(config)
         state, result = helper.unsafe_run('function:int')
-        return k(result) == state.name
+        return k(result) == state.state.name
 
     def data(self) -> Expectation:
         helper = DispatchHelper.cons(config)
         state, result = helper.unsafe_run('function:dat')
-        return k(state.data.counter) == 23
+        return k(state.state.data.counter) == 23
 
     def json(self) -> Expectation:
         helper = DispatchHelper.cons(config)
@@ -224,7 +226,7 @@ class DispatchSpec(SpecBase):
     def autocmd(self) -> Expectation:
         helper = DispatchHelper.cons(config)
         state, result = helper.unsafe_run('autocmd:vim_enter')
-        return k(state.data.counter) == 19
+        return k(state.state.data.counter) == 19
 
 
 __all__ = ('DispatchSpec',)

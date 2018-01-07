@@ -28,36 +28,33 @@ I = TypeVar('I')
 class TransformTransState(Generic[G], TypeClass):
 
     @abc.abstractmethod
-    def transform(self, st: StateT[G, D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
+    def run(self, st: StateT[G, D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
         ...
-
-    def run(self, st: StateT[G, D, List[Message]]) -> NvimIOState[D, DispatchResult]:
-        return self.transform(st)
 
 
 class TransformIdState(TransformTransState[Id], tpe=IdState):
 
-    def transform(self, st: IdState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
+    def run(self, st: IdState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
         return NvimIOState.from_id(st)
 
 
 class TransformMaybeState(TransformTransState[Maybe], tpe=MaybeState):
 
-    def transform(self, st: MaybeState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
-        return NvimIOState.apply(lambda s: NvimIO.pure(st.run(s) | (s, DispatchResult(DispatchUnit(), Nil))))
+    def run(self, st: MaybeState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
+        return NvimIOState.apply(lambda s: NvimIO.pure(st.run(s) | (s, TransUnit())))
 
 
 class TransformEitherState(TransformTransState[Either], tpe=EitherState):
 
-    def transform(self, st: EitherState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
+    def run(self, st: EitherState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
         return NvimIOState.apply(
-            lambda s: NvimIO.pure(st.run(s).value_or(lambda err: (s, DispatchResult(DispatchError.cons(err), Nil))))
+            lambda s: NvimIO.pure(st.run(s).value_or(lambda err: (s, TransFailure(err))))
         )
 
 
 class TransformNvimIOState(TransformTransState[NvimIO], tpe=NvimIOState):
 
-    def transform(self, st: NvimIOState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
+    def run(self, st: NvimIOState[D, DispatchResult]) -> NvimIOState[D, DispatchResult]:
         return st
 
 

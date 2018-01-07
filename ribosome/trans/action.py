@@ -41,6 +41,12 @@ class TransMPure(TransM):
         self.handler = handler
 
 
+class TransMSwitch(TransM):
+
+    def __init__(self, handler: Any) -> None:
+        self.handler = handler
+
+
 class TransMBind(TransM):
 
     def __init__(self, fa: TransM[A], f: Callable[[A], TransM[B]]) -> None:
@@ -54,7 +60,7 @@ class Monad_TransM(Monad, tpe=TransM):
     def pure(self, a: A) -> TransM[A]:
         from ribosome.trans.api import trans
         @trans.free.result()
-        def pure() -> None:
+        def pure() -> A:
             return a
         return TransMPure(pure)
 
@@ -207,4 +213,4 @@ class TransEffectError(TransStep[str]):
 
 
 __all__ = ('TransAction', 'Transit', 'Propagate', 'TransUnit', 'TransResult', 'TransFailure', 'TransStep', 'Strict',
-           'Lift', 'TransEffectError')
+           'Lift', 'TransEffectError', 'TransM', 'TransMPure', 'TransMSwitch', 'TransMBind')

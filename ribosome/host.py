@@ -32,6 +32,7 @@ R = TypeVar('R')
 DP = TypeVar('DP', bound=Dispatch)
 RDP = TypeVar('RDP', bound=Algebra)
 S = TypeVar('S', bound=Settings)
+CC = TypeVar('CC')
 
 
 def dispatch_job(state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> DispatchJob:
@@ -61,7 +62,7 @@ def request_handler(
     return handle
 
 
-@do(NvimIO[PluginState[S, D]])
+@do(NvimIO[PluginState[S, D, CC]])
 def init_state(dispatch_config: DispatchConfig) -> Do:
     data = dispatch_config.config.state()
     log_handler = yield NvimIO.delay(nvim_logging)

@@ -1,19 +1,24 @@
-from typing import TypeVar, Callable, Generic
+from typing import TypeVar, Callable, Generic, Any, Type
 
 import toolz
 
-from amino import Map, List, Either, _, Nil, Maybe, I
+from amino import Map, List, Either, _, Nil, Maybe, Boolean, __
 from amino.dat import Dat
 from amino.func import flip
 
 from ribosome.nvim.io import NS
 from ribosome.dispatch.data import DispatchResult
-from ribosome.trans.handler import TransHandler
+from ribosome.trans.handler import TransHandler, FreeTransHandler
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 
 D = TypeVar('D')
-C = TypeVar('C')
+CD = TypeVar('CD')
+CC = TypeVar('CC')
 TransState = NS[D, DispatchResult]
+
+
+class NoComponentData(Dat['NoComponentData']):
+    pass
 
 
 class Handlers(Dat['Handlers']):
@@ -33,52 +38,82 @@ def message_handlers(handlers: List[TransHandler]) -> Map[float, Handlers]:
     return Map(toolz.groupby(_.prio, handlers)).map(create)
 
 
-class ComponentData(Generic[D, C], Dat['ComponentData[D, C]']):
+class ComponentData(Generic[D, CD], Dat['ComponentData[D, CD]']):
 
-    def __init__(self, main: D, comp: C) -> None:
+    def __init__(self, main: D, comp: CD) -> None:
         self.main = main
         self.comp = comp
 
 
-C = TypeVar('C', bound=ComponentData)
+CD = TypeVar('CD', bound=ComponentData)
 
 
-class Component(Generic[D, C], Dat['Component']):
+class Component(Generic[D, CD, CC], Dat['Component']):
 
     @staticmethod
     def cons(
             name: str,
             request_handlers: List[RequestHandler]=Nil,
             handlers: List[TransHandler]=Nil,
-            state_ctor: Callable[[], C]=None,
-    ) -> 'Component[D]':
+            state_ctor: Callable[[], CD]=None,
+            config: CC=None,
+    ) -> 'Component[D, CD, CC]':
         hs = message_handlers(handlers)
         return Component(
             name,
             RequestHandlers.cons(*request_handlers),
             hs,
-            state_ctor or (lambda: None),
+            state_ctor or NoComponentData,
+            Maybe.check(config),
         )
 
-    def __init__(self,
-                 name: str,
-                 request_handlers: RequestHandlers,
-                 handlers: Map[float, Handlers],
-                 state_ctor: Maybe[Callable[[D], C]],
-                 ) -> None:
+    def __init__(
+            self,
+            name: str,
+            request_handlers: RequestHandlers,
+            handlers: Map[float, Handlers],
+            state_ctor: Maybe[Callable[[D], CD]],
+            config: Maybe[CC],
+    ) -> None:
         self.name = name
         self.request_handlers = request_handlers
         self.handlers = handlers
         self.state_ctor = state_ctor
+        self.config = config
+
+    def handler_by_name(self, name: str) -> Either[str, TransHandler]:
+        return self.handlers.find(_.name == name).to_either(f'component `{self.name}` has no handler `name`')
+
+    def contains(self, handler: FreeTransHandler) -> Boolean:
+        return self.request_handlers.trans_handlers.exists(_.fun == handler.fun)
 
 
-class Components(Dat['Components']):
+class Components(Generic[D, CC], Dat['Components']):
 
-    def __init__(self, all: List[Component]) -> None:
+    @staticmethod
+    def cons(
+            all: List[Component[D, Any, CC]]=Nil,
+            config_type: Type[CC]=Any,
+    ) -> 'Components[D, CC]':
+        return Components(all, config_type)
+
+    def __init__(self, all: List[Component[D, Any, CC]], config_type: Type[CC]) -> None:
         self.all = all
+        self.config_type = config_type
 
-    def by_name(self, name: str) -> Either[str, Component]:
+    @property
+    def has_config(self) -> Boolean:
+        return self.config_type is not Any
+
+    def by_name(self, name: str) -> Either[str, Component[D, CD, CC]]:
         return self.all.find(_.name == name).to_either(f'no component named {name}')
+
+    @property
+    def config(self) -> List[CC]:
+        return self.all.collect(_.config)
+
+    def for_handler(self, handler: FreeTransHandler) -> Maybe[Component]:
+        return self.all.find(__.contains(handler))
 
 
 __all__ = ('Component', 'Components')

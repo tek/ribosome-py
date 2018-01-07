@@ -1,13 +1,13 @@
 from kallikrein import Expectation
 
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
-from ribosome.config.config import SimpleData
+from ribosome.config.config import NoData
 from ribosome.config.settings import Settings
 
 from integration._support.autocmd import val
 
 
-class AutocmdSpec(AutoPluginIntegrationKlkSpec[Settings, SimpleData]):
+class AutocmdSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
     '''
     execute handler when triggering an autocmd $autocmd
     '''

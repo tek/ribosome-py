@@ -1,75 +1,78 @@
 import abc
 import inspect
-import traceback
-import typing
+from traceback import FrameSummary
 from typing import TypeVar, Callable, Any, Generic, Generator, Union, Tuple
 from threading import Thread
 
 from amino.tc.base import ImplicitInstances, F, TypeClass, tc_prop
 from amino.lazy import lazy
 from amino.tc.monad import Monad
-from amino import Either, __, IO, Maybe, Left, Eval, L, List, Nothing, Right, Lists, _, Just, options
-from amino.state import tcs, StateT, State
+from amino import Either, __, IO, Maybe, Left, Eval, L, List, Right, Lists, _, options, Nil, Try, Path
+from amino.state import tcs, StateT, State, EitherState
 from amino.func import CallByName, tailrec
 from amino.do import do
-from amino.io import safe_fmt
-from amino.util.string import ToStr
-from amino.util.fun import lambda_str
-from amino.util.exception import sanitize_tb, format_exception
+from amino.util.exception import format_exception
 from amino.dat import ADT
 
 from ribosome.nvim.components import NvimFacade
 
 A = TypeVar('A')
 B = TypeVar('B')
+C = TypeVar('C')
 S = TypeVar('S')
 
 
-class NvimIOException(Exception):
-    remove_pkgs = List('amino', 'fn')
+def cframe() -> FrameSummary:
+    return inspect.currentframe()
 
-    def __init__(self, f, stack, cause) -> None:
+
+def callsite(frame) -> Any:
+    def loop(f) -> None:
+        pkg = f.f_globals.get('__package__')
+        return loop(f.f_back) if pkg.startswith('ribosome.nvim') or pkg.startswith('amino') else f
+    return loop(frame)
+
+
+def callsite_info(frame: FrameSummary) -> List[str]:
+    cs = callsite(frame)
+    source = inspect.getsourcefile(cs.f_code)
+    line = cs.f_lineno
+    code = Try(Path, source) // (lambda a: Try(a.read_text)) / Lists.lines // __.lift(line - 1) | '<no source>'
+    fun = cs.f_code.co_name
+    clean = code.strip()
+    return List(f'  File "{source}", line {line}, in {fun}', f'    {clean}')
+
+
+def callsite_source(frame) -> Tuple[List[str], int]:
+    cs = callsite(frame)
+    source = inspect.getsourcefile(cs.f_code)
+    return Try(Path, source) // (lambda a: Try(a.read_text)) / Lists.lines // __.lift(cs.f_lineno - 1) | '<no source>'
+
+
+class NvimIOException(Exception):
+
+    def __init__(self, f, stack, cause, frame=None) -> None:
         self.f = f
         self.stack = List.wrap(stack)
         self.cause = cause
-
-    @property
-    def location(self):
-        files = List('io', 'anon', 'instances/io', 'tc/base', 'nvim/io')
-        def filt(entry, name):
-            return entry.filename.endswith('/{}.py'.format(name))
-        stack = self.stack.filter_not(lambda a: files.exists(L(filt)(a, _)))
-        pred = (lambda a: not NvimIOException.remove_pkgs
-                .exists(lambda b: '/{}/'.format(b) in a.filename))
-        return stack.find(pred)
-
-    @property
-    def format_stack(self) -> List[str]:
-        rev = self.stack.reversed
-        def remove_recursion(i):
-            pre = rev[:i + 1]
-            post = rev[i:].drop_while(__.filename.endswith('/amino/io.py'))
-            return pre + post
-        def remove_internal():
-            start = rev.index_where(_.function == 'unsafe_perform_sync')
-            return start / remove_recursion | rev
-        frames = (self.location.to_list if IO.stack_only_location else remove_internal())
-        data = frames / (lambda a: a[1:-2] + tuple(a[-2]))
-        return sanitize_tb(Lists.wrap(traceback.format_list(list(data))))
+        self.frame = frame
 
     @property
     def lines(self) -> List[str]:
         cause = format_exception(self.cause)
-        suf1 = '' if self.stack.empty else ' at:'
-        tb1 = (List() if self.stack.empty else self.format_stack)
-        return tb1.cons(f'IO exception{suf1}').cat('Cause:') + cause + List(
-            '',
-            'Callback:',
-            f'  {self.f}'
-        )
+        cs = callsite_info(self.frame)
+        return List(f'NvimIO exception') + cs + cause[-3:]
 
     def __str__(self):
         return self.lines.join_lines
+
+    @property
+    def callsite(self) -> Any:
+        return callsite(self.frame)
+
+    @property
+    def callsite_source(self) -> List[str]:
+        return callsite_source(self.frame)
 
 
 class NvimIOInstances(ImplicitInstances):
@@ -117,16 +120,16 @@ class NFatal(Generic[A], NResult[A]):
         return Left(self.exception)
 
 
-class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
+class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
     debug = options.io_debug.exists
 
     @staticmethod
-    def wrap_either(f: Callable[[NvimFacade], Either[B, A]]) -> 'NvimIO[A]':
-        return NvimIO.suspend(lambda a: f(a).cata(NvimIO.error, NvimIO.pure))
+    def wrap_either(f: Callable[[NvimFacade], Either[B, A]], frame: FrameSummary=None) -> 'NvimIO[A]':
+        return NvimIO.suspend(lambda a: f(a).cata(NvimIO.error, NvimIO.pure), _frame=frame)
 
     @staticmethod
-    def from_either(e: Either[str, A]) -> 'NvimIO[A]':
-        return NvimIO.wrap_either(lambda v: e)
+    def from_either(e: Either[str, A], frame: FrameSummary=None) -> 'NvimIO[A]':
+        return NvimIO.wrap_either(lambda v: e, frame)
 
     @staticmethod
     def from_maybe(e: Maybe[A], error: CallByName) -> 'NvimIO[A]':
@@ -172,57 +175,39 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
     def delay(f: Callable[..., A], *a: Any, **kw: Any) -> 'NvimIO[A]':
         def g(vim: NvimFacade) -> A:
             return Pure(f(vim, *a, **kw))
-        return Suspend(g, safe_fmt(f, ('vim',) + a, kw))
+        return Suspend(g)
 
     @staticmethod
     def simple(f: Callable[..., A], *a, **kw) -> 'NvimIO[A]':
         return NvimIO.delay(lambda v: f(*a, **kw))
 
     @staticmethod
-    def suspend(f: Callable[..., 'NvimIO[A]'], *a: Any, **kw: Any) -> 'NvimIO[A]':
+    def suspend(f: Callable[..., 'NvimIO[A]'], *a: Any, _frame: FrameSummary=None, **kw: Any) -> 'NvimIO[A]':
         def g(vim: NvimFacade) -> NvimIO[A]:
             return f(vim, *a, **kw)
-        return Suspend(g, safe_fmt(f, a, kw))
+        return Suspend(g, _frame)
 
     @staticmethod
     def pure(a: A) -> 'NvimIO[A]':
         return Pure(a)
 
     @abc.abstractmethod
-    def lambda_str(self) -> Eval[str]:
-        ...
-
-    @abc.abstractmethod
     def _flat_map(self, f: Callable[[A], 'NvimIO[B]'], ts: Eval[str], fs: Eval[str]) -> 'NvimIO[B]':
         ...
 
     @abc.abstractmethod
-    def step1(self, vim: NvimFacade) -> 'NvimIO[A]':
+    def step(self, vim: NvimFacade) -> 'NvimIO[A]':
         ...
 
-    def __init__(self) -> None:
-        self.stack = inspect.stack() if NvimIO.debug else []
+    def __init__(self, frame=None) -> None:
+        self.frame = frame or inspect.currentframe()
 
-    def flat_map(self, f: Callable[[A], 'NvimIO[B]'], ts: Maybe[Eval[str]]=Nothing, fs: Maybe[Eval[str]]=Nothing
-                 ) -> 'NvimIO[B]':
-        ts1 = ts | self.lambda_str
-        fs1 = fs | Eval.later(lambda: f'flat_map({lambda_str(f)})')
-        return self._flat_map(f, ts1, fs1)
-
-    def _arg_desc(self) -> List[str]:
-        return List(self.lambda_str().evaluate())
-
-    def step(self, vim: NvimFacade) -> Union[A, 'NvimIO[A]']:
-        try:
-            return self.step1(vim)
-        except NvimIOException as e:
-            raise e
-        except Exception as e:
-            raise NvimIOException(self.lambda_str().evaluate(), self.stack, e)
+    def flat_map(self, f: Callable[[A], 'NvimIO[B]']) -> 'NvimIO[B]':
+        return self._flat_map(f)
 
     def run(self, vim: NvimFacade) -> A:
         @tailrec
-        def run(t: Union[A, 'NvimIO[A]']) -> Union[Tuple[bool, A], Tuple[bool, Tuple[Union[A, 'NvimIO[A]']]]]:
+        def run(t: 'NvimIO[A]') -> Union[Tuple[bool, A], Tuple[bool, Tuple[Union[A, 'NvimIO[A]']]]]:
             if isinstance(t, Pure):
                 return True, (t.value,)
             elif isinstance(t, (Suspend, BindSuspend)):
@@ -249,10 +234,6 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
 
     def attempt(self, vim: NvimFacade) -> Either[NvimIOException, A]:
         return self.either(vim)
-
-    def with_stack(self, s: typing.List[inspect.FrameInfo]) -> 'IO[A]':
-        self.stack = s
-        return self
 
     def unsafe(self, vim: NvimFacade) -> A:
         return self.either(vim).get_or_raise()
@@ -282,47 +263,55 @@ class NvimIO(Generic[A], F[A], ToStr, implicits=True, imp_mod='ribosome.nvim.io'
     def error_effect_f(self, f: Callable[[Exception], 'NvimIO[None]']) -> 'NvimIO[A]':
         return self.ensure(lambda a: NvimIO.suspend(lambda v: a.cata(f, NvimIO.pure)))
 
+    @property
+    def callsite_l1(self) -> str:
+        return callsite_source(self.frame)[0][0]
+
 
 class Suspend(Generic[A], NvimIO[A]):
 
-    def __init__(self, thunk: Callable[[NvimFacade], NvimIO[A]], string: Eval[str]) -> None:
-        super().__init__()
+    def __init__(self, thunk: Callable[[NvimFacade], NvimIO[A]], frame: FrameSummary=None) -> None:
+        super().__init__(frame)
         self.thunk = thunk
-        self.string = string
 
-    def lambda_str(self) -> Eval[str]:
-        return self.string
+    def step(self, vim: NvimFacade) -> NvimIO[A]:
+        try:
+            return self.thunk(vim)
+        except NvimIOException as e:
+            raise e
+        except Exception as e:
+            raise NvimIOException('', Nil, e, self.frame)
 
-    def step1(self, vim: NvimFacade) -> NvimIO[A]:
-        return self.thunk(vim).with_stack(self.stack)
-
-    def _flat_map(self, f: Callable[[A], NvimIO[B]], ts: Eval[str], fs: Eval[str]) -> NvimIO[B]:
-        return BindSuspend(self.thunk, f, ts, fs)
+    def _flat_map(self, f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
+        return BindSuspend(self.thunk, f, self.frame)
 
 
-class BindSuspend(Generic[A], NvimIO[A]):
+class BindSuspend(Generic[A, B], NvimIO[B]):
 
-    def __init__(self, thunk: Callable[[NvimFacade], NvimIO[A]], f: Callable, ts: Eval[str], fs: Eval[str]) -> None:
-        super().__init__()
+    def __init__(self, thunk: Callable[[NvimFacade], NvimIO[A]], f: Callable[[A], NvimIO[B]], frame: FrameSummary
+                 ) -> None:
+        super().__init__(frame)
         self.thunk = thunk
         self.f = f
-        self.ts = ts
-        self.fs = fs
 
-    def lambda_str(self) -> Eval[str]:
-        return (self.ts & self.fs).map2('{}.{}'.format)
+    def step(self, vim: NvimFacade) -> NvimIO[B]:
+        try:
+            step = self.thunk(vim)
+        except NvimIOException as e:
+            raise e
+        except Exception as e:
+            raise NvimIOException('', Nil, e, self.frame)
+        try:
+            return step.flat_map(self.f)
+        except NvimIOException as e:
+            raise e
+        except Exception as e:
+            raise NvimIOException('', Nil, e, step.frame)
 
-    def step1(self, vim: NvimFacade) -> NvimIO[A]:
-        return (
-            self.thunk(vim)
-            .flat_map(self.f, fs=Just(self.fs))
-            .with_stack(self.stack)
-        )
-
-    def _flat_map(self, f: Callable[[A], NvimIO[B]], ts: Eval[str], fs: Eval[str]) -> NvimIO[B]:
-        def bs(vim: NvimFacade) -> NvimIO[B]:
-            return BindSuspend(self.thunk, lambda a: self.f(a).flat_map(f, Just(ts), Just(fs)), ts, fs)
-        return Suspend(bs, (ts & fs).map2('{}.{}'.format))
+    def _flat_map(self, f: Callable[[B], NvimIO[C]]) -> NvimIO[C]:
+        def bs(vim: NvimFacade) -> NvimIO[C]:
+            return BindSuspend(self.thunk, lambda a: self.f(a).flat_map(f), self.frame)
+        return Suspend(bs)
 
 
 class Pure(Generic[A], NvimIO[A]):
@@ -331,19 +320,16 @@ class Pure(Generic[A], NvimIO[A]):
         super().__init__()
         self.value = value
 
-    def lambda_str(self) -> Eval[str]:
-        return Eval.later(lambda: f'Pure({self.value})')
-
     def _arg_desc(self) -> List[str]:
         return List(str(self.value))
 
-    def step1(self, vim: NvimFacade) -> NvimIO[A]:
+    def step(self, vim: NvimFacade) -> NvimIO[A]:
         return self
 
-    def _flat_map(self, f: Callable[[A], NvimIO[B]], ts: Eval[str], fs: Eval[str]) -> NvimIO[B]:
+    def _flat_map(self, f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
         def g(vim: NvimFacade) -> NvimIO[B]:
             return f(self.value)
-        return Suspend(g, (ts & fs).map2('{}.{}'.format))
+        return Suspend(g)
 
 
 class NvimIOError(Generic[A], NvimIO[A]):
@@ -351,16 +337,10 @@ class NvimIOError(Generic[A], NvimIO[A]):
     def __init__(self, error: str) -> None:
         self.error = error
 
-    def _arg_desc(self) -> List[str]:
-        return List(str(self.error))
-
-    def lambda_str(self) -> Eval[str]:
-        return Eval.later(lambda: f'NvimIOError({self.error})')
-
-    def _flat_map(self, f: Callable[[A], NvimIO[B]], ts: Eval[str], fs: Eval[str]) -> NvimIO[B]:
+    def _flat_map(self, f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
         return self
 
-    def step1(self, vim: NvimFacade) -> NvimIO[A]:
+    def step(self, vim: NvimFacade) -> NvimIO[A]:
         return self
 
 
@@ -369,16 +349,10 @@ class NvimIOFatal(Generic[A], NvimIO[A]):
     def __init__(self, exception: Exception) -> None:
         self.exception = exception
 
-    def _arg_desc(self) -> List[str]:
-        return List(str(self.exception))
-
-    def lambda_str(self) -> Eval[str]:
-        return Eval.later(lambda: f'NvimIOFatal({self.exception})')
-
-    def _flat_map(self, f: Callable[[A], NvimIO[B]], ts: Eval[str], fs: Eval[str]) -> NvimIO[B]:
+    def _flat_map(self, f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
         return self
 
-    def step1(self, vim: NvimFacade) -> NvimIO[A]:
+    def step(self, vim: NvimFacade) -> NvimIO[A]:
         return self
 
 
@@ -418,6 +392,10 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
         return NvimIOState.lift(NvimIO.from_either(e))
 
     @staticmethod
+    def from_either_state(st: EitherState[S, A]) -> 'NvimIOState[S, A]':
+        return st.transform_f(NvimIOState, lambda s: NvimIO.from_either(s))
+
+    @staticmethod
     def failed(e: str) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO.failed(e))
 
@@ -427,7 +405,8 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
 
     @staticmethod
     def inspect_either(f: Callable[[S], Either[str, A]]) -> 'NvimIOState[S, A]':
-        return NvimIOState.inspect_f(lambda s: NvimIO.from_either(f(s)))
+        frame = cframe()
+        return NvimIOState.inspect_f(lambda s: NvimIO.from_either(f(s), frame))
 
     @staticmethod
     def call(name: str, *args: Any, **kw: Any) -> 'NvimIOState[S, A]':
@@ -451,5 +430,13 @@ class IdStateToNvimStateIO(ToNvimStateIO, tpe=State):
     @tc_prop
     def nvim(self, fa: State[S, A]) -> NS:
         return NvimIOState.from_id(fa)
+
+
+class EitherStateToNvimStateIO(ToNvimStateIO, tpe=EitherState):
+
+    @tc_prop
+    def nvim(self, fa: EitherState[S, A]) -> NS:
+        return NvimIOState.from_either_state(fa)
+
 
 __all__ = ('NvimIO', 'NvimIOState', 'NS')

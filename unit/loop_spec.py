@@ -17,7 +17,7 @@ from ribosome.plugin_state import PluginState, DispatchConfig
 from ribosome.trans.api import trans
 from ribosome.dispatch.data import DispatchResult, DispatchUnit
 from ribosome.nvim.io import NvimIOState
-from ribosome.config.config import Config, SimpleData
+from ribosome.config.config import Config, NoData
 
 
 class Msg1(Msg): pass
@@ -41,7 +41,7 @@ class LoopSpec(SpecBase):
     '''
 
     def prio(self) -> Expectation:
-        d = SimpleData()
+        d = NoData()
         a = Msg1()
         b = Msg2()
         messages = PrioQueue.empty.put_default(a).put(b, 0.1)
@@ -53,7 +53,7 @@ class LoopSpec(SpecBase):
 
     def send_message(self) -> Expectation:
         config = Config.cons('test')
-        d = SimpleData()
+        d = NoData()
         state = PluginState.cons(DispatchConfig.cons(config), d, List(Component.cons('comp1', handlers=List(msg1))),
                                  messages=PrioQueue.empty)
         a = Msg1()

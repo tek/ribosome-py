@@ -1,7 +1,7 @@
 from typing import Callable, Any, Optional
 from contextlib import contextmanager
 
-from amino import List, Map, Boolean, Maybe, Just
+from amino import List, Map, Boolean, Maybe, Just, Nil
 from amino.util.fun import format_funcall
 
 from ribosome.nvim import Buffer, Tab, Window
@@ -66,20 +66,26 @@ class MockNvim:
     def __init__(self, responses: Callable[[str], Any]) -> None:
         self.responses = responses
         self.channel_id = 1
+        self.request_log = Nil
 
     @property
     def types(self) -> Map[str, type]:
         return Map()
 
     def command(self, cmdline: str, **kw: Any) -> Any:
+        self.log_request(cmdline)
         return self.responses(cmdline).get_or_fail(f'no response recorded for command {cmdline}')
 
     def call(self, name: str, *a: Any, **kw: Any) -> Any:
         rep = format_funcall(name, a, kw)
+        self.log_request(rep)
         return self.responses(name).get_or_fail(f'no response recorded for call {rep}')
 
     def async_call(self, f: Callable[['MockNvim'], None]) -> None:
         pass
+
+    def log_request(self, line: str) -> None:
+        self.request_log = self.request_log.cat(line)
 
 
 class MockNvimFacade(MockNvimComponent, NvimFacade):

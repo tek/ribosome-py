@@ -1,11 +1,11 @@
 from kallikrein import Expectation
 
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
-from ribosome.config.config import SimpleData
+from ribosome.config.config import NoData
 from ribosome.config.settings import Settings
 
 
-class SettingsSpec(AutoPluginIntegrationKlkSpec[Settings, SimpleData]):
+class SettingsSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
     '''
     test $test
     '''

@@ -1,29 +1,32 @@
-from typing import Callable, TypeVar, Generic, Union, Optional, Type
+from typing import Callable, TypeVar, Generic, Union, Optional, Type, Any
 
 from amino import List, Nil, Map, Either, Right, do, Do
 from amino.dat import Dat
 from amino.json.encoder import Encoder, json_object_with_type
 from amino.json.data import JsonError, Json, JsonScalar
 from amino.json.decoder import Decoder, decode
+from amino.state import StateT
 
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import Settings
 from ribosome.request.rpc import RpcHandlerSpec
+from ribosome.dispatch.component import Components
 
-A = TypeVar('A', contravariant=True)
-B = TypeVar('B')
+A = TypeVar('A')
 D = TypeVar('D')
 S = TypeVar('S', bound=Settings)
+CC = TypeVar('CC')
+G = TypeVar('G')
 
 
-class SimpleData(Dat['SimpleData']):
+class NoData(Dat['NoData']):
     pass
 
 
-class Config(Generic[S, D], Dat['Config[S, D]']):
+class Config(Generic[S, D, CC], Dat['Config[S, D, CC]']):
 
     @staticmethod
-    def from_opt(data: Map) -> 'Config[S, D]':
+    def from_opt(data: Map) -> 'Config[S, D, CC]':
         return Config.cons(data.lift('name') | 'no name in json', data.lift('prefix') | None)
 
     @staticmethod
@@ -31,22 +34,24 @@ class Config(Generic[S, D], Dat['Config[S, D]']):
             name: str,
             prefix: Optional[str]=None,
             components: Map[str, Union[str, type]]=Map(),
-            state_ctor: Optional[Callable[['Config'], D]]=None,
+            state_ctor: Optional[Callable[[], D]]=None,
             settings: Optional[S]=None,
             request_handlers: List[RequestHandler]=Nil,
             core_components: List[str]=Nil,
             default_components: List[str]=Nil,
-    ) -> 'Config[S, D]':
+            component_config_type: Type[CC]=Any,
+    ) -> 'Config[S, D, CC]':
         from ribosome.trans.internal import internal
         return Config(
             name,
             prefix or name,
             components + ('internal', internal),
-            state_ctor or SimpleData,
+            state_ctor or NoData,
             settings or Settings(name=name),
             RequestHandlers.cons(*request_handlers),
             core_components.cons('internal'),
             default_components,
+            component_config_type,
         )
 
     def __init__(
@@ -54,11 +59,12 @@ class Config(Generic[S, D], Dat['Config[S, D]']):
             name: str,
             prefix: str,
             components: Map[str, Union[str, type]],
-            state_ctor: Callable[['Config'], D],
+            state_ctor: Callable[[], D],
             settings: S,
             request_handlers: RequestHandlers,
             core_components: List[str],
             default_components: List[str],
+            component_config_type: Type[CC],
     ) -> None:
         self.name = name
         self.prefix = prefix
@@ -68,6 +74,7 @@ class Config(Generic[S, D], Dat['Config[S, D]']):
         self.request_handlers = request_handlers
         self.core_components = core_components
         self.default_components = default_components
+        self.component_config_type = component_config_type
 
     def _arg_desc(self) -> List[str]:
         return List(str(self.components), str(self.settings), str(self.request_handlers))
@@ -98,11 +105,17 @@ class ConfigDecoder(Decoder[Config], tpe=Config):
         yield Right(Config.cons(name))
 
 
-class Resources(Generic[S, D], Dat['Resources[S, D]']):
+class Resources(Generic[S, D, CC], Dat['Resources[S, D, CC]']):
 
-    def __init__(self, settings: S, data: D) -> None:
-        self.settings = settings
+    def __init__(self, data: D, settings: S, components: Components[D, CC]) -> None:
         self.data = data
+        self.settings = settings
+        self.components = components
 
 
-__all__ = ('Config', 'SimpleData', 'Resources')
+def resources_lift(st: StateT[G, D, A]) -> StateT[G, Resources[S, D, CC], A]:
+    def trans(r: Resources[S, D, CC]) -> G:
+        return st.run(r.data).map2(lambda s, a: (Resources(s, r.settings, r.components), a))
+    return st.cls.apply(trans)
+
+__all__ = ('Config', 'NoData', 'Resources')

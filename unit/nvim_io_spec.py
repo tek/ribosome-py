@@ -1,3 +1,5 @@
+import inspect
+
 from kallikrein import k, Expectation
 from kallikrein.matchers.either import be_right
 
@@ -13,6 +15,7 @@ class NvimIoSpec:
     delay $delay
     suspend flat_map $suspend_flat_map
     stack safety $stack
+    frame $frame
     '''
 
     def suspend(self) -> Expectation:
@@ -41,5 +44,19 @@ class NvimIoSpec:
             for i in range(1000):
                 a = yield NvimIO.pure(a + 1)
         return k(run().attempt(None)).must(be_right(1000))
+
+    def frame(self) -> Expectation:
+        @do(NvimIO[int])
+        def sub(a: int) -> Do:
+            yield NvimIO.pure(a + 5)
+            yield NvimIO.suspend(lambda v: asdf)
+            yield NvimIO.pure(a + 5)
+        @do(NvimIO[int])
+        def run() -> Do:
+            yield NvimIO.pure(1)
+            x = yield sub(5)
+            yield NvimIO.pure(x)
+        result = run().result(None)
+        return k(1) == 1
 
 __all__ = ('NvimIoSpec',)

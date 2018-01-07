@@ -20,6 +20,7 @@ D = TypeVar('D')
 M = TypeVar('M', bound=Sendable)
 NP = TypeVar('NP')
 S = TypeVar('S', bound=Settings)
+CC = TypeVar('CC')
 
 
 def resolve_handler(component: Component, msg: Message, prio: float=None) -> Maybe[Callable]:
@@ -82,11 +83,11 @@ def send_message1(components: Components, msg: M, prio: float) -> Do:
     yield send(components, msg, prio)
 
 
-def transform_data_state(st: NS[D, DispatchResult]) -> NS[PluginState[S, D], DispatchResult]:
+def transform_data_state(st: NS[D, DispatchResult]) -> NS[PluginState[S, D, CC], DispatchResult]:
     return st.transform_s(_.data, lambda r, s: r.copy(data=s))
 
 
-@do(NS[PluginState[S, D], DispatchResult])
+@do(NS[PluginState[S, D, CC], DispatchResult])
 def send_message(msg: M, prio: float=None) -> Do:
     yield NS.modify(__.log_message(msg.msg))
     components = yield NS.inspect(_.components)

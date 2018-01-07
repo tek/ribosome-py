@@ -88,4 +88,5 @@ class UpdateStateSpec(SpecBase):
         r = helper.loop('command:update_component_state', args=['c1'] + data.split(' ')).unsafe(helper.vim)
         return k(r.component_data.lift('c1') / _.d).must(be_just(D1(D2(new, items))))
 
+
 __all__ = ('UpdateStateSpec',)

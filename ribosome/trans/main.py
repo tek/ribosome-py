@@ -1,6 +1,6 @@
 from typing import Callable, TypeVar, Type
 
-from amino import Lists
+from amino import Lists, Boolean
 from ribosome.trans.effect import (TransEffect, TransEffectUnit, TransEffectSingleMessage, TransEffectMessages,
                                    TransEffectResult, TransEffectDo)
 from ribosome.trans.handler import FreeTransHandler, MessageTransHandler
@@ -41,24 +41,25 @@ class MessageTransCons:
 
 class FreeTransCons:
 
-    def cons(self, *effects: TransEffect, prio: float=dp) -> FDecorator:
+    def cons(self, *effects: TransEffect, prio: float=dp, **kw: Boolean) -> FDecorator:
         def add_handler(func: Callable[[C], R]) -> FreeTransHandler[M, D]:
-            return FreeTransHandler.create(func, Lists.wrap(effects), prio)
+            return FreeTransHandler.create(func, Lists.wrap(effects), prio, **kw)
         return add_handler
 
-    def unit(self, *effects: TransEffect, prio: float=default_prio) -> FDecorator:
-        return self.cons(*effects, TransEffectUnit(), prio=prio)
+    def unit(self, *effects: TransEffect, prio: float=default_prio, **kw: Boolean) -> FDecorator:
+        return self.cons(*effects, TransEffectUnit(), prio=prio, **kw)
 
-    def one(self, *effects: TransEffect, prio: float=dp) -> FDecorator:
-        return self.cons(*effects, TransEffectSingleMessage(), prio=prio)
+    def one(self, *effects: TransEffect, prio: float=dp, **kw: Boolean) -> FDecorator:
+        return self.cons(*effects, TransEffectSingleMessage(), prio=prio, **kw)
 
-    def multi(self, *effects: TransEffect, prio: float=dp) -> FDecorator:
-        return self.cons(*effects, TransEffectMessages(), prio=prio)
+    def multi(self, *effects: TransEffect, prio: float=dp, **kw: Boolean) -> FDecorator:
+        return self.cons(*effects, TransEffectMessages(), prio=prio, **kw)
 
-    def result(self, *effects: TransEffect, prio: float=dp) -> FDecorator:
-        return self.cons(*effects, TransEffectResult(), prio=prio)
+    def result(self, *effects: TransEffect, prio: float=dp, **kw: Boolean) -> FDecorator:
+        return self.cons(*effects, TransEffectResult(), prio=prio, **kw)
 
-    def do(self, prio: float=dp) -> FDecorator:
-        return self.cons(TransEffectDo(), prio=prio)
+    def do(self, prio: float=dp, **kw: Boolean) -> FDecorator:
+        return self.cons(TransEffectDo(), prio=prio, **kw)
+
 
 __all__ = ('MessageTransCons', 'FreeTransCons')

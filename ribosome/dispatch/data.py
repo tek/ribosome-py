@@ -75,26 +75,6 @@ class Trans(Generic[Meth, B], DispatchSync, DispatchAsync):
         return f'trans `{self.name}`'
 
 
-class Internal(Generic[Meth, B], DispatchSync, DispatchAsync):
-
-    def __init__(self, handler: RequestHandler[Meth, TransDispatcher[B]]) -> None:
-        self.handler = handler
-
-    @property
-    def desc(self) -> str:
-        return f'internal `{self.name}`'
-
-
-class ResourcesState(Generic[Meth, B], DispatchSync, DispatchAsync):
-
-    def __init__(self, handler: RequestHandler[Meth, TransDispatcher[B]]) -> None:
-        self.handler = handler
-
-    @property
-    def desc(self) -> str:
-        return f'resources `{self.name}`'
-
-
 class DispatchOutput(ADT, base=True): pass
 
 
@@ -244,5 +224,5 @@ class DispatchResult(Dat['DispatchResult'], metaclass=DispatchResultMeta):
         self.msgs = msgs
 
 
-__all__ = ('DispatchSync', 'DispatchAsync', 'Legacy', 'SendMessage', 'Trans', 'Internal', 'DispatchOutput',
+__all__ = ('DispatchSync', 'DispatchAsync', 'Legacy', 'SendMessage', 'Trans', 'DispatchOutput',
            'DispatchError', 'DispatchReturn', 'DispatchUnit', 'DispatchContinuation', 'DispatchResult')

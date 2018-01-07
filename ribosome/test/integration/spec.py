@@ -348,11 +348,11 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
         self.root.sub.cat(self.root) % __.report()
 
 
-Settings = TypeVar('S', bound=Settings)
+S = TypeVar('S', bound=Settings)
 D = TypeVar('D')
 
 
-class AutoPluginIntegrationSpec(Generic[Settings, D], VimIntegrationSpec):
+class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
 
     def setup(self) -> None:
         self.log_format = '{message}'

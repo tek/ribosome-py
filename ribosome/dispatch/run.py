@@ -1,20 +1,20 @@
-from typing import TypeVar, Any, Generic, Type, Callable
+from typing import TypeVar, Any, Generic, Type, Callable, Tuple, Union
 
-from amino import List, Boolean, Nil, Either, Left, Right, __, _, L
+from amino import List, Boolean, Either, Left, Right, __, Maybe, Lists, Nothing, _
 from amino.dat import Dat
 from amino.do import do, Do
 from amino.dispatch import dispatch_alg
+from amino.state import StateT
 
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.args import ArgValidator, ParamsSpec
-from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliaton, RootDispatch, ComponentDispatch
-from ribosome.dispatch.data import (DispatchReturn, Internal, Trans, SendMessage, DispatchResult, Dispatch,
-                                    ResourcesState)
+from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliation, RootDispatch, ComponentDispatch
+from ribosome.dispatch.data import Trans, SendMessage, DispatchResult, Dispatch
 from ribosome.nvim.io import NS
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.transform import validate_trans_complete
-from ribosome.trans.send_message import send_message, transform_data_state
+from ribosome.trans.send_message import send_message
 from ribosome.trans.handler import FreeTransHandler
 from ribosome.dispatch.component import ComponentData
 from ribosome.request.handler.handler import RequestHandler
@@ -26,13 +26,35 @@ NP = TypeVar('NP')
 D = TypeVar('D')
 DP = TypeVar('DP', bound=Dispatch)
 S = TypeVar('S', bound=Settings)
-Res = NS[PluginState[S, D], DispatchResult]
+CC = TypeVar('CC')
+Res = NS[PluginState[S, D, CC], DispatchResult]
 St = TypeVar('St')
 C = TypeVar('C')
-DST = Callable[[NS[St, C]], NS[PluginState[St, D], C]]
+E = TypeVar('E')
+R = TypeVar('R')
+TD = Union[PluginState[S, D, CC], Resources[S, D, CC], D]
+TT = Union[TD, ComponentData[TD, C]]
 
 
-def log_trans(trans: FreeTransHandler) -> NS[PluginState[S, D], None]:
+class DispatchState(Generic[S, D, CC], Dat['DispatchState']):
+
+    def __init__(self, state: PluginState[S, D, CC], aff: DispatchAffiliation) -> None:
+        self.state = state
+        self.aff = aff
+
+
+DRes = NS[DispatchState[S, D, CC], DispatchResult]
+
+
+def dispatch_to_plugin(st: NS[DispatchState[S, D, CC], R], aff: DispatchAffiliation) -> NS[PluginState[S, D, CC], R]:
+    return st.transform_s(lambda r: DispatchState(r, aff), lambda r, s: s.state)
+
+
+def plugin_to_dispatch(st: NS[PluginState[S, D, CC], R]) -> NS[DispatchState[S, D, CC], R]:
+    return st.transform_s(lambda r: r.state, lambda r, s: r.copy(state=s))
+
+
+def log_trans(trans: FreeTransHandler) -> NS[PluginState[S, D, CC], None]:
     return NS.pure(None) if trans.name in ('trans_log', 'pure') else NS.modify(__.log_trans(trans.name))
 
 
@@ -40,60 +62,119 @@ def execute_trans(handler: FreeTransHandler) -> NS[D, DispatchResult]:
     return validate_trans_complete(handler.run())
 
 
-class DataStateTransformer:
-
-    def root_dispatch(self, aff: RootDispatch[DP]) -> DST:
-        return transform_data_state
-
-    def component_dispatch(self, aff: ComponentDispatch[DP]) -> DST:
-        def get(r: PluginState[S, D]) -> ComponentData[D, C]:
-            return ComponentData(r.data, r.component_data.lift(aff.name).get_or_else(aff.state_ctor()))
-        def put(r: PluginState[S, D], s: ComponentData[D, C]) -> PluginState[S, D]:
-            return r.update_component_data(aff.name, s.comp).copy(data=s.main)
-        def transform(st: NS[St, C]) -> NS[PluginState[S, D], C]:
-            return st.transform_s(get, put)
-        return transform
-
-
-data_state_transformer = dispatch_alg(DataStateTransformer(), DispatchAffiliaton)
-
-
 def parse_args(handler: RequestHandler, dispatcher: RequestDispatcher, args: List[Any]) -> NS[D, List[Any]]:
     return handler.parser(dispatcher.params_spec).parse(args)
 
 
 @do(Res)
-def setup_trans(aff: DispatchAffiliaton[Dispatch], args: List[Any]) -> Do:
-    trans = aff.dispatch
-    dispatcher = trans.handler.dispatcher
-    parsed_args = yield NS.from_either(parse_args(trans.handler, dispatcher, args))
-    yield log_trans(trans)
+def setup_trans(dispatch: Dispatch, args: List[Any]) -> Do:
+    dispatcher = dispatch.handler.dispatcher
+    parsed_args = yield NS.from_either(parse_args(dispatch.handler, dispatcher, args))
+    yield plugin_to_dispatch(log_trans(dispatch))
     yield NS.pure(dispatcher.handler(*parsed_args))
 
 
-@do(Res)
-def run_trans(aff: DispatchAffiliaton[Trans], args: List[Any]) -> Do:
-    handler = yield setup_trans(aff, args)
-    trans_state = data_state_transformer(aff)
-    yield trans_state(execute_trans(handler))
+AWWrap = Callable[[PluginState[S, D, CC], TD], TT]
+AWUnwrap = Callable[[TT], TD]
+AWStore = Callable[[TT, PluginState[S, D, CC]], PluginState[S, D, CC]]
+AWR = Tuple[AWWrap, AWUnwrap, AWStore]
 
 
-@do(Res)
-def run_internal(aff: DispatchAffiliaton[Internal], args: List[Any]) -> Do:
-    handler = yield setup_trans(aff, args)
-    yield execute_trans(handler)
+# FIXME `wrap` should return an ADT that is dispatched in unwrap
+# should have an abstract `update` method that is used deeper down
+class AffiliationWrapper:
+
+    def root_dispatch(self, aff: RootDispatch, handler: FreeTransHandler) -> AWR:
+        def wrap(r: PluginState[S, D, CC], b: TD) -> TT:
+            return b
+        def unwrap(r: TT) -> TD:
+            return r
+        def store(r: TT, s: PluginState[S, D, CC]) -> PluginState[S, D, CC]:
+            return s
+        return wrap, unwrap, store
+
+    def component_dispatch(self, aff: ComponentDispatch, handler: FreeTransHandler) -> AWR:
+        return (
+            self._component_dispatch(aff, handler)
+            if handler.component else
+            self.root_dispatch(RootDispatch(), handler)
+        )
+
+    def _component_dispatch(self, aff: ComponentDispatch, handler: FreeTransHandler) -> AWR:
+        def wrap(original: PluginState[S, D, CC], wrapped: TD) -> TT:
+            return ComponentData(wrapped, original.data_for(aff.component))
+        def unwrap(r: TT) -> TD:
+            return r.main
+        def store(r: TT, s: PluginState[S, D, CC]) -> PluginState[S, D, CC]:
+            return s.update_component_data(aff.name, r.comp)
+        return wrap, unwrap, store
 
 
-def trans_resources_state(settings: S, st: NS[Resources[S, St], C]) -> NS[St, C]:
-    return st.transform_s(L(Resources)(settings, _), lambda r, s: s.data)
+affiliation_wrapper = dispatch_alg(AffiliationWrapper(), DispatchAffiliation)
 
 
-@do(Res)
-def run_resources(aff: DispatchAffiliaton[ResourcesState], args: List[Any]) -> Do:
-    handler = yield setup_trans(aff, args)
-    trans_state = data_state_transformer(aff)
-    settings = yield NS.inspect(_.settings)
-    yield trans_state(trans_resources_state(settings, execute_trans(handler)))
+def trans_style(handler: FreeTransHandler) -> Tuple[Boolean, Boolean]:
+    tpe = handler.params_spec.rettype
+    state_type = (
+        Maybe.getattr(tpe, '__args__') / Lists.wrap // _.head
+        if tpe is not None and issubclass(tpe, StateT)
+        else Nothing
+    )
+    is_state = lambda st: state_type.exists(lambda t: issubclass(t, st))
+    return is_state(PluginState), is_state(Resources)
+
+
+STR = Tuple[Callable[[PluginState[S, D, CC]], C], Callable[[PluginState[S, D, CC], C], PluginState[S, D, CC]]]
+
+
+def data_wrapper(handler: FreeTransHandler, aff: DispatchAffiliation) -> STR:
+    explicit_r, explicit_i = handler.resources, handler.internal
+    internal, resources = (explicit_i, explicit_r) if (explicit_r or explicit_i) else trans_style(handler)
+    def wrap(ps: PluginState[S, D, CC]) -> TD:
+        return (
+            ps.resources
+            if resources else
+            ps
+            if internal else
+            ps.data
+        )
+    def unwrap(original: PluginState[S, D, CC], result: TD) -> PluginState[S, D, CC]:
+        return (
+            original.copy(data=result.data)
+            if resources else
+            result
+            if internal else
+            original.copy(data=result)
+        )
+    return wrap, unwrap
+
+
+def transform_state(
+        st: NS[TT, DispatchResult],
+        data_wrap: Callable[[PluginState[S, D, CC]], TD],
+        affiliation_wrap: AWWrap,
+        affiliation_unwrap: AWUnwrap,
+        data_unwrap: Callable[[PluginState[S, D, CC], TD], PluginState[S, D, CC]],
+        affiliation_store: AWStore,
+) -> DRes:
+    def get(r: PluginState[S, D, CC]) -> None:
+        return affiliation_wrap(r, data_wrap(r))
+    def put(r: PluginState[S, D, CC], s: TT) -> None:
+        return affiliation_store(s, data_unwrap(r, affiliation_unwrap(s)))
+    return plugin_to_dispatch(st.transform_s(get, put))
+
+
+@do(DRes)
+def run_trans(aff: DispatchAffiliation, handler: FreeTransHandler, args: List[Any]) -> Do:
+    aff_wrap, aff_unwrap, aff_store = affiliation_wrapper(aff, handler)
+    data_wrap, data_unwrap = data_wrapper(handler, aff)
+    yield transform_state(execute_trans(handler), data_wrap, aff_wrap, aff_unwrap, data_unwrap, aff_store)
+
+
+@do(DRes)
+def setup_and_run_trans(trans: Trans, aff: DispatchAffiliation, args: List[Any]) -> Do:
+    handler = yield setup_trans(trans, args)
+    yield run_trans(aff, handler, args)
 
 
 def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str) -> Either[str, Message]:
@@ -103,14 +184,8 @@ def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str
 
 class RunDispatch(Generic[D, NP], Logging):
 
-    def internal(self, dispatch: Internal, aff: DispatchAffiliaton[Internal]) -> Res:
-        return run_internal(aff, self.args)
-
-    def trans(self, dispatch: Trans, aff: DispatchAffiliaton[Trans]) -> Res:
-        return run_trans(aff, self.args)
-
-    def resources_state(self, dispatch: ResourcesState, aff: DispatchAffiliaton[ResourcesState]) -> Res:
-        return run_resources(aff, self.args)
+    def trans(self, dispatch: Trans, aff: DispatchAffiliation) -> DRes:
+        return setup_and_run_trans(dispatch, aff, self.args)
 
 
 class RunDispatchSync(RunDispatch):
@@ -124,11 +199,11 @@ class RunDispatchAsync(RunDispatch):
     def __init__(self, args: List[Any]) -> None:
         self.args = args
 
-    @do(NS[PluginState[S, D], DispatchResult])
-    def send_message(self, dispatch: SendMessage, aff: DispatchAffiliaton[SendMessage]) -> Do:
-        cmd_name = yield NS.inspect(__.config.vim_cmd_name(dispatch.handler))
+    @do(NS[PluginState[S, D, CC], DispatchResult])
+    def send_message(self, dispatch: SendMessage, aff: DispatchAffiliation) -> Do:
+        cmd_name = yield NS.inspect(__.state.config.vim_cmd_name(dispatch.handler))
         msg_e = cons_message(dispatch.msg, self.args, cmd_name, dispatch.method)
-        yield msg_e.cata(DispatchResult.error_nio, send_message)
+        yield plugin_to_dispatch(msg_e.cata(DispatchResult.error_nio, send_message))
 
 
 def invalid_dispatch(tpe: Type[RunDispatch], data: Any) -> NvimIO[Any]:

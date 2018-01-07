@@ -6,10 +6,11 @@ from amino.state import State
 from amino.func import flip
 
 from ribosome.nvim.io import NS
-from ribosome.plugin_state import PluginState, DispatchAffiliaton, RootDispatch, ComponentDispatch, Syncs, Asyncs
+from ribosome.plugin_state import (PluginState, DispatchAffiliation, RootDispatch, ComponentDispatch, Syncs, Asyncs,
+                                   AffiliatedDispatch)
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.config.config import Config
-from ribosome.dispatch.data import DispatchAsync, SendMessage, Internal, Trans, Dispatch, ResourcesState
+from ribosome.dispatch.data import DispatchAsync, SendMessage, Trans, Dispatch
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.dispatch.component import Components, Component
 from ribosome.request.rpc import define_handlers
@@ -18,35 +19,34 @@ from ribosome.config.settings import Settings
 D = TypeVar('D')
 DP = TypeVar('DP', bound=Dispatch)
 S = TypeVar('S', bound=Settings)
+CC = TypeVar('CC')
 
 
 def choose_dispatch(handler: RequestHandler) -> DispatchAsync:
     tpe = (
         SendMessage
         if handler.msg else
-        Internal
-        if handler.internal else
-        ResourcesState
-        if handler.resources else
         Trans
     )
     return tpe(handler)
 
 
-def request_handlers_dispatches(handlers: RequestHandlers) -> List[DispatchAffiliaton[DP]]:
+def request_handlers_dispatches(handlers: RequestHandlers) -> List[DispatchAffiliation]:
     return handlers.handlers.v.map(choose_dispatch)
 
 
-def config_dispatches(config: Config) -> List[DispatchAffiliaton[Dispatch]]:
-    return request_handlers_dispatches(config.request_handlers) / RootDispatch
+def config_dispatches(config: Config) -> List[AffiliatedDispatch[Dispatch]]:
+    return request_handlers_dispatches(config.request_handlers) / L(AffiliatedDispatch)(_, RootDispatch())
 
 
-def component_dispatches(component: Component) -> List[DispatchAffiliaton[DispatchAsync]]:
-    return request_handlers_dispatches(component.request_handlers) / L(ComponentDispatch)(component.name, _,
-                                                                                          component.state_ctor)
+def component_dispatches(component: Component) -> List[AffiliatedDispatch[DispatchAsync]]:
+    return (
+        request_handlers_dispatches(component.request_handlers) /
+        L(AffiliatedDispatch)(_, ComponentDispatch(component))
+    )
 
 
-def dispatches(state: PluginState[S, D]) -> Tuple[Syncs, Asyncs]:
+def dispatches(state: PluginState[S, D, CC]) -> Tuple[Syncs, Asyncs]:
     config = state.config
     cfg_dispatches = config_dispatches(config)
     compo_dispatches = state.components.all // component_dispatches
@@ -59,24 +59,24 @@ def dispatches(state: PluginState[S, D]) -> Tuple[Syncs, Asyncs]:
     )
 
 
-@do(State[PluginState[S, D], None])
+@do(State[PluginState[S, D, CC], None])
 def update_components(from_user: Either[str, List[str]]) -> Do:
     config = yield State.inspect(_.config)
     components = yield State.lift(ComponentResolver(config, from_user).run)
-    yield State.modify(__.copy(components=Components(components)))
+    yield State.modify(__.copy(components=Components.cons(components, config.component_config_type)))
     sy, asy = yield State.inspect(dispatches)
     yield State.modify(lens.dispatch_config.async_dispatch.set(asy))
     yield State.modify(lens.dispatch_config.sync_dispatch.set(sy))
 
 
 # TODO finish
-@do(NS[PluginState[S, D], None])
+@do(NS[PluginState[S, D, CC], None])
 def undef_handlers() -> Do:
     handlers = yield NS.inspect(_.dispatch_config.rpc_handlers)
     return handlers
 
 
-@do(NS[PluginState[S, D], None])
+@do(NS[PluginState[S, D, CC], None])
 def update_rpc() -> Do:
     config = yield NS.inspect(_.config)
     yield undef_handlers()
