@@ -427,6 +427,10 @@ class Buffer(HasWindow):
     def line_count(self):
         return self.content.length
 
+    @property
+    def listed(self) -> Boolean:
+        return Boolean(self.vim.call('buflisted', self.id))
+
 
 class Window(HasTab, HasBuffers):
 
