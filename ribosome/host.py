@@ -48,7 +48,7 @@ def request_handler(
         state: PluginStateHolder[D],
 ) -> Callable[[str, tuple], Any]:
     sync_prefix = '' if sync else 'a'
-    def handle(name: str, args: tuple) -> Do:
+    def handle(name: str, args: tuple) -> Any:
         try:
             job = dispatch_job(state, name, args, sync)
             amino_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')

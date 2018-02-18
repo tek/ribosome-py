@@ -1,18 +1,19 @@
 import abc
 import inspect
 from traceback import FrameSummary
-from typing import TypeVar, Callable, Any, Generic, Generator, Union, Tuple
+from typing import TypeVar, Callable, Any, Generic, Union, Tuple
 from threading import Thread
 
 from amino.tc.base import ImplicitInstances, F, TypeClass, tc_prop
 from amino.lazy import lazy
 from amino.tc.monad import Monad
-from amino import Either, __, IO, Maybe, Left, Eval, L, List, Right, Lists, _, options, Nil, Try, Path
+from amino import Either, __, IO, Maybe, Left, Eval, List, Right, options, Nil, Do, Just
 from amino.state import tcs, StateT, State, EitherState
 from amino.func import CallByName, tailrec
 from amino.do import do
-from amino.util.exception import format_exception
 from amino.dat import ADT
+from amino.io import IOExceptionBase
+from amino.util.trace import default_internal_packages
 
 from ribosome.nvim.components import NvimFacade
 
@@ -22,57 +23,15 @@ C = TypeVar('C')
 S = TypeVar('S')
 
 
-def cframe() -> FrameSummary:
-    return inspect.currentframe()
-
-
-def callsite(frame) -> Any:
-    def loop(f) -> None:
-        pkg = f.f_globals.get('__package__')
-        return loop(f.f_back) if pkg.startswith('ribosome.nvim') or pkg.startswith('amino') else f
-    return loop(frame)
-
-
-def callsite_info(frame: FrameSummary) -> List[str]:
-    cs = callsite(frame)
-    source = inspect.getsourcefile(cs.f_code)
-    line = cs.f_lineno
-    code = Try(Path, source) // (lambda a: Try(a.read_text)) / Lists.lines // __.lift(line - 1) | '<no source>'
-    fun = cs.f_code.co_name
-    clean = code.strip()
-    return List(f'  File "{source}", line {line}, in {fun}', f'    {clean}')
-
-
-def callsite_source(frame) -> Tuple[List[str], int]:
-    cs = callsite(frame)
-    source = inspect.getsourcefile(cs.f_code)
-    return Try(Path, source) // (lambda a: Try(a.read_text)) / Lists.lines // __.lift(cs.f_lineno - 1) | '<no source>'
-
-
-class NvimIOException(Exception):
-
-    def __init__(self, f, stack, cause, frame=None) -> None:
-        self.f = f
-        self.stack = List.wrap(stack)
-        self.cause = cause
-        self.frame = frame
+class NvimIOException(IOExceptionBase):
 
     @property
-    def lines(self) -> List[str]:
-        cause = format_exception(self.cause)
-        cs = callsite_info(self.frame)
-        return List(f'NvimIO exception') + cs + cause[-3:]
-
-    def __str__(self):
-        return self.lines.join_lines
+    def desc(self) -> str:
+        return 'NvimIO exception'
 
     @property
-    def callsite(self) -> Any:
-        return callsite(self.frame)
-
-    @property
-    def callsite_source(self) -> List[str]:
-        return callsite_source(self.frame)
+    def internal_packages(self) -> Maybe[List[str]]:
+        return Just(default_internal_packages.cons('ribosome.nvim'))
 
 
 class NvimIOInstances(ImplicitInstances):
@@ -243,7 +202,7 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
 
     # FIXME use NResult
     @do('NvimIO[A]')
-    def ensure(self, f: Callable[[Either[Exception, A]], 'NvimIO[None]']) -> Generator:
+    def ensure(self, f: Callable[[Either[Exception, A]], 'NvimIO[None]']) -> Do:
         result = yield NvimIO.delay(self.attempt)
         yield f(result)
         yield NvimIO.from_either(result)
@@ -418,21 +377,21 @@ tcs(NvimIO, NvimIOState)  # type: ignore
 NS = NvimIOState
 
 
-class ToNvimStateIO(TypeClass):
+class ToNvimIOState(TypeClass):
 
     @abc.abstractproperty
     def nvim(self) -> NS:
         ...
 
 
-class IdStateToNvimStateIO(ToNvimStateIO, tpe=State):
+class IdStateToNvimIOState(ToNvimIOState, tpe=State):
 
     @tc_prop
     def nvim(self, fa: State[S, A]) -> NS:
         return NvimIOState.from_id(fa)
 
 
-class EitherStateToNvimStateIO(ToNvimStateIO, tpe=EitherState):
+class EitherStateToNvimIOState(ToNvimIOState, tpe=EitherState):
 
     @tc_prop
     def nvim(self, fa: EitherState[S, A]) -> NS:
