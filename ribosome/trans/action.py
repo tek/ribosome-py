@@ -5,14 +5,14 @@ from logging import INFO, ERROR
 
 from amino import Either, List, Id, Maybe, Nil
 from amino.state import StateT
-from amino.util.string import ToStr
-from amino.algebra import AlgebraMeta
 from amino.dat import ADT, ADTMeta
 from amino.tc.base import Implicits, ImplicitsMeta
 from amino.tc.monad import Monad
 from amino.logging import LogError
+from amino.func import CallByName
 
 from ribosome.trans.message_base import Sendable, Message
+from ribosome.trans.handler import FreeTransHandler
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -32,27 +32,40 @@ class TransMMeta(ADTMeta, ImplicitsMeta):
 
 
 class TransM(Generic[A], ADT['TransM'], Implicits, implicits=True, auto=True, base=True, metaclass=TransMMeta):
-    pass
+
+    @staticmethod
+    def from_maybe(fa: Maybe[A], error: CallByName) -> 'TransM[A]':
+        return fa / TransM.pure | (lambda: TransMError(error()))
+
+    @staticmethod
+    def pure(a: A) -> 'TransMPure[A]':
+        return TransMPure(FreeTransHandler.cons(lambda: TransResult(a)))
 
 
-class TransMPure(TransM):
+class TransMPure(Generic[A], TransM[A]):
 
-    def __init__(self, handler: Any) -> None:
+    def __init__(self, handler: FreeTransHandler[A]) -> None:
         self.handler = handler
 
 
-class TransMSwitch(TransM):
+class TransMSwitch(Generic[A], TransM[A]):
 
-    def __init__(self, handler: Any) -> None:
+    def __init__(self, handler: FreeTransHandler[A]) -> None:
         self.handler = handler
 
 
-class TransMBind(TransM):
+class TransMBind(Generic[A], TransM[A]):
 
     def __init__(self, fa: TransM[A], f: Callable[[A], TransM[B]]) -> None:
         super().__init__()
         self.fa = fa
         self.f = f
+
+
+class TransMError(Generic[A], TransM[A]):
+
+    def __init__(self, error: str) -> None:
+        self.error = error
 
 
 class Monad_TransM(Monad, tpe=TransM):
@@ -111,9 +124,9 @@ class TransUnit(TransAction):
         return List()
 
 
-class TransResult(TransAction):
+class TransResult(Generic[A], TransAction):
 
-    def __init__(self, data: Any) -> None:
+    def __init__(self, data: A) -> None:
         self.data = data
         super().__init__(Nil)
 
@@ -183,34 +196,5 @@ class TransLog(TransAction):
         self.message = message
 
 
-class TransStep(Generic[R], ToStr, metaclass=AlgebraMeta, base=True):
-
-    def __init__(self, data: R) -> None:
-        self.data = data
-
-    @property
-    def strict(self) -> bool:
-        return isinstance(self, Strict)
-
-    @property
-    def error(self) -> bool:
-        return isinstance(self, TransEffectError)
-
-    def _arg_desc(self) -> List[str]:
-        return List(str(self.data))
-
-
-class Strict(Generic[R], TransStep[R]):
-    pass
-
-
-class Lift(Generic[R], TransStep[R]):
-    pass
-
-
-class TransEffectError(TransStep[str]):
-    pass
-
-
-__all__ = ('TransAction', 'Transit', 'Propagate', 'TransUnit', 'TransResult', 'TransFailure', 'TransStep', 'Strict',
-           'Lift', 'TransEffectError', 'TransM', 'TransMPure', 'TransMSwitch', 'TransMBind')
+__all__ = ('TransAction', 'Transit', 'Propagate', 'TransUnit', 'TransResult', 'TransFailure', 'TransM', 'TransMPure',
+           'TransMSwitch', 'TransMBind')

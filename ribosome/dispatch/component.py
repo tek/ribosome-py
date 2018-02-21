@@ -45,10 +45,11 @@ class ComponentData(Generic[D, CD], Dat['ComponentData[D, CD]']):
         self.comp = comp
 
 
+# FIXME reassignment
 CD = TypeVar('CD', bound=ComponentData)
 
 
-class Component(Generic[D, CD, CC], Dat['Component']):
+class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
 
     @staticmethod
     def cons(

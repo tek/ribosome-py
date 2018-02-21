@@ -21,6 +21,7 @@ from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.dispatcher import RequestDispatcher
 from ribosome.config.settings import Settings
 from ribosome.config.config import Resources
+from ribosome.trans.run import run_free_trans_handler
 
 NP = TypeVar('NP')
 D = TypeVar('D')
@@ -59,7 +60,7 @@ def log_trans(trans: FreeTransHandler) -> NS[PluginState[S, D, CC], None]:
 
 
 def execute_trans(handler: FreeTransHandler) -> NS[D, DispatchResult]:
-    return validate_trans_complete(handler.run())
+    return validate_trans_complete(run_free_trans_handler(handler))
 
 
 def parse_args(handler: RequestHandler, dispatcher: RequestDispatcher, args: List[Any]) -> NS[D, List[Any]]:

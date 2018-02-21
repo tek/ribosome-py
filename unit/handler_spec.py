@@ -10,7 +10,8 @@ from ribosome.trans.message_base import pmessage
 from ribosome.trans.action import Transit, Propagate
 from ribosome.dispatch.transform import TransValidator, validate_trans_complete
 from ribosome.dispatch.data import DispatchResult, DispatchIO
-from ribosome.trans.handler import MessageTransHandler, TransComplete
+from ribosome.trans.handler import MessageTransHandler
+from ribosome.trans.run import TransComplete, run_message_trans_handler
 
 from amino import Right, IO, _, Either, Id, Maybe
 from amino.state import IdState, StateT
@@ -33,14 +34,14 @@ class HandlerSpec:
         return validate_trans_complete(action)
 
     def run(self, f: MessageTransHandler) -> Maybe[Msg2]:
-        res = self.validate(f.run(Msg1()))
+        res = self.validate(run_message_trans_handler(f, Msg1()))
         return k(res.run_a(None).attempt(None) / _.msgs // _.head).must(be_just(have_type(Msg2)))
 
     def eso(self) -> Expectation:
         @trans.msg.one(Msg1, trans.e, trans.st, trans.io)
         def f(msg: Msg1) -> Either[str, StateT[Id, int, IO[Msg2]]]:
             return Right(IdState.pure(IO.pure(Msg2())))
-        res = f.run(Msg1())
+        res = run_message_trans_handler(f, Msg1())
         s = self.validate(res)
         valid = s.run_a(None).attempt(None)
         action = res.action

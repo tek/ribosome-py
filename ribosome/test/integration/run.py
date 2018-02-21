@@ -16,7 +16,7 @@ from ribosome.dispatch.execute import (sync_runner, async_runner, sync_sender, r
                                        async_sender, dispatch_state)
 from ribosome.nvim.io import NvimIOState, NS
 from ribosome.config.config import Config
-from ribosome.trans.handler import TransComplete
+from ribosome.trans.run import TransComplete
 from ribosome.config.settings import Settings
 
 D = TypeVar('D')

@@ -14,6 +14,7 @@ from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.dispatch.component import Component, Components
 from ribosome.trans.handler import MessageTransHandler
 from ribosome.config.settings import Settings
+from ribosome.trans.run import run_message_trans_handler
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -48,7 +49,7 @@ def try_handler(handler: Callable[[M], A], msg: M, desc: str) -> NS[D, DispatchR
 
 
 def execute_component_handler(component: Component, handler: MessageTransHandler, msg: M) -> NS[D, DispatchResult]:
-    return try_handler(handler.run, msg, component.name)
+    return try_handler(L(run_message_trans_handler)(handler, _), msg, component.name)
 
 
 def process(component: Component, msg: Message, prio: float) -> TransState:

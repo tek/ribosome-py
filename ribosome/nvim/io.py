@@ -13,7 +13,7 @@ from amino.func import CallByName, tailrec
 from amino.do import do
 from amino.dat import ADT
 from amino.io import IOExceptionBase
-from amino.util.trace import default_internal_packages
+from amino.util.trace import default_internal_packages, cframe
 
 from ribosome.nvim.components import NvimFacade
 

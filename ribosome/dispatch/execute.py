@@ -27,8 +27,9 @@ from ribosome.dispatch.loop import process_message
 from ribosome.trans.send_message import send_message
 from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.trans.action import TransM, TransMPure, TransMBind, LogMessage, Info, Error, TransMSwitch
-from ribosome.trans.handler import TransComplete, FreeTransHandler
+from ribosome.trans.handler import FreeTransHandler
 from ribosome.config.settings import Settings
+from ribosome.trans.run import TransComplete
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')

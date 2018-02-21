@@ -1,25 +1,26 @@
 from typing import Callable, TypeVar, Type
 
 from amino import Lists, Boolean
-from ribosome.trans.effect import (TransEffect, TransEffectUnit, TransEffectSingleMessage, TransEffectMessages,
-                                   TransEffectResult, TransEffectDo)
+from ribosome.trans.effect import TransEffect
+from ribosome.trans.effects import (TransEffectUnit, TransEffectSingleMessage, TransEffectMessages, TransEffectResult,
+                                    TransEffectDo)
 from ribosome.trans.handler import FreeTransHandler, MessageTransHandler
 from ribosome.dispatch.component import Component
 from ribosome.trans.message_base import default_prio, Message
 
 C = TypeVar('C', bound=Component)
-D = TypeVar('D')
+A = TypeVar('A')
 M = TypeVar('M', bound=Message)
 R = TypeVar('R')
 dp = default_prio
-MDecorator = Callable[[Callable[[C], R]], MessageTransHandler[M, D]]
-FDecorator = Callable[[Callable[[C], R]], FreeTransHandler[M, D]]
+MDecorator = Callable[[Callable[[C], R]], MessageTransHandler[M, A]]
+FDecorator = Callable[[Callable[[C], R]], FreeTransHandler[A]]
 
 
 class MessageTransCons:
 
     def cons(self, msg_type: Type[M], *effects: TransEffect, prio: float=dp) -> MDecorator:
-        def add_handler(func: Callable[[C], R]) -> MessageTransHandler[M, D]:
+        def add_handler(func: Callable[[C], R]) -> MessageTransHandler[M, A]:
             return MessageTransHandler.create(func, msg_type, effects, prio)
         return add_handler
 
@@ -32,7 +33,7 @@ class MessageTransCons:
     def multi(self, tpe: Type[M], *effects: TransEffect, prio: float=dp) -> MDecorator:
         return self.cons(tpe, *effects, TransEffectMessages(), prio=prio)
 
-    def relay(self, tpe: Type[M], prio: float=dp) -> Callable[[Callable[[C], R]], MessageTransHandler[M, D]]:
+    def relay(self, tpe: Type[M], prio: float=dp) -> Callable[[Callable[[C], R]], MessageTransHandler[M, A]]:
         def add_handler(func: Callable[[C], R]):
             return func
             # return decorate(func, tpe, prio)
@@ -42,7 +43,7 @@ class MessageTransCons:
 class FreeTransCons:
 
     def cons(self, *effects: TransEffect, prio: float=dp, **kw: Boolean) -> FDecorator:
-        def add_handler(func: Callable[[C], R]) -> FreeTransHandler[M, D]:
+        def add_handler(func: Callable[[C], R]) -> FreeTransHandler[A]:
             return FreeTransHandler.create(func, Lists.wrap(effects), prio, **kw)
         return add_handler
 

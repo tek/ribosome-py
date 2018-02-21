@@ -6,7 +6,7 @@ from threading import Lock
 
 import greenlet
 
-from amino import Map, List, Boolean, Nil, Either, _, Maybe, Nothing, Try, do, Do, IO, __
+from amino import Map, List, Boolean, Nil, Either, _, Maybe, Nothing, Try, do, Do, IO, __, L
 from amino.dat import Dat, ADT
 
 from ribosome.trans.message_base import Message, Sendable, Envelope
@@ -14,13 +14,14 @@ from ribosome.dispatch.component import Component, Components
 from ribosome.nvim.io import NvimIOState, NS
 from ribosome.dispatch.data import DispatchResult, DIO, Dispatch, DispatchSync, DispatchAsync
 from ribosome.trans.queue import PrioQueue
-from ribosome.trans.handler import TransComplete, FreeTransHandler
+from ribosome.trans.handler import FreeTransHandler
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
 from ribosome.trans.action import LogMessage
 from ribosome.config.settings import Settings
 from ribosome.config.config import Config, Resources
+from ribosome.trans.run import TransComplete
 
 D = TypeVar('D')
 C = TypeVar('C')
@@ -208,6 +209,10 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
 
     def update_component_data(self, name: str, new: Any) -> 'PluginState[S, D, CC]':
         return self.mod.component_data(__.cat((name, new)))
+
+    def modify_component_data(self, name: str, mod: Callable[[Any], Any]) -> 'PluginState[S, D, CC]':
+        comp = self.data_by_name(name)
+        return comp / mod / L(self.update_component_data)(name, _) | self
 
     @property
     def resources(self) -> Resources[S, D, CC]:

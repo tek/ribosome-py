@@ -10,7 +10,7 @@ from ribosome.request.handler.method import RpcMethod
 from ribosome.nvim import NvimIO
 from ribosome.nvim.io import NvimIOState
 from ribosome.trans.message_base import Message
-from ribosome.trans.effect import GatherIOs, GatherSubprocs
+from ribosome.trans.effects import GatherIOs, GatherSubprocs
 from ribosome.trans.action import TransDo, TransLog
 
 B = TypeVar('B')

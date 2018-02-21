@@ -1,7 +1,7 @@
 import abc
 from typing import TypeVar, Generic, Union
 
-from amino import Maybe, List, Nil, Either, L, _
+from amino import Maybe, Nil, Either, L, _
 from amino.state import StateT, MaybeState, EitherState, IdState
 from amino.id import Id
 from amino.dispatch import dispatch_alg
@@ -15,8 +15,7 @@ from ribosome.dispatch.data import (DispatchResult, DispatchUnit, DispatchError,
                                     DispatchDo, DispatchLog)
 from ribosome.trans.action import (Transit, Propagate, TransUnit, TransResult, TransFailure, TransAction, TransIO,
                                    TransDo, TransLog)
-from ribosome.trans.message_base import Message
-from ribosome.trans.handler import TransComplete
+from ribosome.trans.run import TransComplete
 
 
 D = TypeVar('D')
@@ -107,4 +106,4 @@ def validate_trans_complete(tc: TransComplete) -> NS[D, DispatchResult]:
     return validate_trans_action(tc.name, tc.action)
 
 
-__all__ = ('validate_trans_complete', 'validate_trans_complete')
+__all__ = ('validate_trans_complete',)

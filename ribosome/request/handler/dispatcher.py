@@ -73,7 +73,7 @@ class MsgDispatcher(Generic[M], AsyncRequestDispatcher):
 
 class TransDispatcher(Generic[B], SyncRequestDispatcher):
 
-    def __init__(self, handler: FreeTransHandler[D, B]) -> None:
+    def __init__(self, handler: FreeTransHandler[B]) -> None:
         self.handler = handler
 
     @property

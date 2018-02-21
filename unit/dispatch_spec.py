@@ -1,4 +1,4 @@
-from kallikrein import Expectation, k
+from kallikrein import Expectation, k, pending
 from kallikrein.matchers.either import be_right
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.length import have_length
@@ -174,6 +174,7 @@ class DispatchSpec(SpecBase):
         components = ComponentResolver(config, Right(List('p', 'q'))).run.get_or_raise()
         return k(components.lift(1) // _.handlers.v.head / _.handlers).must(be_just(have_length(3)))
 
+    @pending
     def send_message(self) -> Expectation:
         helper = DispatchHelper.cons(config, 'p', 'q')
         args = (27, specimen)
