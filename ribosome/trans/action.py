@@ -12,7 +12,7 @@ from amino.logging import LogError
 from amino.func import CallByName
 
 from ribosome.trans.message_base import Sendable, Message
-from ribosome.trans.handler import FreeTransHandler
+from ribosome.trans.handler import FreeTrans
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -39,18 +39,18 @@ class TransM(Generic[A], ADT['TransM'], Implicits, implicits=True, auto=True, ba
 
     @staticmethod
     def pure(a: A) -> 'TransMPure[A]':
-        return TransMPure(FreeTransHandler.cons(lambda: TransResult(a)))
+        return TransMPure(FreeTrans.cons(lambda: TransResult(a)))
 
 
 class TransMPure(Generic[A], TransM[A]):
 
-    def __init__(self, handler: FreeTransHandler[A]) -> None:
+    def __init__(self, handler: FreeTrans[A]) -> None:
         self.handler = handler
 
 
 class TransMSwitch(Generic[A], TransM[A]):
 
-    def __init__(self, handler: FreeTransHandler[A]) -> None:
+    def __init__(self, handler: FreeTrans[A]) -> None:
         self.handler = handler
 
 

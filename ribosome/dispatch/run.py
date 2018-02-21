@@ -15,7 +15,7 @@ from ribosome.nvim.io import NS
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.trans.send_message import send_message
-from ribosome.trans.handler import FreeTransHandler
+from ribosome.trans.handler import FreeTrans
 from ribosome.dispatch.component import ComponentData
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.dispatcher import RequestDispatcher
@@ -55,11 +55,11 @@ def plugin_to_dispatch(st: NS[PluginState[S, D, CC], R]) -> NS[DispatchState[S, 
     return st.transform_s(lambda r: r.state, lambda r, s: r.copy(state=s))
 
 
-def log_trans(trans: FreeTransHandler) -> NS[PluginState[S, D, CC], None]:
+def log_trans(trans: FreeTrans) -> NS[PluginState[S, D, CC], None]:
     return NS.pure(None) if trans.name in ('trans_log', 'pure') else NS.modify(__.log_trans(trans.name))
 
 
-def execute_trans(handler: FreeTransHandler) -> NS[D, DispatchResult]:
+def execute_trans(handler: FreeTrans) -> NS[D, DispatchResult]:
     return validate_trans_complete(run_free_trans_handler(handler))
 
 
@@ -85,7 +85,7 @@ AWR = Tuple[AWWrap, AWUnwrap, AWStore]
 # should have an abstract `update` method that is used deeper down
 class AffiliationWrapper:
 
-    def root_dispatch(self, aff: RootDispatch, handler: FreeTransHandler) -> AWR:
+    def root_dispatch(self, aff: RootDispatch, handler: FreeTrans) -> AWR:
         def wrap(r: PluginState[S, D, CC], b: TD) -> TT:
             return b
         def unwrap(r: TT) -> TD:
@@ -94,14 +94,14 @@ class AffiliationWrapper:
             return s
         return wrap, unwrap, store
 
-    def component_dispatch(self, aff: ComponentDispatch, handler: FreeTransHandler) -> AWR:
+    def component_dispatch(self, aff: ComponentDispatch, handler: FreeTrans) -> AWR:
         return (
             self._component_dispatch(aff, handler)
             if handler.component else
             self.root_dispatch(RootDispatch(), handler)
         )
 
-    def _component_dispatch(self, aff: ComponentDispatch, handler: FreeTransHandler) -> AWR:
+    def _component_dispatch(self, aff: ComponentDispatch, handler: FreeTrans) -> AWR:
         def wrap(original: PluginState[S, D, CC], wrapped: TD) -> TT:
             return ComponentData(wrapped, original.data_for(aff.component))
         def unwrap(r: TT) -> TD:
@@ -114,7 +114,7 @@ class AffiliationWrapper:
 affiliation_wrapper = dispatch_alg(AffiliationWrapper(), DispatchAffiliation)
 
 
-def trans_style(handler: FreeTransHandler) -> Tuple[Boolean, Boolean]:
+def trans_style(handler: FreeTrans) -> Tuple[Boolean, Boolean]:
     tpe = handler.params_spec.rettype
     state_type = (
         Maybe.getattr(tpe, '__args__') / Lists.wrap // _.head
@@ -128,7 +128,7 @@ def trans_style(handler: FreeTransHandler) -> Tuple[Boolean, Boolean]:
 STR = Tuple[Callable[[PluginState[S, D, CC]], C], Callable[[PluginState[S, D, CC], C], PluginState[S, D, CC]]]
 
 
-def data_wrapper(handler: FreeTransHandler, aff: DispatchAffiliation) -> STR:
+def data_wrapper(handler: FreeTrans, aff: DispatchAffiliation) -> STR:
     explicit_r, explicit_i = handler.resources, handler.internal
     internal, resources = (explicit_i, explicit_r) if (explicit_r or explicit_i) else trans_style(handler)
     def wrap(ps: PluginState[S, D, CC]) -> TD:
@@ -166,7 +166,7 @@ def transform_state(
 
 
 @do(DRes)
-def run_trans(aff: DispatchAffiliation, handler: FreeTransHandler, args: List[Any]) -> Do:
+def run_trans(aff: DispatchAffiliation, handler: FreeTrans, args: List[Any]) -> Do:
     aff_wrap, aff_unwrap, aff_store = affiliation_wrapper(aff, handler)
     data_wrap, data_unwrap = data_wrapper(handler, aff)
     yield transform_state(execute_trans(handler), data_wrap, aff_wrap, aff_unwrap, data_unwrap, aff_store)

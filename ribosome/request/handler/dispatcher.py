@@ -6,7 +6,7 @@ from amino.util.string import snake_case
 from amino.algebra import Algebra
 
 from ribosome.logging import Logging
-from ribosome.trans.handler import FreeTransHandler
+from ribosome.trans.handler import FreeTrans
 from ribosome.trans.message_base import Message
 from ribosome.request.args import ParamsSpec
 
@@ -73,7 +73,7 @@ class MsgDispatcher(Generic[M], AsyncRequestDispatcher):
 
 class TransDispatcher(Generic[B], SyncRequestDispatcher):
 
-    def __init__(self, handler: FreeTransHandler[B]) -> None:
+    def __init__(self, handler: FreeTrans[B]) -> None:
         self.handler = handler
 
     @property

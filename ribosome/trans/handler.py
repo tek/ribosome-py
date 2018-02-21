@@ -29,12 +29,12 @@ class TransHandler(Generic[A], ADT['TransHandler[A]'], Implicits, auto=True, imp
         ...
 
 
-class MessageTransHandler(Generic[A, M], TransHandler[A]):
+class MessageTrans(Generic[A, M], TransHandler[A]):
 
     @staticmethod
     def create(fun: Callable[[M], A], msg: Type[M], effects: List[TransEffect], prio: float) -> 'TransHandler[A]':
         name = fun.__name__
-        return MessageTransHandler(name, fun, msg, effects, prio)
+        return MessageTrans(name, fun, msg, effects, prio)
 
     def __init__(self, name: str, fun: Callable[[M], A], message: Type[M], effects: List[TransEffect], prio: float
                  ) -> None:
@@ -52,8 +52,7 @@ class MessageTransHandler(Generic[A, M], TransHandler[A]):
         return ParamsSpec.from_type(self.message)
 
 
-# TODO rename to FreeTrans and MessageTrans
-class FreeTransHandler(Generic[A], TransHandler[A]):
+class FreeTrans(Generic[A], TransHandler[A]):
 
     @staticmethod
     def cons(
@@ -63,9 +62,9 @@ class FreeTransHandler(Generic[A], TransHandler[A]):
             resources: Boolean=false,
             internal: Boolean=false,
             component: Boolean=true,
-    ) -> 'FreeTransHandler':
+    ) -> 'FreeTrans':
         name = fun.__name__
-        return FreeTransHandler(name, fun, (), effects, prio, resources, internal, component)
+        return FreeTrans(name, fun, (), effects, prio, resources, internal, component)
 
     create = cons
 
@@ -89,7 +88,7 @@ class FreeTransHandler(Generic[A], TransHandler[A]):
         self.internal = internal
         self.component = component
 
-    def __call__(self, *args: Any) -> 'FreeTransHandler':
+    def __call__(self, *args: Any) -> 'FreeTrans':
         return self.copy(args=args)
 
     @property
@@ -97,4 +96,4 @@ class FreeTransHandler(Generic[A], TransHandler[A]):
         return ParamsSpec.from_function(self.fun)
 
 
-__all__ = ('MessageTransHandler', 'FreeTransHandler')
+__all__ = ('MessageTrans', 'FreeTrans')

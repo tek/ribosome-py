@@ -14,7 +14,7 @@ from ribosome.dispatch.component import Component, Components
 from ribosome.nvim.io import NvimIOState, NS
 from ribosome.dispatch.data import DispatchResult, DIO, Dispatch, DispatchSync, DispatchAsync
 from ribosome.trans.queue import PrioQueue
-from ribosome.trans.handler import FreeTransHandler
+from ribosome.trans.handler import FreeTrans
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
@@ -218,7 +218,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
     def resources(self) -> Resources[S, D, CC]:
         return Resources(self.data, self.settings, self.components)
 
-    def reaffiliate(self, handler: FreeTransHandler) -> DispatchAffiliation:
+    def reaffiliate(self, handler: FreeTrans) -> DispatchAffiliation:
         c = self.components.for_handler(handler)
         return c.cata(ComponentDispatch, RootDispatch())
 

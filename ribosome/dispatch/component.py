@@ -8,7 +8,7 @@ from amino.func import flip
 
 from ribosome.nvim.io import NS
 from ribosome.dispatch.data import DispatchResult
-from ribosome.trans.handler import TransHandler, FreeTransHandler
+from ribosome.trans.handler import TransHandler, FreeTrans
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 
 D = TypeVar('D')
@@ -85,7 +85,7 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
     def handler_by_name(self, name: str) -> Either[str, TransHandler]:
         return self.handlers.find(_.name == name).to_either(f'component `{self.name}` has no handler `name`')
 
-    def contains(self, handler: FreeTransHandler) -> Boolean:
+    def contains(self, handler: FreeTrans) -> Boolean:
         return self.request_handlers.trans_handlers.exists(_.fun == handler.fun)
 
 
@@ -113,7 +113,7 @@ class Components(Generic[D, CC], Dat['Components']):
     def config(self) -> List[CC]:
         return self.all.collect(_.config)
 
-    def for_handler(self, handler: FreeTransHandler) -> Maybe[Component]:
+    def for_handler(self, handler: FreeTrans) -> Maybe[Component]:
         return self.all.find(__.contains(handler))
 
 

@@ -10,7 +10,7 @@ from ribosome.trans.message_base import pmessage
 from ribosome.trans.action import Transit, Propagate
 from ribosome.dispatch.transform import TransValidator, validate_trans_complete
 from ribosome.dispatch.data import DispatchResult, DispatchIO
-from ribosome.trans.handler import MessageTransHandler
+from ribosome.trans.handler import MessageTrans
 from ribosome.trans.run import TransComplete, run_message_trans_handler
 
 from amino import Right, IO, _, Either, Id, Maybe
@@ -33,7 +33,7 @@ class HandlerSpec:
     def validate(self, action: TransComplete) -> TransValidator:
         return validate_trans_complete(action)
 
-    def run(self, f: MessageTransHandler) -> Maybe[Msg2]:
+    def run(self, f: MessageTrans) -> Maybe[Msg2]:
         res = self.validate(run_message_trans_handler(f, Msg1()))
         return k(res.run_a(None).attempt(None) / _.msgs // _.head).must(be_just(have_type(Msg2)))
 

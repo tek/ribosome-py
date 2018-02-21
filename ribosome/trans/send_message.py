@@ -12,7 +12,7 @@ from ribosome.nvim.io import NS
 from ribosome.dispatch.data import DispatchResult, DispatchError, DispatchOutputAggregate
 from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.dispatch.component import Component, Components
-from ribosome.trans.handler import MessageTransHandler
+from ribosome.trans.handler import MessageTrans
 from ribosome.config.settings import Settings
 from ribosome.trans.run import run_message_trans_handler
 
@@ -48,7 +48,7 @@ def try_handler(handler: Callable[[M], A], msg: M, desc: str) -> NS[D, DispatchR
     return Try(handler, msg).map(validate_trans_complete).value_or(L(handler_exception)(_, desc))
 
 
-def execute_component_handler(component: Component, handler: MessageTransHandler, msg: M) -> NS[D, DispatchResult]:
+def execute_component_handler(component: Component, handler: MessageTrans, msg: M) -> NS[D, DispatchResult]:
     return try_handler(L(run_message_trans_handler)(handler, _), msg, component.name)
 
 

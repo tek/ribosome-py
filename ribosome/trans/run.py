@@ -6,7 +6,7 @@ from ribosome.trans.step import TransStep, Lift, Strict, TransEffectError
 from ribosome.trans.action import TransAction, Transit, TransFailure, TransM, TransMPure, TransMSwitch
 from ribosome.trans.message_base import Message
 from ribosome.request.args import ArgValidator
-from ribosome.trans.handler import MessageTransHandler, FreeTransHandler, TransHandler
+from ribosome.trans.handler import MessageTrans, FreeTrans, TransHandler
 
 from amino.dispatch import PatMat
 from amino import Dat, List, Maybe, L, _, Lists, Either
@@ -55,16 +55,16 @@ def extract(name: str, output: O, effects: List[TransEffect]) -> TransComplete:
     return TransComplete(name, lift.match(trans_result, False))
 
 
-def run_message_trans_handler(handler: MessageTransHandler[A, M], msg: M) -> TransComplete:
+def run_message_trans_handler(handler: MessageTrans[A, M], msg: M) -> TransComplete:
     return extract(handler.name, handler.fun(msg), Lists.wrap(handler.effects))
 
 
-def execute_free_trans_handler(handler: FreeTransHandler[A]) -> Either[TransAction, O]:
+def execute_free_trans_handler(handler: FreeTrans[A]) -> Either[TransAction, O]:
     val = ArgValidator(handler.params_spec)
     return val.either(handler.args, 'trans', handler.name).bimap(TransFailure, lambda a: handler.fun(*handler.args))
 
 
-def run_free_trans_handler(handler: FreeTransHandler[A]) -> TransComplete:
+def run_free_trans_handler(handler: FreeTrans[A]) -> TransComplete:
     return (
         execute_free_trans_handler(handler)
         .cata(
@@ -85,14 +85,14 @@ class TransHandlerOps(TypeClass):
         ...
 
 
-class FreeTransHandlerOps(TransHandlerOps, tpe=FreeTransHandler):
+class FreeTransHandlerOps(TransHandlerOps, tpe=FreeTrans):
 
     @tc_prop
-    def m(self, handler: FreeTransHandler[A]) -> TransM:
+    def m(self, handler: FreeTrans[A]) -> TransM:
         return TransMPure(handler)
 
     @tc_prop
-    def switch(self, handler: FreeTransHandler[A]) -> TransM:
+    def switch(self, handler: FreeTrans[A]) -> TransM:
         return TransMSwitch(handler)
 
 

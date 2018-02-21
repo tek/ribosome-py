@@ -27,7 +27,7 @@ from ribosome.dispatch.loop import process_message
 from ribosome.trans.send_message import send_message
 from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.trans.action import TransM, TransMPure, TransMBind, LogMessage, Info, Error, TransMSwitch
-from ribosome.trans.handler import FreeTransHandler
+from ribosome.trans.handler import FreeTrans
 from ribosome.config.settings import Settings
 from ribosome.trans.run import TransComplete
 
@@ -84,7 +84,7 @@ execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
 
 
 @do(NS[DispatchState[S, D, CC], R])
-def run_trans_m_trans(handler: FreeTransHandler, aff: DispatchAffiliation) -> Do:
+def run_trans_m_trans(handler: FreeTrans, aff: DispatchAffiliation) -> Do:
     yield plugin_to_dispatch(log_trans(handler))
     result = yield run_trans(aff, handler, Nil)
     yield normalize_output(result)

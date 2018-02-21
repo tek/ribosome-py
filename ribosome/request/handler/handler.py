@@ -15,7 +15,7 @@ from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod
 from ribosome.trans.message_base import Message
 from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
 from ribosome.request.args import ParamsSpec
-from ribosome.trans.handler import FreeTransHandler
+from ribosome.trans.handler import FreeTrans
 
 B = TypeVar('B')
 D = TypeVar('D')
@@ -153,7 +153,7 @@ class RequestHandlers(ToStr):
         return self.handlers.v / __.spec(name, prefix)
 
     @property
-    def trans_handlers(self) -> List[FreeTransHandler]:
+    def trans_handlers(self) -> List[FreeTrans]:
         return (
             self.handlers
             .v
