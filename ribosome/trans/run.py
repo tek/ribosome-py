@@ -3,7 +3,7 @@ from typing import Callable, TypeVar
 
 from ribosome.trans.effect import TransEffect
 from ribosome.trans.step import TransStep, Lift, Strict, TransEffectError
-from ribosome.trans.action import TransAction, Transit, TransFailure, TransM, TransMPure, TransMSwitch
+from ribosome.trans.action import TransAction, Transit, TransFailure, TransM, TransMCont
 from ribosome.trans.message_base import Message
 from ribosome.request.args import ArgValidator
 from ribosome.trans.handler import MessageTrans, FreeTrans, TransHandler
@@ -80,20 +80,12 @@ class TransHandlerOps(TypeClass):
     def m(self, handler: TransHandler[A]) -> TransM:
         ...
 
-    @abc.abstractmethod
-    def switch(self, handler: TransHandler[A]) -> TransM:
-        ...
-
 
 class FreeTransHandlerOps(TransHandlerOps, tpe=FreeTrans):
 
     @tc_prop
     def m(self, handler: FreeTrans[A]) -> TransM:
-        return TransMPure(handler)
-
-    @tc_prop
-    def switch(self, handler: FreeTrans[A]) -> TransM:
-        return TransMSwitch(handler)
+        return TransMCont(handler)
 
 
 __all__ = ('cont', 'lift', 'TransComplete', 'extract')

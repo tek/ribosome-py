@@ -9,7 +9,7 @@ from amino.dat import ADT, ADTMeta
 from amino.tc.base import Implicits, ImplicitsMeta
 from amino.tc.monad import Monad
 from amino.logging import LogError
-from amino.func import CallByName
+from amino.func import CallByName, call_by_name
 
 from ribosome.trans.message_base import Sendable, Message
 from ribosome.trans.handler import FreeTrans
@@ -35,20 +35,18 @@ class TransM(Generic[A], ADT['TransM'], Implicits, implicits=True, auto=True, ba
 
     @staticmethod
     def from_maybe(fa: Maybe[A], error: CallByName) -> 'TransM[A]':
-        return fa / TransM.pure | (lambda: TransMError(error()))
+        return fa / TransM.cont | (lambda: TransMError(call_by_name(error)))
 
     @staticmethod
-    def pure(a: A) -> 'TransMPure[A]':
-        return TransMPure(FreeTrans.cons(lambda: TransResult(a)))
+    def cont(a: A) -> 'TransM[A]':
+        return TransMCont(FreeTrans.cons(lambda: TransResult(a)))
+
+    @staticmethod
+    def pure(a: A) -> 'TransM[A]':
+        return TransMPure(a)
 
 
-class TransMPure(Generic[A], TransM[A]):
-
-    def __init__(self, handler: FreeTrans[A]) -> None:
-        self.handler = handler
-
-
-class TransMSwitch(Generic[A], TransM[A]):
+class TransMCont(Generic[A], TransM[A]):
 
     def __init__(self, handler: FreeTrans[A]) -> None:
         self.handler = handler
@@ -60,6 +58,12 @@ class TransMBind(Generic[A], TransM[A]):
         super().__init__()
         self.fa = fa
         self.f = f
+
+
+class TransMPure(Generic[A], TransM[A]):
+
+    def __init__(self, value: A) -> None:
+        self.value = value
 
 
 class TransMError(Generic[A], TransM[A]):
@@ -75,7 +79,7 @@ class Monad_TransM(Monad, tpe=TransM):
         @trans.free.result()
         def pure() -> A:
             return a
-        return TransMPure(pure)
+        return TransMCont(pure)
 
     def flat_map(self, fa: TransM, f: Callable[[A], TransM[B]]) -> None:
         return TransMBind(fa, f)
@@ -196,5 +200,5 @@ class TransLog(TransAction):
         self.message = message
 
 
-__all__ = ('TransAction', 'Transit', 'Propagate', 'TransUnit', 'TransResult', 'TransFailure', 'TransM', 'TransMPure',
-           'TransMSwitch', 'TransMBind')
+__all__ = ('TransAction', 'Transit', 'Propagate', 'TransUnit', 'TransResult', 'TransFailure', 'TransM', 'TransMCont',
+           'TransMBind', 'TransMPure')

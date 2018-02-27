@@ -26,7 +26,7 @@ from ribosome.trans.message_base import Message
 from ribosome.dispatch.loop import process_message
 from ribosome.trans.send_message import send_message
 from ribosome.dispatch.transform import validate_trans_complete
-from ribosome.trans.action import TransM, TransMPure, TransMBind, LogMessage, Info, Error, TransMSwitch
+from ribosome.trans.action import TransM, TransMCont, TransMBind, LogMessage, Info, Error, TransMPure
 from ribosome.trans.handler import FreeTrans
 from ribosome.config.settings import Settings
 from ribosome.trans.run import TransComplete
@@ -90,21 +90,22 @@ def run_trans_m_trans(handler: FreeTrans, aff: DispatchAffiliation) -> Do:
     yield normalize_output(result)
 
 
-# FIXME if affiliations don't change, the `ComponentData` has to be passed into the sub trans and back
-# better insert an `NS` before and after the trans instead of wrapping in a `transform_s`
 @do(NS[DispatchState[S, D, CC], R])
 def run_trans_m(tr: TransM) -> Do:
-    if isinstance(tr, TransMPure):
-        aff = yield NS.inspect(_.aff.aff)
-        yield run_trans_m_trans(tr.handler, aff)
-    elif isinstance(tr, TransMSwitch):
+    if isinstance(tr, TransMCont):
         handler = tr.handler
-        aff = yield NS.inspect(__.state.reaffiliate(handler))
-        yield run_trans_m_trans(handler, aff)
+        current = yield NS.inspect(_.aff)
+        aff = yield NS.inspect(__.state.reaffiliate(handler, current))
+        yield NS.modify(__.set.aff(aff))
+        result = yield run_trans_m_trans(handler, aff)
+        yield NS.modify(__.set.aff(current))
+        yield NS.pure(result)
     elif isinstance(tr, TransMBind):
         result = yield run_trans_m(tr.fa)
         n = tr.f(result)
         yield run_trans_m(n)
+    elif isinstance(tr, TransMPure):
+        yield NS.pure(tr.value)
 
 
 class DispatchLogger:
@@ -147,8 +148,9 @@ class ExecuteDispatchOutput(Logging):
         yield result.results.traverse(normalize_output, NS)
         yield DispatchResult.unit_nio
 
-    def dispatch_do(self, result: DispatchDo) -> NS[DispatchState[S, D, CC], R]:
-        return run_trans_m(result.trans.action)
+    @do(NS[DispatchState[S, D, CC], R])
+    def dispatch_do(self, result: DispatchDo) -> Do:
+        yield run_trans_m(result.trans.action)
 
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_log(self, result: DispatchLog) -> Do:
@@ -237,7 +239,7 @@ def execute(state: PluginStateHolder[D],
             args: List[Any],
             dispatch: AffiliatedDispatch[DP],
             runner: DispatchRunner[RDP]) -> NvimIO[Any]:
-    return exclusive_dispatch(state, sync_sender(args, dispatch, runner), dispatch.desc, dispatch)
+    return exclusive_dispatch(state, sync_sender(args, dispatch, runner), dispatch.desc, dispatch.aff)
 
 
 def run_forked_job(vim: NvimFacade, f: Callable[[], NvimIO[None]], job: DispatchJob) -> None:

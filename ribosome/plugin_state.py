@@ -218,9 +218,9 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
     def resources(self) -> Resources[S, D, CC]:
         return Resources(self.data, self.settings, self.components)
 
-    def reaffiliate(self, handler: FreeTrans) -> DispatchAffiliation:
+    def reaffiliate(self, handler: FreeTrans, current: DispatchAffiliation) -> DispatchAffiliation:
         c = self.components.for_handler(handler)
-        return c.cata(ComponentDispatch, RootDispatch())
+        return c.cata(ComponentDispatch, current)
 
 
 class PluginStateHolder(Generic[D], Dat['PluginStateHolder'], Logging):

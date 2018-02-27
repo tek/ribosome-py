@@ -44,7 +44,7 @@ class FreeTransCons:
 
     def cons(self, *effects: TransEffect, prio: float=dp, **kw: Boolean) -> FDecorator:
         def add_handler(func: Callable[[C], R]) -> FreeTrans[A]:
-            return FreeTrans.create(func, Lists.wrap(effects), prio, **kw)
+            return FreeTrans.cons(func, Lists.wrap(effects), prio, **kw)
         return add_handler
 
     def unit(self, *effects: TransEffect, prio: float=default_prio, **kw: Boolean) -> FDecorator:
