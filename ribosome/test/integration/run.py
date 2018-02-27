@@ -83,5 +83,8 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
     def update_data(self, **kw: Any) -> 'DispatchHelper[S, D, CC]':
         return lens.state.data.modify(__.copy(**kw))(self)
 
+    def update_component(self, name: str, **kw: Any) -> 'DispatchHelper[S, D, CC]':
+        return self.mod.state(__.modify_component_data(name, __.copy(**kw)))
+
 
 __all__ = ('DispatchHelper',)
