@@ -2,7 +2,7 @@ from typing import TypeVar, Tuple
 
 from amino import do, Do, _, __, Map, List, Either, L
 from amino.lenses.lens import lens
-from amino.state import State
+from amino.state import EitherState
 from amino.func import flip
 
 from ribosome.nvim.io import NS
@@ -59,14 +59,14 @@ def dispatches(state: PluginState[S, D, CC]) -> Tuple[Syncs, Asyncs]:
     )
 
 
-@do(State[PluginState[S, D, CC], None])
+@do(EitherState[PluginState[S, D, CC], None])
 def update_components(from_user: Either[str, List[str]]) -> Do:
-    config = yield State.inspect(_.config)
-    components = yield State.lift(ComponentResolver(config, from_user).run)
-    yield State.modify(__.copy(components=Components.cons(components, config.component_config_type)))
-    sy, asy = yield State.inspect(dispatches)
-    yield State.modify(lens.dispatch_config.async_dispatch.set(asy))
-    yield State.modify(lens.dispatch_config.sync_dispatch.set(sy))
+    config = yield EitherState.inspect(_.config)
+    components = yield EitherState.lift(ComponentResolver(config, from_user).run)
+    yield EitherState.modify(__.copy(components=Components.cons(components, config.component_config_type)))
+    sy, asy = yield EitherState.inspect(dispatches)
+    yield EitherState.modify(lens.dispatch_config.async_dispatch.set(asy))
+    yield EitherState.modify(lens.dispatch_config.sync_dispatch.set(sy))
 
 
 # TODO finish
