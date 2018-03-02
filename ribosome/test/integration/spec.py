@@ -83,6 +83,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         self.start_neovim()
         self._post_start_neovim()
         self._pre_start()
+        self.pvar_becomes('started', True)
         self._start_plugin()
         self._post_start()
 

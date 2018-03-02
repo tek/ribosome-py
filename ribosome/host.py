@@ -75,6 +75,7 @@ def run_session(session: Session, dispatch_config: DispatchConfig) -> Do:
     state = yield init_state(dispatch_config)
     holder = PluginStateHolder.concurrent(state)
     ribo_log.debug(f'running session with state {state}')
+    yield NvimIO.delay(__.vars.set_p('started', True))
     yield NvimIO.delay(
         lambda vim:
         session.run(
