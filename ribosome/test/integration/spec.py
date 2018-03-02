@@ -68,13 +68,13 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         self.log_format = '{levelname} {name}:{message}'
         self.subproc = None
         self.tmux_server = None
+        self._debug = 'RIBOSOME_DEVELOPMENT' in env
 
     def setup(self) -> None:
         IntegrationSpecBase.setup(self)
         env['RIBOSOME_SPEC'] = 1
         env['AMINO_DEVELOPMENT'] = 1
         env['RIBOSOME_PKG_DIR'] = str(pkg_dir())
-        self._debug = 'RIBOSOME_DEVELOPMENT' in env
         self.logfile = temp_dir('log') / self.__class__.__name__
         self.logfile.touch()
         os.environ['RIBOSOME_LOG_FILE'] = str(self.logfile)
@@ -177,11 +177,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
             self.tmux_pane.cmd('kill-pane')
 
     def _nvim_facade(self, vim: Nvim) -> NvimFacade:
-        return NvimFacade(vim, self._prefix)
-
-    @abc.abstractproperty
-    def _prefix(self) -> str:
-        ...
+        return NvimFacade(vim, self.plugin_prefix())
 
     @abc.abstractmethod
     def plugin_name(self) -> str:
@@ -259,10 +255,10 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         def error(err: JsonError) -> None:
             self.log.error(f'{err.error}: {err.data}')
             raise err.exception
-        response = self.vim.call(f'{self.plugin_prefix}State').get_or_raise()
+        response = self.vim.call(f'{self.plugin_prefix()}State').get_or_raise()
         return decode_json(response).value_or(error)
 
-    @abc.abstractproperty
+    @abc.abstractmethod
     def plugin_prefix(self) -> str:
         ...
 
@@ -357,19 +353,15 @@ class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
 
     def setup(self) -> None:
         self.log_format = '{message}'
+        del env['AMINO_COMPILE_COCO']
         super().setup()
 
-    @abc.abstractmethod
     def module(self) -> str:
-        ...
-
-    @property
-    def _prefix(self) -> str:
-        return self.plugin_prefix
+        return self.plugin_prefix()
 
     @property
     def plugin_name(self) -> str:
-        return camelcase(self._prefix)
+        return camelcase(self.plugin_prefix())
 
     @property
     def autostart_plugin(self) -> bool:
