@@ -41,13 +41,18 @@ def create_scratch_ui(use_tab: Boolean, vertical: Boolean) -> Do:
     return ScratchUi(window, tab)
 
 
-@do(NvimIO[Buffer])
-def setup_scratch_buffer(ui: ScratchUi) -> Do:
-    buffer = yield window_buffer(ui.window)
+@do(NvimIO[None])
+def configure_scratch_buffer(buffer: Buffer) -> Do:
     yield set_buffer_option(buffer, 'buftype', 'nofile')
     yield set_buffer_option(buffer, 'bufhidden', 'wipe')
     yield set_buffer_option(buffer, 'buflisted', False)
     yield set_buffer_option(buffer, 'swapfile', False)
+
+
+@do(NvimIO[Buffer])
+def setup_scratch_buffer(ui: ScratchUi) -> Do:
+    buffer = yield window_buffer(ui.window)
+    yield configure_scratch_buffer(buffer)
     return buffer
 
 
