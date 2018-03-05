@@ -1,8 +1,10 @@
 import abc
 import inspect
 from traceback import FrameSummary
-from typing import TypeVar, Callable, Any, Generic, Union, Tuple
+from typing import TypeVar, Callable, Any, Generic, Union, Tuple, Type
 from threading import Thread
+
+from msgpack import ExtType
 
 from amino.tc.base import ImplicitInstances, F, TypeClass, tc_prop
 from amino.lazy import lazy
@@ -150,6 +152,22 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
     def pure(a: A) -> 'NvimIO[A]':
         return Pure(a)
 
+    @staticmethod
+    def read_tpe(cmd: str, tpe: Type[A], *args: Any) -> 'NvimIO[A]':
+        return typechecked_request(cmd, tpe, *args)
+
+    @staticmethod
+    def read_cons(cmd: str, cons: Callable[[Any], Either[str, A]], *args: Any) -> 'NvimIO[A]':
+        return data_cons_request(cmd, cons, *args)
+
+    @staticmethod
+    def read_ext(cmd: str, *args: Any) -> 'NvimIO[A]':
+        return NvimIO.read_tpe(cmd, ExtType, *args)
+
+    @staticmethod
+    def write(cmd: str, *args: Any) -> 'NvimIO[A]':
+        return request(cmd, *args).replace(None)
+
     @abc.abstractmethod
     def _flat_map(self, f: Callable[[A], 'NvimIO[B]'], ts: Eval[str], fs: Eval[str]) -> 'NvimIO[B]':
         ...
@@ -203,7 +221,7 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
     # FIXME use NResult
     @do('NvimIO[A]')
     def ensure(self, f: Callable[[Either[Exception, A]], 'NvimIO[None]']) -> Do:
-        result = yield NvimIO.delay(self.attempt)
+        result = yield NvimIO.delay(self.either)
         yield f(result)
         yield NvimIO.from_either(result)
 
@@ -322,6 +340,26 @@ class NvimIOMonad(Monad[NvimIO]):
 
     def flat_map(self, fa: NvimIO[A], f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
         return fa.flat_map(f)
+
+
+def request(name: str, *args: Any) -> NvimIO[A]:
+    return NvimIO.delay(__.vim._session.request(name, *args))
+
+
+@do(NvimIO[A])
+def typechecked_request(name: str, tpe: Type[A], *args: Any) -> Do:
+    raw = yield request(name, *args)
+    yield (
+        NvimIO.pure(raw)
+        if isinstance(raw, tpe) else
+        NvimIO.error(f'invalid result type of request {name}{args}: {raw}')
+    )
+
+
+@do(NvimIO[A])
+def data_cons_request(name: str, cons: Callable[[Any], Either[str, A]], *args: Any) -> Do:
+    raw = yield request(name, *args)
+    yield NvimIO.from_either(cons(raw))
 
 
 class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
