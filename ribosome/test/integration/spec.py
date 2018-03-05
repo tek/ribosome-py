@@ -83,7 +83,6 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         self.start_neovim()
         self._post_start_neovim()
         self._pre_start()
-        self.pvar_becomes('started', True)
         self._start_plugin()
         self._post_start()
 
@@ -392,6 +391,9 @@ class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
 
     def send(self, msg: Message) -> None:
         self.send_json(dump_json(msg).get_or_raise())
+
+    def _pre_start(self) -> None:
+        self.pvar_becomes('started', True)
 
 
 __all__ = ('VimIntegrationSpec', 'ExternalIntegrationSpec', 'AutoPluginIntegrationSpec')
