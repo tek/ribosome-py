@@ -60,16 +60,16 @@ class CompoComponent(Dat['CompoComponent']):
 
 
 @trans.free.result(trans.st, resources=true)
-@do(State[ComponentData[Resources[Settings, NoData, CompoComponent], CoreData], int])
+@do(State[Resources[Settings, ComponentData[NoData, CoreData], CompoComponent], int])
 def core_fun(a: int) -> Do:
-    yield State.modify(lens.comp.x.modify(_ + 5))
+    yield State.modify(lens.data.comp.x.modify(_ + 5))
     yield State.pure(a + 5)
 
 
 @trans.free.result(trans.st)
-@do(State[ComponentData[Resources[Settings, NoData, CompoComponent], CoreData], int])
+@do(State[Resources[Settings, ComponentData[NoData, CoreData], CompoComponent], int])
 def extra_fun(a: int) -> Do:
-    yield State.modify(lens.comp.y.modify(_ + 39))
+    yield State.modify(lens.data.comp.y.modify(_ + 39))
     yield State.pure(a + 9)
 
 
@@ -77,7 +77,7 @@ def extra_fun(a: int) -> Do:
 @do(TransM)
 def switch() -> Do:
     a = yield core_fun(3).m
-    yield extra_fun(a).switch
+    yield extra_fun(a).m
 
 
 core = Component.cons(
