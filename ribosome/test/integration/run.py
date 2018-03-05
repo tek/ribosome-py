@@ -1,6 +1,6 @@
 from typing import Callable, Tuple, Any, TypeVar, Generic
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 
 from toolz import assoc
@@ -27,18 +27,45 @@ CC = TypeVar('CC')
 class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
 
     @staticmethod
-    def cons(
+    def create(
+            config: Config,
+            *comps: str,
+            vars: dict=dict(),
+            cons_vim: Callable[[dict], NvimFacade],
+            io_executor: Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]=None,
+    ) -> 'DispatchHelper':
+        comps_var = (f'{config.name}_components', Lists.wrap(comps))
+        vim = cons_vim(assoc(vars, *comps_var))
+        dc = DispatchConfig.cons(config, io_executor=io_executor)
+        state = init_state(dc).unsafe(vim)
+        return DispatchHelper(vim, dc, state)
+
+    @staticmethod
+    def nvim(
+            config: Config,
+            vim: NvimFacade,
+            *comps: str,
+            vars: dict=dict(),
+            io_executor: Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]=None,
+    ) -> 'DispatchHelper':
+        def cons_vim(vars: dict) -> NvimFacade:
+            for k, v in vars.items():
+                vim.vars.set(k, v)
+            return vim
+        return DispatchHelper.create(config, *comps, vars=vars, cons_vim=cons_vim, io_executor=io_executor)
+
+    @staticmethod
+    def mock(
             config: Config,
             *comps: str,
             vars: dict=dict(),
             responses: Callable[[str], Map[str, Any]]=lambda a: Just(0),
             io_executor: Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]=None,
     ) -> 'DispatchHelper':
-        dc = DispatchConfig.cons(config, io_executor=io_executor)
-        comps_var = (f'{config.name}_components', Lists.wrap(comps))
-        vim = MockNvimFacade(prefix=config.name, vars=assoc(vars, *comps_var), responses=responses)
-        state = init_state(dc).unsafe(vim)
-        return DispatchHelper(vim, dc, state)
+        cons_vim = lambda vs: MockNvimFacade(prefix=config.name, vars=vs, responses=responses)
+        return DispatchHelper.create(config, *comps, vars=vars, cons_vim=cons_vim, io_executor=io_executor)
+
+    cons = mock
 
     def __init__(self, vim: MockNvimFacade, dispatch_config: DispatchConfig, state: PluginState[S, D, CC]) -> None:
         self.vim = vim
@@ -53,7 +80,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
         job = dispatch_job(self.holder, name, (args,), sync)
         dc = job.state.state.dispatch_config
         dispatch = dc.sync_dispatch if sync else dc.async_dispatch
-        return job, dispatch.lift(job.name).get_or_fail('no matching dispatch')
+        return job, dispatch.lift(job.name).get_or_fail(f'no matching dispatch for `{job.name}`')
 
     def sync_sender(self, name: str, args: tuple=(), sync: bool=True) -> Callable[[], Res]:
         job, dispatch = self.dispatch_job(name, args, sync)
@@ -76,9 +103,12 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
         ds = List(dispatch) if sync else dispatch
         return execute_async_loop(job, ds)
 
-    def unsafe_run(self, name: str, args=(), sync: bool=True) -> Tuple[PluginState, DispatchResult]:
+    def run_s(self, name: str, args=(), sync: bool=True) -> NvimIO[Tuple[PluginState, DispatchResult]]:
         job, dispatch = self.dispatch_job(name, args, sync)
-        return self.run(name, args=args, sync=sync).run(dispatch_state(self.state, dispatch)).unsafe(self.vim)
+        return self.run(name, args=args, sync=sync).run(dispatch_state(self.state, dispatch.aff))
+
+    def unsafe_run(self, name: str, args=(), sync: bool=True) -> Tuple[PluginState, DispatchResult]:
+        return self.run_s(name, args=args, sync=sync).unsafe(self.vim)
 
     def update_data(self, **kw: Any) -> 'DispatchHelper[S, D, CC]':
         return lens.state.data.modify(__.copy(**kw))(self)
