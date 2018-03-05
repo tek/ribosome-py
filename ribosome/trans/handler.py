@@ -64,7 +64,7 @@ class FreeTrans(Generic[A], TransHandler[A]):
             component: Boolean=true,
     ) -> 'FreeTrans':
         name = fun.__name__
-        return FreeTrans(name, fun, (), effects, prio, resources, internal, component)
+        return FreeTrans(name, fun, (), effects, prio, resources, internal, component, ParamsSpec.from_function(fun))
 
     create = cons
 
@@ -78,6 +78,7 @@ class FreeTrans(Generic[A], TransHandler[A]):
             resources: Boolean,
             internal: Boolean,
             component: Boolean,
+            params_spec: ParamsSpec,
     ) -> None:
         self.name = name
         self.fun = fun
@@ -87,13 +88,10 @@ class FreeTrans(Generic[A], TransHandler[A]):
         self.resources = resources
         self.internal = internal
         self.component = component
+        self.params_spec = params_spec
 
     def __call__(self, *args: Any) -> 'FreeTrans':
         return self.copy(args=args)
-
-    @property
-    def params_spec(self) -> ParamsSpec:
-        return ParamsSpec.from_function(self.fun)
 
 
 __all__ = ('MessageTrans', 'FreeTrans')

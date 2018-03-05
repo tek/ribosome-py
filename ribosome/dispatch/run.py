@@ -1,10 +1,12 @@
+import abc
 from typing import TypeVar, Any, Generic, Type, Callable, Tuple, Union
 
-from amino import List, Boolean, Either, Left, Right, __, Maybe, Lists, Nothing, _
+from amino import List, Boolean, Either, Left, Right, __, Maybe, Lists, Nothing, _, ADT, L
 from amino.dat import Dat
 from amino.do import do, Do
-from amino.dispatch import dispatch_alg
+from amino.dispatch import dispatch_alg, PatMat
 from amino.state import StateT
+from amino.lenses.lens import lens
 
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
@@ -23,6 +25,7 @@ from ribosome.config.settings import Settings
 from ribosome.config.config import Resources
 from ribosome.trans.run import run_free_trans_handler
 
+A = TypeVar('A')
 NP = TypeVar('NP')
 D = TypeVar('D')
 DP = TypeVar('DP', bound=Dispatch)
@@ -83,9 +86,16 @@ AWR = Tuple[AWWrap, AWUnwrap, AWStore]
 
 # FIXME `wrap` should return an ADT that is dispatched in unwrap
 # should have an abstract `update` method that is used deeper down
-class AffiliationWrapper:
+# FIXME affiliation_wrapper and plugin_state_wrapper must be swapped
+class affiliation_wrapper(PatMat, alg=DispatchAffiliation):
 
-    def root_dispatch(self, aff: RootDispatch, handler: FreeTrans) -> AWR:
+    def __init__(self, handler: FreeTrans) -> None:
+        self.handler = handler
+
+    def root_dispatch(self, aff: RootDispatch) -> AWR:
+        return self._root_dispatch()
+
+    def _root_dispatch(self) -> AWR:
         def wrap(r: PluginState[S, D, CC], b: TD) -> TT:
             return b
         def unwrap(r: TT) -> TD:
@@ -94,14 +104,14 @@ class AffiliationWrapper:
             return s
         return wrap, unwrap, store
 
-    def component_dispatch(self, aff: ComponentDispatch, handler: FreeTrans) -> AWR:
+    def component_dispatch(self, aff: ComponentDispatch) -> AWR:
         return (
-            self._component_dispatch(aff, handler)
-            if handler.component else
-            self.root_dispatch(RootDispatch(), handler)
+            self._component_dispatch(aff)
+            if self.handler.component else
+            self._root_dispatch()
         )
 
-    def _component_dispatch(self, aff: ComponentDispatch, handler: FreeTrans) -> AWR:
+    def _component_dispatch(self, aff: ComponentDispatch) -> AWR:
         def wrap(original: PluginState[S, D, CC], wrapped: TD) -> TT:
             return ComponentData(wrapped, original.data_for(aff.component))
         def unwrap(r: TT) -> TD:
@@ -111,38 +121,24 @@ class AffiliationWrapper:
         return wrap, unwrap, store
 
 
-affiliation_wrapper = dispatch_alg(AffiliationWrapper(), DispatchAffiliation)
-
-
-def trans_style(handler: FreeTrans) -> Tuple[Boolean, Boolean]:
-    tpe = handler.params_spec.rettype
-    state_type = (
-        Maybe.getattr(tpe, '__args__') / Lists.wrap // _.head
-        if tpe is not None and issubclass(tpe, StateT)
-        else Nothing
-    )
-    is_state = lambda st: state_type.exists(lambda t: issubclass(t, st))
-    return is_state(PluginState), is_state(Resources)
+def handler_has_state(handler: FreeTrans, tpe: type) -> Boolean:
+    return handler.params_spec.state_type.exists(L(issubclass)(_, tpe))
 
 
 STR = Tuple[Callable[[PluginState[S, D, CC]], C], Callable[[PluginState[S, D, CC], C], PluginState[S, D, CC]]]
 
 
-def data_wrapper(handler: FreeTrans, aff: DispatchAffiliation) -> STR:
+def plugin_state_wrapper(handler: FreeTrans, aff: DispatchAffiliation) -> STR:
     explicit_r, explicit_i = handler.resources, handler.internal
-    internal, resources = (explicit_i, explicit_r) if (explicit_r or explicit_i) else trans_style(handler)
+    internal = explicit_i if explicit_i else handler_has_state(handler, PluginState)
     def wrap(ps: PluginState[S, D, CC]) -> TD:
         return (
-            ps.resources
-            if resources else
             ps
             if internal else
             ps.data
         )
     def unwrap(original: PluginState[S, D, CC], result: TD) -> PluginState[S, D, CC]:
         return (
-            original.copy(data=result.data)
-            if resources else
             result
             if internal else
             original.copy(data=result)
@@ -150,26 +146,77 @@ def data_wrapper(handler: FreeTrans, aff: DispatchAffiliation) -> STR:
     return wrap, unwrap
 
 
+# FIXME parameterize `FreeTrans` by state type to replace `Any` here
+class ResourcesWrapping(Generic[S, C, CC, A], ADT['ResourcesWrapped[S, C, CC]']):
+
+    def __init__(self, data: A) -> None:
+        self.data = data
+
+class ResourcesWrapped(Generic[S, C, CC, A], ResourcesWrapping[S, C, CC, Resources[S, C, CC]]):
+    pass
+
+
+class ResourcesPlain(Generic[S, C, CC, A], ResourcesWrapping[S, C, CC, C]):
+    pass
+
+
+RWWrap = Callable[[C], ResourcesWrapping[S, C, CC, A]]
+RWUnwrap = Callable[[ResourcesWrapping[S, C, CC, A]], C]
+
+
+class unwrap_resources(PatMat, alg=ResourcesWrapping):
+
+    def resources_wrapped(self, rw: ResourcesWrapped[S, C, CC, A]) -> C:
+        return rw.data.data
+
+    def resources_plain(self, rw: ResourcesPlain[S, C, CC, A]) -> C:
+        return rw.data
+
+
+def resources_wrapper(handler: FreeTrans) -> Tuple[RWWrap, RWUnwrap]:
+    def wrap(ps: PluginState[S, D, CC], data: C) -> ResourcesWrapping[S, C, CC, A]:
+        return (
+            ResourcesWrapped(ps.resources_with(data))
+            if handler.resources or handler_has_state(handler, Resources) else
+            ResourcesPlain(data)
+        )
+    return wrap, unwrap_resources.match
+
+
+
 def transform_state(
         st: NS[TT, DispatchResult],
-        data_wrap: Callable[[PluginState[S, D, CC]], TD],
+        plugin_state_wrap: Callable[[PluginState[S, D, CC]], TD],
         affiliation_wrap: AWWrap,
+        resources_wrap: RWWrap,
         affiliation_unwrap: AWUnwrap,
-        data_unwrap: Callable[[PluginState[S, D, CC], TD], PluginState[S, D, CC]],
+        plugin_state_unwrap: Callable[[PluginState[S, D, CC], TD], PluginState[S, D, CC]],
+        resources_unwrap: RWUnwrap,
         affiliation_store: AWStore,
 ) -> DRes:
     def get(r: PluginState[S, D, CC]) -> None:
-        return affiliation_wrap(r, data_wrap(r))
+        return resources_wrap(r, affiliation_wrap(r, plugin_state_wrap(r)))
     def put(r: PluginState[S, D, CC], s: TT) -> None:
-        return affiliation_store(s, data_unwrap(r, affiliation_unwrap(s)))
-    return plugin_to_dispatch(st.transform_s(get, put))
+        data = resources_unwrap(s)
+        return affiliation_store(data, plugin_state_unwrap(r, affiliation_unwrap(data)))
+    return plugin_to_dispatch(st.zoom(lens.data).transform_s(get, put))
 
 
 @do(DRes)
 def run_trans(aff: DispatchAffiliation, handler: FreeTrans, args: List[Any]) -> Do:
-    aff_wrap, aff_unwrap, aff_store = affiliation_wrapper(aff, handler)
-    data_wrap, data_unwrap = data_wrapper(handler, aff)
-    yield transform_state(execute_trans(handler), data_wrap, aff_wrap, aff_unwrap, data_unwrap, aff_store)
+    aff_wrap, aff_unwrap, aff_store = affiliation_wrapper(handler)(aff)
+    plugin_state_wrap, plugin_state_unwrap = plugin_state_wrapper(handler, aff)
+    resources_wrap, resources_unwrap = resources_wrapper(handler)
+    yield transform_state(
+        execute_trans(handler),
+        plugin_state_wrap,
+        aff_wrap,
+        resources_wrap,
+        aff_unwrap,
+        plugin_state_unwrap,
+        resources_unwrap,
+        aff_store,
+    )
 
 
 @do(DRes)

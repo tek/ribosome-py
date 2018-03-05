@@ -3,6 +3,7 @@ from typing import Callable, Any
 
 from amino import Maybe, _, Just, Boolean, Lists, Nothing, Either, L, List, Nil, Map
 from amino.dat import Dat
+from amino.state import StateT
 
 from ribosome.request.nargs import Nargs
 
@@ -19,7 +20,12 @@ def cons_params_spec(fun: Callable[..., Any]) -> None:
     nargs = Nargs.cons(min, max)
     types = params.traverse(annotations.lift, Maybe) | Nil
     rettype = getattr(fun, 'tpe', annotations.lift('return') | None)
-    return ParamsSpec(nargs, min, max, method, types, rettype)
+    state_type = (
+        Maybe.getattr(rettype, '__args__') / Lists.wrap // _.head
+        if rettype is not None and issubclass(rettype, StateT)
+        else Nothing
+    )
+    return ParamsSpec(nargs, min, max, method, types, rettype, state_type)
 
 
 class ParamsSpec(Dat['ParamsSpec']):
@@ -33,19 +39,23 @@ class ParamsSpec(Dat['ParamsSpec']):
     def from_type(tpe: type) -> 'ParamsSpec':
         return cons_params_spec(tpe.__init__)
 
-    def __init__(self,
-                 nargs: Nargs,
-                 min: int,
-                 max: Maybe[int],
-                 method: Boolean,
-                 types: List[type],
-                 rettype: type) -> None:
+    def __init__(
+            self,
+            nargs: Nargs,
+            min: int,
+            max: Maybe[int],
+            method: Boolean,
+            types: List[type],
+            rettype: type,
+            state_type: type,
+    ) -> None:
         self.nargs = nargs
         self.min = min
         self.max = max
         self.method = method
         self.types = types
         self.rettype = rettype
+        self.state_type = state_type
 
     @property
     def exact_count(self) -> Maybe[int]:

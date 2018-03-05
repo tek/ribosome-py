@@ -90,6 +90,7 @@ def run_trans_m_trans(handler: FreeTrans, aff: DispatchAffiliation) -> Do:
     yield normalize_output(result)
 
 
+# TODO determine affiliation from the type in the handler's state
 @do(NS[DispatchState[S, D, CC], R])
 def run_trans_m(tr: TransM) -> Do:
     if isinstance(tr, TransMCont):
@@ -102,8 +103,8 @@ def run_trans_m(tr: TransM) -> Do:
         yield NS.pure(result)
     elif isinstance(tr, TransMBind):
         result = yield run_trans_m(tr.fa)
-        n = tr.f(result)
-        yield run_trans_m(n)
+        next_trans = tr.f(result)
+        yield run_trans_m(next_trans)
     elif isinstance(tr, TransMPure):
         yield NS.pure(tr.value)
 

@@ -23,6 +23,7 @@ from ribosome.config.settings import Settings
 from ribosome.config.config import Config, Resources
 from ribosome.trans.run import TransComplete
 
+A = TypeVar('A')
 D = TypeVar('D')
 C = TypeVar('C')
 DP = TypeVar('DP', bound=Dispatch)
@@ -214,9 +215,12 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
         comp = self.data_by_name(name)
         return comp / mod / L(self.update_component_data)(name, _) | self
 
+    def resources_with(self, data: A) -> Resources[S, A, CC]:
+        return Resources(data, self.settings, self.components)
+
     @property
     def resources(self) -> Resources[S, D, CC]:
-        return Resources(self.data, self.settings, self.components)
+        return self.resources_with(self.data)
 
     def reaffiliate(self, handler: FreeTrans, current: DispatchAffiliation) -> DispatchAffiliation:
         c = self.components.for_handler(handler)
