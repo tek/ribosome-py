@@ -1,4 +1,4 @@
-from kallikrein import Expectation
+from kallikrein import Expectation, pending
 
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 from ribosome.config.config import NoData
@@ -12,7 +12,6 @@ class AutocmdSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
     execute handler when triggering an autocmd $autocmd
     '''
 
-    @property
     def plugin_prefix(self) -> str:
         return 'plug'
 
@@ -23,6 +22,7 @@ class AutocmdSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
         super()._pre_start()
         self.vim.vars.set_p('components', ['core'])
 
+    @pending
     def autocmd(self) -> Expectation:
         self.vim.cmd_once_defined('PlugStage1')
         self.cmd_sync('Msg1')

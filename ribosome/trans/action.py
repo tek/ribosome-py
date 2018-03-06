@@ -35,7 +35,11 @@ class TransM(Generic[A], ADT['TransM'], Implicits, implicits=True, auto=True, ba
 
     @staticmethod
     def from_maybe(fa: Maybe[A], error: CallByName) -> 'TransM[A]':
-        return fa / TransM.cont | (lambda: TransMError(call_by_name(error)))
+        return fa / TransM.cont | (lambda: TransM.error(error))
+
+    @staticmethod
+    def from_either(fa: Either[str, A]) -> 'TransM[A]':
+        return fa.cata(TransM.error, TransM.cont)
 
     @staticmethod
     def cont(a: A) -> 'TransM[A]':
@@ -44,6 +48,10 @@ class TransM(Generic[A], ADT['TransM'], Implicits, implicits=True, auto=True, ba
     @staticmethod
     def pure(a: A) -> 'TransM[A]':
         return TransMPure(a)
+
+    @staticmethod
+    def error(error: CallByName) -> 'TransM[A]':
+        return TransMError(call_by_name(error))
 
 
 class TransMCont(Generic[A], TransM[A]):

@@ -58,6 +58,20 @@ def setup_scratch_buffer(ui: ScratchUi) -> Do:
 
 class CreateScratchBufferOptions(Dat['CreateScratchOptions']):
 
+    @staticmethod
+    def cons(
+            tab: bool=None,
+            vertical: bool=None,
+            size: int=None,
+            wrap: bool=None,
+    ) -> None:
+        return CreateScratchBufferOptions(
+            Maybe.optional(tab),
+            Maybe.optional(vertical),
+            Maybe.optional(size),
+            Maybe.optional(wrap),
+        )
+
     def __init__(self, tab: Maybe[Boolean], vertical: Maybe[Boolean], size: Maybe[int], wrap: Maybe[Boolean],) -> None:
         self.tab = tab
         self.vertical = vertical

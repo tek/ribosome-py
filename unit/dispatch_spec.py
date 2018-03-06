@@ -155,7 +155,6 @@ dispatch_conf = DispatchConfig.cons(config)
 
 
 # TODO test free trans function with invalid arg count
-# TODO test TransM
 class DispatchSpec(SpecBase):
     '''
     resolve component handlers $handlers
@@ -203,6 +202,7 @@ class DispatchSpec(SpecBase):
         state, result = helper.unsafe_run('command:trio')
         return k(state.state.messages.items.head / _[1] / _.message).must(be_just(m1))
 
+    @pending
     def multi_io(self) -> Expectation:
         helper = DispatchHelper.cons(config, 'p', 'q')
         state, result = helper.unsafe_run('command:meh', sync=False)

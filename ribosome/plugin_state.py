@@ -3,11 +3,13 @@ import queue
 import logging
 from typing import TypeVar, Generic, Callable, Optional, Any
 from threading import Lock
+from uuid import UUID
 
 import greenlet
 
 from amino import Map, List, Boolean, Nil, Either, _, Maybe, Nothing, Try, do, Do, IO, __, L
 from amino.dat import Dat, ADT
+from amino.util.string import camelcase
 
 from ribosome.trans.message_base import Message, Sendable, Envelope
 from ribosome.dispatch.component import Component, Components
@@ -136,10 +138,21 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
             log_handler: Maybe[logging.Handler]=Nothing,
             logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D, CC], None]']]=Nothing,
             component_data: Map[str, Any]=Map(),
+            active_mappings: Map[UUID, FreeTrans]=Map(),
     ) -> 'PluginState':
         components = Components.cons(components, dispatch_config.config.component_config_type)
-        return PluginState(dispatch_config, data, components, messages, message_log, trans_log, log_handler, logger,
-                           component_data)
+        return PluginState(
+            dispatch_config,
+            data,
+            components,
+            messages,
+            message_log,
+            trans_log,
+            log_handler,
+            logger,
+            component_data,
+            active_mappings,
+        )
 
     def __init__(
             self,
@@ -152,6 +165,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
             log_handler: Maybe[logging.Handler],
             logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D, CC], None]']],
             component_data: Map[str, Any],
+            active_mappings: Map[UUID, FreeTrans],
     ) -> None:
         self.dispatch_config = dispatch_config
         self.data = data
@@ -162,6 +176,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
         self.log_handler = log_handler
         self.logger = logger
         self.component_data = component_data
+        self.active_mappings = active_mappings
 
     def enqueue(self, messages: List[Sendable]) -> 'PluginState[S, D, CC]':
         envelopes = messages / Envelope.from_sendable
@@ -225,6 +240,10 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
     def reaffiliate(self, handler: FreeTrans, current: DispatchAffiliation) -> DispatchAffiliation:
         c = self.components.for_handler(handler)
         return c.cata(ComponentDispatch, current)
+
+    @property
+    def camelcase_name(self) -> str:
+        return camelcase(self.name)
 
 
 class PluginStateHolder(Generic[D], Dat['PluginStateHolder'], Logging):

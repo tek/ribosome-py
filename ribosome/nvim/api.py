@@ -2,7 +2,7 @@ from typing import Any, Type, TypeVar, Callable, List as TList
 
 from msgpack import ExtType
 
-from amino import Right, Left, Either, Dat, List, Lists, __
+from amino import Right, Left, Either, Dat, List, Lists, __, do, Do
 
 from ribosome.nvim import NvimIO
 
@@ -113,10 +113,16 @@ def buffer_content(buffer: Buffer) -> NvimIO[List[str]]:
     return buffer_lines(buffer, 0, -1, False)
 
 
+@do(NvimIO[List[str]])
+def current_buffer_content() -> Do:
+    buffer = yield current_buffer()
+    yield buffer_content(buffer)
+
+
 def set_buffer_option(buffer: Buffer, key: str, value: Any) -> NvimIO[None]:
     return NvimIO.write('nvim_buf_set_option', buffer.data, key, value)
 
 
 __all__ = ('request', 'current_window', 'current_tabpage', 'buffers', 'current_buffer', 'tabpages', 'windows',
            'window_buffer', 'set_buffer_lines', 'set_buffer_content', 'buffer_lines', 'buffer_content',
-           'set_buffer_option')
+           'set_buffer_option', 'current_buffer_content')

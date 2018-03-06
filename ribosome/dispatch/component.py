@@ -10,6 +10,7 @@ from ribosome.nvim.io import NS
 from ribosome.dispatch.data import DispatchResult
 from ribosome.trans.handler import TransHandler, FreeTrans
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
+from ribosome.dispatch.mapping import Mappings
 
 D = TypeVar('D')
 CD = TypeVar('CD')
@@ -58,6 +59,7 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
             handlers: List[TransHandler]=Nil,
             state_ctor: Callable[[], CD]=None,
             config: CC=None,
+            mappings: Mappings=None,
     ) -> 'Component[D, CD, CC]':
         hs = message_handlers(handlers)
         return Component(
@@ -66,6 +68,7 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
             hs,
             state_ctor or NoComponentData,
             Maybe.check(config),
+            mappings or Mappings.cons(),
         )
 
     def __init__(
@@ -75,12 +78,14 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
             handlers: Map[float, Handlers],
             state_ctor: Maybe[Callable[[D], CD]],
             config: Maybe[CC],
+            mappings: Mappings,
     ) -> None:
         self.name = name
         self.request_handlers = request_handlers
         self.handlers = handlers
         self.state_ctor = state_ctor
         self.config = config
+        self.mappings = mappings
 
     def handler_by_name(self, name: str) -> Either[str, TransHandler]:
         return self.handlers.find(_.name == name).to_either(f'component `{self.name}` has no handler `name`')

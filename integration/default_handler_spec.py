@@ -16,7 +16,6 @@ class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
     append a directory to the plugin's `sys.path` $append_path
     '''
 
-    @property
     def plugin_prefix(self) -> str:
         return 'plug'
 

@@ -1,4 +1,4 @@
-from kallikrein import Expectation, k
+from kallikrein import Expectation, k, pending
 from kallikrein.matchers.either import be_right
 
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
@@ -18,22 +18,24 @@ class EnvelopeSpec(AutoPluginIntegrationKlkSpec):
     def module(self) -> str:
         return 'integration._support.envelope'
 
-    @property
     def plugin_prefix(self) -> str:
         return 'envl'
 
+    @pending
     def publish(self) -> Expectation:
         self.vim.cmd_once_defined('EnvlStage1')
         self.cmd_sync('EnvlPub')
         self.seen_message(P1)
         return self.seen_message(P2)
 
+    @pending
     def target(self) -> Expectation:
         self.vim.cmd_once_defined('EnvlStage1')
         self.cmd_sync('EnvlTarget')
         self.seen_message(T3)
         return self.seen_times(T2, 0)
 
+    @pending
     def prio(self) -> Expectation:
         self.vim.cmd_once_defined('EnvlStage1')
         self.cmd_sync('EnvlSeq')

@@ -7,10 +7,9 @@ from ribosome.config.settings import Settings
 
 class SettingsSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
     '''
-    test $test
+    update a setting $update
     '''
 
-    @property
     def plugin_prefix(self) -> str:
         return 'plug'
 
@@ -22,7 +21,7 @@ class SettingsSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
         self.vim.vars.set('counter', 7)
         self.vim.vars.set('inc', 14)
 
-    def test(self) -> Expectation:
+    def update(self) -> Expectation:
         self.vim.cmd_once_defined('PlugCheck')
         self._wait(.5)
         return self.var_becomes('counter', 21)
