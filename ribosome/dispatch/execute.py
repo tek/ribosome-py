@@ -124,7 +124,7 @@ dispatch_log = dispatch_alg(DispatchLogger(), LogMessage)
 class ExecuteDispatchOutput(Logging):
 
     def dispatch_error(self, result: DispatchError) -> NS[DispatchState[S, D, CC], R]:
-        io = result.exception / NvimIO.exception | NvimIO.delay(lambda v: ribo_log.error(result.message))
+        io = result.exception / NvimIO.exception | NvimIO.error(result.message)
         return NS.lift(io)
 
     def dispatch_errors(self, result: DispatchErrors) -> NS[DispatchState[S, D, CC], R]:
