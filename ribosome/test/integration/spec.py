@@ -218,7 +218,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return args.cons(cmd).join_tokens
 
     def _json_cmd(self, cmd: str, args: List[str], data: dict) -> str:
-        j = json.dumps(data).replace('"', '\\"')
+        j = json.dumps(data) #.replace('"', '\\"')
         return f'{cmd} {args.join_tokens} {j}'
 
     def _run_cmd(self, f: Callable[..., Either[Exception, str]], cmd: str) -> Either[Exception, str]:
