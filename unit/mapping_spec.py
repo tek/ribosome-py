@@ -3,7 +3,7 @@ from kallikrein.matchers import contain
 from kallikrein.matchers.start_with import start_with
 from kallikrein.matchers.maybe import be_just
 
-from amino import do, Do, __, Map, List, curried, Either, _, Dat
+from amino import do, Do, __, Map, List, _, Dat
 from amino.boolean import true
 from amino.lenses.lens import lens
 
@@ -15,10 +15,10 @@ from ribosome.test.config import default_config_name
 from ribosome.test.integration.default import ExternalSpec
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.plugin_state import PluginState
-from ribosome.dispatch.component import Component, Components, ComponentData
+from ribosome.dispatch.component import Component, ComponentData
 from ribosome.config.config import Config
-from ribosome.dispatch.mapping import Mappings, Mapping, mapmode, MapMode
-from ribosome.trans.handler import FreeTrans
+from ribosome.dispatch.mapping import Mappings, Mapping, mapmode
+from ribosome.trans.mapping import activate_mapping
 
 keys = 'gs'
 gs_mapping = Mapping.cons('gs', true, List(mapmode.Normal(), mapmode.Visual()))
@@ -32,25 +32,6 @@ class CData(Dat['CData']):
 
     def __init__(self, a: int) -> None:
         self.a = a
-
-
-def mapping_handler(mapping: Mapping, components: Components) -> Either[str, FreeTrans]:
-    return components.all.find_map(__.mappings.lift(mapping)).to_either(f'no handler for {mapping}')
-
-
-def mapping_cmd(plugin: str, mapping: Mapping, mode: MapMode) -> NvimIO[None]:
-    buf = '<buffer>' if mapping.buffer else ''
-    return NvimIO.cmd(
-        f'''{mode.mnemonic}map {buf} {mapping.keys} :call {plugin}Map('{mapping.uuid}', '{mapping.keys}')'''
-    )
-
-
-@do(NS[PluginState, None])
-def activate_mapping(mapping: Mapping) -> Do:
-    handler = yield NS.inspect_either(curried(mapping_handler)(mapping)).zoom(lens.components)
-    yield NS.modify(__.append.active_mappings((mapping.uuid, handler)))
-    plugin = yield NS.inspect(_.camelcase_name)
-    yield NS.lift(mapping.modes.traverse(curried(mapping_cmd)(plugin, mapping), NvimIO))
 
 
 @trans.free.unit(trans.st)
