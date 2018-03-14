@@ -74,8 +74,9 @@ class mapmode:
 class Mapping(Dat['Mapping']):
 
     @staticmethod
-    def cons(keys: str, buffer: bool=False, modes: List[MapMode]=Nil, uuid: UUID=None) -> 'Mapping':
-        return Mapping(keys, Boolean(buffer), modes, uuid or uuid4())
+    def cons(keys: str, buffer: bool=False, modes: List[MapMode]=None, uuid: UUID=None) -> 'Mapping':
+        modes1 = List(mapmode.Normal()) if modes is None else modes
+        return Mapping(keys, Boolean(buffer), modes1, uuid or uuid4())
 
     def __init__(self, keys: str, buffer: Boolean, modes: List[MapMode], uuid: UUID) -> None:
         self.keys = keys
