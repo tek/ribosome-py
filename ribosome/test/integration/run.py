@@ -15,24 +15,27 @@ from ribosome.host import init_state, dispatch_job
 from ribosome.dispatch.execute import (sync_runner, async_runner, sync_sender, run_dispatch, Res, execute_async_loop,
                                        async_sender, dispatch_state)
 from ribosome.nvim.io import NvimIOState, NS
-from ribosome.config.config import Config
+from ribosome.config.config import Config, Resources
 from ribosome.trans.run import TransComplete
 from ribosome.config.settings import Settings
+from ribosome.dispatch.component import ComponentData
 
+C = TypeVar('C')
 D = TypeVar('D')
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
+IOExec = Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]
 
 
 class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
 
     @staticmethod
     def create(
-            config: Config,
+            config: Config[S, D, CC],
             *comps: str,
             vars: dict=dict(),
             cons_vim: Callable[[dict], NvimFacade],
-            io_executor: Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]=None,
+            io_executor: IOExec=None,
     ) -> 'DispatchHelper':
         comps_var = (f'{config.name}_components', Lists.wrap(comps))
         vim = cons_vim(assoc(vars, *comps_var))
@@ -46,7 +49,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
             vim: NvimFacade,
             *comps: str,
             vars: dict=dict(),
-            io_executor: Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]=None,
+            io_executor: IOExec=None,
     ) -> 'DispatchHelper':
         def cons_vim(vars: dict) -> NvimFacade:
             for k, v in vars.items():
@@ -75,6 +78,10 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
     @property
     def holder(self) -> PluginStateHolder[D]:
         return PluginStateHolder.strict(self.state)
+
+    @property
+    def settings(self) -> S:
+        return self.state.settings
 
     def dispatch_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[DispatchJob, Dispatch]:
         job = dispatch_job(self.holder, name, (args,), sync)
@@ -116,5 +123,17 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
     def update_component(self, name: str, **kw: Any) -> 'DispatchHelper[S, D, CC]':
         return self.mod.state(__.modify_component_data(name, __.copy(**kw)))
 
+    def component_res(self, data: C) -> Resources[S, C, CC]:
+        return self.state.resources_with(ComponentData(self.state.data, data))
 
-__all__ = ('DispatchHelper',)
+
+def dispatch_helper(
+        config: Config[S, D, CC],
+        *comps: str,
+        vars: dict=dict(),
+        io_executor: IOExec=None,
+) -> NvimIO[DispatchHelper[S, D, CC]]:
+    return NvimIO.delay(lambda v: DispatchHelper.nvim(config, v, *comps, vars=vars, io_executor=io_executor))
+
+
+__all__ = ('DispatchHelper', 'dispatch_helper')
