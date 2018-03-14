@@ -8,7 +8,7 @@ from subprocess import PIPE, Popen
 import asyncio
 from asyncio.subprocess import PIPE as APIPE
 
-from amino import Map, Future, __, Boolean, _, L, List, Maybe, IO, Lists, do
+from amino import Map, Future, __, Boolean, _, L, List, Maybe, IO, Lists, do, Either
 from amino.lazy import lazy
 from amino.either import Right, Left
 from amino.util.string import ToStr
@@ -251,11 +251,17 @@ class Subprocess(Generic[A], Dat['Subprocess']):
     @staticmethod
     @do(IO[Tuple[int, List[str], List[str]]])
     def popen(*args: str, timeout: float=None, stdin: int=PIPE, stdout: int=PIPE, stderr: int=PIPE, env: dict=dict(),
-              universal_newlines=True, **kw) -> Do:
+              universal_newlines=True, **kw: Any) -> Do:
         pop = yield IO.delay(Popen, args, stdin=stdin, stdout=stdout, stderr=stderr, env=env,
                              universal_newlines=universal_newlines, **kw)
         out, err = yield IO.delay(pop.communicate, timeout=timeout)
-        yield IO.pure((-1 if pop.returncode is None else pop.returncode, Lists.lines(out), Lists.lines(err)))
+        out_lines = Lists.lines(out or '')
+        err_lines = Lists.lines(err or '')
+        yield IO.pure((-1 if pop.returncode is None else pop.returncode, out_lines, err_lines))
+
+    @staticmethod
+    def fatal(*a, **kw) -> IO[Either[str, Tuple[int, List[str], List[str]]]]:
+        ...
 
     def __init__(self, exe: Path, args: List[str], data: A) -> None:
         self.exe = exe
@@ -267,8 +273,8 @@ class Subprocess(Generic[A], Dat['Subprocess']):
         return tuple(self.args.cons(str(self.exe)))
 
     @do(IO[SubprocessResult[A]])
-    def execute(self, timeout: float) -> Do:
-        retval, out, err = yield Subprocess.popen(*self.args_tuple, timeout=timeout)
+    def execute(self, timeout: float, **kw: Any) -> Do:
+        retval, out, err = yield Subprocess.popen(*self.args_tuple, timeout=timeout, **kw)
         yield IO.pure(SubprocessResult(retval, out, err, self.data))
 
 __all__ = ('ProcessExecutor', 'Result', 'Job', 'NvimProcessExecutor', 'Subprocess')
