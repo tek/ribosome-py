@@ -6,16 +6,18 @@ from threading import Thread
 
 from msgpack import ExtType
 
-from amino.tc.base import ImplicitInstances, F, TypeClass, tc_prop
+from neovim.api import NvimError
+
+from amino.tc.base import ImplicitInstances, F, TypeClass, tc_prop, ImplicitsMeta
 from amino.lazy import lazy
 from amino.tc.monad import Monad
-from amino import Either, __, IO, Maybe, Left, Eval, List, Right, options, Nil, Do, Just
+from amino import Either, __, IO, Maybe, Left, Eval, List, Right, options, Nil, Do, Just, Try, Lists
 from amino.state import tcs, StateT, State, EitherState
 from amino.func import CallByName, tailrec
 from amino.do import do
-from amino.dat import ADT
+from amino.dat import ADT, ADTMeta
 from amino.io import IOExceptionBase
-from amino.util.trace import default_internal_packages, cframe
+from amino.util.trace import default_internal_packages, cframe, callsite_source
 
 from ribosome.nvim.components import NvimFacade
 
@@ -81,7 +83,15 @@ class NFatal(Generic[A], NResult[A]):
         return Left(self.exception)
 
 
-class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances'):
+class NvimIOMeta(ADTMeta):
+
+    @property
+    def unit(self) -> 'NvimIO':
+        return NvimIO.pure(None)
+
+
+class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.nvim.io', imp_cls='NvimIOInstances',
+             metaclass=NvimIOMeta):
     debug = options.io_debug.exists
 
     @staticmethod
@@ -93,8 +103,8 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
         return NvimIO.wrap_either(lambda v: e, frame)
 
     @staticmethod
-    def from_maybe(e: Maybe[A], error: CallByName) -> 'NvimIO[A]':
-        return NvimIO.from_either(e.to_either(error))
+    def from_maybe(e: Maybe[A], error: CallByName, frame: FrameSummary=None) -> 'NvimIO[A]':
+        return NvimIO.from_either(e.to_either(error), frame)
 
     @staticmethod
     def cmd_sync(cmdline: str, verbose=False) -> 'NvimIO[str]':
@@ -216,7 +226,10 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
         return self.either(vim).get_or_raise()
 
     def recover(self, f: Callable[[Exception], B]) -> 'NvimIO[B]':
-        return NvimIO.delay(self.attempt).map(__.value_or(f))
+        return NvimIO.delay(self.either).map(__.value_or(f))
+
+    def recover_with(self, f: Callable[[Exception], 'NvimIO[B]']) -> 'NvimIO[B]':
+        return NvimIO.delay(self.either).flat_map(__.map(NvimIO.pure).value_or(f))
 
     # FIXME use NResult
     @do('NvimIO[A]')
@@ -342,13 +355,24 @@ class NvimIOMonad(Monad[NvimIO]):
         return fa.flat_map(f)
 
 
-def request(name: str, *args: Any) -> NvimIO[A]:
-    return NvimIO.delay(__.vim._session.request(name, *args))
+def nvim_error_msg(exc: NvimError) -> str:
+    return Try(lambda: exc.args[0].decode()) | str(exc)
+
+
+def nvim_request(name: str, *args: Any) -> NvimIO[A]:
+    def wrap_error(error: NvimIOException) -> NvimIO[A]:
+        msg = nvim_error_msg(error.cause) if isinstance(error.cause, NvimError) else str(error.cause)
+        argsl = Lists.wrap(args)
+        return NvimIOError(f'error in nvim request `{name}({argsl.join_comma})`: {msg}')
+    return NvimIO.delay(__.vim._session.request(name, *args)).recover_with(wrap_error)
+
+
+request = nvim_request
 
 
 @do(NvimIO[A])
 def typechecked_request(name: str, tpe: Type[A], *args: Any) -> Do:
-    raw = yield request(name, *args)
+    raw = yield nvim_request(name, *args)
     yield (
         NvimIO.pure(raw)
         if isinstance(raw, tpe) else
@@ -385,6 +409,10 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
         return st.transform_f(NvimIOState, lambda s: NvimIO.pure(s.value))
 
     @staticmethod
+    def from_maybe(a: Maybe[A], err: CallByName) -> 'NvimIOState[S, A]':
+        return NvimIOState.lift(NvimIO.from_maybe(a, err))
+
+    @staticmethod
     def from_either(e: Either[str, A]) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO.from_either(e))
 
@@ -399,6 +427,11 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
     @staticmethod
     def error(e: str) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO.error(e))
+
+    @staticmethod
+    def inspect_maybe(f: Callable[[S], Either[str, A]], err: CallByName) -> 'NvimIOState[S, A]':
+        frame = cframe()
+        return NvimIOState.inspect_f(lambda s: NvimIO.from_maybe(f(s), err, frame))
 
     @staticmethod
     def inspect_either(f: Callable[[S], Either[str, A]]) -> 'NvimIOState[S, A]':
@@ -436,4 +469,4 @@ class EitherStateToNvimIOState(ToNvimIOState, tpe=EitherState):
         return NvimIOState.from_either_state(fa)
 
 
-__all__ = ('NvimIO', 'NvimIOState', 'NS')
+__all__ = ('NvimIO', 'NvimIOState', 'NS', 'nvim_request', 'typechecked_request', 'data_cons_request')
