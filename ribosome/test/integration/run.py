@@ -5,10 +5,10 @@ from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 
 from toolz import assoc
 
-from amino import Lists, Map, Just, List, __
+from amino import Lists, Map, Just, List, __, _
 from amino.dat import Dat
 from amino.lenses.lens import lens
-from ribosome.dispatch.run import DispatchJob
+from ribosome.dispatch.run import DispatchJob, DispatchState
 from ribosome.dispatch.data import Dispatch, DispatchResult, DIO
 from ribosome.test.spec import MockNvimFacade
 from ribosome.host import init_state, dispatch_job
@@ -101,7 +101,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
         s = self.sync_sender if sync else self.async_sender
         return s(name, args, sync)
 
-    def run(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[PluginState, DispatchResult]:
+    def run(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[DispatchState, DispatchResult]:
         send = self.sender(name, args, sync)
         return run_dispatch(send)
 
@@ -112,7 +112,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
 
     def run_s(self, name: str, args=(), sync: bool=True) -> NvimIO[Tuple[PluginState, DispatchResult]]:
         job, dispatch = self.dispatch_job(name, args, sync)
-        return self.run(name, args=args, sync=sync).run(dispatch_state(self.state, dispatch.aff))
+        return self.run(name, args=args, sync=sync).run_s(dispatch_state(self.state, dispatch.aff)) / _.state
 
     def unsafe_run(self, name: str, args=(), sync: bool=True) -> Tuple[PluginState, DispatchResult]:
         return self.run_s(name, args=args, sync=sync).unsafe(self.vim)

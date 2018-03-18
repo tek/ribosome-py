@@ -95,4 +95,5 @@ class ArgValidator(Dat['ArgValidator']):
     def either(self, args: tuple, desc: str, name: str) -> Either[str, None]:
         return self.validate(len(args)).e(L(self.error)(args, desc, name), None)
 
+
 __all__ = ('ArgValidator', 'ParamsSpec')
