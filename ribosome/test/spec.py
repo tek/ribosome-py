@@ -61,6 +61,12 @@ class MockBuffer(MockNvimComponent, Buffer):
     pass
 
 
+class MockSession:
+
+    def request(self, *a, **kw) -> None:
+        pass
+
+
 class MockNvim:
 
     def __init__(self, responses: Callable[[str], Any]) -> None:
@@ -86,6 +92,10 @@ class MockNvim:
 
     def log_request(self, line: str) -> None:
         self.request_log = self.request_log.cat(line)
+
+    @property
+    def _session(self) -> MockSession:
+        return MockSession()
 
 
 class MockNvimFacade(MockNvimComponent, NvimFacade):
