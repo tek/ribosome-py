@@ -26,6 +26,11 @@ class Setting(Generic[B], Logging, ToStr):
     def update(self, value: B) -> NvimIO[None]:
         ...
 
+    @do(NvimIO[None])
+    def ensure(self, value: B) -> Do:
+        value = yield self.value
+        yield value.cata(lambda e: self.update(value), lambda a: NvimIO.unit)
+
     @property
     def value_or_default(self) -> NvimIO[B]:
         @do(NvimIO[B])
