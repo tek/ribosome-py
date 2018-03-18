@@ -176,11 +176,20 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
             self.tmux_pane.cmd('kill-pane')
 
     def _nvim_facade(self, vim: Nvim) -> NvimFacade:
-        return NvimFacade(vim, self.plugin_prefix())
+        return NvimFacade(vim, self.plugin_name())
 
     @abc.abstractmethod
     def plugin_name(self) -> str:
         ...
+
+    def plugin_short_name(self) -> str:
+        return self.plugin_name()
+
+    def full_cmd_prefix(self) -> str:
+        return camelcase(self.plugin_name())
+
+    def short_cmd_prefix(self) -> str:
+        return camelcase(self.plugin_short_name())
 
     def teardown(self) -> None:
         IntegrationSpecBase.teardown(self)
@@ -218,7 +227,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return args.cons(cmd).join_tokens
 
     def _json_cmd(self, cmd: str, args: List[str], data: dict) -> str:
-        j = json.dumps(data) #.replace('"', '\\"')
+        j = json.dumps(data)
         return f'{cmd} {args.join_tokens} {j}'
 
     def _run_cmd(self, f: Callable[..., Either[Exception, str]], cmd: str) -> Either[Exception, str]:
@@ -244,22 +253,18 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return self.vim.buffer.content
 
     def message_log(self) -> Either[str, List[Message]]:
-        return self.vim.call(f'{self.plugin_name}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
+        return self.vim.call(f'{self.full_cmd_prefix()}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
 
     def trans_log(self) -> Either[str, List[Message]]:
-        return self.vim.call(f'{self.plugin_name}TransLog') // decode_json
+        return self.vim.call(f'{self.full_cmd_prefix()}TransLog') // decode_json
 
     @property
     def state(self) -> Any:
         def error(err: JsonError) -> None:
             self.log.error(f'{err.error}: {err.data}')
             raise err.exception
-        response = self.vim.call(f'{self.plugin_prefix()}State').get_or_raise()
+        response = self.vim.call(f'{self.full_cmd_prefix()}State').get_or_raise()
         return decode_json(response).value_or(error)
-
-    @abc.abstractmethod
-    def plugin_prefix(self) -> str:
-        ...
 
 
 def main_looped(fun):
@@ -356,11 +361,7 @@ class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
         super().setup()
 
     def module(self) -> str:
-        return self.plugin_prefix()
-
-    @property
-    def plugin_name(self) -> str:
-        return camelcase(self.plugin_prefix())
+        return self.plugin_name()
 
     @property
     def autostart_plugin(self) -> bool:
@@ -393,7 +394,8 @@ class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
         self.send_json(dump_json(msg).get_or_raise())
 
     def _pre_start(self) -> None:
-        self.pvar_becomes('started', True)
+        if self.autostart_plugin:
+            self.pvar_becomes('started', True)
 
 
 __all__ = ('VimIntegrationSpec', 'ExternalIntegrationSpec', 'AutoPluginIntegrationSpec')
