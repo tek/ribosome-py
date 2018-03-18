@@ -12,7 +12,7 @@ from ribosome.dispatch.run import DispatchJob
 from ribosome.dispatch.data import Dispatch, DispatchResult, DIO
 from ribosome.test.spec import MockNvimFacade
 from ribosome.host import init_state, dispatch_job
-from ribosome.dispatch.execute import (sync_runner, async_runner, sync_sender, run_dispatch, Res, execute_async_loop,
+from ribosome.dispatch.execute import (sync_runner, async_runner, SyncSender, run_dispatch, Res, execute_async_loop,
                                        async_sender, dispatch_state)
 from ribosome.nvim.io import NvimIOState, NS
 from ribosome.config.config import Config, Resources
@@ -91,7 +91,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
 
     def sync_sender(self, name: str, args: tuple=(), sync: bool=True) -> Callable[[], Res]:
         job, dispatch = self.dispatch_job(name, args, sync)
-        return sync_sender(Lists.wrap(args), dispatch, sync_runner)
+        return SyncSender(dispatch, Lists.wrap(args), sync_runner)
 
     def async_sender(self, name: str, args: tuple=(), sync: bool=True) -> Callable[[], Res]:
         job, dispatch = self.dispatch_job(name, args, sync)

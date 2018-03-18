@@ -18,7 +18,10 @@ B = TypeVar('B')
 
 
 class TransHandlerMeta(ADTMeta, ImplicitsMeta):
-    pass
+
+    @property
+    def id(self) -> 'FreeTrans':
+        return FreeTrans.cons(lambda a: a)
 
 
 class TransHandler(Generic[A], ADT['TransHandler[A]'], Implicits, auto=True, implicits=True, metaclass=TransHandlerMeta

@@ -3,9 +3,9 @@ from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
-from amino import _, __, Try, IO, Lists, Either, List, L, Nil
+from amino import _, __, Try, IO, Lists, Either, List, L, Nil, Dat
 from amino.do import do, Do
-from amino.dispatch import dispatch_alg
+from amino.dispatch import dispatch_alg, PatMat
 from amino.util.exception import format_exception
 from amino.io import IOException
 from amino.lenses.lens import lens
@@ -25,7 +25,6 @@ from ribosome.trans.queue import PrioQueue
 from ribosome.trans.message_base import Message
 from ribosome.dispatch.loop import process_message
 from ribosome.trans.send_message import send_message
-from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.trans.action import TransM, TransMCont, TransMBind, LogMessage, Info, Error, TransMPure
 from ribosome.trans.handler import FreeTrans
 from ribosome.config.settings import Settings
@@ -57,7 +56,7 @@ def gather_ios(ios: List[IO[A]], timeout: float) -> List[Either[IOException, A]]
         return Lists.wrap(completed).map(__.result(timeout=timeout))
 
 
-class ExecuteDispatchIO(Logging):
+class execute_io(PatMat, alg=DIO):
 
     def iodio(self, io: IODIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
         return NS.from_io(io.io)
@@ -65,7 +64,7 @@ class ExecuteDispatchIO(Logging):
     def gather_i_os_dio(self, io: GatherIOsDIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
         def gather() -> R:
             gio = io.io
-            return gio.handle_result(gather_ios(gio.ios, gio.timeout))
+            return gather_ios(gio.ios, gio.timeout)
         return NS.from_io(IO.delay(gather))
 
     def gather_subprocs_dio(self, io: GatherSubprocsDIO[A, TransComplete]) -> NS[PluginState[S, D, CC], TransComplete]:
@@ -73,14 +72,11 @@ class ExecuteDispatchIO(Logging):
         def gather() -> TransComplete:
             gio = io.io
             popens = gio.procs.map(__.execute(gio.timeout))
-            return gio.handle_result(gather_ios(popens, gio.timeout))
+            return gather_ios(popens, gio.timeout)
         return NS.from_io(IO.delay(gather))
 
     def nvim_iodio(self, io: NvimIODIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
         return NS.lift(io.io)
-
-
-execute_io = dispatch_alg(ExecuteDispatchIO(), DIO, '')
 
 
 @do(NS[DispatchState[S, D, CC], R])
@@ -139,10 +135,9 @@ class ExecuteDispatchOutput(Logging):
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_io(self, result: DispatchIO) -> Do:
         custom_executor = yield NS.inspect(_.state.dispatch_config.io_executor)
-        executor = custom_executor | (lambda: execute_io)
-        inner = yield executor(result.io)
-        result = yield validate_trans_complete(TransComplete('io', inner))
-        yield normalize_output(result)
+        executor = custom_executor | (lambda: execute_io.match)
+        io_result = yield executor(result.io)
+        yield run_trans_m(result.io.handle_result(io_result).m)
 
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_output_aggregate(self, result: DispatchOutputAggregate) -> Do:
@@ -155,7 +150,7 @@ class ExecuteDispatchOutput(Logging):
 
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_log(self, result: DispatchLog) -> Do:
-        custom_logger = yield NS.inspect(_.logger)
+        custom_logger = yield NS.inspect(_.state.logger)
         logger = custom_logger | (lambda: dispatch_log)
         yield logger(result.trans)
 
@@ -170,18 +165,18 @@ def normalize_output(result: DispatchResult) -> Do:
 
 
 @do(NS[DispatchState[S, D, CC], R])
-def run_dispatch(action: Callable[[], NS[DispatchState[S, D, CC], B]]) -> Do:
+def run_dispatch(action: Callable[[], NS[DispatchState[S, D, CC], DispatchResult]]) -> Do:
     result = yield action()
     yield normalize_output(result)
 
 
 def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[DispatchState, R]]], desc: str) -> NvimIO[R]:
     yield holder.acquire()
-    ribo_log.debug(f'exclusive: {desc}')
+    ribo_log.debug2(f'exclusive: {desc}')
     state, response = yield f().error_effect_f(holder.release)
     yield NvimIO.delay(lambda v: holder.update(state.state))
     yield holder.release()
-    ribo_log.debug(f'release: {desc}')
+    ribo_log.debug2(f'release: {desc}')
     yield NvimIO.pure(response)
 
 
@@ -217,10 +212,15 @@ sync_runner = DispatchRunner.cons(RunDispatchSync, DispatchSync)
 async_runner = DispatchRunner.cons(RunDispatchAsync, DispatchAsync)
 
 
-def sync_sender(args: List[Any], ad: AffiliatedDispatch[DP], runner: DispatchRunner[RDP]) -> Callable[[], Res]:
-    def send() -> Res:
-        return runner(args)(ad.dispatch, ad.aff)
-    return send
+class SyncSender(Dat['SyncSender']):
+
+    def __init__(self, ad: AffiliatedDispatch[DP], args: List[Any], runner: DispatchRunner[RDP]) -> None:
+        self.ad = ad
+        self.args = args
+        self.runner = runner
+
+    def __call__(self) -> Res:
+        return self.runner(self.args)(self.ad.dispatch, self.ad.aff)
 
 
 def async_sender(args: List[Any],
@@ -240,7 +240,7 @@ def execute(state: PluginStateHolder[D],
             args: List[Any],
             dispatch: AffiliatedDispatch[DP],
             runner: DispatchRunner[RDP]) -> NvimIO[Any]:
-    return exclusive_dispatch(state, sync_sender(args, dispatch, runner), dispatch.desc, dispatch.aff)
+    return exclusive_dispatch(state, SyncSender(dispatch, args, runner), dispatch.desc, dispatch.aff)
 
 
 def run_forked_job(vim: NvimFacade, f: Callable[[], NvimIO[None]], job: DispatchJob) -> None:
@@ -299,8 +299,11 @@ def request_result(job: DispatchJob, result: NResult) -> int:
     return handler(result)
 
 
-def resend_send() -> NS[DispatchState[S, D, CC], Tuple[PrioQueue[Message], DispatchResult]]:
-    return NS.inspect(lambda state: process_message(state.state.messages, send_message))
+@do(NS[DispatchState[S, D, CC], Tuple[PrioQueue[Message], DispatchResult]])
+def resend_send() -> Do:
+    msgs, send = yield NS.inspect(lambda state: process_message(state.state.messages, send_message))
+    yield NS.modify(lens.state.messages.set(msgs))
+    yield send.zoom(lens.state)
 
 
 @do(NS[PluginState[S, D, CC], DispatchResult])

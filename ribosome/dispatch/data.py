@@ -1,3 +1,4 @@
+import abc
 from typing import TypeVar, Union, Any, Generic, Type
 
 from amino import List, Boolean, Nil, Maybe, Just, Nothing, IO, Either, Right, Left
@@ -12,6 +13,7 @@ from ribosome.nvim.io import NvimIOState
 from ribosome.trans.message_base import Message
 from ribosome.trans.effects import GatherIOs, GatherSubprocs
 from ribosome.trans.action import TransDo, TransLog
+from ribosome.trans.handler import FreeTrans
 
 B = TypeVar('B')
 Meth = TypeVar('Meth', bound=RpcMethod)
@@ -157,11 +159,19 @@ class DIO(Generic[I], ADT['DIO[I]'], base=True):
             Left(f'invalid type for DIO: {io}')
         )
 
+    @abc.abstractproperty
+    def handle_result(self) -> FreeTrans:
+        ...
+
 
 class IODIO(Generic[A], DIO[IO[A]]):
 
     def __init__(self, io: IO[A]) -> None:
         self.io = io
+
+    @property
+    def handle_result(self) -> FreeTrans:
+        return FreeTrans.id
 
 
 class GatherIOsDIO(Generic[A], DIO[GatherIOs[A]]):
@@ -169,17 +179,29 @@ class GatherIOsDIO(Generic[A], DIO[GatherIOs[A]]):
     def __init__(self, io: GatherIOs[A]) -> None:
         self.io = io
 
+    @property
+    def handle_result(self) -> FreeTrans:
+        return self.io.handle_result
+
 
 class GatherSubprocsDIO(Generic[A, R], DIO[GatherSubprocs[A, R]]):
 
     def __init__(self, io: GatherSubprocs[A, R]) -> None:
         self.io = io
 
+    @property
+    def handle_result(self) -> FreeTrans:
+        return self.io.handle_result
+
 
 class NvimIODIO(Generic[A], DIO[NvimIO[A]]):
 
     def __init__(self, io: NvimIO[A]) -> None:
         self.io = io
+
+    @property
+    def handle_result(self) -> FreeTrans:
+        return FreeTrans.id
 
 
 class DispatchIO(Generic[I], DispatchOutput):

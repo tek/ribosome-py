@@ -15,6 +15,7 @@ from ribosome.process import Subprocess, SubprocessResult
 from ribosome.trans.effect import TransEffect
 from ribosome.trans.run import cont, lift
 from ribosome.trans.step import TransStep, TransEffectError, Lift, Strict
+from ribosome.trans.handler import FreeTrans
 
 D = TypeVar('D')
 A = TypeVar('A')
@@ -85,8 +86,7 @@ class TransEffectIO(Generic[R], TransEffect[IO[R]]):
 
 class GatherIOs(Generic[A], Dat['GatherIOs'], Implicits, implicits=True, auto=True):
 
-    def __init__(self, ios: List[IO[A]], handle_result: Callable[[List[A]], TransAction], timeout: float=None
-                 ) -> None:
+    def __init__(self, ios: List[IO[A]], handle_result: FreeTrans, timeout: float=None) -> None:
         self.ios = ios
         self.handle_result = handle_result
         self.timeout = timeout
@@ -105,17 +105,12 @@ class TransEffectGatherIOs(TransEffect[GatherIOs]):
         return GatherIOs
 
     def extract(self, data: GatherIOs, tail: List[TransEffect], in_state: bool) -> TransStep:
-        def handle_result(a: List[A]) -> TransAction:
-            handled = data.handle_result(a)
-            result = cont(tail, False, lambda f: f(handled)) | handled
-            return lift.match(result, in_state)
-        return Lift(TransIO(data.copy(handle_result=handle_result)))
+        return Lift(TransIO(data))
 
 
 class GatherSubprocs(Generic[A, R], Dat['GatherSubprocs'], Implicits, implicits=True, auto=True):
 
-    def __init__(self, procs: List[Subprocess[A]], handle_result: Callable[[SubprocessResult[A]], R],
-                 timeout: float=None) -> None:
+    def __init__(self, procs: List[Subprocess[A]], handle_result: FreeTrans, timeout: float=None) -> None:
         self.procs = procs
         self.handle_result = handle_result
         self.timeout = timeout
@@ -128,11 +123,7 @@ class TransEffectGatherSubprocs(TransEffect[GatherSubprocs]):
         return GatherSubprocs
 
     def extract(self, data: GatherSubprocs, tail: List[TransEffect], in_state: bool) -> TransStep:
-        def handle_result(a: List[A]) -> TransAction:
-            handled = data.handle_result(a)
-            result = cont(tail, False, lambda f: f(handled)) | handled
-            return lift.match(result, in_state)
-        return Lift(TransIO(data.copy(handle_result=handle_result)))
+        return Lift(TransIO(data))
 
 
 class TransEffectNvimIO(Generic[R], TransEffect[NvimIO[R]]):
