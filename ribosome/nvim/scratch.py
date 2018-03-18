@@ -82,7 +82,7 @@ class CreateScratchBufferOptions(Dat['CreateScratchOptions']):
 
 @do(NvimIO[ScratchBuffer])
 def create_scratch_buffer(options: CreateScratchBufferOptions) -> Do:
-    ui = yield create_scratch_ui(options.tab | false, options.vertical | true)
+    ui = yield create_scratch_ui(options.tab | false, options.vertical | false)
     buffer = yield setup_scratch_buffer(ui)
     return ScratchBuffer(buffer, ui)
 
