@@ -74,7 +74,7 @@ def init_state(dispatch_config: DispatchConfig) -> Do:
 def run_session(session: Session, dispatch_config: DispatchConfig) -> Do:
     state = yield init_state(dispatch_config)
     holder = PluginStateHolder.concurrent(state)
-    ribo_log.debug(f'running session with state {state}')
+    ribo_log.debug(f'running session')
     yield NvimIO.delay(__.vars.set_p('started', True))
     yield NvimIO.delay(
         lambda vim:
@@ -119,7 +119,7 @@ def nvim_log() -> Logger:
 
 
 def start_config_stage_2(config: Config) -> int:
-    amino_log.debug(f'starting plugin from {config}')
+    amino_log.debug(f'starting plugin from {config.name}')
     return start_host(config.name, DispatchConfig.cons(config))
 
 

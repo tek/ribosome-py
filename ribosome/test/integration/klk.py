@@ -151,8 +151,7 @@ D = TypeVar('D')
 S = TypeVar('S', bound=Settings)
 
 
-class AutoPluginIntegrationKlkSpec(Generic[S, D], AutoPluginIntegrationSpec[S, D],
-                                   VimIntegrationKlkHelpers):
+class AutoPluginIntegrationKlkSpec(Generic[S, D], AutoPluginIntegrationSpec[S, D], VimIntegrationKlkHelpers):
     pass
 
 __all__ = ('VimIntegrationKlkHelpers', 'VimIntegrationKlkSpec', 'ExternalIntegrationKlkSpec',

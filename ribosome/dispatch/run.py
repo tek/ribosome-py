@@ -121,6 +121,7 @@ class affiliation_wrapper(PatMat, alg=DispatchAffiliation):
         return wrap, unwrap, store
 
 
+# FIXME also descend into `ComponentData`
 def handler_has_state(handler: FreeTrans, tpe: type) -> Boolean:
     return handler.params_spec.state_type.exists(L(issubclass)(_, tpe))
 
@@ -151,6 +152,7 @@ class ResourcesWrapping(Generic[S, C, CC, A], ADT['ResourcesWrapped[S, C, CC]'])
 
     def __init__(self, data: A) -> None:
         self.data = data
+
 
 class ResourcesWrapped(Generic[S, C, CC, A], ResourcesWrapping[S, C, CC, Resources[S, C, CC]]):
     pass

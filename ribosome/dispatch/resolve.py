@@ -24,7 +24,7 @@ class ComponentResolver(Logging):
     def components(self) -> List[str]:
         additional = self.user_components | self.config.default_components
         components = self.config.core_components + additional
-        ribo_log.debug(f'starting {self.config} with components {components}')
+        ribo_log.debug(f'starting {self.config.name} with components {components}')
         return components
 
     def create_components(self, name: str) -> Either[str, List[Component]]:
