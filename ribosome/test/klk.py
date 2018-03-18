@@ -1,4 +1,4 @@
-from typing import TypeVar
+from typing import TypeVar, Callable, Any
 
 from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.nvim.io import NResult, NSuccess
@@ -15,8 +15,8 @@ from amino.boolean import false
 A = TypeVar('A')
 
 
-def kn(io: NvimIO[A], vim: NvimFacade) -> Expectable:
-    return kf(io.result, vim)
+def kn(vim: NvimFacade, f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> Expectable:
+    return kf(lambda: f(*a, **kw).result(vim))
 
 
 class PredContainNResult(PredContain, tpe=NResult):
