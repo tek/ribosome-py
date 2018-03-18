@@ -5,7 +5,6 @@ from msgpack import ExtType, unpackb
 from amino import Right, Left, Either, Dat, List, Lists, __, do, Do, Path, Maybe, Just, Nothing, Try
 
 from ribosome.nvim import NvimIO
-from ribosome import ribo_log
 from ribosome.nvim.io import nvim_request
 
 A = TypeVar('A')
@@ -27,7 +26,7 @@ def nvim_call_function(fun: str, *args: Any) -> NvimIO[Any]:
 
 
 def nvim_call_tpe(tpe: Type[A], fun: str, *args: Any) -> NvimIO[A]:
-    return NvimIO.read_cons('nvim_call_function', tpe, fun, args)
+    return NvimIO.read_tpe('nvim_call_function', tpe, fun, args)
 
 
 def nvim_call_cons(cons: Callable[[Any], Either[str, A]], fun: str, *args: Any) -> NvimIO[A]:
