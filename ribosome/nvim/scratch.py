@@ -101,4 +101,10 @@ def show_in_scratch_buffer(lines: List[str], options: CreateScratchBufferOptions
     return scratch
 
 
-__all__ = ('setup_scratch_buffer', 'CreateScratchBufferOptions', 'create_scratch_buffer', 'show_in_scratch_buffer')
+@do(NvimIO[ScratchBuffer])
+def show_in_scratch_buffer_default(lines: List[str]) -> Do:
+    yield show_in_scratch_buffer(lines, CreateScratchBufferOptions.cons())
+
+
+__all__ = ('setup_scratch_buffer', 'CreateScratchBufferOptions', 'create_scratch_buffer', 'show_in_scratch_buffer',
+           'show_in_scratch_buffer_default')
