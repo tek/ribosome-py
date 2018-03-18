@@ -16,7 +16,7 @@ class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
     append a directory to the plugin's `sys.path` $append_path
     '''
 
-    def plugin_prefix(self) -> str:
+    def plugin_name(self) -> str:
         return 'plug'
 
     def module(self) -> str:
@@ -32,5 +32,6 @@ class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
             kf(self.vim.call, 'TestPath').must(be_right(class_name)) &
             kf(self.vim.call, 'PlugShowPythonPath').must(be_right(contain(str(pp))))
         )
+
 
 __all__ = ('DefaultHandlerSpec',)

@@ -10,7 +10,7 @@ class SettingsSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
     update a setting $update
     '''
 
-    def plugin_prefix(self) -> str:
+    def plugin_name(self) -> str:
         return 'plug'
 
     def module(self) -> str:
@@ -25,5 +25,6 @@ class SettingsSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
         self.vim.cmd_once_defined('PlugCheck')
         self._wait(.5)
         return self.var_becomes('counter', 21)
+
 
 __all__ = ('SettingsSpec',)

@@ -18,7 +18,7 @@ class EnvelopeSpec(AutoPluginIntegrationKlkSpec):
     def module(self) -> str:
         return 'integration._support.envelope'
 
-    def plugin_prefix(self) -> str:
+    def plugin_name(self) -> str:
         return 'envl'
 
     @pending

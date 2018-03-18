@@ -12,7 +12,7 @@ class AutocmdSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
     execute handler when triggering an autocmd $autocmd
     '''
 
-    def plugin_prefix(self) -> str:
+    def plugin_name(self) -> str:
         return 'plug'
 
     def module(self) -> str:
@@ -28,5 +28,6 @@ class AutocmdSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
         self.cmd_sync('Msg1')
         self.vim.doautocmd('VimResized')
         return self.var_becomes('msg_cmd_success', val) & self.var_becomes('autocmd_success', val)
+
 
 __all__ = ('AutocmdSpec',)

@@ -194,40 +194,40 @@ class DispatchSpec(SpecBase):
 
     def trans_free(self) -> Expectation:
         helper = DispatchHelper.cons(config, 'p', 'q')
-        state, result = helper.unsafe_run('command:trfree', args=('x',))
-        return k(state.state.message_log) == List()
+        state = helper.unsafe_run_s('command:trfree', args=('x',))
+        return k(state.message_log) == List()
 
     def io(self) -> Expectation:
         helper = DispatchHelper.cons(config)
-        state, result = helper.unsafe_run('command:trio')
-        return k(state.state.messages.items.head / _[1] / _.message).must(be_just(m1))
+        state = helper.unsafe_run_s('command:trio')
+        return k(state.messages.items.head / _[1] / _.message).must(be_just(m1))
 
     @pending
     def multi_io(self) -> Expectation:
         helper = DispatchHelper.cons(config, 'p', 'q')
-        state, result = helper.unsafe_run('command:meh', sync=False)
-        return k(state.state.unwrapped_messages) == List(m1, M4())
+        state = helper.unsafe_run_s('command:meh', sync=False)
+        return k(state.unwrapped_messages) == List(m1, M4())
 
     def internal(self) -> Expectation:
         helper = DispatchHelper.cons(config)
         state, result = helper.unsafe_run('function:int')
-        return k(result) == state.state.name
+        return k(result) == state.name
 
     def data(self) -> Expectation:
         helper = DispatchHelper.cons(config)
-        state, result = helper.unsafe_run('function:dat')
-        return k(state.state.data.counter) == 23
+        state = helper.unsafe_run_s('function:dat')
+        return k(state.data.counter) == 23
 
     def json(self) -> Expectation:
         helper = DispatchHelper.cons(config)
         js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
-        state, result = helper.unsafe_run('command:json', args=(7, 'one', *Lists.split(js, ' ')))
+        result = helper.unsafe_run_a('command:json', args=(7, 'one', *Lists.split(js, ' ')))
         return k(result) == 9
 
     def autocmd(self) -> Expectation:
         helper = DispatchHelper.cons(config)
-        state, result = helper.unsafe_run('autocmd:vim_enter')
-        return k(state.state.data.counter) == 19
+        state = helper.unsafe_run_s('autocmd:vim_enter')
+        return k(state.data.counter) == 19
 
 
 __all__ = ('DispatchSpec',)

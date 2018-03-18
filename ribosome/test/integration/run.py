@@ -101,7 +101,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
         s = self.sync_sender if sync else self.async_sender
         return s(name, args, sync)
 
-    def run(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[DispatchState, DispatchResult]:
+    def run_dispatch(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[DispatchState, Any]:
         send = self.sender(name, args, sync)
         return run_dispatch(send)
 
@@ -110,12 +110,29 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
         ds = List(dispatch) if sync else dispatch
         return execute_async_loop(job, ds)
 
-    def run_s(self, name: str, args=(), sync: bool=True) -> NvimIO[Tuple[PluginState, DispatchResult]]:
+    def run(self, name: str, args=(), sync: bool=True) -> NvimIO[Tuple[PluginState, Any]]:
         job, dispatch = self.dispatch_job(name, args, sync)
-        return self.run(name, args=args, sync=sync).run_s(dispatch_state(self.state, dispatch.aff)) / _.state
+        return (
+            self
+            .run_dispatch(name, args=args, sync=sync)
+            .run(dispatch_state(self.state, dispatch.aff))
+            .map2(lambda s, a: (s.state, a))
+        )
 
-    def unsafe_run(self, name: str, args=(), sync: bool=True) -> Tuple[PluginState, DispatchResult]:
+    def run_s(self, name: str, args=(), sync: bool=True) -> NvimIO[PluginState]:
+        return self.run(name, args, sync).map2(lambda s, a: s)
+
+    def run_a(self, name: str, args=(), sync: bool=True) -> NvimIO[Any]:
+        return self.run(name, args, sync).map2(lambda s, a: a)
+
+    def unsafe_run(self, name: str, args=(), sync: bool=True) -> Tuple[PluginState, Any]:
+        return self.run(name, args=args, sync=sync).unsafe(self.vim)
+
+    def unsafe_run_s(self, name: str, args=(), sync: bool=True) -> PluginState:
         return self.run_s(name, args=args, sync=sync).unsafe(self.vim)
+
+    def unsafe_run_a(self, name: str, args=(), sync: bool=True) -> Any:
+        return self.run_a(name, args=args, sync=sync).unsafe(self.vim)
 
     def update_data(self, **kw: Any) -> 'DispatchHelper[S, D, CC]':
         return lens.state.data.modify(__.copy(**kw))(self)

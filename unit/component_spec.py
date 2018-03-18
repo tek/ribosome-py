@@ -131,8 +131,8 @@ class ComponentSpec(SpecBase):
         s, r = helper.unsafe_run('function:switch', args=())
         return (
             (k(r) == 17) &
-            (k(s.state.data_by_name('core')).must(be_right(CoreData(-10)))) &
-            (k(s.state.data_by_name('extra')).must(be_right(ExtraData(20))))
+            (k(s.data_by_name('core')).must(be_right(CoreData(-10)))) &
+            (k(s.data_by_name('extra')).must(be_right(ExtraData(20))))
         )
 
 

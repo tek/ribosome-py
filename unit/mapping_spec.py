@@ -74,10 +74,10 @@ class MappingSpec(ExternalSpec):
         helper = DispatchHelper.nvim(config, self.vim, 'main')
         @do(NvimIO[None])
         def run() -> Do:
-            (s, a) = yield helper.run_s('function:setup_map', args=())
-            (s1, b) = yield helper.set.state(s.state).run_s('function:map', args=(str(gs_mapping.uuid), 'gs'))
+            s = yield helper.run_s('function:setup_map', args=())
+            s1 = yield helper.set.state(s).run_s('function:map', args=(str(gs_mapping.uuid), 'gs'))
             maps = yield NvimIO.delay(__.cmd_output('map <buffer>'))
-            return s1.state.component_data.lift('main'), maps
+            return s1.component_data.lift('main'), maps
         data, maps = run().unsafe(self.vim)
         return (
             k(maps).must(contain(start_with(f'x  {keys}')) & contain(start_with(f'n  {keys}'))) &

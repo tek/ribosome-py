@@ -165,7 +165,7 @@ def normalize_output(result: DispatchResult) -> Do:
 
 
 @do(NS[DispatchState[S, D, CC], R])
-def run_dispatch(action: Callable[[], NS[DispatchState[S, D, CC], DispatchResult]]) -> Do:
+def run_dispatch(action: Callable[[], NS[DispatchState[S, D, CC], R]]) -> Do:
     result = yield action()
     yield normalize_output(result)
 
