@@ -46,6 +46,10 @@ class ComponentData(Generic[D, CD], Dat['ComponentData[D, CD]']):
         self.comp = comp
 
 
+def comp_data() -> NS[ComponentData[D, CD], CD]:
+    return NS.inspect(_.comp)
+
+
 # FIXME reassignment
 CD = TypeVar('CD', bound=ComponentData)
 
