@@ -103,8 +103,16 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
         return NvimIO.wrap_either(lambda v: e, frame)
 
     @staticmethod
+    def e(e: Either[str, A], frame: FrameSummary=None) -> 'NvimIO[A]':
+        return NvimIO.from_either(e, frame)
+
+    @staticmethod
     def from_maybe(e: Maybe[A], error: CallByName, frame: FrameSummary=None) -> 'NvimIO[A]':
         return NvimIO.from_either(e.to_either(error), frame)
+
+    @staticmethod
+    def m(e: Maybe[A], error: CallByName, frame: FrameSummary=None) -> 'NvimIO[A]':
+        return NvimIO.from_maybe(e, error, frame)
 
     @staticmethod
     def cmd_sync(cmdline: str, verbose=False) -> 'NvimIO[str]':
