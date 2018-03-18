@@ -18,12 +18,14 @@ from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
 from ribosome.trans.messages import ShowLogInfo
 from ribosome.nvim.io import NS
-from ribosome.dispatch.component import Component
+from ribosome.dispatch.component import Component, ComponentData
 from ribosome.config.settings import Settings
 from ribosome.dispatch.update import update_rpc
 from ribosome.nvim import NvimIO
 from ribosome.trans.handler import FreeTrans
 from ribosome.trans.action import TransM
+from ribosome.config.config import NoData
+from ribosome import ribo_log
 
 D = TypeVar('D')
 S = TypeVar('S', bound=Settings)
@@ -36,10 +38,10 @@ def message_log() -> Do:
     yield EitherState.inspect_f(__.message_log.traverse(dump_json, Either))
 
 
-@trans.free.result(trans.st)
-@do(EitherState[PluginState[S, D, CC], str])
+@trans.free.result(trans.st, internal=true)
+@do(EitherState[ComponentData[PluginState[S, D, CC], NoData], str])
 def trans_log() -> Do:
-    yield EitherState.inspect_f(lambda s: dump_json(s.trans_log))
+    yield EitherState.inspect_f(lambda s: dump_json(s.main.trans_log))
 
 
 @trans.free.unit(trans.st)
@@ -48,14 +50,15 @@ def set_log_level(level: str) -> None:
     handler.setLevel(level)
 
 
-@trans.free.result(trans.st)
-def state_data() -> str:
-    return EitherState.inspect_f(lambda s: dump_json(s.data))
+@trans.free.result(trans.st, internal=true)
+@do(EitherState[ComponentData[PluginState[S, D, CC], NoData], str])
+def state_data() -> Do:
+    yield EitherState.inspect_f(lambda s: dump_json(s.main.data))
 
 
-@trans.free.result(trans.st)
-def rpc_handlers() -> EitherState[D, str]:
-    return EitherState.inspect_f(lambda s: dump_json(s.dispatch_config.distinct_specs))
+@trans.free.result(trans.st, internal=true)
+def rpc_handlers() -> EitherState[PluginState[S, D, CC], str]:
+    return EitherState.inspect_f(lambda s: dump_json(s.main.dispatch_config.distinct_specs))
 
 
 class PatchQuery(Dat['PatchQuery']):
@@ -174,7 +177,7 @@ set_log_level_handler = RequestHandler.trans_function(set_log_level)(prefix=Full
 show_log_info_handler = RequestHandler.msg_cmd(ShowLogInfo)(prefix=Full())
 update_state_handler = RequestHandler.trans_cmd(update_state)(json=true)
 update_component_state_handler = RequestHandler.trans_cmd(update_component_state)(json=true)
-state_handler = RequestHandler.trans_function(state_data)(name='state', sync=true)
+state_handler = RequestHandler.trans_function(state_data)(name='state', sync=true, prefix=Full())
 rpc_handlers_handler = RequestHandler.trans_function(rpc_handlers)(internal=true, sync=true, prefix=Full())
 poll_handler = RequestHandler.trans_cmd(poll)(prefix=Full())
 append_python_path_handler = RequestHandler.trans_function(append_python_path)(prefix=Full())
