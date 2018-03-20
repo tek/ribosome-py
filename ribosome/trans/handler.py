@@ -1,73 +1,96 @@
-import abc
-from typing import Callable, TypeVar, Type, Generic, Any
+from types import SimpleNamespace
+from typing import Callable, TypeVar, Generic, Any
 
-from amino import List, Boolean, Nil, ADT
+from amino import List, Boolean, Nil, ADT, Maybe, Either
 from amino.boolean import false, true
 from amino.tc.base import Implicits, ImplicitsMeta
 from amino.dat import ADTMeta
+from amino.func import CallByName, call_by_name
+from amino.tc.monad import Monad
 
 from ribosome.trans.effect import TransEffect
-from ribosome.trans.message_base import Message, default_prio
 from ribosome.request.args import ParamsSpec
 
-M = TypeVar('M', bound=Message)
 A = TypeVar('A')
 O = TypeVar('O')
 A = TypeVar('A')
 B = TypeVar('B')
 
 
-class TransHandlerMeta(ADTMeta, ImplicitsMeta):
+class TransMMeta(ADTMeta, ImplicitsMeta):
+
+    def __new__(cls, name: str, bases: List[type], namespace: SimpleNamespace, **kw: Any) -> None:
+        return super().__new__(cls, name, bases, namespace, **kw)
+
+    @property
+    def unit(self) -> 'Trans':
+        return Trans.pure(None)
 
     @property
     def id(self) -> 'FreeTrans':
-        return FreeTrans.cons(lambda a: a)
+        return TransF.cons(lambda a: a)
 
 
-class TransHandler(Generic[A], ADT['TransHandler[A]'], Implicits, auto=True, implicits=True, metaclass=TransHandlerMeta
-                   ):
-
-    @abc.abstractmethod
-    def __call__(self, *args: Any) -> 'TransHandler[A]':
-        ...
-
-
-class MessageTrans(Generic[A, M], TransHandler[A]):
+class Trans(Generic[A], ADT['Trans'], Implicits, implicits=True, auto=True, base=True, metaclass=TransMMeta):
 
     @staticmethod
-    def create(fun: Callable[[M], A], msg: Type[M], effects: List[TransEffect], prio: float) -> 'TransHandler[A]':
-        name = fun.__name__
-        return MessageTrans(name, fun, msg, effects, prio)
+    def from_maybe(fa: Maybe[A], error: CallByName) -> 'Trans[A]':
+        return fa / Trans.cont | (lambda: Trans.error(error))
 
-    def __init__(self, name: str, fun: Callable[[M], A], message: Type[M], effects: List[TransEffect], prio: float
-                 ) -> None:
-        self.name = name
-        self.message = message
-        self.fun = fun
-        self.prio = prio
-        self.effects = effects
+    @staticmethod
+    def from_either(fa: Either[str, A]) -> 'Trans[A]':
+        return fa.cata(Trans.error, Trans.pure)
 
-    def __call__(self, *args: Any) -> TransHandler[A]:
-        return self
+    @staticmethod
+    def pure(a: A) -> 'Trans[A]':
+        return TransMPure(a)
 
-    @property
-    def params_spec(self) -> ParamsSpec:
-        return ParamsSpec.from_type(self.message)
+    @staticmethod
+    def error(error: CallByName) -> 'Trans[A]':
+        return TransMError(call_by_name(error))
 
 
-class FreeTrans(Generic[A], TransHandler[A]):
+class TransMBind(Generic[A], Trans[A]):
+
+    def __init__(self, fa: Trans[A], f: Callable[[A], Trans[B]]) -> None:
+        super().__init__()
+        self.fa = fa
+        self.f = f
+
+
+class TransMPure(Generic[A], Trans[A]):
+
+    def __init__(self, value: A) -> None:
+        self.value = value
+
+
+class TransMError(Generic[A], Trans[A]):
+
+    def __init__(self, error: str) -> None:
+        self.error = error
+
+
+class Monad_TransM(Monad, tpe=Trans):
+
+    def pure(self, a: A) -> Trans[A]:
+        return Trans.pure(a)
+
+    def flat_map(self, fa: Trans, f: Callable[[A], Trans[B]]) -> None:
+        return TransMBind(fa, f)
+
+
+class TransF(Generic[A], Trans[A]):
 
     @staticmethod
     def cons(
             fun: Callable[..., A],
             effects: List[TransEffect]=Nil,
-            prio: float=default_prio,
             resources: Boolean=false,
             internal: Boolean=false,
             component: Boolean=true,
-    ) -> 'FreeTrans':
+    ) -> 'TransF':
         name = fun.__name__
-        return FreeTrans(name, fun, (), effects, prio, resources, internal, component, ParamsSpec.from_function(fun))
+        return TransF(name, fun, (), effects, resources, internal, component, ParamsSpec.from_function(fun))
 
     create = cons
 
@@ -77,7 +100,6 @@ class FreeTrans(Generic[A], TransHandler[A]):
             fun: Callable[..., A],
             args: tuple,
             effects: List[TransEffect],
-            prio: float,
             resources: Boolean,
             internal: Boolean,
             component: Boolean,
@@ -87,14 +109,13 @@ class FreeTrans(Generic[A], TransHandler[A]):
         self.fun = fun
         self.args = args
         self.effects = effects
-        self.prio = prio
         self.resources = resources
         self.internal = internal
         self.component = component
         self.params_spec = params_spec
 
-    def __call__(self, *args: Any) -> 'FreeTrans':
+    def __call__(self, *args: Any) -> 'TransF':
         return self.copy(args=args)
 
 
-__all__ = ('MessageTrans', 'FreeTrans')
+__all__ = ('Trans', 'TransF')

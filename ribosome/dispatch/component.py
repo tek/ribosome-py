@@ -1,42 +1,20 @@
 from typing import TypeVar, Callable, Generic, Any, Type
 
-import toolz
-
-from amino import Map, List, Either, _, Nil, Maybe, Boolean, __
+from amino import List, Either, _, Nil, Maybe, Boolean, __
 from amino.dat import Dat
-from amino.func import flip
 
 from ribosome.nvim.io import NS
-from ribosome.dispatch.data import DispatchResult
-from ribosome.trans.handler import TransHandler, FreeTrans
+from ribosome.trans.handler import TransF
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.dispatch.mapping import Mappings
 
 D = TypeVar('D')
-CD = TypeVar('CD')
 CC = TypeVar('CC')
-TransState = NS[D, DispatchResult]
+CD = TypeVar('CD')
 
 
 class NoComponentData(Dat['NoComponentData']):
     pass
-
-
-class Handlers(Dat['Handlers']):
-
-    def __init__(self, prio: int, handlers: Map[type, TransHandler]) -> None:
-        self.prio = prio
-        self.handlers = handlers
-
-    def handler(self, msg):
-        return self.handlers.get(type(msg))
-
-
-def message_handlers(handlers: List[TransHandler]) -> Map[float, Handlers]:
-    def create(prio, h):
-        h = List.wrap(h).apzip(_.message).map2(flip)
-        return prio, Handlers(prio, Map(h))
-    return Map(toolz.groupby(_.prio, handlers)).map(create)
 
 
 class ComponentData(Generic[D, CD], Dat['ComponentData[D, CD]']):
@@ -50,26 +28,19 @@ def comp_data() -> NS[ComponentData[D, CD], CD]:
     return NS.inspect(_.comp)
 
 
-# FIXME reassignment
-CD = TypeVar('CD', bound=ComponentData)
-
-
 class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
 
     @staticmethod
     def cons(
             name: str,
             request_handlers: List[RequestHandler]=Nil,
-            handlers: List[TransHandler]=Nil,
             state_ctor: Callable[[], CD]=None,
             config: CC=None,
             mappings: Mappings=None,
     ) -> 'Component[D, CD, CC]':
-        hs = message_handlers(handlers)
         return Component(
             name,
             RequestHandlers.cons(*request_handlers),
-            hs,
             state_ctor or NoComponentData,
             Maybe.check(config),
             mappings or Mappings.cons(),
@@ -79,22 +50,20 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
             self,
             name: str,
             request_handlers: RequestHandlers,
-            handlers: Map[float, Handlers],
             state_ctor: Maybe[Callable[[D], CD]],
             config: Maybe[CC],
             mappings: Mappings,
     ) -> None:
         self.name = name
         self.request_handlers = request_handlers
-        self.handlers = handlers
         self.state_ctor = state_ctor
         self.config = config
         self.mappings = mappings
 
-    def handler_by_name(self, name: str) -> Either[str, TransHandler]:
+    def handler_by_name(self, name: str) -> Either[str, TransF]:
         return self.handlers.find(_.name == name).to_either(f'component `{self.name}` has no handler `name`')
 
-    def contains(self, handler: FreeTrans) -> Boolean:
+    def contains(self, handler: TransF) -> Boolean:
         return self.request_handlers.trans_handlers.exists(_.fun == handler.fun)
 
 
@@ -122,7 +91,7 @@ class Components(Generic[D, CC], Dat['Components']):
     def config(self) -> List[CC]:
         return self.all.collect(_.config)
 
-    def for_handler(self, handler: FreeTrans) -> Maybe[Component]:
+    def for_handler(self, handler: TransF) -> Maybe[Component]:
         return self.all.find(__.contains(handler))
 
 

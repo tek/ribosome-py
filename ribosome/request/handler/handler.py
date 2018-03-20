@@ -1,25 +1,22 @@
-from typing import Callable, Type, Generic, Any, TypeVar, Tuple
+from typing import Callable, Type, Generic, Any, TypeVar
 
-from amino import List, Lists, Map, _, Boolean, __, Maybe, Nothing
+from amino import List, Lists, Map, _, Boolean, __
 from amino.func import flip
 from amino.util.string import ToStr, camelcase
 from amino.dat import ADT
 from amino.boolean import false
-from amino.state import StateT
 
 from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.logging import Logging
-from ribosome.request.handler.dispatcher import RequestDispatcher, MsgDispatcher, TransDispatcher
+from ribosome.request.handler.dispatcher import RequestDispatcher, TransDispatcher
 from ribosome.request.handler.prefix import PrefixStyle, Short
 from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod, AutocmdMethod
-from ribosome.trans.message_base import Message
 from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
 from ribosome.request.args import ParamsSpec
-from ribosome.trans.handler import FreeTrans
+from ribosome.trans.handler import TransF
 
 B = TypeVar('B')
 D = TypeVar('D')
-M = TypeVar('M', bound=Message)
 RHS = TypeVar('RHS', bound=RpcHandlerSpec)
 DP = TypeVar('DP', bound=RequestDispatcher)
 Meth = TypeVar('Meth', bound=RpcMethod)
@@ -44,22 +41,6 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
         self.sync = sync
         self.json = json
         self.extra_options = extra_options
-
-    @staticmethod
-    def msg_cmd(msg: Type[M]) -> 'RequestHandlerBuilder':
-        return RequestHandlerBuilder(CmdMethod(), MsgDispatcher(msg))
-
-    @staticmethod
-    def msg_fun(msg: Type[M]) -> 'RequestHandlerBuilder':
-        return RequestHandlerBuilder(FunctionMethod(), MsgDispatcher(msg))
-
-    @staticmethod
-    def msg_function(msg: Type[M]) -> 'RequestHandlerBuilder':
-        return RequestHandlerBuilder(FunctionMethod(), MsgDispatcher(msg))
-
-    @staticmethod
-    def msg_autocmd(msg: Type[M]) -> 'RequestHandlerBuilder':
-        return RequestHandlerBuilder(AutocmdMethod(), MsgDispatcher(msg))
 
     @staticmethod
     def trans_cmd(func: Callable[..., B]) -> 'RequestHandlerBuilder':
@@ -100,10 +81,6 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
     def parser(self, params_spec: ParamsSpec) -> ArgParser:
         tpe = JsonArgParser if self.json else TokenArgParser
         return tpe(params_spec)
-
-    @property
-    def msg(self) -> Boolean:
-        return self.dispatcher.is_msg
 
 
 class RequestHandlerBuilder(Generic[Meth, DP]):
@@ -153,7 +130,7 @@ class RequestHandlers(ToStr):
         return self.handlers.v / __.spec(name, prefix)
 
     @property
-    def trans_handlers(self) -> List[FreeTrans]:
+    def trans_handlers(self) -> List[TransF]:
         return (
             self.handlers
             .v

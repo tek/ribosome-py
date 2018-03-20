@@ -1,20 +1,16 @@
-import abc
 from typing import Callable, TypeVar
 
 from ribosome.trans.effect import TransEffect
 from ribosome.trans.step import TransStep, Lift, Strict, TransEffectError
-from ribosome.trans.action import TransAction, Transit, TransFailure, TransM, TransMCont
-from ribosome.trans.message_base import Message
+from ribosome.trans.action import TransAction, Transit, TransFailure
 from ribosome.request.args import ArgValidator
-from ribosome.trans.handler import MessageTrans, FreeTrans, TransHandler
+from ribosome.trans.handler import TransF
 
 from amino.dispatch import PatMat
 from amino import Dat, List, Maybe, L, _, Lists, Either
 from amino.string.hues import red
-from amino.tc.base import TypeClass, tc_prop
 
 A = TypeVar('A')
-M = TypeVar('M', bound=Message)
 R = TypeVar('R')
 O = TypeVar('O')
 
@@ -55,16 +51,12 @@ def extract(name: str, output: O, effects: List[TransEffect]) -> TransComplete:
     return TransComplete(name, lift.match(trans_result, False))
 
 
-def run_message_trans_handler(handler: MessageTrans[A, M], msg: M) -> TransComplete:
-    return extract(handler.name, handler.fun(msg), Lists.wrap(handler.effects))
-
-
-def execute_free_trans_handler(handler: FreeTrans[A]) -> Either[TransAction, O]:
+def execute_free_trans_handler(handler: TransF[A]) -> Either[TransAction, O]:
     val = ArgValidator(handler.params_spec)
     return val.either(handler.args, 'trans', handler.name).bimap(TransFailure, lambda a: handler.fun(*handler.args))
 
 
-def run_free_trans_handler(handler: FreeTrans[A]) -> TransComplete:
+def run_free_trans_handler(handler: TransF[A]) -> TransComplete:
     return (
         execute_free_trans_handler(handler)
         .cata(
@@ -72,20 +64,6 @@ def run_free_trans_handler(handler: FreeTrans[A]) -> TransComplete:
             L(extract)(handler.name, _, Lists.wrap(handler.effects)),
         )
     )
-
-
-class TransHandlerOps(TypeClass):
-
-    @abc.abstractmethod
-    def m(self, handler: TransHandler[A]) -> TransM:
-        ...
-
-
-class FreeTransHandlerOps(TransHandlerOps, tpe=FreeTrans):
-
-    @tc_prop
-    def m(self, handler: FreeTrans[A]) -> TransM:
-        return TransMCont(handler)
 
 
 __all__ = ('cont', 'lift', 'TransComplete', 'extract')

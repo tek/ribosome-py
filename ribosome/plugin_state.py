@@ -11,12 +11,10 @@ from amino import Map, List, Boolean, Nil, Either, _, Maybe, Nothing, Try, do, D
 from amino.dat import Dat, ADT
 from amino.util.string import camelcase
 
-from ribosome.trans.message_base import Message, Sendable, Envelope
 from ribosome.dispatch.component import Component, Components
-from ribosome.nvim.io import NvimIOState, NS
-from ribosome.dispatch.data import DispatchResult, DIO, Dispatch, DispatchSync, DispatchAsync
-from ribosome.trans.queue import PrioQueue
-from ribosome.trans.handler import FreeTrans
+from ribosome.nvim.io import NS
+from ribosome.dispatch.data import DIO, Dispatch, DispatchSync, DispatchAsync
+from ribosome.trans.handler import TransF
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
@@ -29,7 +27,6 @@ A = TypeVar('A')
 D = TypeVar('D')
 C = TypeVar('C')
 DP = TypeVar('DP', bound=Dispatch)
-TransState = NvimIOState[D, DispatchResult]
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
@@ -40,9 +37,16 @@ class DispatchAffiliation(ADT['DispatchAffiliation']):
     def is_component(self) -> Boolean:
         return Boolean.isinstance(self, ComponentDispatch)
 
+    @abc.abstractproperty
+    def name(self) -> str:
+        ...
+
 
 class RootDispatch(DispatchAffiliation):
-    pass
+
+    @property
+    def name(self) -> str:
+        return '<root>'
 
 
 class ComponentDispatch(DispatchAffiliation):
@@ -74,8 +78,7 @@ class AffiliatedDispatch(Generic[DP], Dat['AffiliatedDispatch[DP]']):
         return self.dispatch.desc
 
 
-Syncs = Map[str, AffiliatedDispatch[DispatchSync]]
-Asyncs = Map[str, List[AffiliatedDispatch[DispatchAsync]]]
+Dispatches = Map[str, List[AffiliatedDispatch[DispatchAsync]]]
 
 
 class DispatchConfig(Generic[S, D, CC], Dat['DispatchConfig']):
@@ -83,24 +86,21 @@ class DispatchConfig(Generic[S, D, CC], Dat['DispatchConfig']):
     @staticmethod
     def cons(
             config: Config[S, D, CC],
-            sync_dispatch: Syncs=Map(),
-            async_dispatch: Asyncs=Map(),
+            dispatches: Dispatches=Map(),
             io_executor: Callable[[DIO], NS['PluginState[S, D, CC]', TransComplete]]=None,
             rpc_handlers: List[DefinedHandler]=Nil,
     ) -> 'DispatchConfig':
-        return DispatchConfig(config, sync_dispatch, async_dispatch, Maybe.optional(io_executor), rpc_handlers)
+        return DispatchConfig(config, dispatches, Maybe.optional(io_executor), rpc_handlers)
 
     def __init__(
             self,
             config: 'ribosome.config.Config',
-            sync_dispatch: Map[str, DispatchSync],
-            async_dispatch: Map[str, List[DispatchAsync]],
+            dispatches: Dispatches,
             io_executor: Maybe[Callable[[DIO], NS['PluginState[S, D, CC]', TransComplete]]],
             rpc_handlers: List[DefinedHandler],
     ) -> None:
         self.config = config
-        self.sync_dispatch = sync_dispatch
-        self.async_dispatch = async_dispatch
+        self.dispatches = dispatches
         self.io_executor = io_executor
         self.rpc_handlers = rpc_handlers
 
@@ -114,7 +114,7 @@ class DispatchConfig(Generic[S, D, CC], Dat['DispatchConfig']):
 
     @property
     def dispatch(self) -> List[Dispatch]:
-        return self.sync_dispatch.v + self.async_dispatch.v.join
+        return self.dispatches.v.join
 
     @property
     def specs(self) -> List[RpcHandlerSpec]:
@@ -132,21 +132,17 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
             dispatch_config: DispatchConfig[S, D, CC],
             data: D,
             components: List[Component],
-            messages: PrioQueue[Message]=PrioQueue.empty,
-            message_log: List[Message]=Nil,
             trans_log: List[str]=Nil,
             log_handler: Maybe[logging.Handler]=Nothing,
             logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D, CC], None]']]=Nothing,
             component_data: Map[str, Any]=Map(),
-            active_mappings: Map[UUID, FreeTrans]=Map(),
+            active_mappings: Map[UUID, TransF]=Map(),
     ) -> 'PluginState':
         components = Components.cons(components, dispatch_config.config.component_config_type)
         return PluginState(
             dispatch_config,
             data,
             components,
-            messages,
-            message_log,
             trans_log,
             log_handler,
             logger,
@@ -159,48 +155,26 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
             dispatch_config: DispatchConfig[S, D, CC],
             data: D,
             components: Components,
-            messages: PrioQueue[Message],
-            message_log: List[Message],
             trans_log: List[str],
             log_handler: Maybe[logging.Handler],
             logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D, CC], None]']],
             component_data: Map[str, Any],
-            active_mappings: Map[UUID, FreeTrans],
+            active_mappings: Map[UUID, TransF],
     ) -> None:
         self.dispatch_config = dispatch_config
         self.data = data
         self.components = components
-        self.messages = messages
-        self.message_log = message_log
         self.trans_log = trans_log
         self.log_handler = log_handler
         self.logger = logger
         self.component_data = component_data
         self.active_mappings = active_mappings
 
-    def enqueue(self, messages: List[Sendable]) -> 'PluginState[S, D, CC]':
-        envelopes = messages / Envelope.from_sendable
-        return self.copy(messages=envelopes.fold_left(self.messages)(lambda q, m: q.put(m, m.prio)))
-
     def update(self, data: D) -> 'PluginState[S, D, CC]':
         return self.copy(data=data)
 
-    def log_messages(self, msgs: List[Message]) -> 'PluginState[S, D, CC]':
-        return self.append.message_log(msgs)
-
-    def log_message(self, msg: Message) -> 'PluginState[S, D, CC]':
-        return self.log_messages(List(msg))
-
     def log_trans(self, trans: str) -> 'PluginState[S, D, CC]':
         return self.append1.trans_log(trans)
-
-    @property
-    def has_messages(self) -> Boolean:
-        return not self.messages.empty
-
-    @property
-    def unwrapped_messages(self) -> List[Message]:
-        return self.messages.items / _[1] / _.msg
 
     @property
     def config(self) -> Config:
@@ -237,7 +211,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
     def resources(self) -> Resources[S, D, CC]:
         return self.resources_with(self.data)
 
-    def reaffiliate(self, handler: FreeTrans, current: DispatchAffiliation) -> DispatchAffiliation:
+    def reaffiliate(self, handler: TransF, current: DispatchAffiliation) -> DispatchAffiliation:
         c = self.components.for_handler(handler)
         return c.cata(ComponentDispatch, current)
 
@@ -274,18 +248,6 @@ class PluginStateHolder(Generic[D], Dat['PluginStateHolder'], Logging):
     @abc.abstractmethod
     def dispatch_complete(self) -> IO[None]:
         ...
-
-    @property
-    def has_messages(self) -> Boolean:
-        return self.state.has_messages
-
-    @property
-    def message_queue(self) -> PrioQueue[Message]:
-        return self.state.messages
-
-    @property
-    def messages(self) -> List[Message]:
-        return self.state.unwrapped_messages
 
 
 class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
@@ -363,5 +325,6 @@ class StrictPluginStateHolder(Generic[D], PluginStateHolder[D]):
 
     def dispatch_complete(self) -> IO[None]:
         return IO.pure(None)
+
 
 __all__ = ('PluginState', 'PluginStateHolder')

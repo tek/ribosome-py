@@ -1,23 +1,16 @@
-import abc
-from typing import TypeVar, Any, Generic, Type, Callable, Tuple, Union
+from typing import TypeVar, Any, Generic, Callable, Tuple, Union
 
-from amino import List, Boolean, Either, Left, Right, __, Maybe, Lists, Nothing, _, ADT, L
+from amino import List, Boolean, __, _, ADT, L
 from amino.dat import Dat
 from amino.do import do, Do
-from amino.dispatch import dispatch_alg, PatMat
-from amino.state import StateT
+from amino.dispatch import PatMat
 from amino.lenses.lens import lens
 
-from ribosome.nvim import NvimIO
-from ribosome.logging import Logging
-from ribosome.request.args import ArgValidator, ParamsSpec
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliation, RootDispatch, ComponentDispatch
-from ribosome.dispatch.data import Trans, SendMessage, DispatchResult, Dispatch
+from ribosome.dispatch.data import TransDispatch, Dispatch, DispatchOutput
 from ribosome.nvim.io import NS
-from ribosome.trans.message_base import Message
 from ribosome.dispatch.transform import validate_trans_complete
-from ribosome.trans.send_message import send_message
-from ribosome.trans.handler import FreeTrans
+from ribosome.trans.handler import TransF
 from ribosome.dispatch.component import ComponentData
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.dispatcher import RequestDispatcher
@@ -31,7 +24,7 @@ D = TypeVar('D')
 DP = TypeVar('DP', bound=Dispatch)
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
-Res = NS[PluginState[S, D, CC], DispatchResult]
+Res = NS[PluginState[S, D, CC], DispatchOutput]
 St = TypeVar('St')
 C = TypeVar('C')
 E = TypeVar('E')
@@ -47,7 +40,7 @@ class DispatchState(Generic[S, D, CC], Dat['DispatchState']):
         self.aff = aff
 
 
-DRes = NS[DispatchState[S, D, CC], DispatchResult]
+DRes = NS[DispatchState[S, D, CC], DispatchOutput]
 
 
 def dispatch_to_plugin(st: NS[DispatchState[S, D, CC], R], aff: DispatchAffiliation) -> NS[PluginState[S, D, CC], R]:
@@ -58,11 +51,11 @@ def plugin_to_dispatch(st: NS[PluginState[S, D, CC], R]) -> NS[DispatchState[S, 
     return st.transform_s(lambda r: r.state, lambda r, s: r.copy(state=s))
 
 
-def log_trans(trans: FreeTrans) -> NS[PluginState[S, D, CC], None]:
+def log_trans(trans: TransF) -> NS[PluginState[S, D, CC], None]:
     return NS.pure(None) if trans.name in ('trans_log', 'pure') else NS.modify(__.log_trans(trans.name))
 
 
-def execute_trans(handler: FreeTrans) -> NS[D, DispatchResult]:
+def execute_trans(handler: TransF) -> NS[D, DispatchOutput]:
     return validate_trans_complete(run_free_trans_handler(handler))
 
 
@@ -89,7 +82,7 @@ AWR = Tuple[AWWrap, AWUnwrap, AWStore]
 # FIXME affiliation_wrapper and plugin_state_wrapper must be swapped
 class affiliation_wrapper(PatMat, alg=DispatchAffiliation):
 
-    def __init__(self, handler: FreeTrans) -> None:
+    def __init__(self, handler: TransF) -> None:
         self.handler = handler
 
     def root_dispatch(self, aff: RootDispatch) -> AWR:
@@ -122,15 +115,15 @@ class affiliation_wrapper(PatMat, alg=DispatchAffiliation):
 
 
 # FIXME also descend into `ComponentData`
-def handler_has_state(handler: FreeTrans, tpe: type) -> Boolean:
+def handler_has_state(handler: TransF, tpe: type) -> Boolean:
     return handler.params_spec.state_type.exists(L(issubclass)(_, tpe))
 
 
 STR = Tuple[Callable[[PluginState[S, D, CC]], C], Callable[[PluginState[S, D, CC], C], PluginState[S, D, CC]]]
 
 
-def plugin_state_wrapper(handler: FreeTrans, aff: DispatchAffiliation) -> STR:
-    explicit_r, explicit_i = handler.resources, handler.internal
+def plugin_state_wrapper(handler: TransF, aff: DispatchAffiliation) -> STR:
+    explicit_i = handler.internal
     internal = explicit_i if explicit_i else handler_has_state(handler, PluginState)
     def wrap(ps: PluginState[S, D, CC]) -> TD:
         return (
@@ -147,7 +140,7 @@ def plugin_state_wrapper(handler: FreeTrans, aff: DispatchAffiliation) -> STR:
     return wrap, unwrap
 
 
-# FIXME parameterize `FreeTrans` by state type to replace `Any` here
+# FIXME parameterize `TransF` by state type to replace `Any` here
 class ResourcesWrapping(Generic[S, C, CC, A], ADT['ResourcesWrapped[S, C, CC]']):
 
     def __init__(self, data: A) -> None:
@@ -175,7 +168,7 @@ class unwrap_resources(PatMat, alg=ResourcesWrapping):
         return rw.data
 
 
-def resources_wrapper(handler: FreeTrans) -> Tuple[RWWrap, RWUnwrap]:
+def resources_wrapper(handler: TransF) -> Tuple[RWWrap, RWUnwrap]:
     def wrap(ps: PluginState[S, D, CC], data: C) -> ResourcesWrapping[S, C, CC, A]:
         return (
             ResourcesWrapped(ps.resources_with(data))
@@ -185,9 +178,8 @@ def resources_wrapper(handler: FreeTrans) -> Tuple[RWWrap, RWUnwrap]:
     return wrap, unwrap_resources.match
 
 
-
 def transform_state(
-        st: NS[TT, DispatchResult],
+        st: NS[TT, DispatchOutput],
         plugin_state_wrap: Callable[[PluginState[S, D, CC]], TD],
         affiliation_wrap: AWWrap,
         resources_wrap: RWWrap,
@@ -205,7 +197,7 @@ def transform_state(
 
 
 @do(DRes)
-def run_trans(aff: DispatchAffiliation, handler: FreeTrans, args: List[Any]) -> Do:
+def run_trans(aff: DispatchAffiliation, handler: TransF, args: List[Any]) -> Do:
     aff_wrap, aff_unwrap, aff_store = affiliation_wrapper(handler)(aff)
     plugin_state_wrap, plugin_state_unwrap = plugin_state_wrapper(handler, aff)
     resources_wrap, resources_unwrap = resources_wrapper(handler)
@@ -222,42 +214,9 @@ def run_trans(aff: DispatchAffiliation, handler: FreeTrans, args: List[Any]) -> 
 
 
 @do(DRes)
-def setup_and_run_trans(trans: Trans, aff: DispatchAffiliation, args: List[Any]) -> Do:
+def setup_and_run_trans(trans: TransDispatch, aff: DispatchAffiliation, args: List[Any]) -> Do:
     handler = yield setup_trans(trans, args)
     yield run_trans(aff, handler, args)
-
-
-def cons_message(tpe: Type[Message], args: List[Any], cmd_name: str, method: str) -> Either[str, Message]:
-    validator = ArgValidator(ParamsSpec.from_function(tpe.__init__))
-    return Right(tpe(*args)) if validator.validate(len(args)) else Left(validator.error(args, method, cmd_name))
-
-
-class RunDispatch(Generic[D, NP], Logging):
-
-    def trans(self, dispatch: Trans, aff: DispatchAffiliation) -> DRes:
-        return setup_and_run_trans(dispatch, aff, self.args)
-
-
-class RunDispatchSync(RunDispatch):
-
-    def __init__(self, args: List[Any]) -> None:
-        self.args = args
-
-
-class RunDispatchAsync(RunDispatch):
-
-    def __init__(self, args: List[Any]) -> None:
-        self.args = args
-
-    @do(NS[PluginState[S, D, CC], DispatchResult])
-    def send_message(self, dispatch: SendMessage, aff: DispatchAffiliation) -> Do:
-        cmd_name = yield NS.inspect(__.state.config.vim_cmd_name(dispatch.handler))
-        msg_e = cons_message(dispatch.msg, self.args, cmd_name, dispatch.method)
-        yield plugin_to_dispatch(msg_e.cata(DispatchResult.error_nio, send_message))
-
-
-def invalid_dispatch(tpe: Type[RunDispatch], data: Any) -> NvimIO[Any]:
-    return NS.failed(f'invalid type passed to `{tpe}`: {data}')
 
 
 class DispatchJob(Generic[D], Dat['DispatchJob']):
@@ -280,5 +239,13 @@ class DispatchJob(Generic[D], Dat['DispatchJob']):
     def plugin_name(self) -> str:
         return self.state.state.config.name
 
+    @property
+    def sync_prefix(self) -> str:
+        return '' if self.sync else 'a'
 
-__all__ = ('PluginState', 'PluginStateHolder', 'invalid_dispatch', 'DispatchJob')
+    @property
+    def desc(self) -> str:
+        return f'{self.sync_prefix}sync request {self.name}({self.args}) to `{self.plugin_name}`'
+
+
+__all__ = ('PluginState', 'PluginStateHolder', 'DispatchJob')

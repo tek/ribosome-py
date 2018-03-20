@@ -6,6 +6,7 @@ from amino import List, Either, Lists, Map, _, L, __, Path, Right, Try, Nil, Boo
 from amino.func import flip
 from amino.util.string import ToStr
 from amino.do import do
+from amino.boolean import true
 
 from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
@@ -56,6 +57,8 @@ class Settings(ToStr, Logging):
             'project_state_dir',
             Eval.always(lambda: state_dir_with_name(self.state_dir, self.proteome_name, self.session_name))
         )
+        self.run_internal_init = bool_setting('run_internal_init', 'run internal initialization handler', '', True,
+                                              Right(true))
 
     def all(self) -> Map[str, Setting]:
         settings = inspect.getmembers(self, L(isinstance)(_, Setting))

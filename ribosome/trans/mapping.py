@@ -5,11 +5,11 @@ from ribosome.nvim.io import NS
 from ribosome.plugin_state import PluginState
 from ribosome.dispatch.mapping import Mapping, MapMode
 from ribosome.nvim import NvimIO
-from ribosome.trans.handler import FreeTrans
+from ribosome.trans.handler import TransF
 from ribosome.dispatch.component import Components
 
 
-def mapping_handler(mapping: Mapping, components: Components) -> Either[str, FreeTrans]:
+def mapping_handler(mapping: Mapping, components: Components) -> Either[str, TransF]:
     return components.all.find_map(__.mappings.lift(mapping)).to_either(f'no handler for {mapping}')
 
 

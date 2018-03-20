@@ -2,7 +2,7 @@ import sys
 from typing import TypeVar, Any, Iterable
 from uuid import UUID
 
-from amino.state import EitherState, MaybeState, State
+from amino.state import EitherState, MaybeState
 
 from lenses import UnboundLens
 from amino import do, Do, __, Either, _, List, Map, Maybe, Lists, Just, Regex, L, IO, Nil, Try
@@ -16,14 +16,12 @@ from ribosome.trans.api import trans
 from ribosome.plugin_state import PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
-from ribosome.trans.messages import ShowLogInfo
 from ribosome.nvim.io import NS
 from ribosome.dispatch.component import Component, ComponentData
 from ribosome.config.settings import Settings
-from ribosome.dispatch.update import update_rpc
-from ribosome.nvim import NvimIO
-from ribosome.trans.handler import FreeTrans
-from ribosome.trans.action import TransM
+from ribosome.dispatch.update import undef_handlers, def_handlers
+from ribosome.trans.handler import TransF
+from ribosome.trans.action import Trans
 from ribosome.config.config import NoData
 from ribosome import ribo_log
 
@@ -140,8 +138,9 @@ def enable_components(*names: str) -> Do:
         yield NS.inspect_either(
             __.config.components.lift_all(*names).to_either(f'couldn\'t find some components: {names}'))
     )
+    yield undef_handlers()
     yield NS.modify(lens.components.all.modify(__.add(comps)))
-    yield update_rpc()
+    yield def_handlers()
 
 
 class MapOptions(Dat['MapOptions']):
@@ -158,23 +157,37 @@ class MapOptions(Dat['MapOptions']):
         self.buffer = buffer
 
 
-@do(EitherState[PluginState[S, D, CC], FreeTrans])
+@do(EitherState[PluginState[S, D, CC], TransF])
 def mapping_handler(uuid: UUID, keys: str) -> Do:
     yield EitherState.inspect_f(lambda a: a.active_mappings.lift(uuid).to_either(f'no handler for mapping `{keys}`'))
 
 
 @trans.free.do()
-@do(TransM)
+@do(Trans)
 def mapping(uuid_s: str, keys: str) -> Do:
-    uuid = yield TransM.from_either(Try(UUID, hex=uuid_s))
+    uuid = yield Trans.from_either(Try(UUID, hex=uuid_s))
     handler = yield mapping_handler(uuid, keys).trans_with(component=false, internal=true)
-    yield handler.m
+    yield handler
+
+
+@trans.free.result(trans.st, internal=true, component=false)
+@do(NS[PluginState[S, D, CC], Maybe[TransF]])
+def internal_init_trans() -> Do:
+    yield NS.inspect(_.config.init)
+
+
+@trans.free.do()
+@do(Trans)
+def internal_init() -> Do:
+    enabled = yield NS.inspect(_.settings.run_internal_init.value_or_default).trans_with(resources=true)
+    if enabled:
+        handler = yield internal_init_trans()
+        yield handler | Trans.unit
 
 
 message_log_handler = RequestHandler.trans_function(message_log)(prefix=Full(), sync=true)
 trans_log_handler = RequestHandler.trans_function(trans_log)(prefix=Full(), sync=true)
 set_log_level_handler = RequestHandler.trans_function(set_log_level)(prefix=Full())
-show_log_info_handler = RequestHandler.msg_cmd(ShowLogInfo)(prefix=Full())
 update_state_handler = RequestHandler.trans_cmd(update_state)(json=true)
 update_component_state_handler = RequestHandler.trans_cmd(update_component_state)(json=true)
 state_handler = RequestHandler.trans_function(state_data)(name='state', sync=true, prefix=Full())
@@ -184,6 +197,7 @@ append_python_path_handler = RequestHandler.trans_function(append_python_path)(p
 show_python_path_handler = RequestHandler.trans_function(show_python_path)(prefix=Full())
 enable_components_handler = RequestHandler.trans_cmd(enable_components)(prefix=Full())
 map_handler = RequestHandler.trans_function(mapping)(name='map', prefix=Full(), json=true)
+internal_init_handler = RequestHandler.trans_function(internal_init)(prefix=Full())
 
 
 internal = Component.cons(
@@ -192,7 +206,6 @@ internal = Component.cons(
         message_log_handler,
         trans_log_handler,
         set_log_level_handler,
-        show_log_info_handler,
         update_state_handler,
         update_component_state_handler,
         state_handler,
@@ -202,8 +215,8 @@ internal = Component.cons(
         show_python_path_handler,
         enable_components_handler,
         map_handler,
+        internal_init_handler,
     ),
-    handlers=Nil,
 )
 
 

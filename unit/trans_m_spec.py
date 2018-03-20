@@ -3,15 +3,13 @@ from kallikrein import k, Expectation
 from amino.test.spec import SpecBase
 from amino import List, Map, do, Do, Dat, _
 from amino.state import State
-from amino.boolean import true
 from amino.lenses.lens import lens
 
-from ribosome.config.config import Config, Resources, NoData
+from ribosome.config.config import Config
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.trans.api import trans
-from ribosome.dispatch.component import Component, ComponentData
-from ribosome.trans.action import TransM
-from ribosome.config.settings import Settings
+from ribosome.dispatch.component import Component
+from ribosome.trans.action import Trans
 from ribosome.dispatch.execute import run_trans_m
 from ribosome.plugin_state import DispatchConfig, RootDispatch
 from ribosome.test.integration.run import DispatchHelper
@@ -57,10 +55,10 @@ def t2_b(a: int) -> Do:
     yield State.modify(lens.comp.y.modify(_ + 39))
 
 
-@trans.free.do(trans.result)
-@do(TransM)
+@trans.free.do()
+@do(Trans)
 def t2(a: int) -> Do:
-    yield t2_b(a).m
+    yield t2_b(a)
 
 
 @trans.free.result(trans.st)
@@ -70,12 +68,12 @@ def t3(a: int) -> Do:
     yield State.inspect(_.x)
 
 
-@trans.free.do(trans.result)
-@do(TransM)
+@trans.free.do()
+@do(Trans)
 def tm() -> Do:
-    yield t1(0).m
-    yield t2(0).m
-    yield t3(0).m
+    yield t1(0)
+    yield t2(0)
+    yield t3(0)
 
 
 c1 = Component.cons(

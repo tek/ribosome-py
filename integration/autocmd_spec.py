@@ -22,12 +22,10 @@ class AutocmdSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
         super()._pre_start()
         self.vim.vars.set_p('components', ['core'])
 
-    @pending
     def autocmd(self) -> Expectation:
         self.vim.cmd_once_defined('PlugStage1')
-        self.cmd_sync('Msg1')
         self.vim.doautocmd('VimResized')
-        return self.var_becomes('msg_cmd_success', val) & self.var_becomes('autocmd_success', val)
+        return self.var_becomes('autocmd_success', val)
 
 
 __all__ = ('AutocmdSpec',)

@@ -9,7 +9,6 @@ from amino.dat import Dat
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.trans.api import trans
-from ribosome.trans.message_base import Msg
 from ribosome.dispatch.component import Component, ComponentData
 from ribosome.host import request_handler
 from ribosome.config.config import Config
@@ -19,22 +18,6 @@ class HSData(Dat['HSData']):
 
     def __init__(self, counter: int=1) -> None:
         self.counter = counter
-
-
-class TM(Msg):
-
-    def __init__(self, i: int) -> None:
-        self.i = i
-
-
-@trans.msg.unit(TM)
-def core_test(msg: TM) -> None:
-    pass
-
-
-@trans.msg.unit(TM)
-def extra_test(msg: TM) -> None:
-    pass
 
 
 @trans.free.unit(trans.st)
@@ -52,9 +35,6 @@ core = Component.cons(
     request_handlers=List(
         RequestHandler.trans_function(core_fun)(),
     ),
-    handlers=List(
-        core_test,
-    )
 )
 
 extra = Component.cons(
@@ -62,9 +42,6 @@ extra = Component.cons(
     request_handlers=List(
         RequestHandler.trans_function(extra_fun)('core_fun'),
     ),
-    handlers=List(
-        extra_test,
-    )
 )
 
 
@@ -72,9 +49,6 @@ config = Config.cons(
     'compo',
     components=Map(core=core, extra=extra),
     core_components=List('core'),
-    request_handlers=List(
-        RequestHandler.msg_function(TM)('test'),
-    ),
     state_ctor=HSData,
 )
 
@@ -86,9 +60,10 @@ class HostSpec(SpecBase):
 
     def multi(self) -> Expectation:
         helper = DispatchHelper.cons(config, 'extra')
-        as_handler = request_handler(helper.vim, False, helper.holder)
-        r = as_handler('function:core_fun', ((1,),))
-        return k(r.data.counter) == 4
+        holder = helper.holder
+        as_handler = request_handler(helper.vim, False, holder)
+        as_handler('function:core_fun', ((1,),))
+        return k(holder.state.data.counter) == 4
 
 
 __all__ = ('HostSpec',)

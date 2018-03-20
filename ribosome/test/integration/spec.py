@@ -20,13 +20,12 @@ from amino.test import fixture_path, temp_dir
 from amino.test.path import base_dir, pkg_dir
 from amino.test.spec import IntegrationSpecBase as AminoIntegrationSpecBase, default_timeout
 from amino.util.string import camelcase
-from amino.json import dump_json, decode_json
+from amino.json import decode_json
 from amino.json.data import JsonError
 
 import ribosome
 from ribosome.logging import Logging
 from ribosome.nvim import AsyncVimProxy, NvimFacade
-from ribosome.trans.message_base import Message
 from ribosome.config.settings import Settings
 
 
@@ -252,10 +251,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def content(self) -> List[str]:
         return self.vim.buffer.content
 
-    def message_log(self) -> Either[str, List[Message]]:
-        return self.vim.call(f'{self.full_cmd_prefix()}MessageLog') / Lists.wrap // __.traverse(decode_json, Either)
-
-    def trans_log(self) -> Either[str, List[Message]]:
+    def trans_log(self) -> Either[str, List['str']]:
         return self.vim.call(f'{self.full_cmd_prefix()}TransLog') // decode_json
 
     @property
@@ -389,9 +385,6 @@ class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
 
     def send_json(self, data: str) -> None:
         self.vim.call(f'{self.plugin_name}Send', data)
-
-    def send(self, msg: Message) -> None:
-        self.send_json(dump_json(msg).get_or_raise())
 
     def _pre_start(self) -> None:
         if self.autostart_plugin:

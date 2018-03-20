@@ -10,10 +10,9 @@ from ribosome.request.handler.dispatcher import TransDispatcher
 from ribosome.request.handler.method import RpcMethod
 from ribosome.nvim import NvimIO
 from ribosome.nvim.io import NvimIOState
-from ribosome.trans.message_base import Message
-from ribosome.trans.effects import GatherIOs, GatherSubprocs
 from ribosome.trans.action import TransDo, TransLog
-from ribosome.trans.handler import FreeTrans
+from ribosome.trans.handler import TransF
+from ribosome.trans.recursive_effects import GatherIOs, GatherSubprocs
 
 B = TypeVar('B')
 Meth = TypeVar('Meth', bound=RpcMethod)
@@ -56,18 +55,7 @@ class DispatchAsync(ADT['DispatchAsync'], Dispatch, base=True):
     pass
 
 
-class SendMessage(DispatchAsync):
-
-    @property
-    def desc(self) -> str:
-        return f'send `{self.msg.__name__}`'
-
-    @property
-    def msg(self) -> Type[Message]:
-        return self.handler.dispatcher.msg
-
-
-class Trans(Generic[Meth, B], DispatchSync, DispatchAsync):
+class TransDispatch(Generic[Meth, B], DispatchSync, DispatchAsync):
 
     def __init__(self, handler: RequestHandler[Meth, TransDispatcher[B]]) -> None:
         self.handler = handler
@@ -160,7 +148,7 @@ class DIO(Generic[I], ADT['DIO[I]'], base=True):
         )
 
     @abc.abstractproperty
-    def handle_result(self) -> FreeTrans:
+    def handle_result(self) -> TransF:
         ...
 
 
@@ -170,8 +158,8 @@ class IODIO(Generic[A], DIO[IO[A]]):
         self.io = io
 
     @property
-    def handle_result(self) -> FreeTrans:
-        return FreeTrans.id
+    def handle_result(self) -> TransF:
+        return TransF.id
 
 
 class GatherIOsDIO(Generic[A], DIO[GatherIOs[A]]):
@@ -180,7 +168,7 @@ class GatherIOsDIO(Generic[A], DIO[GatherIOs[A]]):
         self.io = io
 
     @property
-    def handle_result(self) -> FreeTrans:
+    def handle_result(self) -> TransF:
         return self.io.handle_result
 
 
@@ -190,7 +178,7 @@ class GatherSubprocsDIO(Generic[A, R], DIO[GatherSubprocs[A, R]]):
         self.io = io
 
     @property
-    def handle_result(self) -> FreeTrans:
+    def handle_result(self) -> TransF:
         return self.io.handle_result
 
 
@@ -200,8 +188,8 @@ class NvimIODIO(Generic[A], DIO[NvimIO[A]]):
         self.io = io
 
     @property
-    def handle_result(self) -> FreeTrans:
-        return FreeTrans.id
+    def handle_result(self) -> TransF:
+        return TransF.id
 
 
 class DispatchIO(Generic[I], DispatchOutput):
@@ -239,12 +227,5 @@ class DispatchResultMeta(DatMeta):
         return NvimIOState.pure(DispatchResult.error(problem))
 
 
-class DispatchResult(Dat['DispatchResult'], metaclass=DispatchResultMeta):
-
-    def __init__(self, output: DispatchOutput, msgs: List[Message]) -> None:
-        self.output = output
-        self.msgs = msgs
-
-
-__all__ = ('DispatchSync', 'DispatchAsync', 'Legacy', 'SendMessage', 'Trans', 'DispatchOutput',
-           'DispatchError', 'DispatchReturn', 'DispatchUnit', 'DispatchContinuation', 'DispatchResult')
+__all__ = ('DispatchSync', 'DispatchAsync', 'Legacy', 'SendMessage', 'TransDispatch', 'DispatchOutput',
+           'DispatchError', 'DispatchReturn', 'DispatchUnit', 'DispatchContinuation')

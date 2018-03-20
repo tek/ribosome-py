@@ -1,32 +1,28 @@
-from typing import TypeVar, Type, Callable, Any, Tuple, Generic
+from typing import TypeVar, Callable, Any, Tuple
 from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
-from amino import _, __, Try, IO, Lists, Either, List, L, Nil, Dat
+from amino import _, __, IO, Lists, Either, List, L, Nil
 from amino.do import do, Do
-from amino.dispatch import dispatch_alg, PatMat
+from amino.dispatch import PatMat
 from amino.util.exception import format_exception
 from amino.io import IOException
-from amino.lenses.lens import lens
+from amino.string.hues import red, blue, green
+from amino.util.string import decode
 
-from ribosome.nvim import NvimFacade, NvimIO
-from ribosome.logging import ribo_log, Logging
+from ribosome.nvim import NvimIO, NvimFacade
+from ribosome.logging import ribo_log
 from ribosome.config.config import Config
 from ribosome.nvim.io import NS, NResult, NSuccess, NError, NFatal
-from ribosome.dispatch.run import (DispatchJob, RunDispatchSync, RunDispatchAsync, invalid_dispatch, log_trans,
-                                   DispatchState, RunDispatch, run_trans, plugin_to_dispatch)
-from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput, DispatchSync,
-                                    DispatchAsync, DispatchResult, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors,
-                                    NvimIODIO, DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO,
-                                    DispatchLog)
+from ribosome.dispatch.run import (DispatchJob, log_trans, DispatchState, run_trans, plugin_to_dispatch,
+                                   setup_and_run_trans)
+from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput,
+                                    DispatchAsync, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors, NvimIODIO,
+                                    DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO, DispatchLog)
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliation, AffiliatedDispatch
-from ribosome.trans.queue import PrioQueue
-from ribosome.trans.message_base import Message
-from ribosome.dispatch.loop import process_message
-from ribosome.trans.send_message import send_message
-from ribosome.trans.action import TransM, TransMCont, TransMBind, LogMessage, Info, Error, TransMPure
-from ribosome.trans.handler import FreeTrans
+from ribosome.trans.action import LogMessage, Info, Error
+from ribosome.trans.handler import TransF, Trans, TransMBind, TransMPure
 from ribosome.config.settings import Settings
 from ribosome.trans.run import TransComplete
 
@@ -38,11 +34,11 @@ B = TypeVar('B')
 C = TypeVar('C', bound=Config)
 R = TypeVar('R')
 DP = TypeVar('DP', bound=Dispatch)
-RDP = TypeVar('RDP', bound=RunDispatch)
+RDP = TypeVar('RDP')
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
-Res = NS[PluginState[S, D, CC], DispatchResult]
-DRes = NS[DispatchState[S, D, CC], DispatchResult]
+Res = NS[PluginState[S, D, CC], DispatchOutput]
+DRes = NS[DispatchState[S, D, CC], DispatchOutput]
 
 
 def gather_ios(ios: List[IO[A]], timeout: float) -> List[Either[IOException, A]]:
@@ -80,21 +76,24 @@ class execute_io(PatMat, alg=DIO):
 
 
 @do(NS[DispatchState[S, D, CC], R])
-def run_trans_m_trans(handler: FreeTrans, aff: DispatchAffiliation) -> Do:
+def run_trans_m_trans(handler: TransF, aff: DispatchAffiliation) -> Do:
     yield plugin_to_dispatch(log_trans(handler))
     result = yield run_trans(aff, handler, Nil)
-    yield normalize_output(result)
+    yield execute_dispatch_output.match(result)
 
 
 # TODO determine affiliation from the type in the handler's state
 @do(NS[DispatchState[S, D, CC], R])
-def run_trans_m(tr: TransM) -> Do:
-    if isinstance(tr, TransMCont):
-        handler = tr.handler
+def run_trans_m(tr: Trans) -> Do:
+    if isinstance(tr, TransF):
         current = yield NS.inspect(_.aff)
-        aff = yield NS.inspect(__.state.reaffiliate(handler, current))
+        aff = yield NS.inspect(__.state.reaffiliate(tr, current))
+        if current != aff:
+            from_name = red(current.name)
+            to_name = green(aff.name)
+            ribo_log.debug(f'switching dispatch affiliation for {blue(tr.name)}: {from_name} -> {to_name}')
         yield NS.modify(__.set.aff(aff))
-        result = yield run_trans_m_trans(handler, aff)
+        result = yield run_trans_m_trans(tr, aff)
         yield NS.modify(__.set.aff(current))
         yield NS.pure(result)
     elif isinstance(tr, TransMBind):
@@ -105,7 +104,7 @@ def run_trans_m(tr: TransM) -> Do:
         yield NS.pure(tr.value)
 
 
-class DispatchLogger:
+class dispatch_log(PatMat, alg=LogMessage):
 
     def info(self, msg: Info) -> NS[D, None]:
         return NS.delay(lambda v: ribo_log.info(msg.message))
@@ -114,10 +113,7 @@ class DispatchLogger:
         return NS.delay(lambda v: ribo_log.error(msg))
 
 
-dispatch_log = dispatch_alg(DispatchLogger(), LogMessage)
-
-
-class ExecuteDispatchOutput(Logging):
+class execute_dispatch_output(PatMat, alg=DispatchOutput):
 
     def dispatch_error(self, result: DispatchError) -> NS[DispatchState[S, D, CC], R]:
         io = result.exception / NvimIO.exception | NvimIO.error(result.message)
@@ -137,12 +133,11 @@ class ExecuteDispatchOutput(Logging):
         custom_executor = yield NS.inspect(_.state.dispatch_config.io_executor)
         executor = custom_executor | (lambda: execute_io.match)
         io_result = yield executor(result.io)
-        yield run_trans_m(result.io.handle_result(io_result).m)
+        yield run_trans_m(result.io.handle_result(io_result))
 
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_output_aggregate(self, result: DispatchOutputAggregate) -> Do:
-        yield result.results.traverse(normalize_output, NS)
-        yield DispatchResult.unit_nio
+        yield result.results.traverse(execute_dispatch_output.match, NS)
 
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_do(self, result: DispatchDo) -> Do:
@@ -151,23 +146,20 @@ class ExecuteDispatchOutput(Logging):
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_log(self, result: DispatchLog) -> Do:
         custom_logger = yield NS.inspect(_.state.logger)
-        logger = custom_logger | (lambda: dispatch_log)
+        logger = custom_logger | (lambda: dispatch_log.match)
         yield logger(result.trans)
 
 
-execute_output = dispatch_alg(ExecuteDispatchOutput(), DispatchOutput, '')
-
-
 @do(NS[DispatchState[S, D, CC], R])
-def normalize_output(result: DispatchResult) -> Do:
-    yield NS.modify(lens.state.modify((__.enqueue(result.msgs))))
-    yield execute_output(result.output)
+def compute_dispatch(dispatch: AffiliatedDispatch[DP], args: List[Any]) -> Do:
+    result = yield setup_and_run_trans(dispatch.dispatch, dispatch.aff, args)
+    yield execute_dispatch_output.match(result)
 
 
-@do(NS[DispatchState[S, D, CC], R])
-def run_dispatch(action: Callable[[], NS[DispatchState[S, D, CC], R]]) -> Do:
-    result = yield action()
-    yield normalize_output(result)
+@do(Res)
+def compute_dispatches(dispatches: List[AffiliatedDispatch[DP]], args: List[Any]) -> Do:
+    output = yield dispatches.traverse(lambda a: setup_and_run_trans(a.dispatch, a.aff, args), NS)
+    yield execute_dispatch_output.match(DispatchOutputAggregate(output))
 
 
 def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[DispatchState, R]]], desc: str) -> NvimIO[R]:
@@ -180,168 +172,78 @@ def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[DispatchSt
     yield NvimIO.pure(response)
 
 
-def dispatch_state(state: PluginState[S, D, CC], aff: DispatchAffiliation) -> DispatchState[S, D, CC]:
-    return DispatchState(state, aff)
-
-
-# FIXME it's probably unnecessary to have `action` be a function instead of using the state directly
-# maybe handlers that don't use `StateT` are being evaluated eagerly and lifted into `NS` in the end. find out whether
-# this can be changed to lazy evaluation.
 @do(NvimIO[R])
 def exclusive_dispatch(holder: PluginStateHolder,
-                       action: Callable[[], NS[PluginState[S, D, CC], B]],
+                       dispatch: AffiliatedDispatch[DP],
+                       args: List[Any],
                        desc: str,
                        aff: DispatchAffiliation) -> Do:
-    return exclusive(holder, lambda: run_dispatch(action).run(dispatch_state(holder.state, aff)), desc)
+    return exclusive(holder, lambda: compute_dispatch(dispatch, args).run(DispatchState(holder.state, aff)), desc)
 
 
-class DispatchRunner(Generic[RDP]):
-
-    @staticmethod
-    def cons(run: Type[RDP], dp: Type[DP]) -> 'DispatchRunner[RDP]':
-        return DispatchRunner(lambda args: dispatch_alg(run(args), dp, '', L(invalid_dispatch)(run, _)))
-
-    def __init__(self, f: Callable[[List[Any]], Callable[[RDP], Res]]) -> None:
-        self.f = f
-
-    def __call__(self, args: List[Any]) -> Callable[[RDP], Res]:
-        return self.f(args)
+def execute(state: PluginStateHolder[D], dispatch: AffiliatedDispatch[DP], args: List[Any]) -> NvimIO[Any]:
+    return exclusive_dispatch(state, dispatch, args, dispatch.desc, dispatch.aff)
 
 
-sync_runner = DispatchRunner.cons(RunDispatchSync, DispatchSync)
-async_runner = DispatchRunner.cons(RunDispatchAsync, DispatchAsync)
-
-
-class SyncSender(Dat['SyncSender']):
-
-    def __init__(self, ad: AffiliatedDispatch[DP], args: List[Any], runner: DispatchRunner[RDP]) -> None:
-        self.ad = ad
-        self.args = args
-        self.runner = runner
-
-    def __call__(self) -> Res:
-        return self.runner(self.args)(self.ad.dispatch, self.ad.aff)
-
-
-def async_sender(args: List[Any],
-                 dispatches: List[AffiliatedDispatch[DP]],
-                 runner: DispatchRunner[RDP]) -> Callable[[], Res]:
-    def send() -> Res:
-        r = runner(args)
-        return (
-            dispatches.traverse(lambda a: r(a.dispatch, a), NS) /
-            DispatchOutputAggregate /
-            L(DispatchResult)(_, Nil)
-        )
-    return send
-
-
-def execute(state: PluginStateHolder[D],
-            args: List[Any],
-            dispatch: AffiliatedDispatch[DP],
-            runner: DispatchRunner[RDP]) -> NvimIO[Any]:
-    return exclusive_dispatch(state, SyncSender(dispatch, args, runner), dispatch.desc, dispatch.aff)
-
-
-def run_forked_job(vim: NvimFacade, f: Callable[[], NvimIO[None]], job: DispatchJob) -> None:
-    request_result(job, Try(f).value_or(NvimIO.exception).result(vim))
-    ribo_log.debug(f'async job {job.name} completed')
-
-
-def sync_dispatch(job: DispatchRunner) -> Either[str, AffiliatedDispatch[DispatchSync]]:
+def job_dispatches(job: DispatchJob) -> Either[str, List[AffiliatedDispatch[DispatchAsync]]]:
     name = job.name
-    return job.state.state.dispatch_config.sync_dispatch.lift(name).to_either(f'no sync dispatch for {name}')
+    return job.state.state.dispatch_config.dispatches.lift(name).to_either(f'no sync dispatch for {name}')
 
 
-def async_dispatches(job: DispatchRunner) -> Either[str, List[AffiliatedDispatch[DispatchAsync]]]:
-    name = job.name
-    return job.state.state.dispatch_config.async_dispatch.lift(name).to_either(f'no sync dispatch for {name}')
-
-
-@do(NvimIO)
-def execute_sync(job: DispatchJob) -> Do:
-    dispatch = yield NvimIO.from_either(sync_dispatch(job))
-    response = yield execute(job.state, job.args, dispatch, sync_runner)
-    yield NvimIO.pure(response)
-
-
-class RequestResult:
-
-    @property
-    def sync_prefix(self) -> str:
-        return '' if self.job.sync else 'a'
-
-    @property
-    def desc(self) -> str:
-        return f'{self.sync_prefix}sync request {self.job.name}({self.job.args}) to `{self.job.plugin_name}`'
-
-    def __init__(self, job: DispatchJob) -> None:
-        self.job = job
-
-    def n_success(self, result: NSuccess) -> Any:
-        return result.value
-
-    def n_error(self, result: NError) -> Any:
-        ribo_log.error(result.error)
-        return 1
-
-    def n_fatal(self, result: NFatal) -> Any:
-        exc = result.exception
-        tb = format_exception(exc).join_lines
-        desc = self.desc
-        ribo_log.error(f'fatal error in {desc}')
-        ribo_log.debug(f'{desc} failed:\n{tb}')
-        return 2
-
-
-def request_result(job: DispatchJob, result: NResult) -> int:
-    handler: Callable[[NResult], Any] = dispatch_alg(RequestResult(job), NResult)
-    return handler(result)
-
-
-@do(NS[DispatchState[S, D, CC], Tuple[PrioQueue[Message], DispatchResult]])
-def resend_send() -> Do:
-    msgs, send = yield NS.inspect(lambda state: process_message(state.state.messages, send_message))
-    yield NS.modify(lens.state.messages.set(msgs))
-    yield send.zoom(lens.state)
-
-
-@do(NS[PluginState[S, D, CC], DispatchResult])
-def resend_unpack(result: Tuple[PrioQueue[Message], DispatchResult]) -> Do:
-    messages, trs = result
-    yield NS.modify(__.copy(messages=messages))
-    yield trs
-
-
-@do(NvimIO[PluginState[S, D, CC]])
-def resend_loop(holder: PluginStateHolder) -> Do:
-    @do(NvimIO[PluginState[S, D, CC]])
-    def loop() -> Do:
-        messages = holder.messages.join_comma
-        yield exclusive_dispatch(holder, resend_send, resend_unpack, f'resend {messages}')
-        yield resend_loop(holder)
-    yield loop() if holder.has_messages else NvimIO.pure(holder.state)
-
-
-@do(NvimIO[PluginState[S, D, CC]])
-def execute_async_loop(job: DispatchJob, dispatches: List[AffiliatedDispatch[DispatchAsync]]) -> Do:
-    yield dispatches.traverse(L(execute)(job.state, job.args, _, async_runner), NvimIO)
-    yield resend_loop(job.state)
-
-
-@do(NvimIO)
-def execute_async(job: DispatchJob) -> NvimIO[None]:
-    dispatches = yield NvimIO.from_either(async_dispatches(job))
-    result = yield Try(execute_async_loop, job, dispatches).value_or(NvimIO.exception)
+@do(NvimIO[List[Any]])
+def execute_dispatch_job(job: DispatchJob) -> Do:
+    dispatches = yield NvimIO.from_either(job_dispatches(job))
+    result = yield dispatches.traverse(L(execute)(job.state, _, job.args), NvimIO)
     ribo_log.debug(f'async job {job.name} completed')
     yield NvimIO.from_io(job.state.dispatch_complete())
     yield NvimIO.pure(result)
 
 
-@do(NvimIO[Any])
-def execute_dispatch_job(job: DispatchJob) -> Do:
-    relay = execute_sync if job.sync else execute_async
-    yield relay(job)
+class request_result(PatMat, alg=NResult):
+
+    def __init__(self, job: DispatchJob) -> None:
+        self.job = job
+
+    def n_success(self, result: NSuccess[List[Any]]) -> Any:
+        desc = self.job.desc
+        def multiple_results() -> int:
+            ribo_log.error(f'multiple request handlers for {desc}')
+            return 4
+        def sync_result(head: Any, tail: List[Any]) -> Any:
+            return head if tail.empty else multiple_results()
+        def empty_result() -> int:
+            ribo_log.error(f'no result in {desc}')
+            return 3
+        return result.value.detach_head.map2(sync_result) | empty_result if self.job.sync else 0
+
+    def n_error(self, result: NError[List[Any]]) -> Any:
+        ribo_log.error(result.error)
+        return 1
+
+    def n_fatal(self, result: NFatal[List[Any]]) -> Any:
+        exc = result.exception
+        tb = format_exception(exc).join_lines
+        desc = self.job.desc
+        ribo_log.error(f'fatal error in {desc}')
+        ribo_log.debug(f'{desc} failed:\n{tb}')
+        return 2
 
 
-__all__ = ('execute_dispatch_job', 'execute_async_loop', 'execute_sync', 'execute')
+def dispatch_job(state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> DispatchJob:
+    decoded_args = decode(args)
+    fun_args = decoded_args.head | Nil
+    bang = decoded_args.lift(1).contains(1)
+    return DispatchJob(state, decode(name), fun_args, sync, bang)
+
+
+def execute_request(vim: NvimFacade, state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> Any:
+    sync_prefix = '' if sync else 'a'
+    job = dispatch_job(state, name, args, sync)
+    ribo_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
+    result = request_result(job)(execute_dispatch_job(job).result(vim))
+    if sync:
+        ribo_log.debug(f'request `{job.name}` completed: {result}')
+    return vim.encode_vim_data(result)
+
+
+__all__ = ('execute_dispatch_job', 'execute', 'compute_dispatches', 'compute_dispatch')

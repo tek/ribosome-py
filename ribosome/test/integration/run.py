@@ -5,15 +5,14 @@ from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 
 from toolz import assoc
 
-from amino import Lists, Map, Just, List, __, _
+from amino import Lists, Map, Just, List, __
 from amino.dat import Dat
 from amino.lenses.lens import lens
 from ribosome.dispatch.run import DispatchJob, DispatchState
-from ribosome.dispatch.data import Dispatch, DispatchResult, DIO
+from ribosome.dispatch.data import Dispatch, DIO
 from ribosome.test.spec import MockNvimFacade
-from ribosome.host import init_state, dispatch_job
-from ribosome.dispatch.execute import (sync_runner, async_runner, SyncSender, run_dispatch, Res, execute_async_loop,
-                                       async_sender, dispatch_state)
+from ribosome.host import init_state
+from ribosome.dispatch.execute import dispatch_job, compute_dispatches, compute_dispatch
 from ribosome.nvim.io import NvimIOState, NS
 from ribosome.config.config import Config, Resources
 from ribosome.trans.run import TransComplete
@@ -83,39 +82,21 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
     def settings(self) -> S:
         return self.state.settings
 
-    def dispatch_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[DispatchJob, Dispatch]:
+    def dispatch_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[DispatchJob, List[Dispatch]]:
         job = dispatch_job(self.holder, name, (args,), sync)
         dc = job.state.state.dispatch_config
-        dispatch = dc.sync_dispatch if sync else dc.async_dispatch
-        return job, dispatch.lift(job.name).get_or_fail(f'no matching dispatch for `{job.name}`')
+        return job, dc.dispatches.lift(job.name).get_or_fail(f'no matching dispatch for `{job.name}`')
 
-    def sync_sender(self, name: str, args: tuple=(), sync: bool=True) -> Callable[[], Res]:
+    def compute_dispatches(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[DispatchState, Any]:
         job, dispatch = self.dispatch_job(name, args, sync)
-        return SyncSender(dispatch, Lists.wrap(args), sync_runner)
-
-    def async_sender(self, name: str, args: tuple=(), sync: bool=True) -> Callable[[], Res]:
-        job, dispatch = self.dispatch_job(name, args, sync)
-        return async_sender(Lists.wrap(args), dispatch, async_runner)
-
-    def sender(self, name: str, args: tuple=(), sync: bool=True) -> Callable[[], Res]:
-        s = self.sync_sender if sync else self.async_sender
-        return s(name, args, sync)
-
-    def run_dispatch(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[DispatchState, Any]:
-        send = self.sender(name, args, sync)
-        return run_dispatch(send)
-
-    def loop(self, name: str, args: tuple=(), sync: bool=True) -> NvimIO[PluginState]:
-        job, dispatch = self.dispatch_job(name, args, sync)
-        ds = List(dispatch) if sync else dispatch
-        return execute_async_loop(job, ds)
+        return compute_dispatches(dispatch, Lists.wrap(args))
 
     def run(self, name: str, args=(), sync: bool=True) -> NvimIO[Tuple[PluginState, Any]]:
-        job, dispatch = self.dispatch_job(name, args, sync)
+        job, dispatches = self.dispatch_job(name, args, sync)
+        dispatch = dispatches.head.get_or_fail('multiple dispatches')
         return (
-            self
-            .run_dispatch(name, args=args, sync=sync)
-            .run(dispatch_state(self.state, dispatch.aff))
+            compute_dispatch(dispatch, Lists.wrap(args))
+            .run(DispatchState(self.state, dispatch.aff))
             .map2(lambda s, a: (s.state, a))
         )
 

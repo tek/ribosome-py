@@ -1,6 +1,6 @@
 from typing import Callable, TypeVar, Generic, Union, Optional, Type, Any
 
-from amino import List, Nil, Map, Either, Right, do, Do
+from amino import List, Nil, Map, Either, Right, do, Do, Maybe
 from amino.dat import Dat
 from amino.json.encoder import Encoder, json_object_with_type
 from amino.json.data import JsonError, Json, JsonScalar
@@ -11,6 +11,7 @@ from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import Settings
 from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.dispatch.component import Components
+from ribosome.trans.handler import TransF
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -40,6 +41,7 @@ class Config(Generic[S, D, CC], Dat['Config[S, D, CC]']):
             core_components: List[str]=Nil,
             default_components: List[str]=Nil,
             component_config_type: Type[CC]=Any,
+            init: TransF=None,
     ) -> 'Config[S, D, CC]':
         from ribosome.trans.internal import internal
         return Config(
@@ -52,6 +54,7 @@ class Config(Generic[S, D, CC], Dat['Config[S, D, CC]']):
             core_components.cons('internal'),
             default_components,
             component_config_type,
+            Maybe.optional(init),
         )
 
     def __init__(
@@ -65,6 +68,7 @@ class Config(Generic[S, D, CC], Dat['Config[S, D, CC]']):
             core_components: List[str],
             default_components: List[str],
             component_config_type: Type[CC],
+            init: Maybe[TransF],
     ) -> None:
         self.name = name
         self.prefix = prefix
@@ -75,6 +79,7 @@ class Config(Generic[S, D, CC], Dat['Config[S, D, CC]']):
         self.core_components = core_components
         self.default_components = default_components
         self.component_config_type = component_config_type
+        self.init = init
 
     def _arg_desc(self) -> List[str]:
         return List(str(self.components), str(self.settings), str(self.request_handlers))

@@ -36,7 +36,7 @@ class ScratchSpec(ExternalSpec):
         lines = List('1', '2', '3')
         @do(NvimIO[Tuple[List[Window], List[Buffer], List[str]]])
         def run() -> Do:
-            yield helper.loop('command:create_scratch', args=(lines, '{}',))
+            yield helper.run('command:create_scratch', args=(lines, '{}',))
             wins = yield windows()
             bufs = yield buffers()
             buf = yield current_buffer()

@@ -1,5 +1,6 @@
 from kallikrein import k, Expectation
 from kallikrein.matchers.either import be_right
+from kallikrein.matchers import contain
 
 from amino.test.spec import SpecBase
 from amino import List, Map, do, Do, Dat, _
@@ -11,16 +12,9 @@ from ribosome.test.integration.run import DispatchHelper
 from ribosome.config.config import Config, Resources, NoData
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.trans.api import trans
-from ribosome.trans.message_base import Msg
 from ribosome.dispatch.component import Component, ComponentData
-from ribosome.trans.action import TransM
+from ribosome.trans.action import Trans
 from ribosome.config.settings import Settings
-
-
-class TM(Msg):
-
-    def __init__(self, i: int) -> None:
-        self.i = i
 
 
 class CoreData(Dat['CoreData']):
@@ -41,16 +35,6 @@ class ExtraData(Dat['ExtraData']):
 
     def __init__(self, y: int) -> None:
         self.y = y
-
-
-@trans.msg.unit(TM)
-def core_test(msg: TM) -> None:
-    pass
-
-
-@trans.msg.unit(TM)
-def extra_test(msg: TM) -> None:
-    pass
 
 
 class CompoComponent(Dat['CompoComponent']):
@@ -74,10 +58,10 @@ def extra_fun(a: int) -> Do:
 
 
 @trans.free.do()
-@do(TransM)
+@do(Trans)
 def switch() -> Do:
-    a = yield core_fun(3).m
-    yield extra_fun(a).m
+    a = yield core_fun(3)
+    yield extra_fun(a)
 
 
 core = Component.cons(
@@ -85,9 +69,6 @@ core = Component.cons(
     request_handlers=List(
         RequestHandler.trans_function(core_fun)(),
         RequestHandler.trans_function(switch)(),
-    ),
-    handlers=List(
-        core_test,
     ),
     config=CompoComponent(13),
     state_ctor=CoreData.cons,
@@ -98,9 +79,6 @@ extra = Component.cons(
     request_handlers=List(
         RequestHandler.trans_function(extra_fun)(),
     ),
-    handlers=List(
-        extra_test,
-    ),
     state_ctor=ExtraData.cons,
 )
 
@@ -110,7 +88,6 @@ config = Config.cons(
     components=Map(core=core, extra=extra),
     core_components=List('core'),
     request_handlers=List(
-        RequestHandler.msg_function(TM)('test'),
     )
 )
 
@@ -123,8 +100,8 @@ class ComponentSpec(SpecBase):
 
     def enable_component(self) -> Expectation:
         helper = DispatchHelper.cons(config)
-        helper.loop('command:enable_components', args=('extra',)).unsafe(helper.vim)
-        return k(1) == 1
+        s = helper.unsafe_run_s('command:enable_components', args=('extra',))
+        return k(s.components.all / _.name).must(contain('extra'))
 
     def switch(self) -> Expectation:
         helper = DispatchHelper.cons(config, 'extra')

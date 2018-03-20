@@ -6,59 +6,35 @@ from neovim.api import Nvim
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 from neovim.msgpack_rpc.event_loop.uv import UvEventLoop
 
-from amino import Either, _, L, amino_log, Logger, __, Path, Nil, Just
+from amino import Either, _, L, amino_log, Logger, __, Path, Nil, Just, IO
 from amino.either import ImportFailure
 from amino.logging import amino_root_file_logging
 from amino.do import do, Do
-from amino.algebra import Algebra
-from amino.util.string import decode
 from amino.mod import instance_from_module
 
 from ribosome.config.config import Config
-from ribosome.dispatch.data import Dispatch
-from ribosome.dispatch.execute import execute_dispatch_job, request_result
-from ribosome.dispatch.run import DispatchJob
+from ribosome.dispatch.execute import execute_request
 from ribosome.logging import ribo_log, nvim_logging
 from ribosome.nvim import NvimFacade, NvimIO
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
-from ribosome.dispatch.update import update_rpc
+from ribosome.dispatch.update import init_rpc
 from ribosome.config.settings import Settings
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
-B = TypeVar('B')
 C = TypeVar('C', bound=Config)
-R = TypeVar('R')
-DP = TypeVar('DP', bound=Dispatch)
-RDP = TypeVar('RDP', bound=Algebra)
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
 
-def dispatch_job(state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> DispatchJob:
-    decoded_args = decode(args)
-    fun_args = decoded_args.head | Nil
-    bang = decoded_args.lift(1).contains(1)
-    return DispatchJob(state, decode(name), fun_args, sync, bang)
-
-
-def request_handler(
-        vim: NvimFacade,
-        sync: bool,
-        state: PluginStateHolder[D],
-) -> Callable[[str, tuple], Any]:
-    sync_prefix = '' if sync else 'a'
+def request_handler(vim: NvimFacade, sync: bool, state: PluginStateHolder[D]) -> Callable[[str, tuple], Any]:
     def handle(name: str, args: tuple) -> Any:
         try:
-            job = dispatch_job(state, name, args, sync)
-            amino_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
-            result = request_result(job, execute_dispatch_job(job).result(vim))
-            if sync:
-                ribo_log.debug(f'request `{job.name}` completed: {result}')
-            return vim.encode_vim_data(result)
+            return execute_request(vim, state, name, args, sync)
         except Exception as e:
-            amino_log.caught_exception(f'dispatching request: {name}({args})', e)
-            ribo_log.error(f'fatal error dispatching request {name}({args})')
+            desc = f'dispatching request {name}({args})'
+            amino_log.caught_exception(desc, e)
+            ribo_log.error(f'fatal error {desc}')
     return handle
 
 
@@ -67,7 +43,7 @@ def init_state(dispatch_config: DispatchConfig) -> Do:
     data = dispatch_config.config.state()
     log_handler = yield NvimIO.delay(nvim_logging)
     state = yield NvimIO.pure(PluginState.cons(dispatch_config, data, Nil, log_handler=Just(log_handler)))
-    yield update_rpc().run_s(state)
+    yield init_rpc().run_s(state)
 
 
 @do(NvimIO[int])
@@ -76,6 +52,7 @@ def run_session(session: Session, dispatch_config: DispatchConfig) -> Do:
     holder = PluginStateHolder.concurrent(state)
     ribo_log.debug(f'running session')
     yield NvimIO.delay(__.vars.set_p('started', True))
+    yield NvimIO.from_io(IO.delay(session._enqueue_notification, 'function:internal_init', ()))
     yield NvimIO.delay(
         lambda vim:
         session.run(
@@ -95,7 +72,7 @@ def run_loop(session: Session, prefix: str, dispatch_config: DispatchConfig) -> 
     return run_session(session, dispatch_config).attempt(vim).get_or_raise()
 
 
-def session(*args: str, loop: Loop=UvEventLoop, transport_type: str='stdio', **kwargs: str) -> Session:
+def session(*args: str, loop: Type[Loop]=UvEventLoop, transport_type: str='stdio', **kwargs: str) -> Session:
     return Session(AsyncSession(MsgpackStream(loop(transport_type, *args, **kwargs))))
 
 

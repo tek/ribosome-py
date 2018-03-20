@@ -5,7 +5,7 @@ from ribosome.dispatch.component import Component
 from amino import Map, Lists
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.config.config import Config
-from ribosome.trans.handler import FreeTrans
+from ribosome.trans.handler import TransF
 
 
 default_config_name = 'spec'
@@ -23,7 +23,7 @@ def spec_config(*request_handlers: RequestHandler) -> Config:
     )
 
 
-def single_trans_config(trans: FreeTrans, **kw: Any) -> Config:
+def single_trans_config(trans: TransF, **kw: Any) -> Config:
     return spec_config(RequestHandler.trans_cmd(trans)(**kw))
 
 

@@ -3,7 +3,7 @@ from uuid import uuid4, UUID
 
 from amino import Dat, Map, Boolean, ADT, List, Nil, Maybe
 
-from ribosome.trans.handler import FreeTrans
+from ribosome.trans.handler import TransF
 
 
 class MapMode(ADT['MapMode']):
@@ -88,13 +88,13 @@ class Mapping(Dat['Mapping']):
 class Mappings(Dat['Mappings']):
 
     @staticmethod
-    def cons(mappings: Map[Mapping, FreeTrans]=Map()) -> 'Mappings':
+    def cons(mappings: Map[Mapping, TransF]=Map()) -> 'Mappings':
         return Mappings(mappings)
 
-    def __init__(self, mappings: Map[Mapping, FreeTrans]) -> None:
+    def __init__(self, mappings: Map[Mapping, TransF]) -> None:
         self.mappings = mappings
 
-    def lift(self, mapping: Mapping) -> Maybe[FreeTrans]:
+    def lift(self, mapping: Mapping) -> Maybe[TransF]:
         return self.mappings.lift(mapping)
 
 

@@ -14,12 +14,10 @@ from kallikrein.matchers import contain, equal
 from kallikrein.matchers.lines import have_lines
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.either import be_right
-from kallikrein.matchers.typed import have_type
 
 from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationSpec, ExternalIntegrationSpec,
                                             AutoPluginIntegrationSpec)
 from ribosome.nvim.components import Buffer
-from ribosome.trans.message_base import Message
 from ribosome.config.settings import Settings
 
 
@@ -34,9 +32,6 @@ def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0
 
 def later(exp: Expectation, timeout: float=None, intval: float=0.1) -> None:
     return later_f(lambda: exp, timeout, intval)
-
-
-M = TypeVar('M', bound=Message)
 
 
 class VimIntegrationKlkHelpers(VimIntegrationSpecI):
@@ -105,13 +100,6 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
 
     def _messages_contain(self, line: str) -> Expectation:
         return later(kf(lambda: self.vim.messages).must(contain(line)))
-
-    def seen_message(self, tpe: Type[M], **kw) -> Expectation:
-        return later(kf(self.message_log).must(be_right(contain(have_type(tpe)))), **kw)
-
-    def seen_times(self, tpe: Type[M], count: int, **kw) -> Expectation:
-        seen = lambda: self.message_log() / __.filter_type(tpe)
-        return later(kf(seen).must(be_right(have_length(count))), **kw)
 
     def seen_trans(self, name: str, **kw) -> Expectation:
         return later(kf(self.trans_log).must(be_right(contain(name))), **kw)
