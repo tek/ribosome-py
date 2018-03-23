@@ -1,7 +1,8 @@
 from typing import TypeVar, Callable, Any
 
-from ribosome.nvim import NvimIO, NvimFacade
 from ribosome.nvim.io import NResult, NSuccess
+from ribosome.nvim.api.data import NvimApi
+from ribosome.nvim import NvimIO
 
 from kallikrein import kf
 from kallikrein.expectable import Expectable
@@ -15,7 +16,7 @@ from amino.boolean import false
 A = TypeVar('A')
 
 
-def kn(vim: NvimFacade, f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> Expectable:
+def kn(vim: NvimApi, f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> Expectable:
     return kf(lambda: f(*a, **kw).result(vim))
 
 

@@ -2,8 +2,10 @@ from amino import do, Do, List, Boolean, Maybe, Dat, Just, Nothing
 from amino.boolean import false, true
 
 from ribosome.nvim import NvimIO
-from ribosome.nvim.api import (current_tabpage, current_window, Window, Buffer, window_buffer, Tabpage,
-                               set_buffer_content, set_buffer_option)
+from ribosome.nvim.api.ui import current_tabpage, current_window, window_buffer, set_buffer_content
+from ribosome.nvim.api.data import Window, Buffer, Tabpage
+from ribosome.nvim.api.option import option_buffer_set
+from ribosome.nvim.api.command import nvim_command
 
 
 class ScratchUi(Dat['ScratchUi']):
@@ -23,13 +25,13 @@ class ScratchBuffer(Dat['ScratchBuffer']):
 
 @do(NvimIO[Tabpage])
 def create_scratch_tab() -> Do:
-    yield NvimIO.cmd_sync('tabnew')
+    yield nvim_command('tabnew')
     yield current_tabpage()
 
 
 @do(NvimIO[Window])
 def create_scratch_window(vertical: Boolean) -> Do:
-    yield NvimIO.cmd_sync('vnew' if vertical else 'new', True)
+    yield nvim_command('vnew' if vertical else 'new')
     yield current_window()
 
 
@@ -43,11 +45,11 @@ def create_scratch_ui(use_tab: Boolean, vertical: Boolean) -> Do:
 
 @do(NvimIO[None])
 def configure_scratch_buffer(buffer: Buffer) -> Do:
-    yield set_buffer_option(buffer, 'buftype', 'nofile')
-    yield set_buffer_option(buffer, 'bufhidden', 'wipe')
-    yield set_buffer_option(buffer, 'buflisted', False)
-    yield set_buffer_option(buffer, 'swapfile', False)
-    yield set_buffer_option(buffer, 'modifiable', False)
+    yield option_buffer_set(buffer, 'buftype', 'nofile')
+    yield option_buffer_set(buffer, 'bufhidden', 'wipe')
+    yield option_buffer_set(buffer, 'buflisted', False)
+    yield option_buffer_set(buffer, 'swapfile', False)
+    yield option_buffer_set(buffer, 'modifiable', False)
 
 
 @do(NvimIO[Buffer])
@@ -89,9 +91,9 @@ def create_scratch_buffer(options: CreateScratchBufferOptions) -> Do:
 
 @do(NvimIO[None])
 def set_scratch_buffer_content(scratch: ScratchBuffer, lines: List[str]) -> Do:
-    yield set_buffer_option(scratch.buffer, 'modifiable', True)
+    yield option_buffer_set(scratch.buffer, 'modifiable', True)
     yield set_buffer_content(scratch.buffer, lines)
-    yield set_buffer_option(scratch.buffer, 'modifiable', False)
+    yield option_buffer_set(scratch.buffer, 'modifiable', False)
 
 
 @do(NvimIO[ScratchBuffer])

@@ -3,6 +3,8 @@ from kallikrein import Expectation
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 from ribosome.config.config import NoData
 from ribosome.config.settings import Settings
+from ribosome.nvim.api.variable import variable_set
+from ribosome.nvim.api.command import command_once_defined
 
 
 class SettingsSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
@@ -18,11 +20,11 @@ class SettingsSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
 
     def _pre_start(self) -> None:
         super()._pre_start()
-        self.vim.vars.set('counter', 7)
-        self.vim.vars.set('inc', 14)
+        variable_set('counter', 7).unsafe(self.vim)
+        variable_set('inc', 14).unsafe(self.vim)
 
     def update(self) -> Expectation:
-        self.vim.cmd_once_defined('PlugCheck')
+        command_once_defined('PlugCheck').unsafe(self.vim)
         self._wait(.5)
         return self.var_becomes('counter', 21)
 

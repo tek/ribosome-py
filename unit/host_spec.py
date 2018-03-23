@@ -59,7 +59,7 @@ class HostSpec(SpecBase):
     '''
 
     def multi(self) -> Expectation:
-        helper = DispatchHelper.cons(config, 'extra')
+        helper = DispatchHelper.strict(config, 'extra')
         holder = helper.holder
         as_handler = request_handler(helper.vim, False, holder)
         as_handler('function:core_fun', ((1,),))

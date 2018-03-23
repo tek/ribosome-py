@@ -8,8 +8,11 @@ from amino.util.string import camelcaseify, ToStr
 from amino.list import Nil
 from amino.dat import Dat
 
-from ribosome.nvim import NvimFacade, NvimIO
+from ribosome.nvim.api.data import NvimApi
 from ribosome.logging import ribo_log
+from ribosome.nvim import NvimIO
+from ribosome.nvim.api.rpc import channel_id
+from ribosome.nvim.api.command import nvim_command
 
 A = TypeVar('A')
 
@@ -283,7 +286,7 @@ def register_handler_args(host: str, spec: RpcHandlerSpec) -> List[str]:
     return List(f'remote#define#{fun_prefix}OnHost', host, spec.rpc_method, spec.sync, spec.name, spec.opts)
 
 
-def define_handler_native(vim: NvimFacade, host: str, spec: RpcHandlerSpec
+def define_handler_native(vim: NvimApi, host: str, spec: RpcHandlerSpec
                           ) -> Either[Exception, None]:
     ribo_log.debug1(lambda: f'defining {spec} on {host}')
     args = register_handler_args(host, spec)
@@ -310,10 +313,11 @@ def define_handler_cmd(rhs_f: Callable[[str], str], channel: int, spec: RpcHandl
     return List(spec.def_cmd) + spec.rpc_opts_pre + List(spec.name) + spec.rpc_opts_post + List(rhs)
 
 
-def define_handler_io(rhs: Callable[[str], str], channel: int, spec: RpcHandlerSpec
-                      ) -> NvimIO[DefinedHandler]:
+@do(NvimIO[DefinedHandler])
+def define_handler_io(rhs: Callable[[str], str], channel: int, spec: RpcHandlerSpec) -> Do:
     tokens = define_handler_cmd(rhs, channel, spec)
-    return NvimIO.cmd_sync(tokens.join_tokens).replace(DefinedHandler(spec, channel))
+    yield nvim_command(tokens.join_tokens)
+    return DefinedHandler(spec, channel)
 
 
 def define_function(channel: int, spec: RpcHandlerSpec) -> NvimIO[DefinedHandler]:
@@ -326,9 +330,9 @@ def define_command(channel: int, spec: RpcHandlerSpec) -> NvimIO[DefinedHandler]
 
 @do(NvimIO[DefinedHandler])
 def define_autocmd(channel: int, spec: RpcHandlerSpec, plugin_name: str) -> Generator:
-    yield NvimIO.cmd_sync(f'augroup {plugin_name}')
+    yield nvim_command(f'augroup {plugin_name}')
     result = yield define_handler_io(lambda a: f'call {a}', channel, spec)
-    yield NvimIO.cmd_sync(f'augroup end')
+    yield nvim_command(f'augroup end')
     yield NvimIO.pure(result)
 
 
@@ -345,7 +349,7 @@ def define_handler(channel: int, spec: RpcHandlerSpec, plugin_name: str) -> Nvim
 
 @do(NvimIO[List[DefinedHandler]])
 def define_handlers(specs: List[RpcHandlerSpec], plugin_name: str) -> Generator:
-    channel = yield NvimIO.delay(_.channel_id)
+    channel = yield channel_id()
     yield specs.traverse(L(define_handler)(channel, _, plugin_name), NvimIO)
 
 

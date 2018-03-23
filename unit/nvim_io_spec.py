@@ -1,12 +1,11 @@
-import inspect
-
 from kallikrein import k, Expectation
 from kallikrein.matchers.either import be_right
 
 from amino import do
 from amino.do import Do
 
-from ribosome.nvim import NvimIO, NvimFacade
+from ribosome.nvim.api.data import NvimApi
+from ribosome.nvim import NvimIO
 
 
 class NvimIoSpec:
@@ -19,12 +18,12 @@ class NvimIoSpec:
     '''
 
     def suspend(self) -> Expectation:
-        def f(v: NvimFacade) -> NvimIO[int]:
+        def f(v: NvimApi) -> NvimIO[int]:
             return NvimIO.pure(7)
         return k(NvimIO.suspend(f).attempt(None)).must(be_right(7))
 
     def delay(self) -> Expectation:
-        def f(v: NvimFacade) -> int:
+        def f(v: NvimApi) -> int:
             return 7
         return k(NvimIO.delay(f).attempt(None)).must(be_right(7))
 
@@ -33,7 +32,7 @@ class NvimIoSpec:
             return NvimIO.pure(a + 2)
         def g(a: int) -> NvimIO[int]:
             return NvimIO.suspend(lambda v, b: h(b), a + 1)
-        def f(v: NvimFacade) -> NvimIO[int]:
+        def f(v: NvimApi) -> NvimIO[int]:
             return NvimIO.pure(7)
         return k(NvimIO.suspend(f).flat_map(g).flat_map(h).attempt(None)).must(be_right(12))
 

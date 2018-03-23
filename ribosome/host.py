@@ -15,10 +15,12 @@ from amino.mod import instance_from_module
 from ribosome.config.config import Config
 from ribosome.dispatch.execute import execute_request
 from ribosome.logging import ribo_log, nvim_logging
-from ribosome.nvim import NvimFacade, NvimIO
+from ribosome.nvim.api.data import NvimApi, NativeNvimApi
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.dispatch.update import init_rpc
 from ribosome.config.settings import Settings
+from ribosome.nvim import NvimIO
+from ribosome.nvim.api.variable import variable_set_prefixed
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
@@ -27,7 +29,7 @@ S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
 
-def request_handler(vim: NvimFacade, sync: bool, state: PluginStateHolder[D]) -> Callable[[str, tuple], Any]:
+def request_handler(vim: NvimApi, sync: bool, state: PluginStateHolder[D]) -> Callable[[str, tuple], Any]:
     def handle(name: str, args: tuple) -> Any:
         try:
             return execute_request(vim, state, name, args, sync)
@@ -51,7 +53,7 @@ def run_session(session: Session, dispatch_config: DispatchConfig) -> Do:
     state = yield init_state(dispatch_config)
     holder = PluginStateHolder.concurrent(state)
     ribo_log.debug(f'running session')
-    yield NvimIO.delay(__.vars.set_p('started', True))
+    yield variable_set_prefixed('started', True)
     yield NvimIO.from_io(IO.delay(session._enqueue_notification, 'function:internal_init', ()))
     yield NvimIO.delay(
         lambda vim:
@@ -68,7 +70,7 @@ def no_listen_address(err: Exception) -> None:
 
 
 def run_loop(session: Session, prefix: str, dispatch_config: DispatchConfig) -> int:
-    vim = NvimFacade(Nvim.from_session(session), dispatch_config.name)
+    vim = NativeNvimApi(dispatch_config.name, Nvim.from_session(session)._session)
     return run_session(session, dispatch_config).attempt(vim).get_or_raise()
 
 
@@ -90,7 +92,7 @@ log_initialized = False
 def nvim_log() -> Logger:
     global log_initialized
     if not log_initialized:
-        NvimFacade.stdio_with_logging('ribosome_start_host')
+        NvimApi.stdio_with_logging('ribosome_start_host')
         log_initialized = True
     return ribo_log
 

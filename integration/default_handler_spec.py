@@ -1,5 +1,4 @@
-from kallikrein import Expectation, kf
-from kallikrein.matchers.either import be_right
+from kallikrein import Expectation
 from kallikrein.matchers import contain
 
 from amino.test import temp_dir
@@ -7,6 +6,8 @@ from amino.test import temp_dir
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 from ribosome.config.settings import Settings
 from ribosome.config.config import NoData
+from ribosome.test.klk import kn
+from ribosome.nvim.api.function import call_once_defined, nvim_call_tpe
 
 from integration._support.default_handler import class_name
 
@@ -27,10 +28,10 @@ class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
         pp = pkg.parent
         file = pkg / '__init__.py'
         file.write_text(f'class {class_name}: pass')
-        self.vim.call_once_defined('PlugAppendPythonPath', str(pp))
+        call_once_defined('PlugAppendPythonPath', str(pp)).unsafe(self.vim)
         return (
-            kf(self.vim.call, 'TestPath').must(be_right(class_name)) &
-            kf(self.vim.call, 'PlugShowPythonPath').must(be_right(contain(str(pp))))
+            kn(self.vim, nvim_call_tpe, str, 'TestPath').must(contain(class_name)) &
+            kn(self.vim, nvim_call_tpe, str, 'PlugShowPythonPath').must(contain(contain(str(pp))))
         )
 
 

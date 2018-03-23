@@ -1,7 +1,7 @@
 import abc
 
 from ribosome.trans.message_base import Message, pmessage
-from ribosome import NvimFacade
+from ribosome import NvimApi
 from ribosome.logging import Logging
 from ribosome.nvim.components import Syntax
 
@@ -37,12 +37,12 @@ class UniteEntity(Logging, metaclass=abc.ABCMeta):
     def _func_defs_async(self) -> List[str]:
         ...
 
-    def _force_function_defs(self, vim: NvimFacade) -> None:
+    def _force_function_defs(self, vim: NvimApi) -> None:
         force = lambda c, n: c('silent call {}()'.format(n))
         self._func_defs_sync.foreach(L(force)(vim.cmd_sync, _))
         self._func_defs_async.foreach(L(force)(vim.cmd, _))
 
-    def define(self, vim: NvimFacade) -> None:
+    def define(self, vim: NvimApi) -> None:
         ''' set up sources and kinds dynamically.
         The nvim-python call API cannot be used, as funcrefs cannot be serialized.
         The callback functions must be called once so that exists() can see them, otherwise Unite refuses to work.

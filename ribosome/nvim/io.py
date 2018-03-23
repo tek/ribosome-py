@@ -11,15 +11,16 @@ from neovim.api import NvimError
 from amino.tc.base import ImplicitInstances, F, TypeClass, tc_prop, ImplicitsMeta
 from amino.lazy import lazy
 from amino.tc.monad import Monad
-from amino import Either, __, IO, Maybe, Left, Eval, List, Right, options, Nil, Do, Just, Try, Lists
+from amino import Either, __, IO, Maybe, Left, Eval, List, Right, options, Nil, Do, Just, Try, Lists, curried
 from amino.state import tcs, StateT, State, EitherState
 from amino.func import CallByName, tailrec
 from amino.do import do
 from amino.dat import ADT, ADTMeta
 from amino.io import IOExceptionBase
 from amino.util.trace import default_internal_packages, cframe, callsite_source
+from amino.util.string import decode
 
-from ribosome.nvim.components import NvimFacade
+from ribosome.nvim.api.data import NvimApi
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -95,7 +96,7 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
     debug = options.io_debug.exists
 
     @staticmethod
-    def wrap_either(f: Callable[[NvimFacade], Either[B, A]], frame: FrameSummary=None) -> 'NvimIO[A]':
+    def wrap_either(f: Callable[[NvimApi], Either[B, A]], frame: FrameSummary=None) -> 'NvimIO[A]':
         return NvimIO.suspend(lambda a: f(a).cata(NvimIO.error, NvimIO.pure), _frame=frame)
 
     @staticmethod
@@ -146,13 +147,13 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
     def from_io(io: IO[A]) -> 'NvimIO[A]':
         return NvimIO.delay(lambda a: io.attempt.get_or_raise())
 
-    @staticmethod
-    def fork(f: Callable[[NvimFacade], None]) -> 'NvimIO[None]':
-        return NvimIO.delay(lambda v: Thread(target=f, args=(v,)).start())
+    # @staticmethod
+    # def fork(f: Callable[[NvimApi], None]) -> 'NvimIO[None]':
+    #     return NvimIO.delay(lambda v: Thread(target=f, args=(v,)).start())
 
     @staticmethod
     def delay(f: Callable[..., A], *a: Any, **kw: Any) -> 'NvimIO[A]':
-        def g(vim: NvimFacade) -> A:
+        def g(vim: NvimApi) -> A:
             return Pure(f(vim, *a, **kw))
         return Suspend(g)
 
@@ -162,7 +163,7 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
 
     @staticmethod
     def suspend(f: Callable[..., 'NvimIO[A]'], *a: Any, _frame: FrameSummary=None, **kw: Any) -> 'NvimIO[A]':
-        def g(vim: NvimFacade) -> NvimIO[A]:
+        def g(vim: NvimApi) -> NvimIO[A]:
             return f(vim, *a, **kw)
         return Suspend(g, _frame)
 
@@ -184,14 +185,14 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
 
     @staticmethod
     def write(cmd: str, *args: Any) -> 'NvimIO[A]':
-        return request(cmd, *args).replace(None)
+        return nvim_request(cmd, *args).replace(None)
 
     @abc.abstractmethod
     def _flat_map(self, f: Callable[[A], 'NvimIO[B]'], ts: Eval[str], fs: Eval[str]) -> 'NvimIO[B]':
         ...
 
     @abc.abstractmethod
-    def step(self, vim: NvimFacade) -> 'NvimIO[A]':
+    def step(self, vim: NvimApi) -> 'NvimIO[A]':
         ...
 
     def __init__(self, frame=None) -> None:
@@ -200,7 +201,7 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
     def flat_map(self, f: Callable[[A], 'NvimIO[B]']) -> 'NvimIO[B]':
         return self._flat_map(f)
 
-    def run(self, vim: NvimFacade) -> A:
+    def run(self, vim: NvimApi) -> A:
         @tailrec
         def run(t: 'NvimIO[A]') -> Union[Tuple[bool, A], Tuple[bool, Tuple[Union[A, 'NvimIO[A]']]]]:
             if isinstance(t, Pure):
@@ -215,22 +216,22 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
                 return False, NSuccess(t)
         return run(self)
 
-    def result(self, vim: NvimFacade) -> NResult[A]:
+    def result(self, vim: NvimApi) -> NResult[A]:
         try:
             return self.run(vim)
         except NvimIOException as e:
             return NFatal(e)
 
-    def either(self, vim: NvimFacade) -> Either[NvimIOException, A]:
+    def either(self, vim: NvimApi) -> Either[NvimIOException, A]:
         try:
             return self.run(vim).to_either
         except NvimIOException as e:
             return Left(e)
 
-    def attempt(self, vim: NvimFacade) -> Either[NvimIOException, A]:
+    def attempt(self, vim: NvimApi) -> Either[NvimIOException, A]:
         return self.either(vim)
 
-    def unsafe(self, vim: NvimFacade) -> A:
+    def unsafe(self, vim: NvimApi) -> A:
         return self.either(vim).get_or_raise()
 
     def recover(self, f: Callable[[Exception], B]) -> 'NvimIO[B]':
@@ -247,7 +248,7 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
         yield NvimIO.from_either(result)
 
     def effect(self, f: Callable[[A], Any]) -> 'NvimIO[A]':
-        def wrap(v: NvimFacade) -> A:
+        def wrap(v: NvimApi) -> A:
             ret = self.run(v)
             f(ret)
             return ret
@@ -268,11 +269,11 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO'], implicits=True, imp_mod='ribosome.
 
 class Suspend(Generic[A], NvimIO[A]):
 
-    def __init__(self, thunk: Callable[[NvimFacade], NvimIO[A]], frame: FrameSummary=None) -> None:
+    def __init__(self, thunk: Callable[[NvimApi], NvimIO[A]], frame: FrameSummary=None) -> None:
         super().__init__(frame)
         self.thunk = thunk
 
-    def step(self, vim: NvimFacade) -> NvimIO[A]:
+    def step(self, vim: NvimApi) -> NvimIO[A]:
         try:
             return self.thunk(vim)
         except NvimIOException as e:
@@ -286,13 +287,13 @@ class Suspend(Generic[A], NvimIO[A]):
 
 class BindSuspend(Generic[A, B], NvimIO[B]):
 
-    def __init__(self, thunk: Callable[[NvimFacade], NvimIO[A]], f: Callable[[A], NvimIO[B]], frame: FrameSummary
+    def __init__(self, thunk: Callable[[NvimApi], NvimIO[A]], f: Callable[[A], NvimIO[B]], frame: FrameSummary
                  ) -> None:
         super().__init__(frame)
         self.thunk = thunk
         self.f = f
 
-    def step(self, vim: NvimFacade) -> NvimIO[B]:
+    def step(self, vim: NvimApi) -> NvimIO[B]:
         try:
             step = self.thunk(vim)
         except NvimIOException as e:
@@ -307,7 +308,7 @@ class BindSuspend(Generic[A, B], NvimIO[B]):
             raise NvimIOException('', Nil, e, step.frame)
 
     def _flat_map(self, f: Callable[[B], NvimIO[C]]) -> NvimIO[C]:
-        def bs(vim: NvimFacade) -> NvimIO[C]:
+        def bs(vim: NvimApi) -> NvimIO[C]:
             return BindSuspend(self.thunk, lambda a: self.f(a).flat_map(f), self.frame)
         return Suspend(bs)
 
@@ -321,11 +322,11 @@ class Pure(Generic[A], NvimIO[A]):
     def _arg_desc(self) -> List[str]:
         return List(str(self.value))
 
-    def step(self, vim: NvimFacade) -> NvimIO[A]:
+    def step(self, vim: NvimApi) -> NvimIO[A]:
         return self
 
     def _flat_map(self, f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
-        def g(vim: NvimFacade) -> NvimIO[B]:
+        def g(vim: NvimApi) -> NvimIO[B]:
             return f(self.value)
         return Suspend(g)
 
@@ -338,7 +339,7 @@ class NvimIOError(Generic[A], NvimIO[A]):
     def _flat_map(self, f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
         return self
 
-    def step(self, vim: NvimFacade) -> NvimIO[A]:
+    def step(self, vim: NvimApi) -> NvimIO[A]:
         return self
 
 
@@ -350,7 +351,7 @@ class NvimIOFatal(Generic[A], NvimIO[A]):
     def _flat_map(self, f: Callable[[A], NvimIO[B]]) -> NvimIO[B]:
         return self
 
-    def step(self, vim: NvimFacade) -> NvimIO[A]:
+    def step(self, vim: NvimApi) -> NvimIO[A]:
         return self
 
 
@@ -364,18 +365,33 @@ class NvimIOMonad(Monad[NvimIO]):
 
 
 def nvim_error_msg(exc: NvimError) -> str:
-    return Try(lambda: exc.args[0].decode()) | str(exc)
+    return Try(lambda: decode(exc.args[0])) | str(exc)
 
 
-def nvim_request(name: str, *args: Any) -> NvimIO[A]:
-    def wrap_error(error: NvimIOException) -> NvimIO[A]:
-        msg = nvim_error_msg(error.cause) if isinstance(error.cause, NvimError) else str(error.cause)
-        argsl = Lists.wrap(args)
-        return NvimIOError(f'error in nvim request `{name}({argsl.join_comma})`: {msg}')
-    return NvimIO.delay(__.vim._session.request(name, *args)).recover_with(wrap_error)
+@curried
+def nvim_request_error(name: str, args: tuple, desc: str, error: Any) -> NvimIO[A]:
+    msg = (nvim_error_msg(error.cause) if isinstance(error, NvimIOException) else str(error))
+    return NvimIOError(f'{desc} in nvim request `{name}({Lists.wrap(args).join_comma})`: {msg}')
 
 
-request = nvim_request
+@decode.register(ExtType)
+def decode_ext_type(a: ExtType) -> ExtType:
+    return a
+
+
+@do(NvimIO[Either[str, A]])
+def nvim_nonfatal_request(name: str, *args: Any) -> Do:
+    value = yield (
+        NvimIO.delay(__.request(name, Lists.wrap(args)))
+        .recover_with(nvim_request_error(name, args, 'fatal error'))
+    )
+    return value / decode
+
+
+@do(NvimIO[A])
+def nvim_request(name: str, *args: Any) -> Do:
+    result = yield nvim_nonfatal_request(name, *args)
+    yield NvimIO.from_either(result).recover_with(nvim_request_error(name, args, 'error'))
 
 
 @do(NvimIO[A])
@@ -390,22 +406,28 @@ def typechecked_request(name: str, tpe: Type[A], *args: Any) -> Do:
 
 @do(NvimIO[A])
 def data_cons_request(name: str, cons: Callable[[Any], Either[str, A]], *args: Any) -> Do:
-    raw = yield request(name, *args)
+    raw = yield nvim_request(name, *args)
     yield NvimIO.from_either(cons(raw))
+
+
+@do(NvimIO[Either[str, A]])
+def data_cons_request_nonfatal(name: str, cons: Callable[[Either[str, Any]], Either[str, A]], *args: Any) -> Do:
+    raw = yield nvim_nonfatal_request(name, *args)
+    return cons(raw)
 
 
 class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
 
     @staticmethod
-    def io(f: Callable[[NvimFacade], A]) -> 'NvimIOState[S, A]':
+    def io(f: Callable[[NvimApi], A]) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO.delay(f))
 
     @staticmethod
-    def delay(f: Callable[[NvimFacade], A]) -> 'NvimIOState[S, A]':
+    def delay(f: Callable[[NvimApi], A]) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO.delay(f))
 
     @staticmethod
-    def suspend(f: Callable[[NvimFacade], NvimIO[A]]) -> 'NvimIOState[S, A]':
+    def suspend(f: Callable[[NvimApi], NvimIO[A]]) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(NvimIO.suspend(f))
 
     @staticmethod

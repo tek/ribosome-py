@@ -1,5 +1,5 @@
 import logging
-from typing import TypeVar, Callable
+from typing import TypeVar, Callable, Union
 
 from toolz import merge
 
@@ -8,29 +8,64 @@ from amino.lazy import lazy
 import amino.logging
 from amino.logging import (amino_logger, init_loglevel, amino_root_file_logging, DDEBUG, print_log_info, VERBOSE,
                            LazyRecord, TEST, log_stamp)
-from amino import Path, Logger
+from amino import Path, Logger, Nothing, Maybe, List, Lists
 
 import ribosome  # noqa
 from ribosome import options
+from ribosome.nvim.api.ui import echo
 
 A = TypeVar('A')
 
 
+def squote(text: str) -> str:
+    return text.replace("'", "''")
+
+
+def dquote(text: str) -> str:
+    return text.replace('"', '\\"')
+
+
+def quote(text: str) -> str:
+    return dquote(squote(text))
+
+
+def fmt_echo(text: Union[str, List[str]], cmd: str='echom', prefix: Maybe[str]=Nothing) -> List[str]:
+    lines = text if isinstance(text, List) else Lists.lines(str(text))
+    pre = prefix.map(_ + ': ') | ''
+    return lines.map(lambda a: '{} "{}{}"'.format(cmd, pre, dquote(a)))
+
+
+def fmt_echohl(text: Union[str, List[str]], hl: str, prefix: Maybe[str]=Nothing) -> List[str]:
+    return echo(text, prefix=prefix).cons(f'echohl {hl}').cat('echohl None')
+
+
 class NvimHandler(logging.Handler):
 
-    def __init__(self, vim: 'ribosome.NvimFacade') -> None:
+    def __init__(self, vim: 'ribosome.NvimApi') -> None:
         self.vim = vim
         self.dispatchers = {
-            logging.INFO: self.vim.echo,
-            logging.WARN: self.vim.echowarn,
-            logging.ERROR: self.vim.echoerr,
-            logging.CRITICAL: self.vim.echoerr,
+            logging.INFO: self.echo,
+            logging.WARN: self.echowarn,
+            logging.ERROR: self.echoerr,
+            logging.CRITICAL: self.echoerr,
         }
         super().__init__()
 
     def emit(self, record: LazyRecord) -> None:
-        dispatcher = self.dispatchers.get(record.levelno, self.vim.echom)
+        dispatcher = self.dispatchers.get(record.levelno, self.echom)
         dispatcher(record.short())
+
+    def echo(self, msg: str) -> None:
+        echo(msg).unsafe(self.vim)
+
+    def echowarn(self, msg: str) -> None:
+        echo(msg).unsafe(self.vim)
+
+    def echoerr(self, msg: str) -> None:
+        echo(msg).unsafe(self.vim)
+
+    def echom(self, msg: str) -> None:
+        echo(msg).unsafe(self.vim)
 
 
 class NvimFilter(logging.Filter):
@@ -68,20 +103,20 @@ def ribosome_envvar_file_logging() -> None:
     options.ribo_log_file.value % (lambda f: amino_root_file_logging(logfile=Path(f), level=TEST, **fmt))
 
 
-def ribosome_nvim_handler(vim: 'ribosome.NvimFacade') -> None:
+def ribosome_nvim_handler(vim: 'ribosome.NvimApi') -> None:
     handler = NvimHandler(vim)
     handler.addFilter(nvim_filter)
     ribosome_root_logger.addHandler(handler)
     init_loglevel(handler, VERBOSE)
 
 
-def nvim_logging(vim: 'ribosome.NvimFacade', file_kw: dict=dict()) -> logging.Handler:
+def nvim_logging(vim: 'ribosome.NvimApi', file_kw: dict=dict()) -> logging.Handler:
     global _nvim_logging_initialized
     if not _nvim_logging_initialized:
         ribosome_nvim_handler(vim)
         _nvim_logging_initialized = True
         ribosome_envvar_file_logging()
-        return ribosome_file_logging(vim.prefix, file_kw)
+        return ribosome_file_logging(vim.name, file_kw)
 
 
 class Logging(amino.logging.Logging):

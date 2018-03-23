@@ -1,6 +1,6 @@
 
 class LegacyData:
-    # vim_facade = maybe_field((NvimFacade, AsyncVimProxy))
+    # vim_facade = maybe_field((NvimApi, AsyncVimProxy))
     # sub_states = field(Map, initial=Map())
     # debug = bool_field()
 

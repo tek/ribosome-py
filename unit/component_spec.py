@@ -99,12 +99,12 @@ class ComponentSpec(SpecBase):
     '''
 
     def enable_component(self) -> Expectation:
-        helper = DispatchHelper.cons(config)
+        helper = DispatchHelper.strict(config)
         s = helper.unsafe_run_s('command:enable_components', args=('extra',))
         return k(s.components.all / _.name).must(contain('extra'))
 
     def switch(self) -> Expectation:
-        helper = DispatchHelper.cons(config, 'extra')
+        helper = DispatchHelper.strict(config, 'extra')
         s, r = helper.unsafe_run('function:switch', args=())
         return (
             (k(r) == 17) &

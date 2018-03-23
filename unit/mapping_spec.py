@@ -19,6 +19,7 @@ from ribosome.dispatch.component import Component, ComponentData
 from ribosome.config.config import Config
 from ribosome.dispatch.mapping import Mappings, Mapping, mapmode
 from ribosome.trans.mapping import activate_mapping
+from ribosome.nvim.api.command import nvim_command_output
 
 keys = 'gs'
 gs_mapping = Mapping.cons('gs', true, List(mapmode.Normal(), mapmode.Visual()))
@@ -76,7 +77,7 @@ class MappingSpec(ExternalSpec):
         def run() -> Do:
             s = yield helper.run_s('function:setup_map', args=())
             s1 = yield helper.set.state(s).run_s('function:map', args=(str(gs_mapping.uuid), 'gs'))
-            maps = yield NvimIO.delay(__.cmd_output('map <buffer>'))
+            maps = yield nvim_command_output('map <buffer>')
             return s1.component_data.lift('main'), maps
         data, maps = run().unsafe(self.vim)
         return (

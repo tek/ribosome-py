@@ -17,7 +17,7 @@ from amino.do import Do
 
 import ribosome
 from ribosome.logging import Logging
-from ribosome.nvim import NvimFacade
+from ribosome.nvim.api.data import NvimApi
 
 
 class Result(ToStr):
@@ -222,7 +222,7 @@ class ProcessExecutor(Logging, abc.ABC):
 
 class NvimProcessExecutor(ProcessExecutor):
 
-    def __init__(self, vim: NvimFacade, loop=None) -> None:
+    def __init__(self, vim: NvimApi, loop=None) -> None:
         self.vim = vim
         super().__init__(loop, self._main_event_loop)
 

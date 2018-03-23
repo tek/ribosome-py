@@ -5,8 +5,10 @@ from amino import List, Either, __, Left, Eval
 from amino.util.string import ToStr
 from amino.do import do, Do
 
-from ribosome.nvim import NvimIO, NvimFacade
+from ribosome.nvim import NvimIO
 from ribosome.logging import Logging
+from ribosome.nvim.api.variable import variable_prefixed, variable, variable_set, variable_set_prefixed
+from ribosome.nvim.api.util import cons_checked_e
 
 A = TypeVar('A', contravariant=True)
 B = TypeVar('B')
@@ -65,15 +67,8 @@ class StrictSetting(Generic[A, B], Setting[B]):
 
     @property
     def value(self) -> NvimIO[Either[str, B]]:
-        @do(Either[str, B])
-        def read(v: NvimFacade) -> Do:
-            self.log.debug(f'request variable `{self.name}`')
-            getter = v.sync_vars.p if self.prefix else v.sync_vars.get
-            untyped = getter(self.name)
-            raw = yield v.sync_vars.typed(self.tpe, untyped)
-            self.log.debug(f'variable `{self.name}`: {raw}')
-            yield self.ctor(raw)
-        return NvimIO.delay(read)
+        api_call = variable_prefixed if self.prefix else variable
+        return api_call(self.name, cons_checked_e(self.tpe, self.ctor))
 
     def value_or(self, default: B) -> NvimIO[B]:
         return self.value / __.get_or_else(default)
@@ -83,10 +78,8 @@ class StrictSetting(Generic[A, B], Setting[B]):
         return self.default
 
     def update(self, value: B) -> NvimIO[None]:
-        def write(v: NvimFacade) -> NvimIO[None]:
-            setter = v.sync_vars.set_p if self.prefix else v.sync_vars.set
-            setter(self.name, value)
-        return NvimIO.delay(write)
+        api_call = variable_set_prefixed if self.prefix else variable_set
+        return api_call(self.name, value)
 
 
 class EvalSetting(Generic[B], Setting[B]):

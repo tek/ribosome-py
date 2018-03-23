@@ -90,33 +90,33 @@ class DispatchSpec(SpecBase):
     '''
 
     def trans_free(self) -> Expectation:
-        helper = DispatchHelper.cons(config)
+        helper = DispatchHelper.strict(config)
         result = helper.unsafe_run_a('command:trfree', args=('x',))
         return k(result) == 8
 
     def io(self) -> Expectation:
-        helper = DispatchHelper.cons(config)
+        helper = DispatchHelper.strict(config)
         result = helper.unsafe_run_a('command:trio')
         return k(result) == 5
 
     def internal(self) -> Expectation:
-        helper = DispatchHelper.cons(config)
+        helper = DispatchHelper.strict(config)
         state, result = helper.unsafe_run('function:int')
         return k(result) == state.name
 
     def data(self) -> Expectation:
-        helper = DispatchHelper.cons(config)
+        helper = DispatchHelper.strict(config)
         state = helper.unsafe_run_s('function:dat')
         return k(state.data.counter) == 23
 
     def json(self) -> Expectation:
-        helper = DispatchHelper.cons(config)
+        helper = DispatchHelper.strict(config)
         js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
         result = helper.unsafe_run_a('command:json', args=(7, 'one', *Lists.split(js, ' ')))
         return k(result) == 9
 
     def autocmd(self) -> Expectation:
-        helper = DispatchHelper.cons(config)
+        helper = DispatchHelper.strict(config)
         state = helper.unsafe_run_s('autocmd:vim_enter')
         return k(state.data.counter) == 19
 

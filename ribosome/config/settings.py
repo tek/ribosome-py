@@ -72,10 +72,10 @@ def path_list(data: list) -> Either[str, List[Path]]:
     return Lists.wrap(data).traverse(lambda a: Try(Path, a) / __.expanduser(), Either)
 
 
-str_setting = setting_ctor(str, lambda a: Right(a))
-int_setting = setting_ctor(int, lambda a: Right(a))
-float_setting = setting_ctor(float, lambda a: Right(a))
-list_setting = setting_ctor(list, cast(Callable[[Iterable[A]], Either[str, List[B]]], (lambda a: Right(Lists.wrap(a)))))
+str_setting = setting_ctor(str, Right)
+int_setting = setting_ctor(int, Right)
+float_setting = setting_ctor(float, Right)
+list_setting = setting_ctor(list, Right)
 path_setting = setting_ctor(str, (lambda a: Try(Path, a)))
 path_list_setting = setting_ctor(list, path_list)
 map_setting = setting_ctor(dict, lambda a: Right(Map(a)))

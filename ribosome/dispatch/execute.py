@@ -11,7 +11,7 @@ from amino.io import IOException
 from amino.string.hues import red, blue, green
 from amino.util.string import decode
 
-from ribosome.nvim import NvimIO, NvimFacade
+from ribosome.nvim import NvimIO
 from ribosome.logging import ribo_log
 from ribosome.config.config import Config
 from ribosome.nvim.io import NS, NResult, NSuccess, NError, NFatal
@@ -25,6 +25,7 @@ from ribosome.trans.action import LogMessage, Info, Error
 from ribosome.trans.handler import TransF, Trans, TransMBind, TransMPure
 from ribosome.config.settings import Settings
 from ribosome.trans.run import TransComplete
+from ribosome import NvimApi
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
@@ -236,14 +237,14 @@ def dispatch_job(state: PluginStateHolder[D], name: str, args: tuple, sync: bool
     return DispatchJob(state, decode(name), fun_args, sync, bang)
 
 
-def execute_request(vim: NvimFacade, state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> Any:
+def execute_request(vim: NvimApi, state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> Any:
     sync_prefix = '' if sync else 'a'
     job = dispatch_job(state, name, args, sync)
     ribo_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
     result = request_result(job)(execute_dispatch_job(job).result(vim))
     if sync:
         ribo_log.debug(f'request `{job.name}` completed: {result}')
-    return vim.encode_vim_data(result)
+    return decode(result)
 
 
 __all__ = ('execute_dispatch_job', 'execute', 'compute_dispatches', 'compute_dispatch')

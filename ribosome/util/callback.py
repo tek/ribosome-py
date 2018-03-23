@@ -5,7 +5,7 @@ from typing import Callable
 from amino import Maybe, Either, __, Right, L, List, _, Map, Try
 
 from ribosome.logging import Logging
-from ribosome.nvim import NvimFacade
+from ribosome.nvim.api.data import NvimApi
 
 
 class VimCallback(Logging, metaclass=abc.ABCMeta):
@@ -34,10 +34,10 @@ class CallbackSpec(Logging, metaclass=abc.ABCMeta):
         self.spec = spec
 
     @abc.abstractmethod
-    def func(self, vim: NvimFacade) -> Either[str, Callable]:
+    def func(self, vim: NvimApi) -> Either[str, Callable]:
         ...
 
-    def __call__(self, vim: NvimFacade, *a):
+    def __call__(self, vim: NvimApi, *a):
         return self.func(vim) // __(*a)
 
     def __str__(self):

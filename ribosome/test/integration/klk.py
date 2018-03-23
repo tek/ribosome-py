@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Callable, Any, Union, Type, TypeVar, Generic
 
 from amino.test.spec import default_timeout
-from amino import List, __
+from amino import List
 
 from kallikrein import Expectation, kf
 from kallikrein.expectable import Expectable
@@ -17,8 +17,9 @@ from kallikrein.matchers.either import be_right
 
 from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationSpec, ExternalIntegrationSpec,
                                             AutoPluginIntegrationSpec)
-from ribosome.nvim.components import Buffer
 from ribosome.config.settings import Settings
+from ribosome.test.klk import kn
+from ribosome.nvim.api.variable import variable_prefixed_raw, variable_raw
 
 
 def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> Expectation:
@@ -40,7 +41,7 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
         return later(kf(pred, *a, **kw).true)
 
     @property
-    def buffer(self) -> Buffer:
+    def buffer(self) -> Any:
         return self.vim.buffer
 
     @property
@@ -105,13 +106,13 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
         return later(kf(self.trans_log).must(be_right(contain(name))), **kw)
 
     def var_is(self, name: str, value: Any) -> Expectation:
-        return kf(self.vim.vars, name).must(be_right(value))
+        return kn(self.vim, variable_raw, name).must(contain(be_right(value)))
 
     def var_becomes(self, name: str, value: Any) -> Expectation:
         return later(self.var_is(name, value))
 
     def pvar_is(self, name: str, value: Any) -> Expectation:
-        return kf(self.vim.vars.p, name).must(be_right(value))
+        return kn(self.vim, variable_prefixed_raw, name).must(contain(be_right(value)))
 
     def pvar_becomes(self, name: str, value: Any) -> Expectation:
         return later(self.pvar_is(name, value))

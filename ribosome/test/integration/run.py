@@ -1,16 +1,11 @@
 from typing import Callable, Tuple, Any, TypeVar, Generic
 
-from ribosome.nvim import NvimIO, NvimFacade
-from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
-
-from toolz import assoc
-
-from amino import Lists, Map, Just, List, __
+from amino import Lists, Map, List, __, Either, Left, Right, do, Do
 from amino.dat import Dat
 from amino.lenses.lens import lens
+
 from ribosome.dispatch.run import DispatchJob, DispatchState
 from ribosome.dispatch.data import Dispatch, DIO
-from ribosome.test.spec import MockNvimFacade
 from ribosome.host import init_state
 from ribosome.dispatch.execute import dispatch_job, compute_dispatches, compute_dispatch
 from ribosome.nvim.io import NvimIOState, NS
@@ -18,6 +13,10 @@ from ribosome.config.config import Config, Resources
 from ribosome.trans.run import TransComplete
 from ribosome.config.settings import Settings
 from ribosome.dispatch.component import ComponentData
+from ribosome.nvim.api.data import NvimApi, StrictNvimApi
+from ribosome.nvim import NvimIO
+from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
+from ribosome.nvim.api.variable import variable_set
 
 C = TypeVar('C')
 D = TypeVar('D')
@@ -26,18 +25,49 @@ CC = TypeVar('CC')
 IOExec = Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]
 
 
+def api_info(name: str, args: List[Any]) -> Either[str, Any]:
+    return Right((1, {}))
+
+
+def rh_nvim_command(name: str, args: List[Any]) -> Either[str, Any]:
+    return Right(None)
+
+
+@do(Either[str, Any])
+def default_request_handler(name: str, args: List[Any]) -> Do:
+    handler = yield default_request_handlers.lift(name).to_either(f'no default request handler for {name}')
+    yield handler(name, args)
+
+
+default_request_handlers = Map({
+    'silent': default_request_handler,
+    'silent!': default_request_handler,
+    'nvim_get_api_info': api_info,
+    'nvim_command': rh_nvim_command,
+})
+
+
+class StrictRequestHandler:
+
+    def __init__(self, extra: Callable[[str, List[Any]], Either[str, Any]]) -> None:
+        self.extra = extra
+
+    def __call__(self, name: str, args: List[Any]) -> Either[str, Any]:
+        return self.extra(name, args).lmap(List).accum_error_lift(default_request_handler, name, args)
+
+
 class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
 
     @staticmethod
     def create(
             config: Config[S, D, CC],
             *comps: str,
-            vars: dict=dict(),
-            cons_vim: Callable[[dict], NvimFacade],
+            vars: Map[str, Any]=Map(),
+            cons_vim: Callable[[dict], NvimApi],
             io_executor: IOExec=None,
     ) -> 'DispatchHelper':
-        comps_var = (f'{config.name}_components', Lists.wrap(comps))
-        vim = cons_vim(assoc(vars, *comps_var))
+        comps_var = Map({f'{config.name}_components': Lists.wrap(comps)})
+        vim = cons_vim(vars ** comps_var)
         dc = DispatchConfig.cons(config, io_executor=io_executor)
         state = init_state(dc).unsafe(vim)
         return DispatchHelper(vim, dc, state)
@@ -45,31 +75,29 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
     @staticmethod
     def nvim(
             config: Config,
-            vim: NvimFacade,
+            vim: NvimApi,
             *comps: str,
             vars: dict=dict(),
             io_executor: IOExec=None,
     ) -> 'DispatchHelper':
-        def cons_vim(vars: dict) -> NvimFacade:
+        def cons_vim(vars: dict) -> NvimApi:
             for k, v in vars.items():
-                vim.vars.set(k, v)
+                variable_set(k, v).unsafe(vim)
             return vim
-        return DispatchHelper.create(config, *comps, vars=vars, cons_vim=cons_vim, io_executor=io_executor)
+        return DispatchHelper.create(config, *comps, vars=Map(vars), cons_vim=cons_vim, io_executor=io_executor)
 
     @staticmethod
-    def mock(
+    def strict(
             config: Config,
             *comps: str,
-            vars: dict=dict(),
-            responses: Callable[[str], Map[str, Any]]=lambda a: Just(0),
+            vars: Map[str, Any]=Map(),
+            request_handler: Callable[[str, List[Any]], Either[str, Any]]=lambda n, a: Left(f'no handler for {n}'),
             io_executor: Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]=None,
     ) -> 'DispatchHelper':
-        cons_vim = lambda vs: MockNvimFacade(prefix=config.name, vars=vs, responses=responses)
+        cons_vim = lambda vs: StrictNvimApi(config.name, vars=vs, request_handler=StrictRequestHandler(request_handler))
         return DispatchHelper.create(config, *comps, vars=vars, cons_vim=cons_vim, io_executor=io_executor)
 
-    cons = mock
-
-    def __init__(self, vim: MockNvimFacade, dispatch_config: DispatchConfig, state: PluginState[S, D, CC]) -> None:
+    def __init__(self, vim: NvimApi, dispatch_config: DispatchConfig, state: PluginState[S, D, CC]) -> None:
         self.vim = vim
         self.dispatch_config = dispatch_config
         self.state = state

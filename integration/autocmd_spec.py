@@ -1,8 +1,10 @@
-from kallikrein import Expectation, pending
+from kallikrein import Expectation
 
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 from ribosome.config.config import NoData
 from ribosome.config.settings import Settings
+from ribosome.nvim.api.variable import variable_set_prefixed
+from ribosome.nvim.api.command import command_once_defined, doautocmd
 
 from integration._support.autocmd import val
 
@@ -20,11 +22,11 @@ class AutocmdSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
 
     def _pre_start(self) -> None:
         super()._pre_start()
-        self.vim.vars.set_p('components', ['core'])
+        variable_set_prefixed('components', ['core']).unsafe(self.vim)
 
     def autocmd(self) -> Expectation:
-        self.vim.cmd_once_defined('PlugStage1')
-        self.vim.doautocmd('VimResized')
+        command_once_defined('PlugStage1').unsafe(self.vim)
+        doautocmd('VimResized').unsafe(self.vim)
         return self.var_becomes('autocmd_success', val)
 
 

@@ -114,7 +114,7 @@ class TransMSpec(SpecBase):
     '''
 
     def test(self) -> Expectation:
-        helper = DispatchHelper.cons(config)
+        helper = DispatchHelper.strict(config)
         ds = DispatchState(helper.state, RootDispatch())
         a = run_trans_m(tm.fun()).run_a(ds).unsafe(helper.vim)
         return k(a) == 24

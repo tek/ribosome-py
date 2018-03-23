@@ -10,10 +10,11 @@ from ribosome.trans.api import trans
 from ribosome.nvim.io import NS
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.nvim import NvimIO
-from ribosome.nvim.api import buffers, windows, Window, Buffer, current_buffer, buffer_content
 from ribosome.nvim.scratch import CreateScratchBufferOptions, show_in_scratch_buffer
 from ribosome.test.config import single_trans_config
 from ribosome.test.integration.default import ExternalSpec
+from ribosome.nvim.api.ui import buffer_content, buffers, windows, current_buffer
+from ribosome.nvim.api.data import Window, Buffer
 
 
 @trans.free.result(trans.st)

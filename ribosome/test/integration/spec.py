@@ -25,8 +25,12 @@ from amino.json.data import JsonError
 
 import ribosome
 from ribosome.logging import Logging
-from ribosome.nvim import AsyncVimProxy, NvimFacade
+from ribosome.nvim.api.data import NvimApi
 from ribosome.config.settings import Settings
+from ribosome.nvim.api.data import NativeNvimApi
+from ribosome.nvim.api.option import option_cat
+from ribosome.nvim.api.variable import variable_set_prefixed
+from ribosome.nvim.api.function import define_function, nvim_call_function
 
 
 def wait_for(cond: Callable[[], bool], timeout: float=None, intval: float=0.1) -> bool:
@@ -41,7 +45,6 @@ class IntegrationSpecBase(AminoIntegrationSpecBase):
 
     def setup(self) -> None:
         AminoIntegrationSpecBase.setup(self)
-        AsyncVimProxy.allow_async_relay = False
 
     def teardown(self) -> None:
         AminoIntegrationSpecBase.teardown(self)
@@ -174,8 +177,8 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         if self.tmux_pane is not None and not self.keep_tmux_pane:
             self.tmux_pane.cmd('kill-pane')
 
-    def _nvim_facade(self, vim: Nvim) -> NvimFacade:
-        return NvimFacade(vim, self.plugin_name())
+    def _nvim_facade(self, vim: Nvim) -> NvimApi:
+        return NativeNvimApi(self.plugin_name(), vim._session)
 
     @abc.abstractmethod
     def plugin_name(self) -> str:
@@ -206,8 +209,8 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
 
     def _post_start_neovim(self) -> None:
         rtp = fixture_path('config', 'rtp')
-        self.vim.options.amend_l('runtimepath', rtp)
-        self.vim.vars.set_p('debug', True)
+        option_cat('runtimepath', List(rtp)).unsafe(self.vim)
+        variable_set_prefixed('debug', True)
 
     def _pre_start(self) -> None:
         pass
@@ -316,11 +319,10 @@ class ExternalIntegrationSpec(VimIntegrationSpec):
     def _pre_start_neovim(self):
         super()._pre_start_neovim()
         ribosome.in_vim = False
-        NvimFacade.async = _mock_async
-        NvimFacade.main_event_loop = _nop_main_loop
-        NvimFacade.proxy = property(_mock_proxy)
-        NvimFacade.clean = lambda self: True
-        AsyncVimProxy.allow_async_relay = False
+        # NvimApi.async = _mock_async
+        # NvimApi.main_event_loop = _nop_main_loop
+        # NvimApi.proxy = property(_mock_proxy)
+        # NvimApi.clean = lambda self: True
 
     def _post_start_neovim(self):
         cls = self.plugin_class.get_or_raise()
@@ -377,11 +379,11 @@ class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
         python3 ribosome_envvar_file_logging()
         execute 'python3 amino.amino_log.error(f"""error starting rpc job on channel ' . a:id . ':\\r' . err . '""")'
         '''
-        self.vim.define_function(stderr_handler_name, List('id', 'data', 'event'), stderr_handler_body)
+        define_function(stderr_handler_name, List('id', 'data', 'event'), stderr_handler_body).unsafe(self.vim)
         cmd = f'from ribosome.host import start_module; start_module({self.module()!r})'
         args = ['python3', '-c', cmd]
         opts = dict(rpc=True, on_stderr=stderr_handler_name)
-        self.vim.call('jobstart', args, opts).get_or_raise()
+        nvim_call_function('jobstart', args, opts).unsafe(self.vim)
 
     def send_json(self, data: str) -> None:
         self.vim.call(f'{self.plugin_name}Send', data)

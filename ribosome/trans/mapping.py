@@ -7,6 +7,7 @@ from ribosome.dispatch.mapping import Mapping, MapMode
 from ribosome.nvim import NvimIO
 from ribosome.trans.handler import TransF
 from ribosome.dispatch.component import Components
+from ribosome.nvim.api.command import nvim_command
 
 
 def mapping_handler(mapping: Mapping, components: Components) -> Either[str, TransF]:
@@ -16,8 +17,13 @@ def mapping_handler(mapping: Mapping, components: Components) -> Either[str, Tra
 def mapping_cmd(plugin: str, mapping: Mapping, mode: MapMode) -> NvimIO[None]:
     buf = '<buffer>' if mapping.buffer else ''
     keys = mapping.keys.replace('<', '<lt>')
-    cmdline = f'''{mode.mnemonic}map {buf} {mapping.keys} :call {plugin}Map('{mapping.uuid}', '{keys}')<cr>'''
-    return NvimIO.cmd(cmdline)
+    rhs = f''':call {plugin}Map('{mapping.uuid}', '{keys}')<cr>'''
+    return nvim_command(
+        f'{mode.mnemonic}map',
+        buf,
+        mapping.keys,
+        rhs,
+    )
 
 
 @do(NS[PluginState, None])
