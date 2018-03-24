@@ -53,7 +53,7 @@ def cons_ext_list(cons: Callable[[ExtType], A]) -> Callable[[Any], Either[str, L
     return cons_checked_list(ExtType, cons)
 
 
-cons_decode_str = cons_checked_e((bytes, str), (lambda a: Try(a.decode) if isinstance(a, bytes) else a))
+cons_decode_str = cons_checked_e((bytes, str), (lambda a: Try(a.decode) if isinstance(a, bytes) else Right(a)))
 
 
 def check_str_list(a: list) -> Either[str, List[str]]:
