@@ -8,9 +8,10 @@ from ribosome.nvim.api.util import run_once_defined, cons_split_lines
 A = TypeVar('A')
 
 
-def nvim_command(cmd: str, *args: Any) -> NvimIO[None]:
+def nvim_command(cmd: str, *args: Any, verbose: bool=False) -> NvimIO[None]:
     arg_string = ' '.join(map(str, args))
-    return NvimIO.write('nvim_command', f'silent! {cmd} {arg_string}')
+    silent = 'silent! ' if verbose else ''
+    return NvimIO.write('nvim_command', f'{silent}{cmd} {arg_string}')
 
 
 def nvim_command_output(cmd: str, *args: Any) -> NvimIO[None]:
