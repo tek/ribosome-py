@@ -17,7 +17,7 @@ A = TypeVar('A')
 B = TypeVar('B')
 
 
-class TransMMeta(ADTMeta, ImplicitsMeta):
+class TransMeta(ADTMeta, ImplicitsMeta):
 
     def __new__(cls, name: str, bases: List[type], namespace: SimpleNamespace, **kw: Any) -> None:
         return super().__new__(cls, name, bases, namespace, **kw)
@@ -31,11 +31,11 @@ class TransMMeta(ADTMeta, ImplicitsMeta):
         return TransF.cons(lambda a: a)
 
 
-class Trans(Generic[A], ADT['Trans'], Implicits, implicits=True, auto=True, base=True, metaclass=TransMMeta):
+class Trans(Generic[A], ADT['Trans'], Implicits, implicits=True, auto=True, base=True, metaclass=TransMeta):
 
     @staticmethod
     def from_maybe(fa: Maybe[A], error: CallByName) -> 'Trans[A]':
-        return fa / Trans.cont | (lambda: Trans.error(error))
+        return fa / Trans.pure | (lambda: Trans.error(error))
 
     @staticmethod
     def from_either(fa: Either[str, A]) -> 'Trans[A]':
@@ -43,14 +43,14 @@ class Trans(Generic[A], ADT['Trans'], Implicits, implicits=True, auto=True, base
 
     @staticmethod
     def pure(a: A) -> 'Trans[A]':
-        return TransMPure(a)
+        return TransPure(a)
 
     @staticmethod
     def error(error: CallByName) -> 'Trans[A]':
-        return TransMError(call_by_name(error))
+        return TransError(call_by_name(error))
 
 
-class TransMBind(Generic[A], Trans[A]):
+class TransBind(Generic[A], Trans[A]):
 
     def __init__(self, fa: Trans[A], f: Callable[[A], Trans[B]]) -> None:
         super().__init__()
@@ -58,25 +58,25 @@ class TransMBind(Generic[A], Trans[A]):
         self.f = f
 
 
-class TransMPure(Generic[A], Trans[A]):
+class TransPure(Generic[A], Trans[A]):
 
     def __init__(self, value: A) -> None:
         self.value = value
 
 
-class TransMError(Generic[A], Trans[A]):
+class TransError(Generic[A], Trans[A]):
 
     def __init__(self, error: str) -> None:
         self.error = error
 
 
-class Monad_TransM(Monad, tpe=Trans):
+class Monad_Trans(Monad, tpe=Trans):
 
     def pure(self, a: A) -> Trans[A]:
         return Trans.pure(a)
 
     def flat_map(self, fa: Trans, f: Callable[[A], Trans[B]]) -> None:
-        return TransMBind(fa, f)
+        return TransBind(fa, f)
 
 
 class TransF(Generic[A], Trans[A]):

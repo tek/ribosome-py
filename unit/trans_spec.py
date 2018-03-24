@@ -1,4 +1,6 @@
-from kallikrein import k, Expectation
+from typing import TypeVar
+
+from kallikrein import k, Expectation, kf
 
 from amino.test.spec import SpecBase
 from amino import List, Map, do, Do, Dat, _
@@ -10,10 +12,14 @@ from ribosome.request.handler.handler import RequestHandler
 from ribosome.trans.api import trans
 from ribosome.dispatch.component import Component
 from ribosome.trans.action import Trans
-from ribosome.dispatch.execute import run_trans_m
+from ribosome.dispatch.execute import eval_trans
 from ribosome.plugin_state import DispatchConfig, RootDispatch
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.dispatch.run import DispatchState
+from ribosome.test.klk import kn
+from ribosome.nvim.io import NError
+
+A = TypeVar('A')
 
 
 class CoreData(Dat['CoreData']):
@@ -53,6 +59,7 @@ def t1(a: int) -> Do:
 @do(State[ExtraData, int])
 def t2_b(a: int) -> Do:
     yield State.modify(lens.comp.y.modify(_ + 39))
+    return a + 3
 
 
 @trans.free.do()
@@ -64,16 +71,16 @@ def t2(a: int) -> Do:
 @trans.free.result(trans.st)
 @do(State[CoreData, int])
 def t3(a: int) -> Do:
-    yield State.modify(lens.x.modify(_ + 39))
+    yield State.modify(lens.x.modify(_ + a))
     yield State.inspect(_.x)
 
 
 @trans.free.do()
 @do(Trans)
 def tm() -> Do:
-    yield t1(0)
-    yield t2(0)
-    yield t3(0)
+    a = yield t1(0)
+    b = yield t2(a)
+    yield t3(b)
 
 
 c1 = Component.cons(
@@ -106,18 +113,45 @@ config = Config.cons(
     ),
 )
 dispatch_conf = DispatchConfig.cons(config)
+helper = DispatchHelper.strict(config)
+ds = DispatchState(helper.state, RootDispatch())
 
 
-class TransMSpec(SpecBase):
+def run(t: Trans[A]) -> A:
+    return eval_trans(t).run_a(ds).unsafe(helper.vim)
+
+
+@trans.free.do()
+@do(Trans[None])
+def n3(a: int) -> Do:
+    yield Trans.error('stop')
+
+
+@trans.free.do()
+@do(Trans[None])
+def n2() -> Do:
+    yield Trans.pure(7)
+
+
+@trans.free.do()
+@do(Trans[None])
+def n1() -> Do:
+    a = yield n2()
+    b = yield n3(a)
+    return b + 7
+
+
+class TransSpec(SpecBase):
     '''
-    test $test
+    nest several trans $nest
+    fail on error $error
     '''
 
-    def test(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
-        ds = DispatchState(helper.state, RootDispatch())
-        a = run_trans_m(tm.fun()).run_a(ds).unsafe(helper.vim)
-        return k(a) == 24
+    def nest(self) -> Expectation:
+        return kf(run, tm) == -7
+
+    def error(self) -> Expectation:
+        return kn(helper.vim, eval_trans.match(n1).run_a, ds) == NError('stop')
 
 
-__all__ = ('TransMSpec',)
+__all__ = ('TransSpec',)

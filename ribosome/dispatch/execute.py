@@ -22,7 +22,7 @@ from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit,
                                     DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO, DispatchLog)
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliation, AffiliatedDispatch
 from ribosome.trans.action import LogMessage, Info, Error
-from ribosome.trans.handler import TransF, Trans, TransMBind, TransMPure
+from ribosome.trans.handler import TransF, Trans, TransBind, TransPure, TransError
 from ribosome.config.settings import Settings
 from ribosome.trans.run import TransComplete
 from ribosome import NvimApi
@@ -77,16 +77,16 @@ class execute_io(PatMat, alg=DIO):
 
 
 @do(NS[DispatchState[S, D, CC], R])
-def run_trans_m_trans(handler: TransF, aff: DispatchAffiliation) -> Do:
+def run_trans_f(handler: TransF, aff: DispatchAffiliation) -> Do:
     yield plugin_to_dispatch(log_trans(handler))
     result = yield run_trans(aff, handler, Nil)
     yield execute_dispatch_output.match(result)
 
 
-# TODO determine affiliation from the type in the handler's state
-@do(NS[DispatchState[S, D, CC], R])
-def run_trans_m(tr: Trans) -> Do:
-    if isinstance(tr, TransF):
+class eval_trans(PatMat[Trans, R], alg=Trans):
+
+    @do(NS[DispatchState[S, D, CC], R])
+    def trans_f(self, tr: TransF[R]) -> Do:
         current = yield NS.inspect(_.aff)
         aff = yield NS.inspect(__.state.reaffiliate(tr, current))
         if current != aff:
@@ -94,15 +94,24 @@ def run_trans_m(tr: Trans) -> Do:
             to_name = green(aff.name)
             ribo_log.debug(f'switching dispatch affiliation for {blue(tr.name)}: {from_name} -> {to_name}')
         yield NS.modify(__.set.aff(aff))
-        result = yield run_trans_m_trans(tr, aff)
+        result = yield run_trans_f(tr, aff)
         yield NS.modify(__.set.aff(current))
         yield NS.pure(result)
-    elif isinstance(tr, TransMBind):
-        result = yield run_trans_m(tr.fa)
+
+    # TODO determine affiliation from the type in the handler's state
+    @do(NS[DispatchState[S, D, CC], R])
+    def trans_bind(self, tr: TransBind[R]) -> Do:
+        result = yield self(tr.fa)
         next_trans = tr.f(result)
-        yield run_trans_m(next_trans)
-    elif isinstance(tr, TransMPure):
+        yield self(next_trans)
+
+    @do(NS[DispatchState[S, D, CC], R])
+    def trans_pure(self, tr: TransPure[R]) -> Do:
         yield NS.pure(tr.value)
+
+    @do(NS[DispatchState[S, D, CC], R])
+    def trans_error(self, tr: TransError[R]) -> Do:
+        yield NS.error(tr.error)
 
 
 class dispatch_log(PatMat, alg=LogMessage):
@@ -134,7 +143,7 @@ class execute_dispatch_output(PatMat, alg=DispatchOutput):
         custom_executor = yield NS.inspect(_.state.dispatch_config.io_executor)
         executor = custom_executor | (lambda: execute_io.match)
         io_result = yield executor(result.io)
-        yield run_trans_m(result.io.handle_result(io_result))
+        yield eval_trans.match(result.io.handle_result(io_result))
 
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_output_aggregate(self, result: DispatchOutputAggregate) -> Do:
@@ -142,7 +151,7 @@ class execute_dispatch_output(PatMat, alg=DispatchOutput):
 
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_do(self, result: DispatchDo) -> Do:
-        yield run_trans_m(result.trans.action)
+        yield eval_trans.match(result.trans.action)
 
     @do(NS[DispatchState[S, D, CC], R])
     def dispatch_log(self, result: DispatchLog) -> Do:
