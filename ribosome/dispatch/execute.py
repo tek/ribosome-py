@@ -5,7 +5,7 @@ from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
 from amino import _, __, IO, Lists, Either, List, L, Nil
 from amino.do import do, Do
-from amino.dispatch import PatMat
+from amino.case import Case
 from amino.util.exception import format_exception
 from amino.io import IOException
 from amino.string.hues import red, blue, green
@@ -53,7 +53,7 @@ def gather_ios(ios: List[IO[A]], timeout: float) -> List[Either[IOException, A]]
         return Lists.wrap(completed).map(__.result(timeout=timeout))
 
 
-class execute_io(PatMat, alg=DIO):
+class execute_io(Case, alg=DIO):
 
     def iodio(self, io: IODIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
         return NS.from_io(io.io)
@@ -83,7 +83,7 @@ def run_trans_f(handler: TransF, aff: DispatchAffiliation) -> Do:
     yield execute_dispatch_output.match(result)
 
 
-class eval_trans(PatMat[Trans, R], alg=Trans):
+class eval_trans(Case[Trans, R], alg=Trans):
 
     @do(NS[DispatchState[S, D, CC], R])
     def trans_f(self, tr: TransF[R]) -> Do:
@@ -114,7 +114,7 @@ class eval_trans(PatMat[Trans, R], alg=Trans):
         yield NS.error(tr.error)
 
 
-class dispatch_log(PatMat, alg=LogMessage):
+class dispatch_log(Case, alg=LogMessage):
 
     def info(self, msg: Info) -> NS[D, None]:
         return NS.delay(lambda v: ribo_log.info(msg.message))
@@ -123,7 +123,7 @@ class dispatch_log(PatMat, alg=LogMessage):
         return NS.delay(lambda v: ribo_log.error(msg))
 
 
-class execute_dispatch_output(PatMat, alg=DispatchOutput):
+class execute_dispatch_output(Case, alg=DispatchOutput):
 
     def dispatch_error(self, result: DispatchError) -> NS[DispatchState[S, D, CC], R]:
         io = result.exception / NvimIO.exception | NvimIO.error(result.message)
@@ -209,7 +209,7 @@ def execute_dispatch_job(job: DispatchJob) -> Do:
     yield NvimIO.pure(result)
 
 
-class request_result(PatMat, alg=NResult):
+class request_result(Case, alg=NResult):
 
     def __init__(self, job: DispatchJob) -> None:
         self.job = job

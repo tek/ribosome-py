@@ -14,7 +14,7 @@ class NvimApi(Dat['NvimApi']):
         self.name = name
 
     @abc.abstractmethod
-    def request(self, method: str, args: List[Any]) -> Either[str, Tuple[Any, 'NvimApi']]:
+    def request(self, method: str, args: List[Any]) -> Either[str, Tuple['NvimApi', Any]]:
         ...
 
 
@@ -24,8 +24,8 @@ class NativeNvimApi(NvimApi):
         self.name = name
         self.session = session
 
-    def request(self, method: str, args: List[Any]) -> Either[str, Tuple[Any, 'NvimApi']]:
-        return Try(self.session.request, method, *args) / (lambda a: (self, a))
+    def request(self, method: str, args: List[Any]) -> Either[str, Tuple['NvimApi', Any]]:
+        return Try(self.session.request, method, *args) / (lambda a: (a, self))
 
 
 class StrictNvimApi(NvimApi):
@@ -34,13 +34,13 @@ class StrictNvimApi(NvimApi):
             self,
             name: str,
             vars: Map[str, Any],
-            request_handler: Callable[['StrictNvimApi', str, List[Any]], Either[List[str], Tuple[Any, 'NvimApi']]],
+            request_handler: Callable[['StrictNvimApi', str, List[Any]], Either[List[str], Tuple['NvimApi', Any]]],
     ) -> None:
         self.name = name
         self.vars = vars
         self.request_handler = request_handler
 
-    def request(self, method: str, args: List[Any]) -> Either[str, Tuple[Any, 'NvimApi']]:
+    def request(self, method: str, args: List[Any]) -> Either[str, Tuple['NvimApi', Any]]:
         return self.request_handler(self, method, args).accum_error_lift(self.try_var, method, args)
 
     def try_var(self, method: str, args: List[Any]) -> Either[str, Any]:
@@ -49,7 +49,7 @@ class StrictNvimApi(NvimApi):
             .detach_head
             .to_either('no variable name given')
             .flat_map2(lambda h, t: self.var(h))
-            .map(lambda a: (a, self))
+            .map(lambda a: (self, a))
             if method == 'nvim_get_var' else
             Left(f'not a variable request')
         )

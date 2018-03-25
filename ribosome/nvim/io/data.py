@@ -1,9 +1,14 @@
 import abc
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Callable, Tuple
+from traceback import FrameSummary
 
-from amino import ADT, Either, Right, Left
+from amino import ADT, Either, Right, Left, Dat, Nil
+from amino.util.trace import cframe
+
+from ribosome.nvim.io.trace import NvimIOException
 
 A = TypeVar('A')
+B = TypeVar('B')
 
 
 class NResult(Generic[A], ADT['NResult[A]']):
@@ -43,4 +48,24 @@ class NFatal(Generic[A], NResult[A]):
         return Left(self.exception)
 
 
-__all__ = ('NResult', 'NSuccess', 'NError', 'NFatal')
+class Thunk(Generic[A, B], Dat['Thunk[A, B]']):
+
+    @staticmethod
+    def cons(thunk: Callable[[A], Tuple[A, B]], frame: FrameSummary=None) -> 'Thunk[A, B]':
+        return Thunk(thunk, frame or cframe())
+
+    def __init__(self, thunk: Callable[[A], Tuple[A, B]], frame: FrameSummary) -> None:
+        self.thunk = thunk
+        self.frame = frame
+
+
+def eval_thunk(resource: A, thunk: Thunk[A, B]) -> None:
+    try:
+        return thunk.thunk(resource)
+    except NvimIOException as e:
+        raise e
+    except Exception as e:
+        raise NvimIOException('', Nil, e, thunk.frame)
+
+
+__all__ = ('NResult', 'NSuccess', 'NError', 'NFatal', 'Thunk', 'eval_thunk')

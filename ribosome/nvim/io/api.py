@@ -1,5 +1,6 @@
 from traceback import FrameSummary
 from typing import TypeVar, Callable, Any, Type
+from functools import wraps
 
 from msgpack import ExtType
 
@@ -7,10 +8,10 @@ from amino import Either, IO, Maybe, List
 from amino.func import CallByName
 
 from ribosome.nvim.api.data import NvimApi
-from ribosome.nvim.io.compute import (NvimIOComputePure, NvimIOSuspend, NvimIORequest, NvimIOPure, NvimIOFatal,
-                                      NvimIOError)
+from ribosome.nvim.io.compute import NvimIOSuspend, NvimIORequest, NvimIOPure, NvimIOFatal, NvimIOError
 from ribosome.nvim.io import NvimIO
 from ribosome.nvim.request import typechecked_request, data_cons_request, nvim_request
+from ribosome.nvim.io.data import Thunk
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -28,7 +29,7 @@ class N(metaclass=NMeta):
 
     @staticmethod
     def wrap_either(f: Callable[[NvimApi], Either[B, A]], frame: FrameSummary=None) -> NvimIO[A]:
-        return N.suspend(lambda v: f(v).cata(N.error, lambda a: (NvimIOComputePure(a, v), v)), _frame=frame)
+        return N.suspend(lambda v: f(v).cata(N.error, lambda a: (NvimIOPure(a), v)), _frame=frame)
 
     @staticmethod
     def from_either(e: Either[str, A], frame: FrameSummary=None) -> NvimIO[A]:
@@ -64,9 +65,9 @@ class N(metaclass=NMeta):
 
     @staticmethod
     def delay(f: Callable[..., A], *a: Any, **kw: Any) -> NvimIO[A]:
-        def g(vim: NvimApi) -> A:
-            return NvimIOComputePure(f(vim, *a, **kw), vim)
-        return NvimIOSuspend(g)
+        def thunk(vim: NvimApi) -> A:
+            return NvimIOPure(f(vim, *a, **kw))
+        return NvimIOSuspend.cons(thunk)
 
     @staticmethod
     def request(method: str, args: List[str]) -> NvimIO[A]:
@@ -77,10 +78,11 @@ class N(metaclass=NMeta):
         return N.delay(lambda v: f(*a, **kw))
 
     @staticmethod
-    def suspend(f: Callable[..., NvimIO[A]], *a: Any, _frame: FrameSummary=None, **kw: Any) -> NvimIO[A]:
-        def g(vim: NvimApi) -> NvimIO[A]:
+    def suspend(f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> NvimIO[A]:
+        @wraps(f)
+        def thunk(vim: NvimApi) -> NvimIO[A]:
             return f(vim, *a, **kw), vim
-        return NvimIOSuspend(g, _frame)
+        return NvimIOSuspend.cons(thunk)
 
     @staticmethod
     def pure(a: A) -> NvimIO[A]:
@@ -101,5 +103,32 @@ class N(metaclass=NMeta):
     @staticmethod
     def write(cmd: str, *args: Any) -> NvimIO[A]:
         return nvim_request(cmd, *args).replace(None)
+
+#     def recover(self, f: Callable[[Exception], B]) -> 'NvimIO[B]':
+#         return NvimIO.delay(self.either).map(__.value_or(f))
+
+#     def recover_with(self, f: Callable[[Exception], 'NvimIO[B]']) -> 'NvimIO[B]':
+#         return NvimIO.delay(self.either).flat_map(__.map(NvimIO.pure).value_or(f))
+
+#     @do('NvimIO[A]')
+#     def ensure(self, f: Callable[[Either[Exception, A]], 'NvimIO[None]']) -> Do:
+#         result = yield NvimIO.delay(self.either)
+#         yield f(result)
+#         yield NvimIO.from_either(result)
+
+#     def effect(self, f: Callable[[A], Any]) -> 'NvimIO[A]':
+#         def wrap(vim: NvimApi) -> A:
+#             ret = self.run(vim)
+#             f(ret)
+#             return ret
+#         return NvimIO.delay(wrap)
+
+#     __mod__ = effect
+
+#     def error_effect(self, f: Callable[[Exception], None]) -> 'NvimIO[A]':
+#         return self.ensure(lambda a: NvimIO.delay(lambda vim: a.leffect(f)))
+
+#     def error_effect_f(self, f: Callable[[Exception], 'NvimIO[None]']) -> 'NvimIO[A]':
+#         return self.ensure(lambda a: NvimIO.suspend(lambda vim: a.cata(f, NvimIO.pure)))
 
 __all__ = ('N',)

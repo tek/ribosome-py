@@ -6,7 +6,7 @@ from ribosome.trans.action import TransAction, Transit, TransFailure
 from ribosome.request.args import ArgValidator
 from ribosome.trans.handler import TransF
 
-from amino.dispatch import PatMat
+from amino.case import Case
 from amino import Dat, List, Maybe, L, _, Lists, Either
 from amino.string.hues import red
 
@@ -20,7 +20,7 @@ def cont(tail: List[TransEffect], in_state: bool, f: Callable[[Callable[[R], Tra
     return tail.detach_head.map2(lambda h, t: f(lambda a: h.run(a, t, in_state)))
 
 
-class lift(PatMat, alg=TransStep):
+class lift(Case, alg=TransStep):
 
     def lift(self, res: Lift, in_state: bool) -> TransAction:
         return self(res.data, in_state)
@@ -31,7 +31,7 @@ class lift(PatMat, alg=TransStep):
     def trans_effect_error(self, res: TransEffectError, in_state: bool) -> TransAction:
         return TransFailure(res.data)
 
-    def patmat_default(self, res: R, in_state: bool) -> TransAction:
+    def case_default(self, res: R, in_state: bool) -> TransAction:
         return (
             res
             if isinstance(res, TransAction) else

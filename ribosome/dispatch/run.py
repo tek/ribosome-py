@@ -3,7 +3,7 @@ from typing import TypeVar, Any, Generic, Callable, Tuple, Union
 from amino import List, Boolean, __, _, ADT, L
 from amino.dat import Dat
 from amino.do import do, Do
-from amino.dispatch import PatMat
+from amino.case import Case
 from amino.lenses.lens import lens
 
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliation, RootDispatch, ComponentDispatch
@@ -80,7 +80,7 @@ AWR = Tuple[AWWrap, AWUnwrap, AWStore]
 # FIXME `wrap` should return an ADT that is dispatched in unwrap
 # should have an abstract `update` method that is used deeper down
 # FIXME affiliation_wrapper and plugin_state_wrapper must be swapped
-class affiliation_wrapper(PatMat, alg=DispatchAffiliation):
+class affiliation_wrapper(Case, alg=DispatchAffiliation):
 
     def __init__(self, handler: TransF) -> None:
         self.handler = handler
@@ -159,7 +159,7 @@ RWWrap = Callable[[C], ResourcesWrapping[S, C, CC, A]]
 RWUnwrap = Callable[[ResourcesWrapping[S, C, CC, A]], C]
 
 
-class unwrap_resources(PatMat, alg=ResourcesWrapping):
+class unwrap_resources(Case, alg=ResourcesWrapping):
 
     def resources_wrapped(self, rw: ResourcesWrapped[S, C, CC, A]) -> C:
         return rw.data.data
