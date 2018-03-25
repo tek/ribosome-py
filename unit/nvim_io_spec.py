@@ -1,6 +1,6 @@
 from typing import Tuple, Any
 
-from kallikrein import k, Expectation, kf
+from kallikrein import k, Expectation
 from kallikrein.matchers.either import be_right
 from kallikrein.matchers import contain
 
@@ -54,11 +54,11 @@ class NvimIoSpec(SpecBase):
 
     def stack(self) -> Expectation:
         @do(NvimIO[int])
-        def run() -> Do:
-            a = 0
-            for i in range(1000):
-                a = yield N.pure(a + 1)
-        return kn(None, run).must(contain(1000))
+        def run(a: int) -> Do:
+            b = yield N.pure(a + 1)
+            if b < 1000:
+                yield run(b)
+        return kn(None, run, 1).must(contain(1000))
 
     def request(self) -> Expectation:
         return k(N.request('blub', Nil).run_s(vim).vars) == vars
@@ -68,10 +68,10 @@ class NvimIoSpec(SpecBase):
         def run() -> Do:
             a = yield N.request('blub', List(5))
             b = yield N.suspend(lambda v: N.pure(a + 1))
-            c = yield N.delay(lambda v: b)
+            c = yield N.delay(lambda v: b + 3)
             return c + 23
         updated_vim, result = run().run(vim)
-        return (k(updated_vim.vars) == vars) & (k(result).must(contain(31)))
+        return (k(updated_vim.vars) == vars) & (k(result).must(contain(34)))
 
 
 __all__ = ('NvimIoSpec',)

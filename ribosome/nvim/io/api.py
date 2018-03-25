@@ -1,18 +1,16 @@
 from traceback import FrameSummary
 from typing import TypeVar, Callable, Any, Type
-from functools import wraps
 
 from msgpack import ExtType
 
 from amino import Either, IO, Maybe, List
 from amino.func import CallByName
-from amino.state import State
+from amino.state import EitherState
 
 from ribosome.nvim.api.data import NvimApi
 from ribosome.nvim.io.compute import NvimIOSuspend, NvimIORequest, NvimIOPure, NvimIOFatal, NvimIOError
 from ribosome.nvim.io import NvimIO
 from ribosome.nvim.request import typechecked_request, data_cons_request, nvim_request
-from ribosome.nvim.io.data import Thunk
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -68,7 +66,7 @@ class N(metaclass=NMeta):
     def delay(f: Callable[..., A], *a: Any, **kw: Any) -> NvimIO[A]:
         def thunk(vim: NvimApi) -> A:
             return vim, NvimIOPure(f(vim, *a, **kw))
-        return NvimIOSuspend.cons(State.inspect(lambda vim: NvimIOPure(f(vim, *a, **kw))))
+        return NvimIOSuspend.cons(EitherState.inspect(lambda vim: NvimIOPure(f(vim, *a, **kw))))
 
     @staticmethod
     def request(method: str, args: List[str]) -> NvimIO[A]:
@@ -80,7 +78,7 @@ class N(metaclass=NMeta):
 
     @staticmethod
     def suspend(f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> NvimIO[A]:
-        return NvimIOSuspend.cons(State.inspect(lambda vim: f(vim, *a, **kw)))
+        return NvimIOSuspend.cons(EitherState.inspect(lambda vim: f(vim, *a, **kw)))
 
     @staticmethod
     def pure(a: A) -> NvimIO[A]:

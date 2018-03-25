@@ -1,10 +1,10 @@
 import abc
-from typing import Generic, TypeVar, Callable, Tuple
+from typing import Generic, TypeVar, Tuple
 from traceback import FrameSummary
 
 from amino import ADT, Either, Right, Left, Dat, Nil
 from amino.util.trace import cframe
-from amino.state import State
+from amino.state import EitherState
 
 from ribosome.nvim.io.trace import NvimIOException
 
@@ -52,17 +52,17 @@ class NFatal(Generic[A], NResult[A]):
 class Thunk(Generic[A, B], Dat['Thunk[A, B]']):
 
     @staticmethod
-    def cons(thunk: State[A, B], frame: FrameSummary=None) -> 'Thunk[A, B]':
+    def cons(thunk: EitherState[A, B], frame: FrameSummary=None) -> 'Thunk[A, B]':
         return Thunk(thunk, frame or cframe())
 
-    def __init__(self, thunk: State[A, B], frame: FrameSummary) -> None:
+    def __init__(self, thunk: EitherState[A, B], frame: FrameSummary) -> None:
         self.thunk = thunk
         self.frame = frame
 
 
-def eval_thunk(resource: A, thunk: Thunk[A, B]) -> Tuple[A, B]:
+def eval_thunk(resource: A, thunk: Thunk[A, B]) -> Either[str, Tuple[A, B]]:
     try:
-        return thunk.thunk.run(resource).value
+        return thunk.thunk.run(resource)
     except NvimIOException as e:
         raise e
     except Exception as e:
