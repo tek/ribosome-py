@@ -4,6 +4,7 @@ from traceback import FrameSummary
 
 from amino import ADT, Either, Right, Left, Dat, Nil
 from amino.util.trace import cframe
+from amino.state import State
 
 from ribosome.nvim.io.trace import NvimIOException
 
@@ -51,17 +52,17 @@ class NFatal(Generic[A], NResult[A]):
 class Thunk(Generic[A, B], Dat['Thunk[A, B]']):
 
     @staticmethod
-    def cons(thunk: Callable[[A], Tuple[A, B]], frame: FrameSummary=None) -> 'Thunk[A, B]':
+    def cons(thunk: State[A, B], frame: FrameSummary=None) -> 'Thunk[A, B]':
         return Thunk(thunk, frame or cframe())
 
-    def __init__(self, thunk: Callable[[A], Tuple[A, B]], frame: FrameSummary) -> None:
+    def __init__(self, thunk: State[A, B], frame: FrameSummary) -> None:
         self.thunk = thunk
         self.frame = frame
 
 
-def eval_thunk(resource: A, thunk: Thunk[A, B]) -> None:
+def eval_thunk(resource: A, thunk: Thunk[A, B]) -> Tuple[A, B]:
     try:
-        return thunk.thunk(resource)
+        return thunk.thunk.run(resource).value
     except NvimIOException as e:
         raise e
     except Exception as e:

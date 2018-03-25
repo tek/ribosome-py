@@ -92,7 +92,7 @@ class NvimIOFatal(Generic[A], NvimIO[A]):
 def execute_nvim_request(vim: NvimApi, io: NvimIORequest[A]) -> NvimIO[A]:
     return (
         vim.request(io.method, io.args)
-        .map2(lambda updated_vim, result: NvimIOSuspend.cons(lambda v1: (updated_vim, NvimIOPure(result))))
+        .map2(lambda updated_vim, result: NvimIOSuspend.cons(State.reset(updated_vim, NvimIOPure(result))))
         .value_or(NvimIOError)
     )
 
@@ -103,21 +103,18 @@ class flat_map_nvim_io(Case[Callable[[A], NvimIO[B]], NvimIO[B]], alg=NvimIO):
         self.f = f
 
     def nvim_io_pure(self, io: NvimIOPure[A]) -> NvimIO[B]:
-        def thunk(vim: NvimApi) -> NvimIO[B]:
-            return vim, self.f(io.value)
+        thunk = State.delay(self.f, io.value)
         return NvimIOSuspend.cons(thunk)
 
     def nvim_io_suspend(self, io: NvimIOSuspend[A]) -> NvimIO[B]:
         return NvimIOBind(io.thunk, self.f)
 
     def nvim_io_request(self, io: NvimIORequest[A]) -> NvimIO[B]:
-        def thunk(vim: NvimApi) -> NvimIO[B]:
-            return vim, execute_nvim_request(vim, io)
+        thunk = State.inspect(lambda vim: execute_nvim_request(vim, io))
         return NvimIOBind(Thunk.cons(thunk), self.f)
 
     def nvim_io_bind(self, io: NvimIOBind[C, A]) -> NvimIO[B]:
-        def thunk(vim: NvimApi) -> NvimIO[C]:
-            return vim, NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f))
+        thunk = State.inspect(lambda vim: NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f)))
         return NvimIOSuspend.cons(thunk)
 
     def nvim_io_error(self, io: NvimIOError[A]) -> NvimIO[B]:
