@@ -117,7 +117,7 @@ class flat_map_nvim_io(Case[Callable[[A], NvimIO[B]], NvimIO[B]], alg=NvimIO):
 
     def nvim_io_bind(self, io: NvimIOBind[C, A]) -> NvimIO[B]:
         def thunk(vim: NvimApi) -> NvimIO[C]:
-            return vim, NvimIOBind(self.thunk, lambda a: io.f(a).flat_map(self.f))
+            return vim, NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f))
         return NvimIOSuspend.cons(thunk)
 
     def nvim_io_error(self, io: NvimIOError[A]) -> NvimIO[B]:

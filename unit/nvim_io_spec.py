@@ -67,9 +67,11 @@ class NvimIoSpec(SpecBase):
         @do(NvimIO[int])
         def run() -> Do:
             a = yield N.request('blub', List(5))
-            b = yield N.pure(a + 1)
-            return b + 23
-        return kf(lambda: run().run_s(vim).vars) == vars
+            b = yield N.suspend(lambda v: N.pure(a + 1))
+            c = yield N.delay(lambda v: b)
+            return c + 23
+        updated_vim, result = run().run(vim)
+        return (k(updated_vim.vars) == vars) & (k(result).must(contain(31)))
 
 
 __all__ = ('NvimIoSpec',)

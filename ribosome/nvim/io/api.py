@@ -66,7 +66,7 @@ class N(metaclass=NMeta):
     @staticmethod
     def delay(f: Callable[..., A], *a: Any, **kw: Any) -> NvimIO[A]:
         def thunk(vim: NvimApi) -> A:
-            return NvimIOPure(f(vim, *a, **kw))
+            return vim, NvimIOPure(f(vim, *a, **kw))
         return NvimIOSuspend.cons(thunk)
 
     @staticmethod
@@ -81,7 +81,7 @@ class N(metaclass=NMeta):
     def suspend(f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> NvimIO[A]:
         @wraps(f)
         def thunk(vim: NvimApi) -> NvimIO[A]:
-            return f(vim, *a, **kw), vim
+            return vim, f(vim, *a, **kw)
         return NvimIOSuspend.cons(thunk)
 
     @staticmethod
