@@ -1,20 +1,22 @@
 from kallikrein import k, Expectation
 from kallikrein.matchers.either import be_right
 
-from amino import do
+from amino import do, List, Map, Right
 from amino.do import Do
+from amino.test.spec import SpecBase
 
-from ribosome.nvim.api.data import NvimApi
+from ribosome.nvim.api.data import NvimApi, StrictNvimApi
 from ribosome.nvim import NvimIO
 
 
-class NvimIoSpec:
+class NvimIoSpec(SpecBase):
     '''
     suspend $suspend
     delay $delay
     suspend flat_map $suspend_flat_map
     stack safety $stack
     frame $frame
+    request handler $request_handler
     '''
 
     def suspend(self) -> Expectation:
@@ -57,5 +59,20 @@ class NvimIoSpec:
             yield NvimIO.pure(x)
         result = run().result(None)
         return k(1) == 1
+
+    def request_handler(self) -> Expectation:
+        def handler(vim: StrictNvimApi, method: str, args: List[str]) -> None:
+            return Right(((args.head | 9) + 2, vim.copy(vars=dict(a=1))))
+        @do(NvimIO[int])
+        def run() -> Do:
+            a = yield NvimIO.request('blub', List(5))
+            b = yield NvimIO.pure(a + 1)
+            return b + 23
+        vim = StrictNvimApi('test', Map(), handler)
+        vim1, result = run().run(vim)
+        print(result)
+        print(vim1.vars)
+        return k(1) == 1
+
 
 __all__ = ('NvimIoSpec',)
