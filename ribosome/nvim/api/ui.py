@@ -4,7 +4,7 @@ from msgpack import unpackb
 
 from amino import List, I, do, Do, Path
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.nvim.api.data import Tabpage, Window, Buffer
 from ribosome.nvim.api.util import cons_ext, cons_ext_list, cons_checked_list, cons_checked_e, extract_int_pair
 from ribosome.nvim.api.command import nvim_command

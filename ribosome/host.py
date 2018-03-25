@@ -19,7 +19,7 @@ from ribosome.nvim.api.data import NvimApi, NativeNvimApi
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.dispatch.update import init_rpc
 from ribosome.config.settings import Settings
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.nvim.api.variable import variable_set_prefixed
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)

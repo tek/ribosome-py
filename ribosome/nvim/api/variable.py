@@ -4,7 +4,7 @@ from typing import Any, Callable, TypeVar
 from amino import Either, do, Do, Left, I
 from amino.logging import module_log
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.nvim.io import nvim_nonfatal_request, data_cons_request_nonfatal, nvim_request
 from ribosome.nvim.api.rpc import plugin_name
 from ribosome.nvim.api.util import cons_decode_str, cons_checked_e

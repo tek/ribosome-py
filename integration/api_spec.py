@@ -6,7 +6,7 @@ from amino import do, Do
 
 from ribosome.test.integration.default import ExternalSpec
 from ribosome.test.klk import kn
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.nvim.api.rpc import channel_id
 from ribosome.nvim.api.variable import variable_set_prefixed, variable_prefixed_num
 

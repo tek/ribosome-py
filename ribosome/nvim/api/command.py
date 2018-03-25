@@ -2,7 +2,7 @@ from typing import Any, TypeVar
 
 from amino import L
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.nvim.api.util import run_once_defined, cons_split_lines
 
 A = TypeVar('A')

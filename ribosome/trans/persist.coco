@@ -5,7 +5,7 @@ from lenses import UnboundLens
 from amino import IO, List, Path, Left, do, Do
 from amino.json import decode_json, dump_json
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.nvim.io import NS
 from ribosome.config.config import Resources
 from ribosome.config.settings import Settings

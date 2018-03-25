@@ -8,7 +8,7 @@ from amino.util.string import ToStr
 from amino.do import do
 from amino.boolean import true
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.logging import Logging
 from ribosome.config.setting import Setting, EvalSetting, setting_ctor
 

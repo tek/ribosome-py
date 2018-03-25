@@ -10,7 +10,7 @@ from amino.dat import Dat
 
 from ribosome.nvim.api.data import NvimApi
 from ribosome.logging import ribo_log
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.nvim.api.rpc import channel_id
 from ribosome.nvim.api.command import nvim_command
 

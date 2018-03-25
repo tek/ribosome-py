@@ -5,7 +5,7 @@ from amino import List, Either, __, Left, Eval
 from amino.util.string import ToStr
 from amino.do import do, Do
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.logging import Logging
 from ribosome.nvim.api.variable import variable_prefixed, variable, variable_set, variable_set_prefixed
 from ribosome.nvim.api.util import cons_checked_e

@@ -2,7 +2,7 @@ from typing import Tuple, Any
 
 from amino import _, Either, Map, Left, Right, do, Do
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 
 
 def plugin_name() -> NvimIO[str]:

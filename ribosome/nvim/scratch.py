@@ -1,7 +1,7 @@
 from amino import do, Do, List, Boolean, Maybe, Dat, Just, Nothing
 from amino.boolean import false, true
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.nvim.api.ui import current_tabpage, current_window, window_buffer, set_buffer_content
 from ribosome.nvim.api.data import Window, Buffer, Tabpage
 from ribosome.nvim.api.option import option_buffer_set

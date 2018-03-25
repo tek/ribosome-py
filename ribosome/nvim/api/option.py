@@ -2,7 +2,7 @@ from typing import Callable, TypeVar, Any
 
 from amino import Either, List, do, Do, Right
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.nvim.api.util import cons_decode_str, cons_decode_str_list, cons_decode_str_list_option
 from ribosome.nvim.api.data import Buffer
 

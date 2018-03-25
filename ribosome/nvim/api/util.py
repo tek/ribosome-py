@@ -5,7 +5,7 @@ from msgpack import ExtType
 
 from amino import Either, Left, Right, List, Lists, Try, do, Maybe, Do, Just, Nothing
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 
 A = TypeVar('A')
 B = TypeVar('B')

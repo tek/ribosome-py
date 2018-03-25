@@ -14,7 +14,7 @@ from ribosome.trans.run import TransComplete
 from ribosome.config.settings import Settings
 from ribosome.dispatch.component import ComponentData
 from ribosome.nvim.api.data import NvimApi, StrictNvimApi
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.nvim.api.variable import variable_set
 

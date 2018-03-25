@@ -1,6 +1,6 @@
 from typing import Any, Type, TypeVar, Callable
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 
 from amino import Either, L, List
 from ribosome.nvim.io import nvim_request

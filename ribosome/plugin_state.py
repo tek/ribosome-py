@@ -15,7 +15,7 @@ from ribosome.dispatch.component import Component, Components
 from ribosome.nvim.io import NS
 from ribosome.dispatch.data import DIO, Dispatch, DispatchSync, DispatchAsync
 from ribosome.trans.handler import TransF
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
 from ribosome.trans.action import LogMessage

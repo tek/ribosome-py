@@ -10,7 +10,7 @@ from amino.string.hues import blue
 
 from ribosome.logging import Logging
 from ribosome.nvim.io import NvimIOState, NS
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.dispatch.data import (DispatchOutput, DispatchUnit, DispatchError, DispatchReturn, DispatchIO, DIO,
                                     DispatchDo, DispatchLog)
 from ribosome.trans.action import (Transit, TransUnit, TransResult, TransFailure, TransAction, TransIO, TransDo,

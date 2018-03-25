@@ -11,7 +11,7 @@ from amino.io import IOException
 from amino.string.hues import red, blue, green
 from amino.util.string import decode
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.logging import ribo_log
 from ribosome.config.config import Config
 from ribosome.nvim.io import NS, NResult, NSuccess, NError, NFatal

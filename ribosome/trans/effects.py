@@ -3,7 +3,7 @@ from typing import TypeVar, Type, Generic, Any
 from amino import Either, List, IO, L, _
 from amino.state import StateT
 
-from ribosome.nvim import NvimIO
+from ribosome.nvim.io import NvimIO
 from ribosome.trans.action import TransUnit, TransResult, TransIO, LogMessage, TransLog
 from ribosome.trans.effect import TransEffect
 from ribosome.trans.run import cont, lift
@@ -13,9 +13,7 @@ D = TypeVar('D')
 A = TypeVar('A')
 B = TypeVar('B')
 R = TypeVar('R')
-N = TypeVar('N')
 G = TypeVar('G')
-O = TypeVar('O')
 
 
 class TransEffectStateT(Generic[G, D, R], TransEffect[StateT[G, D, R]]):
@@ -71,7 +69,7 @@ class TransEffectUnit(TransEffect[None]):
     def tpe(self) -> Type[None]:
         return type(None)
 
-    def extract(self, data: None, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+    def extract(self, data: None, tail: List[TransEffect], in_state: bool) -> Either[R, A]:
         return Lift(TransUnit()) if tail.empty else TransEffectError('cannot apply trans effects to unit')
 
 
@@ -81,7 +79,7 @@ class TransEffectResult(TransEffect[Any]):
     def tpe(self) -> Type[Any]:
         return object
 
-    def extract(self, data: object, tail: List[TransEffect], in_state: bool) -> Either[R, N]:
+    def extract(self, data: object, tail: List[TransEffect], in_state: bool) -> Either[R, A]:
         return Lift(TransResult(data)) if tail.empty else TransEffectError('cannot apply trans effects to result')
 
 
