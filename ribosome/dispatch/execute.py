@@ -11,10 +11,10 @@ from amino.io import IOException
 from amino.string.hues import red, blue, green
 from amino.util.string import decode
 
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.logging import ribo_log
 from ribosome.config.config import Config
-from ribosome.nvim.io import NS, NResult, NSuccess, NError, NFatal
+from ribosome.nvim.io.state import NS
 from ribosome.dispatch.run import (DispatchJob, log_trans, DispatchState, run_trans, plugin_to_dispatch,
                                    setup_and_run_trans)
 from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput,
@@ -26,6 +26,8 @@ from ribosome.trans.handler import TransF, Trans, TransBind, TransPure, TransErr
 from ribosome.config.settings import Settings
 from ribosome.trans.run import TransComplete
 from ribosome import NvimApi
+from ribosome.nvim.io.data import NResult, NSuccess, NError, NFatal
+from ribosome.nvim.io.api import N
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
@@ -126,7 +128,7 @@ class dispatch_log(Case, alg=LogMessage):
 class execute_dispatch_output(Case, alg=DispatchOutput):
 
     def dispatch_error(self, result: DispatchError) -> NS[DispatchState[S, D, CC], R]:
-        io = result.exception / NvimIO.exception | NvimIO.error(result.message)
+        io = result.exception / N.exception | N.error(result.message)
         return NS.lift(io)
 
     def dispatch_errors(self, result: DispatchErrors) -> NS[DispatchState[S, D, CC], R]:
@@ -175,11 +177,11 @@ def compute_dispatches(dispatches: List[AffiliatedDispatch[DP]], args: List[Any]
 def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[DispatchState, R]]], desc: str) -> NvimIO[R]:
     yield holder.acquire()
     ribo_log.debug2(f'exclusive: {desc}')
-    state, response = yield f().error_effect_f(holder.release)
-    yield NvimIO.delay(lambda v: holder.update(state.state))
+    state, response = yield N.error_effect_f(f(), holder.release)
+    yield N.delay(lambda v: holder.update(state.state))
     yield holder.release()
     ribo_log.debug2(f'release: {desc}')
-    yield NvimIO.pure(response)
+    yield N.pure(response)
 
 
 @do(NvimIO[R])
@@ -202,11 +204,11 @@ def job_dispatches(job: DispatchJob) -> Either[str, List[AffiliatedDispatch[Disp
 
 @do(NvimIO[List[Any]])
 def execute_dispatch_job(job: DispatchJob) -> Do:
-    dispatches = yield NvimIO.from_either(job_dispatches(job))
+    dispatches = yield N.from_either(job_dispatches(job))
     result = yield dispatches.traverse(L(execute)(job.state, _, job.args), NvimIO)
     ribo_log.debug(f'async job {job.name} completed')
-    yield NvimIO.from_io(job.state.dispatch_complete())
-    yield NvimIO.pure(result)
+    yield N.from_io(job.state.dispatch_complete())
+    yield N.pure(result)
 
 
 class request_result(Case, alg=NResult):

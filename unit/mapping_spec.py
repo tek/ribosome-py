@@ -8,9 +8,9 @@ from amino.boolean import true
 from amino.lenses.lens import lens
 
 from ribosome.trans.api import trans
-from ribosome.nvim.io import NS
+from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import DispatchHelper
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.config import default_config_name
 from ribosome.test.integration.default import ExternalSpec
 from ribosome.request.handler.handler import RequestHandler

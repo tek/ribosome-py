@@ -8,8 +8,7 @@ from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.dispatcher import TransDispatcher
 from ribosome.request.handler.method import RpcMethod
-from ribosome.nvim.io import NvimIO
-from ribosome.nvim.io import NvimIOState
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.trans.action import TransDo, TransLog
 from ribosome.trans.handler import TransF
 from ribosome.trans.recursive_effects import GatherIOs, GatherSubprocs

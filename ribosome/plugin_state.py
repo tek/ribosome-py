@@ -12,16 +12,17 @@ from amino.dat import Dat, ADT
 from amino.util.string import camelcase
 
 from ribosome.dispatch.component import Component, Components
-from ribosome.nvim.io import NS
-from ribosome.dispatch.data import DIO, Dispatch, DispatchSync, DispatchAsync
+from ribosome.nvim.io.state import NS
+from ribosome.dispatch.data import DIO, Dispatch, DispatchAsync
 from ribosome.trans.handler import TransF
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
 from ribosome.trans.action import LogMessage
 from ribosome.config.settings import Settings
 from ribosome.config.config import Config, Resources
 from ribosome.trans.run import TransComplete
+from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -290,17 +291,17 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
             self._enqueue_greenlet()
             Try(lambda: greenlet.getcurrent().parent.switch()).leffect(self._pop_greenlet)
         if self.running:
-            yield NvimIO.simple(switch)
-        yield NvimIO.simple(self.lock.acquire)
-        yield NvimIO.simple(setattr, self, 'running', True)
+            yield N.simple(switch)
+        yield N.simple(self.lock.acquire)
+        yield N.simple(setattr, self, 'running', True)
 
     @do(NvimIO[None])
     def release(self, error: Optional[Exception]=None) -> Do:
-        yield NvimIO.simple(setattr, self, 'running', False)
-        yield NvimIO.simple(Try, self.lock.release)
+        yield N.simple(setattr, self, 'running', False)
+        yield N.simple(Try, self.lock.release)
         if error:
             self.log.debug(f'released lock due to error: {error}')
-            yield NvimIO.exception(error)
+            yield N.exception(error)
 
     @do(IO[None])
     def dispatch_complete(self) -> Do:
@@ -318,10 +319,10 @@ class StrictPluginStateHolder(Generic[D], PluginStateHolder[D]):
     pass
 
     def acquire(self) -> NvimIO[None]:
-        return NvimIO.pure(None)
+        return N.pure(None)
 
     def release(self, error: Optional[Exception]=None) -> NvimIO[None]:
-        return NvimIO.pure(None)
+        return N.pure(None)
 
     def dispatch_complete(self) -> IO[None]:
         return IO.pure(None)

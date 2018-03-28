@@ -2,7 +2,7 @@ from typing import TypeVar, Callable, Generic, Union, Tuple
 
 from amino.tc.base import F
 from amino import Either, List, options, Do
-from amino.state import State, EitherState
+from amino.state import State
 from amino.func import tailrec
 from amino.do import do
 from amino.dat import ADT
@@ -88,13 +88,15 @@ class NvimIOFatal(Generic[A], NvimIO[A]):
         self.exception = exception
 
 
-@do(EitherState[NvimApi, NvimIO[A]])
+@do(State[NvimApi, NvimIO[Either[List[str], A]]])
 def execute_nvim_request(io: NvimIORequest[A]) -> Do:
-    @do(Either[str, Tuple[NvimApi, NvimIO[A]]])
-    def make_request(vim: NvimApi) -> Do:
-        updated_vim, result = yield vim.request(io.method, io.args)
+    def make_request(vim: NvimApi) -> Tuple[NvimApi, Either[List[str], A]]:
+        response = vim.request(io.method, io.args)
+        updated_vim = response.map2(lambda v, a: v) | vim
+        result = response.map2(lambda v, a: a)
         return updated_vim, NvimIOPure(result)
-    yield EitherState.apply(make_request)
+    updated_vim, result = yield State.inspect(make_request)
+    yield State.reset(updated_vim, result)
 
 
 class flat_map_nvim_io(Case[Callable[[A], NvimIO[B]], NvimIO[B]], alg=NvimIO):
@@ -103,7 +105,7 @@ class flat_map_nvim_io(Case[Callable[[A], NvimIO[B]], NvimIO[B]], alg=NvimIO):
         self.f = f
 
     def nvim_io_pure(self, io: NvimIOPure[A]) -> NvimIO[B]:
-        thunk = EitherState.delay(self.f, io.value)
+        thunk = State.delay(self.f, io.value)
         return NvimIOSuspend.cons(thunk)
 
     def nvim_io_suspend(self, io: NvimIOSuspend[A]) -> NvimIO[B]:
@@ -113,7 +115,7 @@ class flat_map_nvim_io(Case[Callable[[A], NvimIO[B]], NvimIO[B]], alg=NvimIO):
         return NvimIOBind(Thunk.cons(execute_nvim_request(io)), self.f)
 
     def nvim_io_bind(self, io: NvimIOBind[C, A]) -> NvimIO[B]:
-        thunk = EitherState.inspect(lambda vim: NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f)))
+        thunk = State.inspect(lambda vim: NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f)))
         return NvimIOSuspend.cons(thunk)
 
     def nvim_io_error(self, io: NvimIOError[A]) -> NvimIO[B]:
@@ -135,22 +137,16 @@ class eval_step(CaseRec[NvimIO[A], NResult[A]], alg=NvimIO):
         return Term((self.vim, NSuccess(io.value)))
 
     def nvim_io_request(self, io: NvimIORequest[A]) -> EvalRes:
-        next = execute_nvim_request(self.vim, io)
-        return eval_step(self.vim)(next)
+        thunk = Thunk.cons(execute_nvim_request(io))
+        return eval_step(self.vim)(NvimIOSuspend(thunk))
 
     def nvim_io_suspend(self, io: NvimIOSuspend[A]) -> EvalRes:
-        return (
-            eval_thunk(self.vim, io.thunk)
-            .map2(lambda vim, next: eval_step(vim)(next))
-            .value_or(NError)
-        )
+        vim, next = eval_thunk(self.vim, io.thunk)
+        return eval_step(vim)(next)
 
     def nvim_io_bind(self, io: NvimIOBind[B, A]) -> EvalRes:
-        return (
-            eval_thunk(self.vim, io.thunk)
-            .map2(lambda vim, next: eval_step(vim)(next.flat_map(io.kleisli)))
-            .value_or(NError)
-        )
+        vim, next = eval_thunk(self.vim, io.thunk)
+        return eval_step(vim)(next.flat_map(io.kleisli))
 
     def nvim_io_error(self, io: NvimIOError[A]) -> EvalRes:
         return Term((self.vim, NError(io.error)))

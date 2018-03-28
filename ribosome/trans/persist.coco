@@ -5,8 +5,8 @@ from lenses import UnboundLens
 from amino import IO, List, Path, Left, do, Do
 from amino.json import decode_json, dump_json
 
-from ribosome.nvim.io import NvimIO
-from ribosome.nvim.io import NS
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.state import NS
 from ribosome.config.config import Resources
 from ribosome.config.settings import Settings
 
@@ -26,18 +26,18 @@ def mkdir(dir: Path) -> IO[None]:
 @do(NvimIO[Path])
 def state_file(settings: S, name: str) -> Do:
     dir = yield settings.project_state_dir.value_or_default
-    yield NvimIO.from_io(mkdir(dir))
-    yield NvimIO.pure(dir / f'{name}.json')
+    yield N.from_io(mkdir(dir))
+    yield N.pure(dir / f'{name}.json')
 
 
 @do(NvimIO[A])
 def load_json_data_from(name: str, file: Path) -> Do:
-    exists = yield NvimIO.from_io(IO.delay(file.exists))
+    exists = yield N.from_io(IO.delay(file.exists))
     if exists:
-        json = yield NvimIO.from_io(IO.delay(file.read_text))
-        yield NvimIO.pure(decode_json(json))
+        json = yield N.from_io(IO.delay(file.read_text))
+        yield N.pure(decode_json(json))
     else:
-        yield NvimIO.pure(Left(f'state file {file} does not exist'))
+        yield N.pure(Left(f'state file {file} does not exist'))
 
 
 @do(NvimIO[A])
@@ -56,9 +56,9 @@ def load_json_state(name: str, store: UnboundLens) -> Do:
 @do(NvimIO[None])
 def store_json_data(settings: S, name: str, \data: A) -> Do:
     file = yield state_file(settings, name)
-    json = yield NvimIO.from_either(dump_json(\data))
-    yield NvimIO.from_io(IO.delay(file.write_text, json))
-    yield NvimIO.pure(None)
+    json = yield N.from_either(dump_json(\data))
+    yield N.from_io(IO.delay(file.write_text, json))
+    yield N.pure(None)
 
 
 @do(NS[Resources[S, D, CC], None])

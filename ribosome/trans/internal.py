@@ -16,7 +16,7 @@ from ribosome.trans.api import trans
 from ribosome.plugin_state import PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
-from ribosome.nvim.io import NS
+from ribosome.nvim.io.state import NS
 from ribosome.dispatch.component import Component, ComponentData
 from ribosome.config.settings import Settings
 from ribosome.dispatch.update import undef_handlers, def_handlers

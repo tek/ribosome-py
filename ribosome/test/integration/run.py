@@ -8,15 +8,16 @@ from ribosome.dispatch.run import DispatchJob, DispatchState
 from ribosome.dispatch.data import Dispatch, DIO
 from ribosome.host import init_state
 from ribosome.dispatch.execute import dispatch_job, compute_dispatches, compute_dispatch
-from ribosome.nvim.io import NvimIOState, NS
+from ribosome.nvim.io.state import NvimIOState, NS
 from ribosome.config.config import Config, Resources
 from ribosome.trans.run import TransComplete
 from ribosome.config.settings import Settings
 from ribosome.dispatch.component import ComponentData
-from ribosome.nvim.api.data import NvimApi, StrictNvimApi
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.api.data import NvimApi, StrictNvimApi, StrictNvimHandler, StrictNvimHandler
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.nvim.api.variable import variable_set
+from ribosome.nvim.io.api import N
 
 C = TypeVar('C')
 D = TypeVar('D')
@@ -25,35 +26,46 @@ CC = TypeVar('CC')
 IOExec = Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]
 
 
-def api_info(name: str, args: List[Any]) -> Either[str, Any]:
-    return Right((1, {}))
+def api_info(vim: NvimApi, name: str, args: List[Any]) -> Either[str, Any]:
+    return Right((vim, (1, {})))
 
 
-def rh_nvim_command(name: str, args: List[Any]) -> Either[str, Any]:
-    return Right(None)
+def rh_write(vim: NvimApi, name: str, args: List[Any]) -> Either[str, Any]:
+    return Right((vim, None))
 
 
 @do(Either[str, Any])
-def default_request_handler(name: str, args: List[Any]) -> Do:
+def default_request_handler(vim: NvimApi, name: str, args: List[Any]) -> Do:
     handler = yield default_request_handlers.lift(name).to_either(f'no default request handler for {name}')
-    yield handler(name, args)
+    yield handler(vim, name, args)
+
+
+@do(Either[str, Any])
+def pop_first(vim: NvimApi, name: str, args: List[Any]) -> Do:
+    name1, args1 = yield args.detach_head.to_either(f'invalid command: {name}({args})')
+    yield default_request_handler(vim, name1, args1)
 
 
 default_request_handlers = Map({
-    'silent': default_request_handler,
-    'silent!': default_request_handler,
+    'silent': pop_first,
+    'silent!': pop_first,
     'nvim_get_api_info': api_info,
-    'nvim_command': rh_nvim_command,
+    'nvim_command': rh_write,
+    'nvim_out_write': rh_write,
 })
 
 
 class StrictRequestHandler:
 
-    def __init__(self, extra: Callable[[str, List[Any]], Either[str, Any]]) -> None:
+    def __init__(self, extra: StrictNvimHandler) -> None:
         self.extra = extra
 
-    def __call__(self, name: str, args: List[Any]) -> Either[str, Any]:
-        return self.extra(name, args).lmap(List).accum_error_lift(default_request_handler, name, args)
+    def __call__(self, vim: NvimApi, name: str, args: List[Any]) -> Either[List[str], Tuple[NvimApi, Any]]:
+        return (
+            self.extra(vim, name, args)
+            .lmap(List)
+            .accum_error_lift(default_request_handler, vim, name, args)
+        )
 
 
 class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
@@ -91,7 +103,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
             config: Config,
             *comps: str,
             vars: Map[str, Any]=Map(),
-            request_handler: Callable[[str, List[Any]], Either[str, Any]]=lambda n, a: Left(f'no handler for {n}'),
+            request_handler: StrictNvimHandler=lambda v, n, a: Left(f'no handler for {n}'),
             io_executor: Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]=None,
     ) -> 'DispatchHelper':
         cons_vim = lambda vs: StrictNvimApi(config.name, vars=vs, request_handler=StrictRequestHandler(request_handler))
@@ -159,7 +171,7 @@ def dispatch_helper(
         vars: dict=dict(),
         io_executor: IOExec=None,
 ) -> NvimIO[DispatchHelper[S, D, CC]]:
-    return NvimIO.delay(lambda v: DispatchHelper.nvim(config, v, *comps, vars=vars, io_executor=io_executor))
+    return N.delay(lambda v: DispatchHelper.nvim(config, v, *comps, vars=vars, io_executor=io_executor))
 
 
 __all__ = ('DispatchHelper', 'dispatch_helper')

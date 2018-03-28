@@ -8,7 +8,7 @@ from amino.util.string import ToStr
 from amino.do import do
 from amino.boolean import true
 
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.logging import Logging
 from ribosome.config.setting import Setting, EvalSetting, setting_ctor
 
@@ -40,7 +40,7 @@ def state_dir_with_name(state_dir: Setting[Path], proteome_name: Setting[str],
     pro_name = yield proteome_name.value
     sess_name = yield session_name.value
     path = pro_name.o(sess_name).o(project_name_from_path) / (lambda a: base / a)
-    yield NvimIO.pure(path)
+    yield N.pure(path)
 
 
 class Settings(ToStr, Logging):

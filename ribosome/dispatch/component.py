@@ -3,10 +3,10 @@ from typing import TypeVar, Callable, Generic, Any, Type
 from amino import List, Either, _, Nil, Maybe, Boolean, __
 from amino.dat import Dat
 
-from ribosome.nvim.io import NS
 from ribosome.trans.handler import TransF
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.dispatch.mapping import Mappings
+from ribosome.nvim.io.state import NS
 
 D = TypeVar('D')
 CC = TypeVar('CC')

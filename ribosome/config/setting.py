@@ -5,10 +5,11 @@ from amino import List, Either, __, Left, Eval
 from amino.util.string import ToStr
 from amino.do import do, Do
 
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.logging import Logging
 from ribosome.nvim.api.variable import variable_prefixed, variable, variable_set, variable_set_prefixed
 from ribosome.nvim.api.util import cons_checked_e
+from ribosome.nvim.io.api import N
 
 A = TypeVar('A', contravariant=True)
 B = TypeVar('B')
@@ -31,14 +32,14 @@ class Setting(Generic[B], Logging, ToStr):
     @do(NvimIO[None])
     def ensure(self, fallback: B) -> Do:
         current = yield self.value
-        yield current.cata(lambda e: self.update(fallback), lambda a: NvimIO.unit)
+        yield current.cata(lambda e: self.update(fallback), lambda a: N.unit)
 
     @property
     def value_or_default(self) -> NvimIO[B]:
         @do(NvimIO[B])
         def run() -> Generator:
             value = yield self.value
-            yield NvimIO.from_either(value.o(self.default_e))
+            yield N.from_either(value.o(self.default_e))
         return run()
 
 
@@ -106,7 +107,7 @@ class EvalSetting(Generic[B], Setting[B]):
         return self.default
 
     def update(self, value: B) -> NvimIO[None]:
-        return NvimIO.pure(None)
+        return N.pure(None)
 
 
 def setting_ctor(tpe: Type[A], ctor: Callable[[A], B]) -> Callable[[str, str, str, bool, B], Setting[B]]:

@@ -4,38 +4,39 @@ from msgpack import unpackb
 
 from amino import List, I, do, Do, Path
 
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.data import Tabpage, Window, Buffer
 from ribosome.nvim.api.util import cons_ext, cons_ext_list, cons_checked_list, cons_checked_e, extract_int_pair
 from ribosome.nvim.api.command import nvim_command
+from ribosome.nvim.io.api import N
 
 
 def current_tabpage() -> NvimIO[Tabpage]:
-    return NvimIO.read_tpe('nvim_get_current_tabpage', cons_ext(Tabpage))
+    return N.read_tpe('nvim_get_current_tabpage', cons_ext(Tabpage))
 
 
 def current_window() -> NvimIO[Window]:
-    return NvimIO.read_cons('nvim_get_current_win', cons_ext(Window))
+    return N.read_cons('nvim_get_current_win', cons_ext(Window))
 
 
 def current_buffer() -> NvimIO[Buffer]:
-    return NvimIO.read_cons('nvim_get_current_buf', cons_ext(Buffer))
+    return N.read_cons('nvim_get_current_buf', cons_ext(Buffer))
 
 
 def tabpages() -> NvimIO[List[Tabpage]]:
-    return NvimIO.read_cons('nvim_list_bufs', cons_ext_list(Tabpage))
+    return N.read_cons('nvim_list_bufs', cons_ext_list(Tabpage))
 
 
 def windows() -> NvimIO[List[Window]]:
-    return NvimIO.read_cons('nvim_list_wins', cons_ext_list(Window))
+    return N.read_cons('nvim_list_wins', cons_ext_list(Window))
 
 
 def buffers() -> NvimIO[List[Buffer]]:
-    return NvimIO.read_cons('nvim_list_bufs', cons_ext_list(Buffer))
+    return N.read_cons('nvim_list_bufs', cons_ext_list(Buffer))
 
 
 def window_buffer(window: Window) -> NvimIO[Buffer]:
-    return NvimIO.read_cons('nvim_win_get_buf', cons_ext(Buffer), window.data)
+    return N.read_cons('nvim_win_get_buf', cons_ext(Buffer), window.data)
 
 
 def set_buffer_lines(
@@ -45,7 +46,7 @@ def set_buffer_lines(
         lines: List[str],
         strict_indexing: bool=False,
 ) -> NvimIO[None]:
-    return NvimIO.write('nvim_buf_set_lines', buffer.data, start, end, strict_indexing, lines)
+    return N.write('nvim_buf_set_lines', buffer.data, start, end, strict_indexing, lines)
 
 
 def set_buffer_content(buffer: Buffer, lines: List[str]) -> NvimIO[None]:
@@ -58,7 +59,7 @@ def buffer_lines(
         end: int,
         strict_indexing: bool=False,
 ) -> NvimIO[None]:
-    return NvimIO.read_cons(
+    return N.read_cons(
         'nvim_buf_get_lines',
         cons_checked_list(str, I),
         buffer.data,
@@ -79,12 +80,12 @@ def current_buffer_content() -> Do:
 
 
 def buffer_number(buffer: Buffer) -> NvimIO[int]:
-    return NvimIO.delay(lambda v: unpackb(buffer.data.data))
+    return N.delay(lambda v: unpackb(buffer.data.data))
 
 
 @do(NvimIO[None])
 def close_buffer(buffer: Buffer) -> Do:
-    yield NvimIO.pure(None)
+    yield N.pure(None)
     num = yield buffer_number(buffer)
     yield nvim_command('bdelete', num)
 
@@ -96,7 +97,7 @@ def close_current_buffer() -> Do:
 
 
 def cursor(window: Window) -> NvimIO[Tuple[int, int]]:
-    return NvimIO.read_cons('nvim_win_get_cursor', cons_checked_e(list, extract_int_pair), window.data)
+    return N.read_cons('nvim_win_get_cursor', cons_checked_e(list, extract_int_pair), window.data)
 
 
 @do(NvimIO[Tuple[int, int]])
@@ -112,11 +113,11 @@ def window_line(window: Window) -> Do:
 
 
 def focus_window(window: Window) -> NvimIO[None]:
-    return NvimIO.write('nvim_set_current_win', window.data)
+    return N.write('nvim_set_current_win', window.data)
 
 
 def buffer_name(buffer: Buffer) -> NvimIO[str]:
-    return NvimIO.read_tpe('nvim_buf_get_name', str, buffer.data)
+    return N.read_tpe('nvim_buf_get_name', str, buffer.data)
 
 
 @do(NvimIO[str])
@@ -133,7 +134,7 @@ def current_buffer_name() -> Do:
 
 def set_cursor(window: Window, coords: Tuple[int, int]) -> NvimIO[None]:
     line, col = coords
-    return NvimIO.write('nvim_win_set_cursor', window.data, coords)
+    return N.write('nvim_win_set_cursor', window.data, coords)
 
 
 def set_line(window: Window, line: int) -> NvimIO[None]:
@@ -149,11 +150,11 @@ def set_local_cursor(coords: Tuple[int, int]) -> Do:
 @do(NvimIO[int])
 def current_window_number() -> Do:
     window = yield current_window()
-    yield NvimIO.read_tpe('nvim_win_get_number', int, window.data)
+    yield N.read_tpe('nvim_win_get_number', int, window.data)
 
 
 def send_input(data: str) -> NvimIO[None]:
-    return NvimIO.write('nvim_input', data)
+    return N.write('nvim_input', data)
 
 
 def edit_file(file: Path) -> NvimIO[None]:
@@ -161,7 +162,7 @@ def edit_file(file: Path) -> NvimIO[None]:
 
 
 def echo(text: str) -> NvimIO[None]:
-    return NvimIO.write('nvim_out_write', text)
+    return N.write('nvim_out_write', text)
 
 
 __all__ = ('current_tabpage', 'current_window', 'current_buffer', 'tabpages', 'windows', 'buffers', 'window_buffer',

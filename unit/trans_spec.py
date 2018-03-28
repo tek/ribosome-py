@@ -17,7 +17,7 @@ from ribosome.plugin_state import DispatchConfig, RootDispatch
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.dispatch.run import DispatchState
 from ribosome.test.klk import kn
-from ribosome.nvim.io import NError
+from ribosome.nvim.io.data import NError
 
 A = TypeVar('A')
 
@@ -118,7 +118,7 @@ ds = DispatchState(helper.state, RootDispatch())
 
 
 def run(t: Trans[A]) -> A:
-    return eval_trans(t).run_a(ds).unsafe(helper.vim)
+    return eval_trans.match(t).run_a(ds).unsafe(helper.vim)
 
 
 @trans.free.do()

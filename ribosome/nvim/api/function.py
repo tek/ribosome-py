@@ -1,11 +1,12 @@
 from typing import Any, Type, TypeVar, Callable
 
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 
 from amino import Either, L, List
-from ribosome.nvim.io import nvim_request
 from ribosome.nvim.api.util import run_once_defined
 from ribosome.nvim.api.command import nvim_command
+from ribosome.nvim.request import nvim_request
+from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
 
@@ -15,11 +16,11 @@ def nvim_call_function(fun: str, *args: Any) -> NvimIO[Any]:
 
 
 def nvim_call_tpe(tpe: Type[A], fun: str, *args: Any) -> NvimIO[A]:
-    return NvimIO.read_tpe('nvim_call_function', tpe, fun, args)
+    return N.read_tpe('nvim_call_function', tpe, fun, args)
 
 
 def nvim_call_cons(cons: Callable[[Any], Either[str, A]], fun: str, *args: Any) -> NvimIO[A]:
-    return NvimIO.read_cons('nvim_call_function', cons, fun, args)
+    return N.read_cons('nvim_call_function', cons, fun, args)
 
 
 def call_once_defined(name: str, *args: str, timeout: int=10) -> NvimIO[A]:

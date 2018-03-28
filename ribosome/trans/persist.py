@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0xf8c32699
+# __coconut_hash__ = 0x12855146
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -29,8 +29,8 @@ from amino import Do  # line 5
 from amino.json import decode_json  # line 6
 from amino.json import dump_json  # line 6
 
-from ribosome.nvim.io import NvimIO  # line 8
-from ribosome.nvim.io import NS  # line 9
+from ribosome.nvim.io.compute import NvimIO  # line 8
+from ribosome.nvim.io.state import NS  # line 9
 from ribosome.config.config import Resources  # line 10
 from ribosome.config.settings import Settings  # line 11
 
@@ -50,18 +50,18 @@ def mkdir(dir: 'Path') -> 'IO[None]':  # line 22
 @do(NvimIO[Path])  # line 26
 def state_file(settings: 'S', name: 'str') -> 'Do':  # line 27
     dir = yield settings.project_state_dir.value_or_default  # line 28
-    yield NvimIO.from_io(mkdir(dir))  # line 29
-    yield NvimIO.pure(dir / f'{name}.json')  # line 30
+    yield N.from_io(mkdir(dir))  # line 29
+    yield N.pure(dir / f'{name}.json')  # line 30
 
 
 @do(NvimIO[A])  # line 33
 def load_json_data_from(name: 'str', file: 'Path') -> 'Do':  # line 34
-    exists = yield NvimIO.from_io(IO.delay(file.exists))  # line 35
+    exists = yield N.from_io(IO.delay(file.exists))  # line 35
     if exists:  # line 36
-        json = yield NvimIO.from_io(IO.delay(file.read_text))  # line 37
-        yield NvimIO.pure(decode_json(json))  # line 38
+        json = yield N.from_io(IO.delay(file.read_text))  # line 37
+        yield N.pure(decode_json(json))  # line 38
     else:  # line 39
-        yield NvimIO.pure(Left(f'state file {file} does not exist'))  # line 40
+        yield N.pure(Left(f'state file {file} does not exist'))  # line 40
 
 
 @do(NvimIO[A])  # line 43
@@ -80,9 +80,9 @@ def load_json_state(name: 'str', store: 'UnboundLens') -> 'Do':  # line 50
 @do(NvimIO[None])  # line 56
 def store_json_data(settings: 'S', name: 'str', data: 'A') -> 'Do':  # line 57
     file = yield state_file(settings, name)  # line 58
-    json = yield NvimIO.from_either(dump_json(data))  # line 59
-    yield NvimIO.from_io(IO.delay(file.write_text, json))  # line 60
-    yield NvimIO.pure(None)  # line 61
+    json = yield N.from_either(dump_json(data))  # line 59
+    yield N.from_io(IO.delay(file.write_text, json))  # line 60
+    yield N.pure(None)  # line 61
 
 
 @do(NS[Resources[S, D, CC], None])  # line 64

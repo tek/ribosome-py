@@ -1,11 +1,12 @@
 from amino import do, Do, List, Boolean, Maybe, Dat, Just, Nothing
 from amino.boolean import false, true
 
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.ui import current_tabpage, current_window, window_buffer, set_buffer_content
 from ribosome.nvim.api.data import Window, Buffer, Tabpage
 from ribosome.nvim.api.option import option_buffer_set
 from ribosome.nvim.api.command import nvim_command
+from ribosome.nvim.io.api import N
 
 
 class ScratchUi(Dat['ScratchUi']):
@@ -38,7 +39,7 @@ def create_scratch_window(vertical: Boolean) -> Do:
 @do(NvimIO[ScratchUi])
 def create_scratch_ui(use_tab: Boolean, vertical: Boolean) -> Do:
     current = yield current_window()
-    tab = yield create_scratch_tab() / Just if use_tab else NvimIO.pure(Nothing)
+    tab = yield create_scratch_tab() / Just if use_tab else N.pure(Nothing)
     window = yield current_window() if use_tab else create_scratch_window(vertical)
     return ScratchUi(window, tab, current)
 

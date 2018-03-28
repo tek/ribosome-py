@@ -10,9 +10,10 @@ from amino.dat import Dat
 
 from ribosome.nvim.api.data import NvimApi
 from ribosome.logging import ribo_log
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.rpc import channel_id
 from ribosome.nvim.api.command import nvim_command
+from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
 
@@ -333,7 +334,7 @@ def define_autocmd(channel: int, spec: RpcHandlerSpec, plugin_name: str) -> Gene
     yield nvim_command(f'augroup {plugin_name}')
     result = yield define_handler_io(lambda a: f'call {a}', channel, spec)
     yield nvim_command(f'augroup end')
-    yield NvimIO.pure(result)
+    yield N.pure(result)
 
 
 def define_handler(channel: int, spec: RpcHandlerSpec, plugin_name: str) -> NvimIO[DefinedHandler]:
@@ -344,7 +345,7 @@ def define_handler(channel: int, spec: RpcHandlerSpec, plugin_name: str) -> Nvim
     elif spec.tpe == 'autocmd':
         return define_autocmd(channel, spec, plugin_name)
     else:
-        return NvimIO.failed(f'invalid type for {spec}')
+        return N.failed(f'invalid type for {spec}')
 
 
 @do(NvimIO[List[DefinedHandler]])

@@ -247,8 +247,8 @@ R = TypeVar('R', bound=Remote)
 #         return Syntax(self)
 
 #     @lazy
-#     def root(self) -> 'NvimApi':
-#         return NvimApi(self.vim, self.prefix)
+#     def root(self) -> 'NvimFacade':
+#         return NvimFacade(self.vim, self.prefix)
 
 
 # class NvimCmd:
@@ -529,13 +529,13 @@ R = TypeVar('R', bound=Remote)
 #         self.funcall = funcall
 
 
-# class NvimApi(HasTabs, HasWindows, HasBuffers, HasTab):
+# class NvimFacade(HasTabs, HasWindows, HasBuffers, HasTab):
 
 #     @staticmethod
-#     def stdio_with_logging(name: str) -> 'NvimApi':
+#     def stdio_with_logging(name: str) -> 'NvimFacade':
 #         from ribosome.logging import nvim_logging
 #         native = neovim.attach('stdio')
-#         vim = NvimApi(native, name)
+#         vim = NvimFacade(native, name)
 #         nvim_logging(vim)
 #         return vim
 
@@ -890,7 +890,7 @@ R = TypeVar('R', bound=Remote)
 
 
 # # FIXME recording variable name for eventual cleanup only works with a global
-# # NvimApi instance
+# # NvimFacade instance
 # class Vars(OptVar):
 
 #     def __init__(self, vim: NvimComponent) -> None:
@@ -1042,7 +1042,7 @@ R = TypeVar('R', bound=Remote)
 
 # class HasNvim:
 
-#     def __init__(self, vim: NvimApi) -> None:
+#     def __init__(self, vim: NvimFacade) -> None:
 #         self.vim = vim
 #         self.flags = Flags(vim.vars, False)
 #         self.pflags = Flags(vim.vars, True)
@@ -1073,4 +1073,4 @@ R = TypeVar('R', bound=Remote)
 #         self.target.cmd(c)
 
 
-# __all__ = ('NvimApi', 'HasNvim')
+# __all__ = ('NvimFacade', 'HasNvim')

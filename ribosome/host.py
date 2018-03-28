@@ -19,8 +19,9 @@ from ribosome.nvim.api.data import NvimApi, NativeNvimApi
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.dispatch.update import init_rpc
 from ribosome.config.settings import Settings
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.variable import variable_set_prefixed
+from ribosome.nvim.io.api import N
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
@@ -43,8 +44,8 @@ def request_handler(vim: NvimApi, sync: bool, state: PluginStateHolder[D]) -> Ca
 @do(NvimIO[PluginState[S, D, CC]])
 def init_state(dispatch_config: DispatchConfig) -> Do:
     data = dispatch_config.config.state()
-    log_handler = yield NvimIO.delay(nvim_logging)
-    state = yield NvimIO.pure(PluginState.cons(dispatch_config, data, Nil, log_handler=Just(log_handler)))
+    log_handler = yield N.delay(nvim_logging)
+    state = yield N.pure(PluginState.cons(dispatch_config, data, Nil, log_handler=Just(log_handler)))
     yield init_rpc().run_s(state)
 
 
@@ -53,16 +54,16 @@ def run_session(session: Session, dispatch_config: DispatchConfig) -> Do:
     state = yield init_state(dispatch_config)
     holder = PluginStateHolder.concurrent(state)
     ribo_log.debug(f'running session')
+    yield N.from_io(IO.delay(session._enqueue_notification, 'function:internal_init', ()))
     yield variable_set_prefixed('started', True)
-    yield NvimIO.from_io(IO.delay(session._enqueue_notification, 'function:internal_init', ()))
-    yield NvimIO.delay(
+    yield N.delay(
         lambda vim:
         session.run(
             request_handler(vim, True, holder),
             request_handler(vim, False, holder)
         )
     )
-    yield NvimIO.pure(0)
+    yield N.pure(0)
 
 
 def no_listen_address(err: Exception) -> None:
@@ -71,7 +72,7 @@ def no_listen_address(err: Exception) -> None:
 
 def run_loop(session: Session, prefix: str, dispatch_config: DispatchConfig) -> int:
     vim = NativeNvimApi(dispatch_config.name, Nvim.from_session(session)._session)
-    return run_session(session, dispatch_config).attempt(vim).get_or_raise()
+    return run_session(session, dispatch_config).unsafe(vim)
 
 
 def session(*args: str, loop: Type[Loop]=UvEventLoop, transport_type: str='stdio', **kwargs: str) -> Session:
@@ -89,10 +90,17 @@ def config_from_module(mod: ModuleType) -> Either[str, Type[C]]:
 log_initialized = False
 
 
+def nvim_stdio_with_logging(name: str) -> NvimApi:
+    from ribosome.logging import nvim_logging
+    vim = NvimApi(name, session())
+    nvim_logging(vim)
+    return vim
+
+
 def nvim_log() -> Logger:
     global log_initialized
     if not log_initialized:
-        NvimApi.stdio_with_logging('ribosome_start_host')
+        nvim_stdio_with_logging('ribosome_start_host')
         log_initialized = True
     return ribo_log
 
@@ -103,8 +111,11 @@ def start_config_stage_2(config: Config) -> int:
 
 
 def error(msg: str) -> int:
-    amino_log.error(msg)
-    nvim_log().error(msg)
+    try:
+        amino_log.error(msg)
+        nvim_log().error(msg)
+    except Exception as e:
+        pass
     return 1
 
 
@@ -114,8 +125,11 @@ def import_error(e: ImportFailure, desc: str) -> int:
 
 def exception(e: Exception, desc: str) -> int:
     f = __.caught_exception_error(f'starting host from {desc}', e)
-    f(amino_log)
-    f(nvim_log())
+    try:
+        f(amino_log)
+        f(nvim_log())
+    except Exception as e:
+        pass
     return 1
 
 

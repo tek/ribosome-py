@@ -7,9 +7,9 @@ from amino import do, Do, List
 from amino.boolean import true
 
 from ribosome.trans.api import trans
-from ribosome.nvim.io import NS
+from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import DispatchHelper
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.scratch import CreateScratchBufferOptions, show_in_scratch_buffer
 from ribosome.test.config import single_trans_config
 from ribosome.test.integration.default import ExternalSpec

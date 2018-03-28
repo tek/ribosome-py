@@ -1,7 +1,7 @@
 from amino import Map, __, List
 
 from ribosome.trans.api import trans
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.dispatch.component import Component
 from ribosome.request.handler.prefix import Plain
 from ribosome.request.handler.handler import RequestHandler

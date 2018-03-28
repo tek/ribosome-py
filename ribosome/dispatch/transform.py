@@ -9,13 +9,14 @@ from amino.tc.base import TypeClass, F
 from amino.string.hues import blue
 
 from ribosome.logging import Logging
-from ribosome.nvim.io import NvimIOState, NS
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.state import NvimIOState, NS
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.dispatch.data import (DispatchOutput, DispatchUnit, DispatchError, DispatchReturn, DispatchIO, DIO,
                                     DispatchDo, DispatchLog)
 from ribosome.trans.action import (Transit, TransUnit, TransResult, TransFailure, TransAction, TransIO, TransDo,
                                    TransLog)
 from ribosome.trans.run import TransComplete
+from ribosome.nvim.io.api import N
 
 
 D = TypeVar('D')
@@ -40,14 +41,14 @@ class TransformIdState(TransformTransState[Id], tpe=IdState):
 class TransformMaybeState(TransformTransState[Maybe], tpe=MaybeState):
 
     def run(self, st: MaybeState[D, DispatchOutput]) -> NvimIOState[D, DispatchOutput]:
-        return NvimIOState.apply(lambda s: NvimIO.pure(st.run(s) | (s, TransUnit())))
+        return NvimIOState.apply(lambda s: N.pure(st.run(s) | (s, TransUnit())))
 
 
 class TransformEitherState(TransformTransState[Either], tpe=EitherState):
 
     def run(self, st: EitherState[D, DispatchOutput]) -> NvimIOState[D, DispatchOutput]:
         return NvimIOState.apply(
-            lambda s: NvimIO.pure(st.run(s).value_or(lambda err: (s, TransFailure(err))))
+            lambda s: N.pure(st.run(s).value_or(lambda err: (s, TransFailure(err))))
         )
 
 

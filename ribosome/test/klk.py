@@ -1,7 +1,7 @@
 from typing import TypeVar, Callable, Any
 
 from ribosome.nvim.api.data import NvimApi
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.data import NResult, NSuccess
 
 from kallikrein import kf

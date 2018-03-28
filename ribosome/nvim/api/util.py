@@ -5,7 +5,8 @@ from msgpack import ExtType
 
 from amino import Either, Left, Right, List, Lists, Try, do, Maybe, Do, Just, Nothing
 
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -18,9 +19,9 @@ def run_once_defined(job: Callable[[], NvimIO[A]], err: str, timeout: int=10) ->
             time.sleep(.1)
             return loop()
         return (
-            job().recover_with(recurse)
+            N.recover_with(job(), recurse)
             if time.time() - start < timeout else
-            NvimIO.error(err)
+            N.error(err)
         )
     return loop()
 

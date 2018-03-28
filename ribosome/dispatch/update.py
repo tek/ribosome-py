@@ -5,7 +5,7 @@ from amino.lenses.lens import lens
 from amino.state import EitherState
 from amino.func import flip
 
-from ribosome.nvim.io import NS
+from ribosome.nvim.io.state import NS
 from ribosome.plugin_state import PluginState, RootDispatch, ComponentDispatch, Dispatches, AffiliatedDispatch
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.config.config import Config

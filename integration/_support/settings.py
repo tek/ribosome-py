@@ -3,7 +3,7 @@ from amino import List, do, Do, _, __
 from ribosome.trans.api import trans
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.config.config import Config, Resources
-from ribosome.nvim.io import NS
+from ribosome.nvim.io.state import NS
 from ribosome.config.settings import Settings, int_setting
 
 

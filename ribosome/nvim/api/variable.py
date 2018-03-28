@@ -4,11 +4,12 @@ from typing import Any, Callable, TypeVar
 from amino import Either, do, Do, Left, I
 from amino.logging import module_log
 
-from ribosome.nvim.io import NvimIO
-from ribosome.nvim.io import nvim_nonfatal_request, data_cons_request_nonfatal, nvim_request
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.rpc import plugin_name
 from ribosome.nvim.api.util import cons_decode_str, cons_checked_e
 from ribosome.nvim.api.data import Buffer
+from ribosome.nvim.request import nvim_nonfatal_request, data_cons_request_nonfatal, nvim_request
+from ribosome.nvim.io.api import N
 
 log = module_log()
 A = TypeVar('A')
@@ -49,13 +50,13 @@ def variable_prefixed_num(name: str) -> NvimIO[Either[str, Number]]:
 
 
 def variable_set(name: str, value: Any) -> NvimIO[None]:
-    return NvimIO.write('nvim_set_var', name, value)
+    return N.write('nvim_set_var', name, value)
 
 
 @do(NvimIO[None])
 def variable_set_prefixed(name: str, value: Any) -> Do:
     plug = yield plugin_name()
-    yield NvimIO.write('nvim_set_var', f'{plug}_{name}', value)
+    yield N.write('nvim_set_var', f'{plug}_{name}', value)
 
 
 def buffer_var_raw(buffer: Buffer, name: str) -> NvimIO[Any]:

@@ -3,7 +3,7 @@ from typing import TypeVar, Type, Generic, Any
 from amino import Either, List, IO, L, _
 from amino.state import StateT
 
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.trans.action import TransUnit, TransResult, TransIO, LogMessage, TransLog
 from ribosome.trans.effect import TransEffect
 from ribosome.trans.run import cont, lift

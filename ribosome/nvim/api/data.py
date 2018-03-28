@@ -25,7 +25,7 @@ class NativeNvimApi(NvimApi):
         self.session = session
 
     def request(self, method: str, args: List[Any]) -> Either[str, Tuple['NvimApi', Any]]:
-        return Try(self.session.request, method, *args) / (lambda a: (a, self))
+        return Try(self.session.request, method, *args) / (lambda a: (self, a))
 
 
 class StrictNvimApi(NvimApi):
@@ -34,7 +34,7 @@ class StrictNvimApi(NvimApi):
             self,
             name: str,
             vars: Map[str, Any],
-            request_handler: Callable[['StrictNvimApi', str, List[Any]], Either[List[str], Tuple['NvimApi', Any]]],
+            request_handler: Callable[['StrictNvimApi', str, List[Any]], Either[List[str], Tuple[NvimApi, Any]]],
     ) -> None:
         self.name = name
         self.vars = vars
@@ -75,4 +75,7 @@ class Buffer(Dat['Buffer']):
         self.data = data
 
 
-__all__ = ('NvimApi', 'NativeNvimApi', 'StrictNvimApi', 'Tabpage', 'Window')
+StrictNvimHandler = Callable[[StrictNvimApi, str, List[Any]], Either[List[str], Tuple[NvimApi, Any]]]
+
+
+__all__ = ('NvimApi', 'NativeNvimApi', 'StrictNvimApi', 'Tabpage', 'Window', 'StrictNvimHandler')

@@ -8,7 +8,7 @@ from amino.lenses.lens import lens
 
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliation, RootDispatch, ComponentDispatch
 from ribosome.dispatch.data import TransDispatch, Dispatch, DispatchOutput
-from ribosome.nvim.io import NS
+from ribosome.nvim.io.state import NS
 from ribosome.dispatch.transform import validate_trans_complete
 from ribosome.trans.handler import TransF
 from ribosome.dispatch.component import ComponentData

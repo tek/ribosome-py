@@ -2,11 +2,12 @@ from typing import Tuple, Any
 
 from amino import _, Either, Map, Left, Right, do, Do
 
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.api import N
 
 
 def plugin_name() -> NvimIO[str]:
-    return NvimIO.delay(_.name)
+    return N.delay(_.name)
 
 
 def api_info() -> NvimIO[Tuple[int, dict]]:
@@ -22,7 +23,7 @@ def api_info() -> NvimIO[Tuple[int, dict]]:
             if not isinstance(data[1], dict) else
             Right(data).map2(lambda a, b: (a, Map(b)))
         )
-    return NvimIO.read_cons('nvim_get_api_info', cons)
+    return N.read_cons('nvim_get_api_info', cons)
 
 
 @do(NvimIO[int])

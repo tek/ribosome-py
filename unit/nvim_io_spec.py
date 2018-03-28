@@ -9,8 +9,9 @@ from amino.do import Do
 from amino.test.spec import SpecBase
 
 from ribosome.nvim.api.data import NvimApi, StrictNvimApi
-from ribosome.nvim.io import NvimIO, N
+from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.klk import kn
+from ribosome.nvim.io.api import N
 
 
 vars = dict(a=1)
@@ -36,12 +37,12 @@ class NvimIoSpec(SpecBase):
     def suspend(self) -> Expectation:
         def f(v: NvimApi) -> NvimIO[int]:
             return N.pure(7)
-        return k(N.suspend(f).attempt(None)).must(be_right(7))
+        return k(N.suspend(f).either(None)).must(be_right(7))
 
     def delay(self) -> Expectation:
         def f(v: NvimApi) -> int:
             return 7
-        return k(N.delay(f).attempt(None)).must(be_right(7))
+        return k(N.delay(f).either(None)).must(be_right(7))
 
     def suspend_flat_map(self) -> Expectation:
         def h(a: int) -> NvimIO[int]:
@@ -50,7 +51,7 @@ class NvimIoSpec(SpecBase):
             return N.suspend(lambda v, b: h(b), a + 1)
         def f(v: NvimApi) -> NvimIO[int]:
             return N.pure(7)
-        return k(N.suspend(f).flat_map(g).flat_map(h).attempt(None)).must(be_right(12))
+        return k(N.suspend(f).flat_map(g).flat_map(h).either(None)).must(be_right(12))
 
     def stack(self) -> Expectation:
         @do(NvimIO[int])
@@ -66,7 +67,8 @@ class NvimIoSpec(SpecBase):
     def request_bind(self) -> Expectation:
         @do(NvimIO[int])
         def run() -> Do:
-            a = yield N.request('blub', List(5))
+            ae = yield N.request('blub', List(5))
+            a = yield N.e(ae)
             b = yield N.suspend(lambda v: N.pure(a + 1))
             c = yield N.delay(lambda v: b + 3)
             return c + 23

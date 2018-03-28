@@ -8,7 +8,8 @@ from amino.func import CallByName
 from amino.util.trace import cframe
 
 from ribosome.nvim.api.data import NvimApi
-from ribosome.nvim.io import NvimIO
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
 S = TypeVar('S')
@@ -18,53 +19,52 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
 
     @staticmethod
     def io(f: Callable[[NvimApi], A]) -> 'NvimIOState[S, A]':
-        return NvimIOState.lift(NvimIO.delay(f))
+        return NvimIOState.lift(N.delay(f))
 
     @staticmethod
     def delay(f: Callable[[NvimApi], A]) -> 'NvimIOState[S, A]':
-        return NvimIOState.lift(NvimIO.delay(f))
+        return NvimIOState.lift(N.delay(f))
 
     @staticmethod
     def suspend(f: Callable[[NvimApi], NvimIO[A]]) -> 'NvimIOState[S, A]':
-        return NvimIOState.lift(NvimIO.suspend(f))
+        return NvimIOState.lift(N.suspend(f))
 
     @staticmethod
     def from_io(io: IO[A]) -> 'NvimIOState[S, A]':
-        return NvimIOState.lift(NvimIO.wrap_either(lambda v: io.attempt))
+        return NvimIOState.lift(N.wrap_either(lambda v: io.attempt))
 
     @staticmethod
     def from_id(st: State[S, A]) -> 'NvimIOState[S, A]':
-        return st.transform_f(NvimIOState, lambda s: NvimIO.pure(s.value))
+        return st.transform_f(NvimIOState, lambda s: N.pure(s.value))
 
     @staticmethod
     def from_maybe(a: Maybe[A], err: CallByName) -> 'NvimIOState[S, A]':
-        return NvimIOState.lift(NvimIO.from_maybe(a, err))
+        return NvimIOState.lift(N.from_maybe(a, err))
 
     @staticmethod
     def from_either(e: Either[str, A]) -> 'NvimIOState[S, A]':
-        return NvimIOState.lift(NvimIO.from_either(e))
+        return NvimIOState.lift(N.from_either(e))
 
     @staticmethod
     def from_either_state(st: EitherState[S, A]) -> 'NvimIOState[S, A]':
-        return st.transform_f(NvimIOState, lambda s: NvimIO.from_either(s))
+        return st.transform_f(NvimIOState, lambda s: N.from_either(s))
 
     @staticmethod
     def failed(e: str) -> 'NvimIOState[S, A]':
-        return NvimIOState.lift(NvimIO.failed(e))
+        return NvimIOState.lift(N.failed(e))
 
     @staticmethod
     def error(e: str) -> 'NvimIOState[S, A]':
-        return NvimIOState.lift(NvimIO.error(e))
+        return NvimIOState.lift(N.error(e))
 
     @staticmethod
     def inspect_maybe(f: Callable[[S], Either[str, A]], err: CallByName) -> 'NvimIOState[S, A]':
         frame = cframe()
-        return NvimIOState.inspect_f(lambda s: NvimIO.from_maybe(f(s), err, frame))
+        return NvimIOState.inspect_f(lambda s: N.from_maybe(f(s), err, frame))
 
     @staticmethod
     def inspect_either(f: Callable[[S], Either[str, A]]) -> 'NvimIOState[S, A]':
-        frame = cframe()
-        return NvimIOState.inspect_f(lambda s: NvimIO.from_either(f(s), frame))
+        return NvimIOState.inspect_f(lambda s: N.from_either(f(s)))
 
     @staticmethod
     def call(name: str, *args: Any, **kw: Any) -> 'NvimIOState[S, A]':

@@ -11,7 +11,7 @@ from amino.state import State
 from ribosome.trans.api import trans
 from ribosome.plugin_state import PluginState, DispatchConfig
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.nvim.io import NS
+from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.config.config import Config
 
