@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0x12855146
+# __coconut_hash__ = 0x301356b8
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -33,62 +33,63 @@ from ribosome.nvim.io.compute import NvimIO  # line 8
 from ribosome.nvim.io.state import NS  # line 9
 from ribosome.config.config import Resources  # line 10
 from ribosome.config.settings import Settings  # line 11
+from ribosome.nvim.io.api import N  # line 12
 
-A = TypeVar('A')  # line 13
-D = TypeVar('D')  # line 14
-S = TypeVar('S', bound=Settings)  # line 15
-CC = TypeVar('CC')  # line 16
-
-
-settings: NS[Resources[S, D, CC], S] = NS.inspect(lambda a: a.settings)  # line 19
+A = TypeVar('A')  # line 14
+D = TypeVar('D')  # line 15
+S = TypeVar('S', bound=Settings)  # line 16
+CC = TypeVar('CC')  # line 17
 
 
-def mkdir(dir: 'Path') -> 'IO[None]':  # line 22
-    return IO.delay(dir.mkdir, parents=True, exist_ok=True)  # line 23
+settings: NS[Resources[S, D, CC], S] = NS.inspect(lambda a: a.settings)  # line 20
 
 
-@do(NvimIO[Path])  # line 26
-def state_file(settings: 'S', name: 'str') -> 'Do':  # line 27
-    dir = yield settings.project_state_dir.value_or_default  # line 28
-    yield N.from_io(mkdir(dir))  # line 29
-    yield N.pure(dir / f'{name}.json')  # line 30
+def mkdir(dir: 'Path') -> 'IO[None]':  # line 23
+    return IO.delay(dir.mkdir, parents=True, exist_ok=True)  # line 24
 
 
-@do(NvimIO[A])  # line 33
-def load_json_data_from(name: 'str', file: 'Path') -> 'Do':  # line 34
-    exists = yield N.from_io(IO.delay(file.exists))  # line 35
-    if exists:  # line 36
-        json = yield N.from_io(IO.delay(file.read_text))  # line 37
-        yield N.pure(decode_json(json))  # line 38
-    else:  # line 39
-        yield N.pure(Left(f'state file {file} does not exist'))  # line 40
+@do(NvimIO[Path])  # line 27
+def state_file(settings: 'S', name: 'str') -> 'Do':  # line 28
+    dir = yield settings.project_state_dir.value_or_default  # line 29
+    yield N.from_io(mkdir(dir))  # line 30
+    yield N.pure(dir / f'{name}.json')  # line 31
 
 
-@do(NvimIO[A])  # line 43
-def load_json_data(settings: 'S', name: 'str') -> 'Do':  # line 44
-    file = yield state_file(settings, name)  # line 45
-    yield load_json_data_from(file)  # line 46
+@do(NvimIO[A])  # line 34
+def load_json_data_from(name: 'str', file: 'Path') -> 'Do':  # line 35
+    exists = yield N.from_io(IO.delay(file.exists))  # line 36
+    if exists:  # line 37
+        json = yield N.from_io(IO.delay(file.read_text))  # line 38
+        yield N.pure(decode_json(json))  # line 39
+    else:  # line 40
+        yield N.pure(Left(f'state file {file} does not exist'))  # line 41
 
 
-@do(NS[Resources[S, D, CC], None])  # line 49
-def load_json_state(name: 'str', store: 'UnboundLens') -> 'Do':  # line 50
-    s = yield settings  # line 51
-    state = yield NS.lift(load_json_data(s, name))  # line 52
-    yield state.cata(lambda a: NS.pure(None), lambda d: NS.modify(store.set(d)))  # line 53
+@do(NvimIO[A])  # line 44
+def load_json_data(settings: 'S', name: 'str') -> 'Do':  # line 45
+    file = yield state_file(settings, name)  # line 46
+    yield load_json_data_from(file)  # line 47
 
 
-@do(NvimIO[None])  # line 56
-def store_json_data(settings: 'S', name: 'str', data: 'A') -> 'Do':  # line 57
-    file = yield state_file(settings, name)  # line 58
-    json = yield N.from_either(dump_json(data))  # line 59
-    yield N.from_io(IO.delay(file.write_text, json))  # line 60
-    yield N.pure(None)  # line 61
+@do(NS[Resources[S, D, CC], None])  # line 50
+def load_json_state(name: 'str', store: 'UnboundLens') -> 'Do':  # line 51
+    s = yield settings  # line 52
+    state = yield NS.lift(load_json_data(s, name))  # line 53
+    yield state.cata(lambda a: NS.pure(None), lambda d: NS.modify(store.set(d)))  # line 54
 
 
-@do(NS[Resources[S, D, CC], None])  # line 64
-def store_json_state(name: 'str', fetch: '_coconut.typing.Callable[[D], A]') -> 'Do':  # line 65
-    payload = yield NS.inspect(lambda s: fetch(s.data))  # line 66
-    s = yield settings  # line 67
-    yield NS.lift(store_json_data(s, name, payload))  # line 68
+@do(NvimIO[None])  # line 57
+def store_json_data(settings: 'S', name: 'str', data: 'A') -> 'Do':  # line 58
+    file = yield state_file(settings, name)  # line 59
+    json = yield N.from_either(dump_json(data))  # line 60
+    yield N.from_io(IO.delay(file.write_text, json))  # line 61
+    yield N.pure(None)  # line 62
 
-__all__ = ('load_json_state', 'store_json_data', 'store_json_state')  # line 70
+
+@do(NS[Resources[S, D, CC], None])  # line 65
+def store_json_state(name: 'str', fetch: '_coconut.typing.Callable[[D], A]') -> 'Do':  # line 66
+    payload = yield NS.inspect(lambda s: fetch(s.data))  # line 67
+    s = yield settings  # line 68
+    yield NS.lift(store_json_data(s, name, payload))  # line 69
+
+__all__ = ('load_json_state', 'store_json_data', 'store_json_state')  # line 71

@@ -1,6 +1,6 @@
 from typing import Callable, Tuple, Any, TypeVar, Generic
 
-from amino import Lists, Map, List, __, Either, Left, Right, do, Do
+from amino import Lists, Map, List, __, Either, Left, Right, do, Do, Nil
 from amino.dat import Dat
 from amino.lenses.lens import lens
 
@@ -81,7 +81,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
         comps_var = Map({f'{config.name}_components': Lists.wrap(comps)})
         vim = cons_vim(vars ** comps_var)
         dc = DispatchConfig.cons(config, io_executor=io_executor)
-        state = init_state(dc).unsafe(vim)
+        vim1, state = init_state(dc).unsafe_run(vim)
         return DispatchHelper(vim, dc, state)
 
     @staticmethod
@@ -106,7 +106,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
             request_handler: StrictNvimHandler=lambda v, n, a: Left(f'no handler for {n}'),
             io_executor: Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]=None,
     ) -> 'DispatchHelper':
-        cons_vim = lambda vs: StrictNvimApi(config.name, vars=vs, request_handler=StrictRequestHandler(request_handler))
+        cons_vim = lambda vs: StrictNvimApi(config.name, vs, StrictRequestHandler(request_handler), Nil)
         return DispatchHelper.create(config, *comps, vars=vars, cons_vim=cons_vim, io_executor=io_executor)
 
     def __init__(self, vim: NvimApi, dispatch_config: DispatchConfig, state: PluginState[S, D, CC]) -> None:

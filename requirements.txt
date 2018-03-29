@@ -1,4 +1,4 @@
-amino~=13.0.0a16
+amino~=13.0.0a22
 neovim~=0.1.13
 pyuv~=1.4.0
 libtmux~=0.7.4

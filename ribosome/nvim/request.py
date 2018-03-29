@@ -8,7 +8,7 @@ from amino.util.string import decode
 from ribosome.nvim.io.compute import NvimIO, NvimIOPure, NvimIORequest
 from ribosome.nvim.io.trace import NvimIOException
 from ribosome.nvim.io.compute import NvimIOError
-from ribosome.nvim.io.cons import nvimio_recover_with, nvimio_from_either
+from ribosome.nvim.io.cons import nvimio_recover_fatal, nvimio_from_either
 
 A = TypeVar('A')
 
@@ -30,7 +30,7 @@ def decode_ext_type(a: ExtType) -> ExtType:
 @do(NvimIO[Either[str, A]])
 def nvim_nonfatal_request(name: str, *args: Any) -> Do:
     request = NvimIORequest(name, Lists.wrap(args))
-    value = yield nvimio_recover_with(request, lambda a: nvim_request_error(name, args, 'fatal error', a))
+    value = yield nvimio_recover_fatal(request, lambda a: nvim_request_error(name, args, 'fatal error', a))
     return value / decode
 
 

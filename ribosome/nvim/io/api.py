@@ -1,16 +1,14 @@
-from traceback import FrameSummary
 from typing import TypeVar, Callable, Any, Type
 
 from msgpack import ExtType
 
 from amino import Either, IO, Maybe, List, do, Do
 from amino.func import CallByName
-from amino.state import State
 
 from ribosome.nvim.api.data import NvimApi
-from ribosome.nvim.io.compute import NvimIOSuspend, NvimIORequest, NvimIOPure, NvimIOFatal, NvimIOError, NvimIO
+from ribosome.nvim.io.compute import NvimIORequest, NvimIOPure, NvimIOFatal, NvimIOError, NvimIO
 from ribosome.nvim.request import typechecked_request, data_cons_request, nvim_request
-from ribosome.nvim.io.cons import (nvimio_delay, nvimio_recover, nvimio_recover_with, nvimio_wrap_either,
+from ribosome.nvim.io.cons import (nvimio_delay, nvimio_recover_error, nvimio_recover_fatal, nvimio_wrap_either,
                                    nvimio_from_either, nvimio_suspend)
 
 A = TypeVar('A')
@@ -77,11 +75,11 @@ class NMeta(type):
     def write(self, cmd: str, *args: Any) -> NvimIO[A]:
         return nvim_request(cmd, *args).replace(None)
 
-    def recover(self, fa: NvimIO[A], f: Callable[[Exception], B]) -> NvimIO[B]:
-        return nvimio_recover(fa, f)
+    def recover_error(self, fa: NvimIO[A], f: Callable[[str], B]) -> NvimIO[B]:
+        return nvimio_recover_error(fa, f)
 
-    def recover_with(self, fa: NvimIO[A], f: Callable[[Exception], NvimIO[B]]) -> NvimIO[B]:
-        return nvimio_recover_with(fa, f)
+    def recover_fatal(self, fa: NvimIO[A], f: Callable[[Exception], NvimIO[B]]) -> NvimIO[B]:
+        return nvimio_recover_fatal(fa, f)
 
     @do(NvimIO[A])
     def ensure(self, fa: NvimIO[A], f: Callable[[Either[Exception, A]], NvimIO[None]]) -> Do:

@@ -21,7 +21,7 @@ def handler(vim: StrictNvimApi, method: str, args: List[str]) -> Either[List[str
     return Right((vim.copy(vars=vars), (args.head | 9) + 2))
 
 
-vim = StrictNvimApi('test', Map(), handler)
+vim = StrictNvimApi.cons('test', request_handler=handler)
 
 
 class NvimIoSpec(SpecBase):
@@ -32,6 +32,7 @@ class NvimIoSpec(SpecBase):
     stack safety $stack
     request $request
     bind on request $request_bind
+    preserve resource state in `recover` $recover
     '''
 
     def suspend(self) -> Expectation:
@@ -59,7 +60,7 @@ class NvimIoSpec(SpecBase):
             b = yield N.pure(a + 1)
             if b < 1000:
                 yield run(b)
-        return kn(None, run, 1).must(contain(1000))
+        return kn(vim, run, 1).must(contain(1000))
 
     def request(self) -> Expectation:
         return k(N.request('blub', Nil).run_s(vim).vars) == vars
@@ -73,7 +74,21 @@ class NvimIoSpec(SpecBase):
             c = yield N.delay(lambda v: b + 3)
             return c + 23
         updated_vim, result = run().run(vim)
-        return (k(updated_vim.vars) == vars) & (k(result).must(contain(34)))
+        return (
+            (k(updated_vim.vars) == vars) &
+            (k(result).must(contain(34))) &
+            (k(updated_vim.request_log) == List(('blub', List(5))))
+        )
+
+    def recover(self) -> Expectation:
+        @do(NvimIO[int])
+        def run() -> Do:
+            a = yield N.recover_error(N.error('booh'), lambda e: Right(1))
+            b = yield N.suspend(lambda v: N.pure(a + 1))
+            c = yield N.delay(lambda v: b + 3)
+            return c + 23
+        updated_vim, result = run().run(vim)
+        return k(result).must(contain(28))
 
 
 __all__ = ('NvimIoSpec',)

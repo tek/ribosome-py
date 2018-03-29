@@ -11,6 +11,7 @@ from amino.boolean import true
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.logging import Logging
 from ribosome.config.setting import Setting, EvalSetting, setting_ctor
+from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
 B = TypeVar('B')

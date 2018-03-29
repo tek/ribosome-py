@@ -1,4 +1,4 @@
-from typing import TypeVar, Callable, Generic, Union, Tuple
+from typing import TypeVar, Callable, Generic, Union, Tuple, cast
 
 from amino.tc.base import F
 from amino import Either, List, options, Do
@@ -20,23 +20,27 @@ C = TypeVar('C')
 class NvimIO(Generic[A], F[A], ADT['NvimIO[A]'], implicits=True, imp_mod='ribosome.nvim.io.tc'):
     debug = options.io_debug.exists
 
-    def eval(self) -> State[NvimApi, A]:
+    def eval(self) -> State[NvimApi, NResult[A]]:
         return eval_nvim_io(self)
 
     def run(self, vim: NvimApi) -> Tuple[NvimApi, NResult[A]]:
-        return self.eval().run(vim).value
+        try:
+            return self.eval().run(vim).value
+        except NvimIOException as e:
+            return vim, NFatal(e)
 
     def run_s(self, vim: NvimApi) -> NvimApi:
-        return self.eval().run_s(vim).value
+        return self.run(vim)[0]
 
     def result(self, vim: NvimApi) -> NResult[A]:
-        try:
-            return self.eval().run_a(vim).value
-        except NvimIOException as e:
-            return NFatal(e)
+        return self.run(vim)[1]
 
     def either(self, vim: NvimApi) -> Either[NvimIOException, A]:
         return self.result(vim).to_either
+
+    def unsafe_run(self, vim: NvimApi) -> Tuple[NvimApi, A]:
+        result_vim, result = self.run(vim)
+        return result_vim, result.to_either.get_or_raise()
 
     def unsafe(self, vim: NvimApi) -> A:
         return self.either(vim).get_or_raise()
@@ -88,6 +92,31 @@ class NvimIOFatal(Generic[A], NvimIO[A]):
         self.exception = exception
 
 
+class NvimIORecover(Generic[A], NvimIO[A]):
+
+    def __init__(
+            self,
+            io: NvimIO[A],
+            recover: Callable[[A], NvimIO[A]],
+            recoverable: Callable[[NResult[A]], bool],
+    ) -> None:
+        self.io = io
+        self.recover = recover
+        self.recoverable = recoverable
+
+
+class lift_n_result(Case[NResult[A], NvimIO[A]], alg=NResult):
+
+    def n_success(self, result: NSuccess[A]) -> NvimIO[A]:
+        return NvimIOPure(result.value)
+
+    def n_error(self, result: NError[A]) -> NvimIO[A]:
+        return NvimIOError(result.message)
+
+    def n_fatal(self, result: NFatal[A]) -> NvimIO[A]:
+        return NvimIOFatal(result.exception)
+
+
 @do(State[NvimApi, NvimIO[Either[List[str], A]]])
 def execute_nvim_request(io: NvimIORequest[A]) -> Do:
     def make_request(vim: NvimApi) -> Tuple[NvimApi, Either[List[str], A]]:
@@ -96,6 +125,19 @@ def execute_nvim_request(io: NvimIORequest[A]) -> Do:
         result = response.map2(lambda v, a: a)
         return updated_vim, NvimIOPure(result)
     updated_vim, result = yield State.inspect(make_request)
+    yield State.reset(updated_vim, result)
+
+
+@do(State[NvimApi, NvimIO[Either[List[str], A]]])
+def execute_nvim_recover(io: NvimIORecover[A]) -> Do:
+    def execute_wrapped(vim: NvimApi) -> Tuple[NvimApi, Either[List[str], A]]:
+        updated_vim, result = io.io.run(vim)
+        return updated_vim, (
+            io.recover(result.error)
+            if io.recoverable(result) else
+            lift_n_result.match(result)
+        )
+    updated_vim, result = yield State.inspect(execute_wrapped)
     yield State.reset(updated_vim, result)
 
 
@@ -115,17 +157,19 @@ class flat_map_nvim_io(Case[Callable[[A], NvimIO[B]], NvimIO[B]], alg=NvimIO):
         return NvimIOBind(Thunk.cons(execute_nvim_request(io)), self.f)
 
     def nvim_io_bind(self, io: NvimIOBind[C, A]) -> NvimIO[B]:
-        thunk = State.inspect(lambda vim: NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f)))
-        return NvimIOSuspend.cons(thunk)
+        return NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f))
 
     def nvim_io_error(self, io: NvimIOError[A]) -> NvimIO[B]:
-        return io
+        return cast(NvimIO[B], io)
 
     def nvim_io_fatal(self, io: NvimIOFatal[A]) -> NvimIO[B]:
-        return io
+        return cast(NvimIO[B], io)
+
+    def nvim_io_recover(self, io: NvimIORecover[A]) -> NvimIO[B]:
+        return NvimIOBind(Thunk.cons(execute_nvim_recover(io)), self.f)
 
 
-EvalRes = RecStep[NvimIO[A], NResult[A]]
+EvalRes = RecStep[NvimIO[A], Tuple[NvimApi, NResult[A]]]
 
 
 class eval_step(CaseRec[NvimIO[A], NResult[A]], alg=NvimIO):
@@ -153,6 +197,9 @@ class eval_step(CaseRec[NvimIO[A], NResult[A]], alg=NvimIO):
 
     def nvim_io_fatal(self, io: NvimIOFatal[A]) -> EvalRes:
         return Term((self.vim, NFatal(io.exception)))
+
+    def nvim_io_recover(self, io: NvimIORecover[A]) -> NvimIO[B]:
+        return eval_step(self.vim)(io.map(lambda a: a))
 
 
 @do(State[NvimApi, A])

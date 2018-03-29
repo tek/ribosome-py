@@ -19,7 +19,7 @@ def run_once_defined(job: Callable[[], NvimIO[A]], err: str, timeout: int=10) ->
             time.sleep(.1)
             return loop()
         return (
-            N.recover_with(job(), recurse)
+            N.recover_fatal(job(), recurse)
             if time.time() - start < timeout else
             N.error(err)
         )
