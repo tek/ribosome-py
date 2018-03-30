@@ -38,7 +38,6 @@ class NestContainNResult(NestContain, tpe=NResult):
             if isinstance(exp, NSuccess) else
             SimpleMatchResult(false, List('{exp} is not NSuccess'))
         )
-        return List.wrap([target.evaluate(e) for e in exp])
 
     def wrap(self, name: str, exp: NResult[A], nested: MatchResult[A]) -> MatchResult[A]:
         return ContainsMatchResult(name, exp, nested)

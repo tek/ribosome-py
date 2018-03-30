@@ -6,7 +6,8 @@ from amino.do import do, Do
 from amino.case import Case
 from amino.lenses.lens import lens
 
-from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliation, RootDispatch, ComponentDispatch
+from ribosome.plugin_state import (PluginState, PluginStateHolder, DispatchAffiliation, RootDispatch, ComponentDispatch,
+                                   Dispatches)
 from ribosome.dispatch.data import TransDispatch, Dispatch, DispatchOutput
 from ribosome.nvim.io.state import NS
 from ribosome.dispatch.transform import validate_trans_complete
@@ -246,6 +247,10 @@ class DispatchJob(Generic[D], Dat['DispatchJob']):
     @property
     def desc(self) -> str:
         return f'{self.sync_prefix}sync request {self.name}({self.args}) to `{self.plugin_name}`'
+
+    @property
+    def dispatches(self) -> Dispatches:
+        return self.state.state.dispatch_config.dispatches
 
 
 __all__ = ('PluginState', 'PluginStateHolder', 'DispatchJob')

@@ -5,7 +5,10 @@ from neovim.msgpack_rpc import Session
 
 from msgpack import ExtType
 
-from amino import List, Either, Map, Left, Try, Dat, do, Do, Nil
+from amino import List, Either, Map, Left, Try, Dat, Nil, do, Do
+from amino.logging import module_log
+
+log = module_log()
 
 
 class NvimApi(Dat['NvimApi']):
@@ -24,8 +27,11 @@ class NativeNvimApi(NvimApi):
         self.name = name
         self.session = session
 
-    def request(self, method: str, args: List[Any]) -> Either[str, Tuple['NvimApi', Any]]:
-        return Try(self.session.request, method, *args) / (lambda a: (self, a))
+    @do(Either[str, Tuple['NvimApi', Any]])
+    def request(self, method: str, args: List[Any]) -> Do:
+        log.debug1(lambda: f'executing nvim request {method}({args.join_comma})')
+        result = yield Try(self.session.request, method, *args)
+        return self, result
 
 
 StrictNvimHandler = Callable[['StrictNvimApi', str, List[Any]], Either[List[str], Tuple[NvimApi, Any]]]
@@ -62,7 +68,7 @@ class StrictNvimApi(NvimApi):
         vim = self.append1.request_log((method, args))
         return self.request_handler(vim, method, args).accum_error_lift(self.try_var, vim, method, args)
 
-    def try_var(self, vim: NvimApi, method: str, args: List[Any]) -> Either[str, Any]:
+    def try_var(self, vim: 'StrictNvimApi', method: str, args: List[Any]) -> Either[str, Any]:
         return (
             args
             .detach_head

@@ -97,7 +97,7 @@ class NvimIORecover(Generic[A], NvimIO[A]):
     def __init__(
             self,
             io: NvimIO[A],
-            recover: Callable[[A], NvimIO[A]],
+            recover: Callable[[NResult[A]], NvimIO[A]],
             recoverable: Callable[[NResult[A]], bool],
     ) -> None:
         self.io = io
@@ -133,7 +133,7 @@ def execute_nvim_recover(io: NvimIORecover[A]) -> Do:
     def execute_wrapped(vim: NvimApi) -> Tuple[NvimApi, Either[List[str], A]]:
         updated_vim, result = io.io.run(vim)
         return updated_vim, (
-            io.recover(result.error)
+            io.recover(result)
             if io.recoverable(result) else
             lift_n_result.match(result)
         )

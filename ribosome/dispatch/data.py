@@ -18,6 +18,7 @@ Meth = TypeVar('Meth', bound=RpcMethod)
 D = TypeVar('D')
 
 
+# TODO remove
 class Dispatch:
 
     def __init__(self, handler: RequestHandler) -> None:

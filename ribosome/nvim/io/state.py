@@ -5,7 +5,6 @@ from amino.tc.base import TypeClass, tc_prop
 from amino import Either, __, IO, Maybe
 from amino.state import tcs, StateT, State, EitherState
 from amino.func import CallByName
-from amino.util.trace import cframe
 
 from ribosome.nvim.api.data import NvimApi
 from ribosome.nvim.io.compute import NvimIO
@@ -59,8 +58,7 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
 
     @staticmethod
     def inspect_maybe(f: Callable[[S], Either[str, A]], err: CallByName) -> 'NvimIOState[S, A]':
-        frame = cframe()
-        return NvimIOState.inspect_f(lambda s: N.from_maybe(f(s), err, frame))
+        return NvimIOState.inspect_f(lambda s: N.from_maybe(f(s), err))
 
     @staticmethod
     def inspect_either(f: Callable[[S], Either[str, A]]) -> 'NvimIOState[S, A]':

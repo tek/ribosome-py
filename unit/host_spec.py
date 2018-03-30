@@ -60,6 +60,7 @@ config = Config.cons(
 class HostSpec(SpecBase):
     '''
     call multiple async transitions with the same rpc handler $multi
+    forced sync request $sync_force
     '''
 
     def multi(self) -> Expectation:
@@ -67,6 +68,13 @@ class HostSpec(SpecBase):
         holder = helper.holder
         as_handler = request_handler(helper.vim, False, holder)
         as_handler('function:core_fun', ((1,),))
+        return k(holder.state.data.counter) == 4
+
+    def sync_force(self) -> Expectation:
+        helper = DispatchHelper.strict(config, 'extra')
+        holder = helper.holder
+        as_handler = request_handler(helper.vim, False, holder)
+        as_handler('sync:function:core_fun', ((1,),))
         return k(holder.state.data.counter) == 4
 
 

@@ -3,13 +3,14 @@ from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
-from amino import _, __, IO, Lists, Either, List, L, Nil
+from amino import _, __, IO, Lists, Either, List, L, Nil, Nothing, Left
 from amino.do import do, Do
 from amino.case import Case
 from amino.util.exception import format_exception
 from amino.io import IOException
 from amino.string.hues import red, blue, green
 from amino.util.string import decode
+from amino.state import EitherState
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.logging import ribo_log
@@ -174,37 +175,56 @@ def compute_dispatches(dispatches: List[AffiliatedDispatch[DP]], args: List[Any]
     yield execute_dispatch_output.match(DispatchOutputAggregate(output))
 
 
-def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[DispatchState, R]]], desc: str) -> NvimIO[R]:
+@do(NvimIO[R])
+def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[DispatchState, R]]], desc: str) -> Do:
     yield holder.acquire()
-    ribo_log.debug2(f'exclusive: {desc}')
+    ribo_log.debug2(lambda: f'exclusive: {desc}')
     state, response = yield N.error_effect_f(f(), holder.release)
     yield N.delay(lambda v: holder.update(state.state))
     yield holder.release()
-    ribo_log.debug2(f'release: {desc}')
+    ribo_log.debug2(lambda: f'release: {desc}')
     yield N.pure(response)
 
 
-@do(NvimIO[R])
-def exclusive_dispatch(holder: PluginStateHolder,
-                       dispatch: AffiliatedDispatch[DP],
-                       args: List[Any],
-                       desc: str,
-                       aff: DispatchAffiliation) -> Do:
-    return exclusive(holder, lambda: compute_dispatch(dispatch, args).run(DispatchState(holder.state, aff)), desc)
+def exclusive_dispatch(holder: PluginStateHolder, dispatch: AffiliatedDispatch[DP], args: List[Any], desc: str
+                       ) -> NvimIO[R]:
+    return exclusive(
+        holder,
+        lambda: compute_dispatch(dispatch, args).run(DispatchState(holder.state, dispatch.aff)),
+        desc
+    )
 
 
 def execute(state: PluginStateHolder[D], dispatch: AffiliatedDispatch[DP], args: List[Any]) -> NvimIO[Any]:
-    return exclusive_dispatch(state, dispatch, args, dispatch.desc, dispatch.aff)
+    return exclusive_dispatch(state, dispatch, args, dispatch.desc)
 
 
-def job_dispatches(job: DispatchJob) -> Either[str, List[AffiliatedDispatch[DispatchAsync]]]:
-    name = job.name
-    return job.state.state.dispatch_config.dispatches.lift(name).to_either(f'no sync dispatch for {name}')
+def regular_dispatches(name: str) -> EitherState[DispatchJob, List[AffiliatedDispatch[DispatchAsync]]]:
+    return EitherState.inspect_f(lambda job: job.dispatches.lift(name).to_either(f'no dispatch for {name}'))
+
+
+def special_dispatches_sync(parts: List[str]) -> EitherState[DispatchJob, List[AffiliatedDispatch[DispatchAsync]]]:
+    return regular_dispatches(parts.mk_string(':'))
+
+
+def special_dispatches(head: str, tail: List[str]) -> EitherState[DispatchJob, List[AffiliatedDispatch[DispatchAsync]]]:
+    return (
+        special_dispatches_sync(tail)
+        if head == 'sync' else
+        regular_dispatches(tail.cons(head).mk_string(':'))
+    )
+
+
+@do(EitherState[DispatchJob, List[AffiliatedDispatch[DispatchAsync]]])
+def job_dispatches() -> Do:
+    name = yield EitherState.inspect(_.name)
+    parts = Lists.split(name, ':')
+    yield parts.detach_head.map2(special_dispatches) | (lambda: regular_dispatches(name))
 
 
 @do(NvimIO[List[Any]])
 def execute_dispatch_job(job: DispatchJob) -> Do:
-    dispatches = yield N.from_either(job_dispatches(job))
+    dispatches = yield N.e(job_dispatches().run_a(job))
     result = yield dispatches.traverse(L(execute)(job.state, _, job.args), NvimIO)
     ribo_log.debug(f'async job {job.name} completed')
     yield N.from_io(job.state.dispatch_complete())

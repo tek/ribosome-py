@@ -31,6 +31,8 @@ from ribosome.nvim.api.data import NativeNvimApi
 from ribosome.nvim.api.option import option_cat
 from ribosome.nvim.api.variable import variable_set_prefixed
 from ribosome.nvim.api.function import define_function, nvim_call_function
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.api.command import nvim_command
 
 
 def wait_for(cond: Callable[[], bool], timeout: float=None, intval: float=0.1) -> bool:
@@ -228,9 +230,9 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def _cmd(self, cmd: str, args: List[str]) -> str:
         return args.cons(cmd).join_tokens
 
-    def _json_cmd(self, cmd: str, args: List[str], data: dict) -> str:
+    def _json_cmd(self, args: List[str], data: dict) -> str:
         j = json.dumps(data)
-        return f'{cmd} {args.join_tokens} {j}'
+        return f'{args.join_tokens} {j}'
 
     def _run_cmd(self, f: Callable[..., Either[Exception, str]], cmd: str) -> Either[Exception, str]:
         try:
@@ -247,8 +249,8 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def json_cmd(self, cmd: str, *args: str, **data: str) -> Either[Exception, str]:
         return self.cmd(self._json_cmd(cmd, Lists.wrap(args), data))
 
-    def json_cmd_sync(self, cmd: str, *args: str, **data: str) -> Either[Exception, str]:
-        return self.cmd_sync(self._json_cmd(cmd, Lists.wrap(args), data))
+    def json_cmd_sync(self, cmd: str, *args: str, **data: str) -> NvimIO[str]:
+        return nvim_command(cmd, self._json_cmd(Lists.wrap(args), data), verbose=True)
 
     @property
     def content(self) -> List[str]:
@@ -386,7 +388,7 @@ class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
         nvim_call_function('jobstart', args, opts).unsafe(self.vim)
 
     def send_json(self, data: str) -> None:
-        self.vim.call(f'{self.plugin_name}Send', data)
+        self.vim.call(f'{self.plugin_name()}Send', data)
 
     def _pre_start(self) -> None:
         if self.autostart_plugin:
