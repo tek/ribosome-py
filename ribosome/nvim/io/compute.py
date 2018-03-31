@@ -1,7 +1,7 @@
 from typing import TypeVar, Callable, Generic, Union, Tuple, cast
 
 from amino.tc.base import F
-from amino import Either, List, options, Do
+from amino import Either, List, options, Do, Boolean
 from amino.state import State
 from amino.func import tailrec
 from amino.do import do
@@ -100,7 +100,7 @@ class NvimIORecover(Generic[A], NvimIO[A]):
             self,
             io: NvimIO[A],
             recover: Callable[[NResult[A]], NvimIO[A]],
-            recoverable: Callable[[NResult[A]], bool],
+            recoverable: Callable[[NResult[A]], Boolean],
     ) -> None:
         self.io = io
         self.recover = recover
@@ -113,7 +113,7 @@ class lift_n_result(Case[NResult[A], NvimIO[A]], alg=NResult):
         return NvimIOPure(result.value)
 
     def n_error(self, result: NError[A]) -> NvimIO[A]:
-        return NvimIOError(result.message)
+        return NvimIOError(result.error)
 
     def n_fatal(self, result: NFatal[A]) -> NvimIO[A]:
         return NvimIOFatal(result.exception)

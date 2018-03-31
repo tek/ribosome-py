@@ -2,14 +2,15 @@ from typing import TypeVar, Callable, Any, Type
 
 from msgpack import ExtType
 
-from amino import Either, IO, Maybe, List, do, Do
+from amino import Either, IO, Maybe, List, Boolean
 from amino.func import CallByName
 
 from ribosome.nvim.api.data import NvimApi
 from ribosome.nvim.io.compute import NvimIORequest, NvimIOPure, NvimIOFatal, NvimIOError, NvimIO
 from ribosome.nvim.request import typechecked_request, data_cons_request, nvim_request
 from ribosome.nvim.io.cons import (nvimio_delay, nvimio_recover_error, nvimio_recover_fatal, nvimio_wrap_either,
-                                   nvimio_from_either, nvimio_suspend)
+                                   nvimio_from_either, nvimio_suspend, nvimio_recover_failure, nvimio_ensure)
+from ribosome.nvim.io.data import NResult, NError, NFatal
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -18,7 +19,7 @@ B = TypeVar('B')
 class NMeta(type):
 
     @property
-    def unit(self) -> NvimIO[A]:
+    def unit(self) -> NvimIO[None]:
         return N.pure(None)
 
     def pure(self, a: A) -> NvimIO[A]:
@@ -57,7 +58,7 @@ class NMeta(type):
     def request(self, method: str, args: List[str]) -> NvimIO[A]:
         return NvimIORequest(method, args)
 
-    def simple(self, f: Callable[..., A], *a, **kw) -> NvimIO[A]:
+    def simple(self, f: Callable[..., A], *a: Any, **kw: Any) -> NvimIO[A]:
         return N.delay(lambda v: f(*a, **kw))
 
     def suspend(self, f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> NvimIO[A]:
@@ -69,38 +70,29 @@ class NMeta(type):
     def read_cons(self, cmd: str, cons: Callable[[Any], Either[str, A]], *args: Any) -> NvimIO[A]:
         return data_cons_request(cmd, cons, *args)
 
-    def read_ext(self, cmd: str, *args: Any) -> NvimIO[A]:
+    def read_ext(self, cmd: str, *args: Any) -> NvimIO[ExtType]:
         return N.read_tpe(cmd, ExtType, *args)
 
     def write(self, cmd: str, *args: Any) -> NvimIO[A]:
         return nvim_request(cmd, *args).replace(None)
 
-    def recover_error(self, fa: NvimIO[A], f: Callable[[str], B]) -> NvimIO[B]:
+    def recover_error(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
         return nvimio_recover_error(fa, f)
 
-    def recover_fatal(self, fa: NvimIO[A], f: Callable[[Exception], NvimIO[B]]) -> NvimIO[B]:
+    def recover_fatal(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
         return nvimio_recover_fatal(fa, f)
 
-    @do(NvimIO[A])
-    def ensure(self, fa: NvimIO[A], f: Callable[[Either[Exception, A]], NvimIO[None]]) -> Do:
-        result = yield N.delay(fa.either)
-        yield f(result)
-        yield N.from_either(result)
+    def recover_failure(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
+        return nvimio_recover_failure(fa, f)
 
-    def effect(self, fa: NvimIO[A], f: Callable[[A], Any]) -> NvimIO[A]:
-        def wrap(vim: NvimApi) -> A:
-            ret = fa.run(vim)
-            f(ret)
-            return ret
-        return N.delay(wrap)
+    def ensure_error(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]]) -> NvimIO[A]:
+        return nvimio_ensure(fa, f, Boolean.is_a(NError))
 
-    __mod__ = effect
+    def ensure_fatal(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]]) -> NvimIO[A]:
+        return nvimio_ensure(fa, f, Boolean.is_a(NFatal))
 
-    def error_effect(self, fa: NvimIO[A], f: Callable[[Exception], None]) -> 'NvimIO[A]':
-        return fa.ensure(lambda a: N.delay(lambda vim: a.leffect(f)))
-
-    def error_effect_f(self, fa: NvimIO[A], f: Callable[[Exception], 'NvimIO[None]']) -> 'NvimIO[A]':
-        return N.ensure(fa, lambda a: N.suspend(lambda vim: a.cata(f, N.pure)))
+    def ensure_failure(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]]) -> NvimIO[A]:
+        return nvimio_ensure(fa, f, Boolean.is_a((NError, NFatal)))
 
 
 class N(metaclass=NMeta):

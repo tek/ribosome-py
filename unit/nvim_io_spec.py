@@ -12,6 +12,7 @@ from ribosome.nvim.api.data import NvimApi, StrictNvimApi
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.klk import kn
 from ribosome.nvim.io.api import N
+from ribosome.nvim.io.data import NError
 
 
 vars = dict(a=1)
@@ -33,6 +34,8 @@ class NvimIoSpec(SpecBase):
     request $request
     bind on request $request_bind
     preserve resource state in `recover` $recover
+    recover an exception with `recover_failure` $recover_failure
+    execute an effect after error $ensure_failure
     '''
 
     def suspend(self) -> Expectation:
@@ -89,6 +92,27 @@ class NvimIoSpec(SpecBase):
             return c + 23
         updated_vim, result = run().run(vim)
         return k(result).must(contain(28))
+
+    def recover_failure(self) -> Expectation:
+        def boom(v: NvimApi) -> NvimIO[int]:
+            raise Exception('boom')
+        @do(NvimIO[int])
+        def run() -> Do:
+            a = yield N.recover_failure(N.delay(boom), lambda e: Right(1))
+            return a + 1
+        result = run().run_a(vim)
+        return k(result).must(contain(2))
+
+    def ensure_failure(self) -> Expectation:
+        x = 1
+        def inc(v: NvimApi) -> None:
+            nonlocal x
+            x = 2
+        @do(NvimIO[None])
+        def run() -> Do:
+            yield N.ensure_failure(N.error('booze'), lambda a: N.delay(inc))
+        result = run().run_a(vim)
+        return (k(x) == 2) & (k(result) == NError('booze'))
 
 
 __all__ = ('NvimIoSpec',)
