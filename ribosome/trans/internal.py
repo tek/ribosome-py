@@ -196,7 +196,7 @@ poll_handler = RequestHandler.trans_cmd(poll)(prefix=Full())
 append_python_path_handler = RequestHandler.trans_function(append_python_path)(prefix=Full())
 show_python_path_handler = RequestHandler.trans_function(show_python_path)(prefix=Full())
 enable_components_handler = RequestHandler.trans_cmd(enable_components)(prefix=Full())
-map_handler = RequestHandler.trans_function(mapping)(name='map', prefix=Full(), json=true)
+map_handler = RequestHandler.trans_function(mapping)(name='map', prefix=Full())
 internal_init_handler = RequestHandler.trans_function(internal_init)(prefix=Full())
 
 
