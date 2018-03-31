@@ -1,10 +1,11 @@
 import abc
-from typing import Any
+from typing import Any, Tuple
 
 from amino import List, Either, Right, Map
 from amino.json.decoder import decode_json_type
 
 from ribosome.request.args import ParamsSpec
+from ribosome import ribo_log
 
 
 def starts_with_brace(data: Any) -> bool:
@@ -30,12 +31,11 @@ class TokenArgParser(ArgParser):
 class JsonArgParser(ArgParser):
 
     def parse(self, args: List[Any]) -> Either[str, List[Any]]:
-        def parse(start: int) -> Either[str, List[Any]]:
-            strict = args[:start]
-            json_args = args[start:].join_tokens
-            tpe = self.params_spec.types.last | (lambda: Map)
-            return decode_json_type(json_args, tpe) / strict.cat
-        return args.index_where(starts_with_brace).cata(parse, Right(args))
+        def pick_json(start: int) -> Tuple[str, str]:
+            return args[:start], args[start:].join_tokens
+        strict, json_args = args.index_where(starts_with_brace).cata(pick_json, (args, '{}'))
+        tpe = self.params_spec.types.last | (lambda: Map)
+        return decode_json_type(json_args, tpe) / strict.cat
 
 
 __all__ = ('ArgParser', 'TokenArgParser', 'JsonArgParser')
