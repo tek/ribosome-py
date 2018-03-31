@@ -31,7 +31,7 @@ def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0
     return exp()
 
 
-def later(exp: Expectation, timeout: float=None, intval: float=0.1) -> None:
+def later(exp: Expectation, timeout: float=None, intval: float=0.1) -> Expectation:
     return later_f(lambda: exp, timeout, intval)
 
 
