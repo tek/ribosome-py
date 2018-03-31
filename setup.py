@@ -18,7 +18,7 @@ setup(
         'pyuv~=1.4.0',
     ],
     tests_require=[
-        'libtmux~=0.7.4',
+        'chiasma~=0.1.0.a13',
         'kallikrein~=0.22.0a',
     ],
     entry_points={

@@ -14,7 +14,7 @@ from typing import Any, Callable, Generic, TypeVar
 import neovim
 from neovim.api import Nvim
 
-from amino import List, Either, __, env, Path, Lists, Map
+from amino import List, Either, __, env, Path, Lists, Map, do, Do, Nil, _, Maybe, Just, Nothing
 from amino.lazy import lazy
 from amino.test import fixture_path, temp_dir
 from amino.test.path import base_dir, pkg_dir
@@ -65,13 +65,13 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         IntegrationSpecBase.__init__(self)
         self.tmux_nvim = 'RIBOSOME_TMUX_SPEC' in env
         self.tmux_nvim_external = False
-        self.tmux_pane = None
+        self.tmux_pane_id = None
         self.keep_tmux_pane = False
         self.vimlog = temp_dir('log') / 'vim'
         self.nvim_cmdline = List('nvim', '-V{}'.format(self.vimlog), '-n', '-u', 'NONE')
         self.log_format = '{levelname} {name}:{message}'
         self.subproc = None
-        self.tmux_server = None
+        self.ribo_tmux = None
         self._debug = 'RIBOSOME_DEVELOPMENT' in env
 
     def setup(self) -> None:
@@ -98,7 +98,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
             self.start_neovim_tmux_bg()
         else:
             self.start_neovim_embedded()
-        self.vim = self._nvim_facade(self.neovim)
+        self.vim = self.create_nvim_api(self.neovim)
 
     @property
     def python_path(self) -> str:
@@ -131,26 +131,28 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def project_path(self) -> str:
         return str(base_dir().parent)
 
-    @property
-    def tmux_socket(self) -> str:
-        return f'ribosome_{os.getpid()}'
-
-    def connect_tmux(self, socket: str) -> Any:
+    def connect_tmux(self, external: bool) -> Any:
         try:
-            import libtmux
+            from chiasma.test.tmux_spec import tmux_spec_socket
+            from chiasma.tmux import Tmux
         except ImportError:
-            raise Exception('install libtmux to run nvim in a tmux pane')
+            raise Exception('install chiasma to run nvim in a tmux pane')
         else:
-            return libtmux.Server(socket_name=socket)
+            return Tmux.cons(socket=tmux_spec_socket if external else None)
 
     @property
     def tmux_window_external(self) -> Any:
-        self.tmux_server = self.connect_tmux(self.tmux_socket)
-        return self.tmux_server.sessions[0].windows[0]
+        self.ribo_tmux = self.connect_tmux(True)
+        from chiasma.io.compute import TmuxIO
+        from chiasma.commands.window import windows
+        @do(TmuxIO)
+        def run() -> Do:
+            ws = yield windows()
+            yield TmuxIO.from_maybe(ws.head, 'tmux contains no windows')
+        return run().unsafe(self.ribo_tmux)
 
     @property
     def tmux_window_local(self) -> Any:
-        server = self.connect_tmux(None)
         session = next(s for s in server.sessions if int(s['session_attached']) >= 1)
         return session.attached_window
 
@@ -163,23 +165,40 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         args = ['tmux', '-L', self.tmux_socket, '-f', str(conf)]
         master, slave = pty.openpty()
         self.subproc = subprocess.Popen(args, stdout=slave, stdin=slave, stderr=slave)
-        self.start_neovim_tmux_pane()
+        env_args = self.vim_proc_env.map2(lambda k, v: f'{k}={v}').cons('env')
+        cmd = env_args + self.nvim_cmdline
+        from chiasma.commands.pane import send_keys
+        send_keys(0, List(cmd.join_tokens)).unsafe(self.ribo_tmux)
+        wait_for(Path(self.nvim_socket).is_socket)
 
     def start_neovim_tmux_pane(self) -> None:
+        self.ribo_tmux = self.connect_tmux(False)
         env_args = self.vim_proc_env.map2(lambda k, v: f'{k}={v}').cons('env')
-        cmd = tuple(env_args + self.nvim_cmdline)
-        out = self.tmux_window.cmd('split-window', '-d', '-P', '-F#{pane_id}', *cmd).stdout
+        cmd = env_args + self.nvim_cmdline
+        pid = os.getpid()
+        from chiasma.io.compute import TmuxIO
+        from chiasma.command import simple_tmux_cmd_attrs
+        from psutil import Process
+        @do(TmuxIO)
+        def run() -> Do:
+            ps = yield simple_tmux_cmd_attrs('list-panes', Nil, List('pane_pid', 'window_id'))
+            def match(pane: Map[str, str]) -> bool:
+                return Lists.wrap(Process(int(pane['pane_pid'])).children(recursive=True)).map(_.pid).contains(pid)
+            current_pane = yield TmuxIO.from_maybe(ps.find(match), 'vim pane not found')
+            window_id = current_pane['window_id']
+            pane = yield simple_tmux_cmd_attrs('split-window', List('-t', window_id, '-d', '-P') + cmd, List('pane_id'))
+            return pane[0]['pane_id'][1:]
+        self.tmux_pane_id = run().unsafe(self.ribo_tmux)
         wait_for(Path(self.nvim_socket).is_socket)
-        from libtmux import Pane
-        self.tmux_pane = Pane(self.tmux_window, pane_id=out[0])
         self.neovim = neovim.attach('socket', path=self.nvim_socket)
         self.neovim.command('python3 sys.path.insert(0, \'{}\')'.format(self.python_path))
 
     def _cleanup_tmux(self) -> None:
-        if self.tmux_pane is not None and not self.keep_tmux_pane:
-            self.tmux_pane.cmd('kill-pane')
+        if self.tmux_pane_id is not None and not self.keep_tmux_pane:
+            from chiasma.commands.pane import close_pane_id
+            close_pane_id(self.tmux_pane_id).unsafe(self.ribo_tmux)
 
-    def _nvim_facade(self, vim: Nvim) -> NvimApi:
+    def create_nvim_api(self, vim: Nvim) -> NvimApi:
         return NativeNvimApi(self.plugin_name(), vim._session)
 
     @abc.abstractmethod
@@ -203,8 +222,9 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
             self._cleanup_tmux()
         if self.subproc is not None:
             self.subproc.kill()
-        if self.tmux_server is not None:
-            self.tmux_server.kill_server()
+        if self.tmux_nvim_external:
+            from chiasma.io.compute import TmuxIO
+            TmuxIO.write('kill-server').unsafe(self.ribo_tmux)
 
     def _pre_start_neovim(self) -> None:
         pass

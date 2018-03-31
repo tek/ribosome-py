@@ -32,8 +32,10 @@ class NvimIO(Generic[A], F[A], ADT['NvimIO[A]'], implicits=True, imp_mod='riboso
     def run_s(self, vim: NvimApi) -> NvimApi:
         return self.run(vim)[0]
 
-    def result(self, vim: NvimApi) -> NResult[A]:
+    def run_a(self, vim: NvimApi) -> NResult[A]:
         return self.run(vim)[1]
+
+    result = run_a
 
     def either(self, vim: NvimApi) -> Either[NvimIOException, A]:
         return self.result(vim).to_either

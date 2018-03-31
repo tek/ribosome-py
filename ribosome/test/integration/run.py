@@ -164,6 +164,10 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
     def component_res(self, data: C) -> Resources[S, C, CC]:
         return self.state.resources_with(ComponentData(self.state.data, data))
 
+    def component_res_for(self, name: str) -> Resources[S, C, CC]:
+        data = self.state.data_by_name(name).get_or_raise()
+        return self.state.resources_with(ComponentData(self.state.data, data))
+
 
 def dispatch_helper(
         config: Config[S, D, CC],
