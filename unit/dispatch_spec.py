@@ -1,9 +1,9 @@
+from typing import Any
+
 from kallikrein import Expectation, k
-from kallikrein.matchers.maybe import be_just
-from kallikrein.matchers.length import have_length
 
 from amino.test.spec import SpecBase
-from amino import Lists, List, _, IO, __, Right
+from amino import Lists, List, _, IO, __
 from amino.boolean import true
 from amino.dat import Dat, ADT
 from amino.state import State
@@ -14,6 +14,9 @@ from ribosome.request.handler.handler import RequestHandler
 from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.config.config import Config
+from ribosome.dispatch.execute import execute_request
+from ribosome.config.settings import Settings
+from ribosome.nvim.io.api import N
 
 specimen = Lists.random_string()
 
@@ -63,7 +66,12 @@ def vim_enter() -> State[HsData, None]:
     return State.modify(__.copy(counter=19))
 
 
-config = Config.cons(
+@trans.free.result(trans.st)
+def trans_error() -> NS[HsData, int]:
+    return NS.lift(N.error('error'))
+
+
+config: Config[Settings, HsData, Any] = Config.cons(
     'hs',
     request_handlers=List(
         RequestHandler.trans_cmd(trans_free)('trfree'),
@@ -72,6 +80,7 @@ config = Config.cons(
         RequestHandler.trans_function(trans_data)('dat'),
         RequestHandler.trans_cmd(trans_json)('json', json=true),
         RequestHandler.trans_autocmd(vim_enter)(),
+        RequestHandler.trans_cmd(trans_error)('error'),
     ),
     state_ctor=HsData,
 )
@@ -87,6 +96,7 @@ class DispatchSpec(SpecBase):
     modify the state data $data
     json command args $json
     run an autocmd $autocmd
+    error $error
     '''
 
     def trans_free(self) -> Expectation:
@@ -119,6 +129,11 @@ class DispatchSpec(SpecBase):
         helper = DispatchHelper.strict(config)
         state = helper.unsafe_run_s('autocmd:vim_enter')
         return k(state.data.counter) == 19
+
+    def error(self) -> Expectation:
+        helper = DispatchHelper.strict(config)
+        result = execute_request(helper.vim, helper.holder, 'command:error', (), True)
+        return k(result) == 1
 
 
 __all__ = ('DispatchSpec',)
