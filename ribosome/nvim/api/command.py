@@ -29,8 +29,8 @@ def command_once_defined(name: str, *args: str, timeout: int=10) -> NvimIO[A]:
     )
 
 
-def doautocmd(name: str, pattern: str='') -> NvimIO[None]:
-    return nvim_command(f'doautocmd <nomodeline> {name} {pattern}')
+def doautocmd(name: str, pattern: str='', verbose: bool=False) -> NvimIO[None]:
+    return nvim_command(f'doautocmd', '<nomodeline>', name, pattern, verbose=verbose)
 
 
 __all__ = ('nvim_command', 'nvim_command_output', 'command_once_defined', 'doautocmd')
