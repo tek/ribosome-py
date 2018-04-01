@@ -59,6 +59,15 @@ class VimIntegrationSpecI(abc.ABC):
         ...
 
 
+def format_json_cmd(args: List[str], data: dict) -> str:
+    j = json.dumps(data)
+    return f'{args.join_tokens} {j}'
+
+
+def json_cmd(cmd: str, *args: str, **data: str) -> NvimIO[str]:
+    return nvim_command(cmd, format_json_cmd(Lists.wrap(args), data), verbose=True)
+
+
 class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
 
     def __init__(self) -> None:
@@ -250,27 +259,11 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def _cmd(self, cmd: str, args: List[str]) -> str:
         return args.cons(cmd).join_tokens
 
-    def _json_cmd(self, args: List[str], data: dict) -> str:
-        j = json.dumps(data)
-        return f'{args.join_tokens} {j}'
+    def cmd(self, cmd: str, *args: str) -> NvimIO[None]:
+        return nvim_command(cmd, *args, verbose=True)
 
-    def _run_cmd(self, f: Callable[..., Either[Exception, str]], cmd: str) -> Either[Exception, str]:
-        try:
-            return f(cmd)
-        finally:
-            self._wait(.1)
-
-    def cmd(self, cmd: str, *args: str) -> Either[Exception, str]:
-        return self._run_cmd(self.vim.cmd, self._cmd(cmd, Lists.wrap(args)))
-
-    def cmd_sync(self, cmd: str, *args: str) -> Either[Exception, str]:
-        return self._run_cmd(self.vim.cmd_sync, self._cmd(cmd, Lists.wrap(args)))
-
-    def json_cmd(self, cmd: str, *args: str, **data: str) -> Either[Exception, str]:
-        return self.cmd(self._json_cmd(cmd, Lists.wrap(args), data))
-
-    def json_cmd_sync(self, cmd: str, *args: str, **data: str) -> NvimIO[str]:
-        return nvim_command(cmd, self._json_cmd(Lists.wrap(args), data), verbose=True)
+    def json_cmd(self, cmd: str, *args: str, **data: Any) -> NvimIO[None]:
+        return json_cmd(cmd, *args, **data)
 
     @property
     def content(self) -> List[str]:
