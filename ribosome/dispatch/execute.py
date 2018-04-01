@@ -1,9 +1,9 @@
-from typing import TypeVar, Callable, Any, Tuple
+from typing import TypeVar, Callable, Any, Tuple, Generic
 from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
-from amino import _, __, IO, Lists, Either, List, L, Nil, Nothing, Left
+from amino import _, __, IO, Lists, Either, List, L, Nil, Nothing, Left, ADT
 from amino.do import do, Do
 from amino.case import Case
 from amino.util.exception import format_exception
@@ -32,8 +32,7 @@ from ribosome.nvim.io.api import N
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
-AS = TypeVar('AS')
-A = TypeVar('A', bound=AS)
+A = TypeVar('A')
 B = TypeVar('B')
 C = TypeVar('C', bound=Config)
 R = TypeVar('R')
@@ -175,11 +174,14 @@ def compute_dispatches(dispatches: List[AffiliatedDispatch[DP]], args: List[Any]
     yield execute_dispatch_output.match(DispatchOutputAggregate(output))
 
 
-@do(NvimIO[R])
-def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[DispatchState, R]]], desc: str) -> Do:
+# TODO use from request_handler, since there is no concurrency handling anywhere else anymore.
+@do(NvimIO[A])
+def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[DispatchState, A]]], desc: str) -> Do:
+    '''this is the central unsafe function, using a lock and updating the state in `holder` in-place.
+    '''
     yield holder.acquire()
     ribo_log.debug2(lambda: f'exclusive: {desc}')
-    state, response = yield N.error_effect_f(f(), holder.release)
+    state, response = yield N.ensure_failure(f(), holder.release)
     yield N.delay(lambda v: holder.update(state.state))
     yield holder.release()
     ribo_log.debug2(lambda: f'release: {desc}')

@@ -210,22 +210,5 @@ class DispatchHandle(DispatchContinuation):
     pass
 
 
-class DispatchResultMeta(DatMeta):
-
-    @property
-    def unit(self) -> 'DispatchResult':
-        return DispatchResult(DispatchUnit(), Nil)
-
-    @property
-    def unit_nio(self) -> 'NvimIOState[D, DispatchResult]':
-        return NvimIOState.pure(DispatchResult.unit)
-
-    def error(self, problem: Union[str, Exception]) -> 'NvimIOState[D, DispatchResult]':
-        return DispatchResult(DispatchError.cons(problem), Nil)
-
-    def error_nio(self, problem: Union[str, Exception]) -> 'NvimIOState[D, DispatchResult]':
-        return NvimIOState.pure(DispatchResult.error(problem))
-
-
 __all__ = ('DispatchSync', 'DispatchAsync', 'Legacy', 'SendMessage', 'TransDispatch', 'DispatchOutput',
            'DispatchError', 'DispatchReturn', 'DispatchUnit', 'DispatchContinuation')

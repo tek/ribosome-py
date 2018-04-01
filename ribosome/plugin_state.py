@@ -15,7 +15,7 @@ from ribosome.dispatch.component import Component, Components
 from ribosome.nvim.io.state import NS
 from ribosome.dispatch.data import DIO, Dispatch, DispatchAsync
 from ribosome.trans.handler import TransF
-from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.compute import NvimIO, lift_n_result
 from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
 from ribosome.trans.action import LogMessage
@@ -23,6 +23,7 @@ from ribosome.config.settings import Settings
 from ribosome.config.config import Config, Resources
 from ribosome.trans.run import TransComplete
 from ribosome.nvim.io.api import N
+from ribosome.nvim.io.data import NResult
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -243,7 +244,7 @@ class PluginStateHolder(Generic[D], Dat['PluginStateHolder'], Logging):
         ...
 
     @abc.abstractmethod
-    def release(self, error: Optional[Exception]=None) -> NvimIO[None]:
+    def release(self, result: Optional[NResult[A]]=None) -> NvimIO[None]:
         ...
 
     @abc.abstractmethod
@@ -275,9 +276,6 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
         self.waiting_greenlets.task_done()
         return gr
 
-    # FIXME if an async request arrives while another async dispatch is executing, will it behave similarly?
-    # If so, this needs multiple waiting greenlets.
-    # If not, the parent switch (and overwriting of `waiting_greenlets`) may not be done.
     @do(NvimIO[None])
     def acquire(self) -> Do:
         '''acquire the state lock that prevents multiple dispatches from updating the state asynchronously.
@@ -296,12 +294,12 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
         yield N.simple(setattr, self, 'running', True)
 
     @do(NvimIO[None])
-    def release(self, error: Optional[Exception]=None) -> Do:
+    def release(self, result: Optional[NResult[A]]=None) -> Do:
         yield N.simple(setattr, self, 'running', False)
         yield N.simple(Try, self.lock.release)
-        if error:
-            self.log.debug(f'released lock due to error: {error}')
-            yield N.exception(error)
+        if result:
+            self.log.debug(f'released lock due to error: {result}')
+            yield lift_n_result.match(result)
 
     @do(IO[None])
     def dispatch_complete(self) -> Do:
@@ -321,7 +319,7 @@ class StrictPluginStateHolder(Generic[D], PluginStateHolder[D]):
     def acquire(self) -> NvimIO[None]:
         return N.pure(None)
 
-    def release(self, error: Optional[Exception]=None) -> NvimIO[None]:
+    def release(self, result: Optional[NResult[A]]=None) -> NvimIO[None]:
         return N.pure(None)
 
     def dispatch_complete(self) -> IO[None]:
