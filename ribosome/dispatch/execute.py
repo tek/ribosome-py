@@ -1,14 +1,13 @@
-from typing import TypeVar, Callable, Any, Tuple, Generic
+from typing import TypeVar, Callable, Any, Tuple
 from concurrent.futures import wait, ThreadPoolExecutor
 
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 
-from amino import _, __, IO, Lists, Either, List, L, Nil, Nothing, Left, ADT
+from amino import _, __, IO, Lists, Either, List, L, Nil
 from amino.do import do, Do
 from amino.case import Case
 from amino.util.exception import format_exception
 from amino.io import IOException
-from amino.string.hues import red, blue, green
 from amino.util.string import decode
 from amino.state import EitherState
 
@@ -16,19 +15,22 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.logging import ribo_log
 from ribosome.config.config import Config
 from ribosome.nvim.io.state import NS
-from ribosome.dispatch.run import (DispatchJob, log_trans, DispatchState, run_trans, plugin_to_dispatch,
-                                   setup_and_run_trans)
 from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput,
-                                    DispatchAsync, Dispatch, DispatchIO, IODIO, DIO, DispatchErrors, NvimIODIO,
+                                    DispatchIO, IODIO, DIO, DispatchErrors, NvimIODIO,
                                     DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO, DispatchLog)
-from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchAffiliation, AffiliatedDispatch
+from ribosome.plugin_state import PluginState, PluginStateHolder
 from ribosome.trans.action import LogMessage, Info, Error
-from ribosome.trans.handler import TransF, Trans, TransBind, TransPure, TransError
+from ribosome.compute.prog import Program
 from ribosome.config.settings import Settings
 from ribosome.trans.run import TransComplete
 from ribosome import NvimApi
 from ribosome.nvim.io.data import NResult, NSuccess, NError, NFatal
 from ribosome.nvim.io.api import N
+from ribosome.dispatch.job import DispatchJob
+from ribosome.request.handler.handler import RequestHandler
+from ribosome.request.args import ParamsSpec
+from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
+from ribosome.compute.run import run_prog
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
@@ -36,12 +38,9 @@ A = TypeVar('A')
 B = TypeVar('B')
 C = TypeVar('C', bound=Config)
 R = TypeVar('R')
-DP = TypeVar('DP', bound=Dispatch)
 RDP = TypeVar('RDP')
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
-Res = NS[PluginState[S, D, CC], DispatchOutput]
-DRes = NS[DispatchState[S, D, CC], DispatchOutput]
 
 
 def gather_ios(ios: List[IO[A]], timeout: float) -> List[Either[IOException, A]]:
@@ -78,42 +77,11 @@ class execute_io(Case, alg=DIO):
         return NS.lift(io.io)
 
 
-@do(NS[DispatchState[S, D, CC], R])
-def run_trans_f(handler: TransF, aff: DispatchAffiliation) -> Do:
+@do(NS[PluginState[S, D, CC], R])
+def run_trans_f(handler: Program) -> Do:
     yield plugin_to_dispatch(log_trans(handler))
-    result = yield run_trans(aff, handler, Nil)
+    result = yield run_program(aff, handler, Nil)
     yield execute_dispatch_output.match(result)
-
-
-class eval_trans(Case[Trans, R], alg=Trans):
-
-    @do(NS[DispatchState[S, D, CC], R])
-    def trans_f(self, tr: TransF[R]) -> Do:
-        current = yield NS.inspect(_.aff)
-        aff = yield NS.inspect(__.state.reaffiliate(tr, current))
-        if current != aff:
-            from_name = red(current.name)
-            to_name = green(aff.name)
-            ribo_log.debug(f'switching dispatch affiliation for {blue(tr.name)}: {from_name} -> {to_name}')
-        yield NS.modify(__.set.aff(aff))
-        result = yield run_trans_f(tr, aff)
-        yield NS.modify(__.set.aff(current))
-        yield NS.pure(result)
-
-    # TODO determine affiliation from the type in the handler's state
-    @do(NS[DispatchState[S, D, CC], R])
-    def trans_bind(self, tr: TransBind[R]) -> Do:
-        result = yield self(tr.fa)
-        next_trans = tr.f(result)
-        yield self(next_trans)
-
-    @do(NS[DispatchState[S, D, CC], R])
-    def trans_pure(self, tr: TransPure[R]) -> Do:
-        yield NS.pure(tr.value)
-
-    @do(NS[DispatchState[S, D, CC], R])
-    def trans_error(self, tr: TransError[R]) -> Do:
-        yield NS.error(tr.error)
 
 
 class dispatch_log(Case, alg=LogMessage):
@@ -127,89 +95,102 @@ class dispatch_log(Case, alg=LogMessage):
 
 class execute_dispatch_output(Case, alg=DispatchOutput):
 
-    def dispatch_error(self, result: DispatchError) -> NS[DispatchState[S, D, CC], R]:
+    def dispatch_error(self, result: DispatchError) -> NS[PluginState[S, D, CC], R]:
         io = result.exception / N.exception | N.error(result.message)
         return NS.lift(io)
 
-    def dispatch_errors(self, result: DispatchErrors) -> NS[DispatchState[S, D, CC], R]:
+    def dispatch_errors(self, result: DispatchErrors) -> NS[PluginState[S, D, CC], R]:
         return result.errors.traverse(self.dispatch_error, NS)
 
-    def dispatch_return(self, result: DispatchReturn) -> NS[DispatchState[S, D, CC], R]:
+    def dispatch_return(self, result: DispatchReturn) -> NS[PluginState[S, D, CC], R]:
         return NS.pure(result.value)
 
-    def dispatch_unit(self, result: DispatchUnit) -> NS[DispatchState[S, D, CC], R]:
+    def dispatch_unit(self, result: DispatchUnit) -> NS[PluginState[S, D, CC], R]:
         return NS.pure(0)
 
-    @do(NS[DispatchState[S, D, CC], R])
+    @do(NS[PluginState[S, D, CC], R])
     def dispatch_io(self, result: DispatchIO) -> Do:
         custom_executor = yield NS.inspect(_.state.dispatch_config.io_executor)
         executor = custom_executor | (lambda: execute_io.match)
         io_result = yield executor(result.io)
         yield eval_trans.match(result.io.handle_result(io_result))
 
-    @do(NS[DispatchState[S, D, CC], R])
+    @do(NS[PluginState[S, D, CC], R])
     def dispatch_output_aggregate(self, result: DispatchOutputAggregate) -> Do:
         yield result.results.traverse(execute_dispatch_output.match, NS)
 
-    @do(NS[DispatchState[S, D, CC], R])
+    @do(NS[PluginState[S, D, CC], R])
     def dispatch_do(self, result: DispatchDo) -> Do:
         yield eval_trans.match(result.trans.action)
 
-    @do(NS[DispatchState[S, D, CC], R])
+    @do(NS[PluginState[S, D, CC], R])
     def dispatch_log(self, result: DispatchLog) -> Do:
         custom_logger = yield NS.inspect(_.state.logger)
         logger = custom_logger | (lambda: dispatch_log.match)
         yield logger(result.trans)
 
 
-@do(NS[DispatchState[S, D, CC], R])
-def compute_dispatch(dispatch: AffiliatedDispatch[DP], args: List[Any]) -> Do:
-    result = yield setup_and_run_trans(dispatch.dispatch, dispatch.aff, args)
-    yield execute_dispatch_output.match(result)
+def arg_parser(handler: RequestHandler, params_spec: ParamsSpec) -> ArgParser:
+    tpe = JsonArgParser if handler.json else TokenArgParser
+    return tpe(params_spec)
 
 
-@do(Res)
-def compute_dispatches(dispatches: List[AffiliatedDispatch[DP]], args: List[Any]) -> Do:
-    output = yield dispatches.traverse(lambda a: setup_and_run_trans(a.dispatch, a.aff, args), NS)
-    yield execute_dispatch_output.match(DispatchOutputAggregate(output))
+def parse_args(handler: RequestHandler, args: List[Any]) -> NS[D, List[Any]]:
+    return arg_parser(handler, handler.program.params_spec).parse(args)
+
+
+def log_trans(trans: Program) -> NS[PluginState[S, D, CC], None]:
+    return NS.pure(None) if trans.name in ('trans_log', 'pure') else NS.modify(__.log_trans(trans.name))
+
+
+@do(NS)
+def run_request_handler(handler: RequestHandler, args: List[Any]) -> Do:
+    program = handler.program
+    parsed_args = yield NS.from_either(parse_args(handler, args))
+    yield log_trans(program)
+    yield run_prog(program, parsed_args)
+
+
+@do(NS)
+def traverse_programs(dispatches: List[Program], args: List[Any]) -> Do:
+    yield dispatches.traverse(lambda a: run_request_handler(a, args), NS)
 
 
 # TODO use from request_handler, since there is no concurrency handling anywhere else anymore.
 @do(NvimIO[A])
-def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[DispatchState, A]]], desc: str) -> Do:
+def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[PluginState, A]]], desc: str) -> Do:
     '''this is the central unsafe function, using a lock and updating the state in `holder` in-place.
     '''
     yield holder.acquire()
     ribo_log.debug2(lambda: f'exclusive: {desc}')
     state, response = yield N.ensure_failure(f(), holder.release)
-    yield N.delay(lambda v: holder.update(state.state))
+    yield N.delay(lambda v: holder.update(state))
     yield holder.release()
     ribo_log.debug2(lambda: f'release: {desc}')
     yield N.pure(response)
 
 
-def exclusive_dispatch(holder: PluginStateHolder, dispatch: AffiliatedDispatch[DP], args: List[Any], desc: str
-                       ) -> NvimIO[R]:
+def exclusive_dispatch(holder: PluginStateHolder, dispatch: Program, args: List[Any], desc: str) -> NvimIO[R]:
     return exclusive(
         holder,
-        lambda: compute_dispatch(dispatch, args).run(DispatchState(holder.state, dispatch.aff)),
+        lambda: run_request_handler(dispatch, args).run(holder.state),
         desc
     )
 
 
-def execute(state: PluginStateHolder[D], dispatch: AffiliatedDispatch[DP], args: List[Any]) -> NvimIO[Any]:
-    return exclusive_dispatch(state, dispatch, args, dispatch.desc)
+def execute(state: PluginStateHolder[D], program: Program, args: List[Any]) -> NvimIO[Any]:
+    return exclusive_dispatch(state, program, args, program.name)
 
 
-def regular_dispatches(name: str) -> EitherState[DispatchJob, List[AffiliatedDispatch[DispatchAsync]]]:
-    return EitherState.inspect_f(lambda job: job.dispatches.lift(name).to_either(f'no dispatch for {name}'))
+def regular_dispatches(name: str) -> EitherState[DispatchJob, List[Program]]:
+    return EitherState.inspect_f(lambda job: job.programs.lift(name).to_either(f'no dispatch for {name}'))
 
 
-def special_dispatches_sync(parts: List[str]) -> EitherState[DispatchJob, List[AffiliatedDispatch[DispatchAsync]]]:
+def special_dispatches_sync(parts: List[str]) -> EitherState[DispatchJob, List[Program]]:
     return regular_dispatches(parts.mk_string(':'))
 
 
-def special_dispatches(head: str, tail: List[str]) -> EitherState[DispatchJob, List[AffiliatedDispatch[DispatchAsync]]]:
+def special_dispatches(head: str, tail: List[str]) -> EitherState[DispatchJob, List[Program]]:
     return (
         special_dispatches_sync(tail)
         if head == 'sync' else
@@ -217,7 +198,7 @@ def special_dispatches(head: str, tail: List[str]) -> EitherState[DispatchJob, L
     )
 
 
-@do(EitherState[DispatchJob, List[AffiliatedDispatch[DispatchAsync]]])
+@do(EitherState[DispatchJob, List[Program]])
 def job_dispatches() -> Do:
     name = yield EitherState.inspect(_.name)
     parts = Lists.split(name, ':')
@@ -280,4 +261,4 @@ def execute_request(vim: NvimApi, state: PluginStateHolder[D], name: str, args: 
     return decode(result)
 
 
-__all__ = ('execute_dispatch_job', 'execute', 'compute_dispatches', 'compute_dispatch')
+__all__ = ('execute_dispatch_job', 'execute', 'traverse_programs', 'compute_dispatch')

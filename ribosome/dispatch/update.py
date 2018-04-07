@@ -1,51 +1,42 @@
-from typing import TypeVar, Tuple
+from typing import TypeVar
 
-from amino import do, Do, _, __, Map, List, Either, L
+from amino import do, Do, _, __, List, Either, L
 from amino.lenses.lens import lens
 from amino.state import EitherState
-from amino.func import flip
 
 from ribosome.nvim.io.state import NS
-from ribosome.plugin_state import PluginState, RootDispatch, ComponentDispatch, Dispatches, AffiliatedDispatch
+from ribosome.plugin_state import PluginState, Programs
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.config.config import Config
-from ribosome.dispatch.data import DispatchAsync, TransDispatch, Dispatch
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.dispatch.component import Components, Component
 from ribosome.request.rpc import define_handlers, RpcHandlerSpec
 from ribosome.config.settings import Settings
+from ribosome.compute.prog import Program
 
 D = TypeVar('D')
-DP = TypeVar('DP', bound=Dispatch)
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
 
-def choose_dispatch(handler: RequestHandler) -> DispatchAsync:
-    return TransDispatch(handler)
+def request_handlers_dispatches(handlers: RequestHandlers) -> List[Program]:
+    return handlers.handlers.v
 
 
-def request_handlers_dispatches(handlers: RequestHandlers) -> List[Dispatch]:
-    return handlers.handlers.v.map(choose_dispatch)
+def config_dispatches(config: Config) -> List[Program]:
+    return request_handlers_dispatches(config.request_handlers)
 
 
-def config_dispatches(config: Config) -> List[AffiliatedDispatch[Dispatch]]:
-    return request_handlers_dispatches(config.request_handlers) / L(AffiliatedDispatch)(_, RootDispatch())
+def component_dispatches(component: Component) -> List[Program]:
+    return request_handlers_dispatches(component.request_handlers)
 
 
-def component_dispatches(component: Component) -> List[AffiliatedDispatch[DispatchAsync]]:
-    return (
-        request_handlers_dispatches(component.request_handlers) /
-        L(AffiliatedDispatch)(_, ComponentDispatch(component))
-    )
-
-
-def dispatches(state: PluginState[S, D, CC]) -> Dispatches:
+def dispatches(state: PluginState[S, D, CC]) -> Programs:
     config = state.config
     cfg_dispatches = config_dispatches(config)
     compo_dispatches = state.components.all // component_dispatches
     dispatch = compo_dispatches + cfg_dispatches
-    rpc_method = lambda d: d.dispatch.spec(config.name, config.prefix).rpc_method
+    rpc_method = lambda d: d.spec(config.name, config.prefix).rpc_method
     return dispatch.group_by(rpc_method)
 
 
@@ -55,7 +46,7 @@ def update_components(from_user: Either[str, List[str]]) -> Do:
     components = yield EitherState.lift(ComponentResolver(config, from_user).run)
     yield EitherState.modify(__.copy(components=Components.cons(components, config.component_config_type)))
     dispatch = yield EitherState.inspect(dispatches)
-    yield EitherState.modify(lens.dispatch_config.dispatches.set(dispatch))
+    yield EitherState.modify(lens.dispatch_config.programs.set(dispatch))
 
 
 @do(NS[PluginState[S, D, CC], None])

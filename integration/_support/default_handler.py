@@ -1,14 +1,14 @@
 from amino import Either, List
 
 from ribosome.config.config import Config
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Plain
 
 class_name = 'ZeeKlass'
 
 
-@trans.free.result()
+@prog.result
 def test_path() -> str:
     return Either.import_name('pkg', class_name).map(lambda a: a.__name__).value_or('failed')
 

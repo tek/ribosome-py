@@ -1,14 +1,13 @@
 from typing import Any
 
-from kallikrein import Expectation, k
+from kallikrein import Expectation, k, pending
 
 from amino.test.spec import SpecBase
-from amino import Lists, List, _, IO, __
+from amino import Lists, List, _, IO, __, do, Do
 from amino.boolean import true
 from amino.dat import Dat, ADT
-from amino.state import State
 
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.plugin_state import PluginState, DispatchConfig
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.nvim.io.state import NS
@@ -27,23 +26,23 @@ class HsData(Dat['HsData']):
         self.counter = counter
 
 
-@trans.free.result()
-def trans_free(a: int, b: str='b') -> int:
-    return 8
+@prog.result
+def trans_free(a: int, b: str='b') -> NS[None, int]:
+    return NS.pure(8)
 
 
-@trans.free.result(trans.io)
+@prog.result
 def trans_io() -> IO[int]:
     return IO.pure(5)
 
 
 # TODO allow args here
-@trans.free.result(trans.st)
+@prog.result
 def trans_internal() -> NS[PluginState, str]:
     return NS.inspect(_.name)
 
 
-@trans.free.unit(trans.st)
+@prog.unit
 def trans_data() -> NS[HsData, None]:
     return NS.modify(__.set.counter(23))
 
@@ -56,17 +55,18 @@ class JData(ADT['JData']):
         self.items = items
 
 
-@trans.free.result()
-def trans_json(a: int, b: str, data: JData) -> int:
-    return data.number + a
+@prog.result
+def trans_json(a: int, b: str, data: JData) -> NS[HsData, int]:
+    return NS.pure(data.number + a)
 
 
-@trans.free.unit(trans.st)
-def vim_enter() -> State[HsData, None]:
-    return State.modify(__.copy(counter=19))
+@prog.unit
+@do(NS[HsData, None])
+def vim_enter() -> Do:
+    yield NS.modify(__.copy(counter=19))
 
 
-@trans.free.result(trans.st)
+@prog.result
 def trans_error() -> NS[HsData, int]:
     return NS.lift(N.error('error'))
 
@@ -104,6 +104,7 @@ class DispatchSpec(SpecBase):
         result = helper.unsafe_run_a('command:trfree', args=('x',))
         return k(result) == 8
 
+    @pending
     def io(self) -> Expectation:
         helper = DispatchHelper.strict(config)
         result = helper.unsafe_run_a('command:trio')

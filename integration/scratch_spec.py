@@ -6,7 +6,7 @@ from kallikrein.matchers.length import have_length
 from amino import do, Do, List
 from amino.boolean import true
 
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.nvim.io.compute import NvimIO
@@ -17,7 +17,7 @@ from ribosome.nvim.api.ui import buffer_content, buffers, windows, current_buffe
 from ribosome.nvim.api.data import Window, Buffer
 
 
-@trans.free.result(trans.st)
+@prog.result
 @do(NS[None, None])
 def create_scratch(lines: List[str], options: CreateScratchBufferOptions) -> Do:
     yield NS.lift(show_in_scratch_buffer(lines, options))

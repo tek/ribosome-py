@@ -2,7 +2,7 @@ import sys
 from typing import TypeVar, Any, Iterable
 from uuid import UUID
 
-from amino.state import EitherState, MaybeState
+from amino.state import EitherState
 
 from lenses import UnboundLens
 from amino import do, Do, __, Either, _, List, Map, Maybe, Lists, Just, Regex, L, IO, Nil, Try
@@ -12,7 +12,7 @@ from amino.dat import Dat
 from amino.lenses.lens import lens
 from amino.regex import Match
 
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.plugin_state import PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
@@ -20,8 +20,8 @@ from ribosome.nvim.io.state import NS
 from ribosome.dispatch.component import Component, ComponentData
 from ribosome.config.settings import Settings
 from ribosome.dispatch.update import undef_handlers, def_handlers
-from ribosome.trans.handler import TransF
-from ribosome.trans.action import Trans
+from ribosome.compute.prog import Program
+from ribosome.trans.action import Prog
 from ribosome.config.config import NoData
 from ribosome import ribo_log
 
@@ -30,31 +30,31 @@ S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
 
-@trans.free.result(trans.st)
+@prog.result
 @do(EitherState[PluginState[S, D, CC], str])
 def message_log() -> Do:
     yield EitherState.inspect_f(__.message_log.traverse(dump_json, Either))
 
 
-@trans.free.result(trans.st, internal=true)
+@prog.result
 @do(EitherState[ComponentData[PluginState[S, D, CC], NoData], str])
 def trans_log() -> Do:
     yield EitherState.inspect_f(lambda s: dump_json(s.main.trans_log))
 
 
-@trans.free.unit(trans.st)
+@prog.unit
 def set_log_level(level: str) -> None:
-    handler = yield MaybeState.inspect_f(_.file_log_handler)
+    handler = yield NS.inspect_f(_.file_log_handler)
     handler.setLevel(level)
 
 
-@trans.free.result(trans.st, internal=true)
+@prog.result
 @do(EitherState[ComponentData[PluginState[S, D, CC], NoData], str])
 def state_data() -> Do:
     yield EitherState.inspect_f(lambda s: dump_json(s.main.data))
 
 
-@trans.free.result(trans.st, internal=true)
+@prog.result
 def rpc_handlers() -> EitherState[PluginState[S, D, CC], str]:
     return EitherState.inspect_f(lambda s: dump_json(s.main.dispatch_config.distinct_specs))
 
@@ -90,48 +90,49 @@ def mk_lens(query: str) -> UnboundLens:
     return Lists.split(query, '.').fold_m(Just(lens))(lens_step)
 
 
-@do(MaybeState[D, None])
+@do(NS[PluginState[S, D, CC], None])
 def patch_update(query: PatchQuery) -> Do:
-    lns = yield MaybeState.lift(mk_lens(query.query))
-    lns1 = lens.main & lns
-    yield MaybeState.modify(lns1.modify(__.typed_copy(**query.data)))
+    lns = yield NS.m(mk_lens(query.query), f'invalid state update query: {query.query}')
+    lns1 = lens.data & lns
+    yield NS.modify(lns1.modify(__.typed_copy(**query.data)))
 
 
-@trans.free.unit(trans.st)
-@do(MaybeState[D, None])
+@prog.unit
+@do(NS[PluginState[S, D, CC], None])
 def update_state(query: UpdateQuery) -> Do:
-    yield query.patch / patch_update | MaybeState.pure(None)
+    yield query.patch / patch_update | NS.pure(None)
 
 
-@do(MaybeState[D, None])
+@do(NS[PluginState[S, D, CC], None])
 def patch_update_component(comp: str, query: PatchQuery) -> Do:
-    lns = yield MaybeState.lift(mk_lens(query.query))
+    lns = yield NS.m(mk_lens(query.query), f'invalid component state update query for {comp}: {query.query}')
     lns1 = lens.component_data.GetItem(comp) & lns
-    yield MaybeState.modify(lns1.modify(__.typed_copy(**query.data)))
+    yield NS.modify(lns1.modify(__.typed_copy(**query.data)))
 
 
-@trans.free.unit(trans.st, internal=true, component=false)
-@do(MaybeState[PluginState[S, D, CC], None])
+@prog.unit
+@do(NS[PluginState[S, D, CC], None])
 def update_component_state(comp: str, query: UpdateQuery) -> Do:
-    yield query.patch / L(patch_update_component)(comp, _) | MaybeState.pure(None)
+    yield query.patch / L(patch_update_component)(comp, _) | NS.pure(None)
 
 
-@trans.free.unit()
+@prog.unit
 def poll() -> None:
     pass
 
 
-@trans.free.unit(trans.io)
+@prog.unit
 def append_python_path(path: str) -> IO[None]:
     return IO.delay(sys.path.append, path)
 
 
-@trans.free.result()
+@prog.result
 def show_python_path() -> Iterable[str]:
     return sys.path
 
 
-@trans.free.unit(trans.st, component=false)
+# FIXME need to update component type map
+@prog.unit
 @do(NS[PluginState[S, D, CC], None])
 def enable_components(*names: str) -> Do:
     comps = (
@@ -157,32 +158,33 @@ class MapOptions(Dat['MapOptions']):
         self.buffer = buffer
 
 
-@do(EitherState[PluginState[S, D, CC], TransF])
+@prog.result
+@do(NS[PluginState[S, D, CC], Program])
 def mapping_handler(uuid: UUID, keys: str) -> Do:
-    yield EitherState.inspect_f(lambda a: a.active_mappings.lift(uuid).to_either(f'no handler for mapping `{keys}`'))
+    yield NS.inspect_either(lambda a: a.active_mappings.lift(uuid).to_either(f'no handler for mapping `{keys}`'))
 
 
-@trans.free.do()
-@do(Trans)
+@prog.do
+@do(Prog)
 def mapping(uuid_s: str, keys: str) -> Do:
-    uuid = yield Trans.from_either(Try(UUID, hex=uuid_s))
-    handler = yield mapping_handler(uuid, keys).trans_with(component=false, internal=true)
-    yield handler
+    uuid = yield Prog.from_either(Try(UUID, hex=uuid_s))
+    handler = yield mapping_handler(uuid, keys)
+    yield handler()
 
 
-@trans.free.result(trans.st, internal=true, component=false)
-@do(NS[PluginState[S, D, CC], Maybe[TransF]])
+@prog.result
+@do(NS[PluginState[S, D, CC], Maybe[Program]])
 def internal_init_trans() -> Do:
     yield NS.inspect(_.config.init)
 
 
-@trans.free.do()
-@do(Trans)
+@prog.do
+@do(Prog)
 def internal_init() -> Do:
-    enabled = yield NS.inspect(_.settings.run_internal_init.value_or_default).trans_with(resources=true)
+    enabled = yield NS.inspect(_.settings.run_internal_init.value_or_default).program_with(resources=true)
     if enabled:
         handler = yield internal_init_trans()
-        yield handler | Trans.unit
+        yield handler | Prog.unit
 
 
 message_log_handler = RequestHandler.trans_function(message_log)(prefix=Full(), sync=true)

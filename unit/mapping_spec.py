@@ -7,7 +7,7 @@ from amino import do, Do, __, Map, List, _, Dat
 from amino.boolean import true
 from amino.lenses.lens import lens
 
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.nvim.io.compute import NvimIO
@@ -16,10 +16,11 @@ from ribosome.test.integration.default import ExternalSpec
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.plugin_state import PluginState
 from ribosome.dispatch.component import Component, ComponentData
-from ribosome.config.config import Config
+from ribosome.config.config import Config, NoData
 from ribosome.dispatch.mapping import Mappings, Mapping, mapmode
 from ribosome.trans.mapping import activate_mapping
 from ribosome.nvim.api.command import nvim_command_output
+from ribosome.config.settings import Settings
 
 keys = 'gs'
 gs_mapping = Mapping.cons('gs', true, List(mapmode.Normal(), mapmode.Visual()))
@@ -35,22 +36,22 @@ class CData(Dat['CData']):
         self.a = a
 
 
-@trans.free.unit(trans.st)
-@do(NS[ComponentData[None, CData], None])
+@prog.unit
+@do(NS[ComponentData[NoData, CData], None])
 def handle_map() -> Do:
     yield NS.modify(lens.comp.a.set(27))
 
 
-@trans.free.unit(trans.st)
-@do(NS[PluginState, None])
+@prog.unit
+@do(NS[PluginState[Settings, NoData, None], None])
 def setup_map() -> Do:
-    yield activate_mapping(gs_mapping).zoom(lens.main)
+    yield activate_mapping(gs_mapping)
     yield NS.unit
 
 
 component = Component.cons(
     'main',
-    state_ctor=CData.cons,
+    state_type=CData,
     request_handlers=List(
         RequestHandler.trans_function(setup_map)(),
         RequestHandler.trans_function(handle_map)(json=true)
@@ -78,7 +79,7 @@ class MappingSpec(ExternalSpec):
             s = yield helper.run_s('function:setup_map', args=())
             s1 = yield helper.set.state(s).run_s('function:map', args=(str(gs_mapping.uuid), 'gs'))
             maps = yield nvim_command_output('map <buffer>')
-            return s1.component_data.lift('main'), maps
+            return s1.component_data.lift(CData), maps
         data, maps = run().unsafe(self.vim)
         return (
             k(maps).must(contain(start_with(f'x  {keys}')) & contain(start_with(f'n  {keys}'))) &

@@ -54,10 +54,8 @@ class C1Data(Dat['C1Data']):
         self.d = d
 
 
-c1 = Component.cons('c1', state_ctor=C1Data.cons)
-
-
-config = Config.cons('us', state_ctor=USData.cons, components=Map(c1=c1))
+c1: Component = Component.cons('c1', state_type=C1Data)
+config: Config = Config.cons('us', state_ctor=USData.cons, components=Map(c1=c1))
 
 
 class UpdateStateSpec(SpecBase):

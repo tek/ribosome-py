@@ -4,17 +4,16 @@ from kallikrein.matchers import contain
 
 from amino.test.spec import SpecBase
 from amino import List, Map, do, Do, Dat, _
-from amino.state import State
-from amino.boolean import true
 from amino.lenses.lens import lens
 
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.config.config import Config, Resources, NoData
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.dispatch.component import Component, ComponentData
-from ribosome.trans.action import Trans
+from ribosome.trans.action import Prog
 from ribosome.config.settings import Settings
+from ribosome.nvim.io.state import NS
 
 
 class CoreData(Dat['CoreData']):
@@ -43,22 +42,22 @@ class CompoComponent(Dat['CompoComponent']):
         self.baseline = baseline
 
 
-@trans.free.result(trans.st, resources=true)
-@do(State[Resources[Settings, ComponentData[NoData, CoreData], CompoComponent], int])
+@prog.result
+@do(NS[Resources[Settings, ComponentData[NoData, CoreData], CompoComponent], int])
 def core_fun(a: int) -> Do:
-    yield State.modify(lens.data.comp.x.modify(_ + 5))
-    yield State.pure(a + 5)
+    yield NS.modify(lens.data.comp.x.modify(_ + 5))
+    yield NS.pure(a + 5)
 
 
-@trans.free.result(trans.st)
-@do(State[Resources[Settings, ComponentData[NoData, CoreData], CompoComponent], int])
+@prog.result
+@do(NS[Resources[Settings, ComponentData[NoData, ExtraData], CompoComponent], int])
 def extra_fun(a: int) -> Do:
-    yield State.modify(lens.data.comp.y.modify(_ + 39))
-    yield State.pure(a + 9)
+    yield NS.modify(lens.data.comp.y.modify(_ + 39))
+    yield NS.pure(a + 9)
 
 
-@trans.free.do()
-@do(Trans)
+@prog.do
+@do(Prog)
 def switch() -> Do:
     a = yield core_fun(3)
     yield extra_fun(a)
@@ -71,7 +70,7 @@ core = Component.cons(
         RequestHandler.trans_function(switch)(),
     ),
     config=CompoComponent(13),
-    state_ctor=CoreData.cons,
+    state_type=CoreData,
 )
 
 extra = Component.cons(
@@ -79,7 +78,7 @@ extra = Component.cons(
     request_handlers=List(
         RequestHandler.trans_function(extra_fun)(),
     ),
-    state_ctor=ExtraData.cons,
+    state_type=ExtraData,
 )
 
 

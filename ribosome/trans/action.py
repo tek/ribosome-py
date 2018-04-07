@@ -7,7 +7,7 @@ from amino.state import StateT
 from amino.dat import ADT
 from amino.logging import LogError
 
-from ribosome.trans.handler import Trans
+from ribosome.compute.prog import Prog
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -18,7 +18,7 @@ G = TypeVar('G')
 I = TypeVar('I')
 
 
-class TransAction(ADT['TransAction'], base=True):
+class TransAction(ADT['TransAction']):
     pass
 
 
@@ -60,7 +60,7 @@ class TransIO(Generic[I], TransAction):
 
 class TransDo(TransAction):
 
-    def __init__(self, action: Trans) -> None:
+    def __init__(self, action: Prog) -> None:
         self.action = action
 
 

@@ -1,11 +1,11 @@
 from typing import TypeVar, Callable, Generic, Union, Tuple, cast
 
-from amino.tc.base import F
+from amino.tc.base import F, ImplicitsMeta, Implicits
 from amino import Either, List, options, Do, Boolean
 from amino.state import State
 from amino.func import tailrec
 from amino.do import do
-from amino.dat import ADT
+from amino.dat import ADT, ADTMeta
 from amino.case import Case, CaseRec, Term, RecStep
 
 from ribosome.nvim.api.data import NvimApi
@@ -17,7 +17,18 @@ B = TypeVar('B')
 C = TypeVar('C')
 
 
-class NvimIO(Generic[A], F[A], ADT['NvimIO[A]'], implicits=True, imp_mod='ribosome.nvim.io.tc'):
+class NvimIOMeta(ImplicitsMeta, ADTMeta):
+    pass
+
+
+class NvimIO(
+        Generic[A],
+        Implicits,
+        ADT['NvimIO[A]'],
+        implicits=True,
+        imp_mod='ribosome.nvim.io.tc',
+        metaclass=NvimIOMeta,
+):
     debug = options.io_debug.exists
 
     def eval(self) -> State[NvimApi, NResult[A]]:

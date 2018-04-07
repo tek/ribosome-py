@@ -1,6 +1,6 @@
 from amino import Map, __, List
 
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.dispatch.component import Component
 from ribosome.request.handler.prefix import Plain
@@ -11,7 +11,7 @@ from ribosome.nvim.api.variable import variable_set
 val = 71
 
 
-@trans.free.unit(trans.nio)
+@prog.unit
 def trans1() -> NvimIO[None]:
     return variable_set('autocmd_success', val)
 

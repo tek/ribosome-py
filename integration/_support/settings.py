@@ -1,10 +1,11 @@
 from amino import List, do, Do, _, __
 
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.config.config import Config, Resources
+from ribosome.config.config import Config, Resources, NoData
 from ribosome.nvim.io.state import NS
 from ribosome.config.settings import Settings, int_setting
+from ribosome.dispatch.component import NoComponentData
 
 
 class PlugSettings(Settings):
@@ -15,15 +16,15 @@ class PlugSettings(Settings):
         self.inc = int_setting('inc', 'inc', '', False)
 
 
-@trans.free.unit(trans.st)
-@do(NS[Resources, None])
+@prog.unit
+@do(NS[Resources[Settings, NoData, NoComponentData], None])
 def check() -> Do:
     counter = yield NS.inspect_f(_.settings.counter.value_or_default)
     inc = yield NS.inspect_f(_.settings.inc.value_or_default)
     yield NS.inspect_f(__.settings.counter.update(counter + inc))
 
 
-config = Config.cons(
+config: Config = Config.cons(
     name='plug',
     request_handlers=List(
         RequestHandler.trans_cmd(check)(),

@@ -3,14 +3,14 @@ from typing import Tuple, Any
 from kallikrein import k, Expectation
 
 from amino.test.spec import SpecBase
-from amino import List, Map, _, Right, Either, Left
+from amino import List, Map, _, Right, Either, Left, do, Do
 from amino.state import State
 from amino.lenses.lens import lens
 from amino.dat import Dat
 
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.dispatch.component import Component, ComponentData
 from ribosome.host import request_handler
 from ribosome.config.config import Config
@@ -24,14 +24,16 @@ class HSData(Dat['HSData']):
         self.counter = counter
 
 
-@trans.free.unit(trans.st)
-def core_fun(a: int) -> State[ComponentData[HSData, None], None]:
-    return State.modify(lens.main.counter.modify(_ + 1))
+@prog.unit
+@do(State[ComponentData[HSData, None], None])
+def core_fun(a: int) -> Do:
+    yield State.modify(lens.main.counter.modify(_ + 1))
 
 
-@trans.free.unit(trans.st)
-def extra_fun(a: int) -> State[ComponentData[HSData, None], None]:
-    return State.modify(lens.main.counter.modify(_ + 2))
+@prog.unit
+@do(State[ComponentData[HSData, None], None])
+def extra_fun(a: int) -> Do:
+    yield State.modify(lens.main.counter.modify(_ + 2))
 
 
 core = Component.cons(

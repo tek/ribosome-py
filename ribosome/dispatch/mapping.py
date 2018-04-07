@@ -1,9 +1,10 @@
 import abc
 from uuid import uuid4, UUID
 
-from amino import Dat, Map, Boolean, ADT, List, Nil, Maybe
+from amino import Dat, Map, Boolean, ADT, List, Maybe
+from amino.boolean import false
 
-from ribosome.trans.handler import TransF
+from ribosome.compute.prog import Program
 
 
 class MapMode(ADT['MapMode']):
@@ -20,7 +21,6 @@ class mapmode:
         @property
         def mnemonic(self) -> str:
             return 'n'
-
 
     class Operator(MapMode):
 
@@ -74,7 +74,7 @@ class mapmode:
 class Mapping(Dat['Mapping']):
 
     @staticmethod
-    def cons(keys: str, buffer: bool=False, modes: List[MapMode]=None, uuid: UUID=None) -> 'Mapping':
+    def cons(keys: str, buffer: Boolean=false, modes: List[MapMode]=None, uuid: UUID=None) -> 'Mapping':
         modes1 = List(mapmode.Normal()) if modes is None else modes
         return Mapping(keys, Boolean(buffer), modes1, uuid or uuid4())
 
@@ -88,13 +88,13 @@ class Mapping(Dat['Mapping']):
 class Mappings(Dat['Mappings']):
 
     @staticmethod
-    def cons(mappings: Map[Mapping, TransF]=Map()) -> 'Mappings':
+    def cons(mappings: Map[Mapping, Program]=Map()) -> 'Mappings':
         return Mappings(mappings)
 
-    def __init__(self, mappings: Map[Mapping, TransF]) -> None:
+    def __init__(self, mappings: Map[Mapping, Program]) -> None:
         self.mappings = mappings
 
-    def lift(self, mapping: Mapping) -> Maybe[TransF]:
+    def lift(self, mapping: Mapping) -> Maybe[Program]:
         return self.mappings.lift(mapping)
 
 

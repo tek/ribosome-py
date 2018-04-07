@@ -10,8 +10,8 @@ from amino.state import StateT
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import Settings
 from ribosome.request.rpc import RpcHandlerSpec
-from ribosome.dispatch.component import Components
-from ribosome.trans.handler import TransF
+from ribosome.dispatch.component import Components, Component
+from ribosome.compute.prog import Program
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -34,20 +34,21 @@ class Config(Generic[S, D, CC], Dat['Config[S, D, CC]']):
     def cons(
             name: str,
             prefix: Optional[str]=None,
-            components: Map[str, Union[str, type]]=Map(),
+            components: Map[str, Component[D, Any, CC]]=Map(),
             state_ctor: Optional[Callable[[], D]]=None,
             settings: Optional[S]=None,
             request_handlers: List[RequestHandler]=Nil,
             core_components: List[str]=Nil,
             default_components: List[str]=Nil,
             component_config_type: Type[CC]=Any,
-            init: TransF=None,
+            init: Program=None,
+            internal_component: bool=True,
     ) -> 'Config[S, D, CC]':
         from ribosome.trans.internal import internal
         return Config(
             name,
             prefix or name,
-            components + ('internal', internal),
+            components + ('internal', internal) if internal_component else components,
             state_ctor or NoData,
             settings or Settings(name=name),
             RequestHandlers.cons(*request_handlers),
@@ -61,14 +62,14 @@ class Config(Generic[S, D, CC], Dat['Config[S, D, CC]']):
             self,
             name: str,
             prefix: str,
-            components: Map[str, Union[str, type]],
+            components: Map[str, Component[D, Any, CC]],
             state_ctor: Callable[[], D],
             settings: S,
             request_handlers: RequestHandlers,
             core_components: List[str],
             default_components: List[str],
             component_config_type: Type[CC],
-            init: Maybe[TransF],
+            init: Maybe[Program],
     ) -> None:
         self.name = name
         self.prefix = prefix
@@ -122,5 +123,6 @@ def resources_lift(st: StateT[G, D, A]) -> StateT[G, Resources[S, D, CC], A]:
     def trans(r: Resources[S, D, CC]) -> G:
         return st.run(r.data).map2(lambda s, a: (Resources(s, r.settings, r.components), a))
     return st.cls.apply(trans)
+
 
 __all__ = ('Config', 'NoData', 'Resources')

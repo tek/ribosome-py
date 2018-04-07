@@ -8,26 +8,28 @@ from amino.boolean import false
 
 from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.logging import Logging
-from ribosome.request.handler.dispatcher import RequestDispatcher, TransDispatcher
 from ribosome.request.handler.prefix import PrefixStyle, Short
 from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod, AutocmdMethod
 from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
 from ribosome.request.args import ParamsSpec
-from ribosome.trans.handler import TransF
+from ribosome.compute.prog import Program
 
 B = TypeVar('B')
 D = TypeVar('D')
 RHS = TypeVar('RHS', bound=RpcHandlerSpec)
-DP = TypeVar('DP', bound=RequestDispatcher)
 Meth = TypeVar('Meth', bound=RpcMethod)
 
 
-class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
+def program_rpc_options(program: Program) -> Map[str, str]:
+    return Map(nargs=program.params_spec.nargs.for_vim)
+
+
+class RequestHandler(Generic[Meth], ADT['RequestHandler'], Logging):
 
     def __init__(
             self,
             method: Meth,
-            dispatcher: DP,
+            program: Program,
             name: str,
             prefix: PrefixStyle,
             sync: Boolean,
@@ -35,7 +37,7 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
             extra_options: Map[str, Any],
     ) -> None:
         self.method = method
-        self.dispatcher = dispatcher
+        self.program = program
         self.name = name
         self.prefix = prefix
         self.sync = sync
@@ -43,24 +45,24 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
         self.extra_options = extra_options
 
     @staticmethod
-    def trans_cmd(func: Callable[..., B]) -> 'RequestHandlerBuilder':
-        return RequestHandlerBuilder(CmdMethod(), TransDispatcher(func))
+    def trans_cmd(prog: Program) -> 'RequestHandlerBuilder':
+        return RequestHandlerBuilder(CmdMethod(), prog)
 
     @staticmethod
-    def trans_function(func: Callable[..., B]) -> 'RequestHandlerBuilder':
-        return RequestHandlerBuilder(FunctionMethod(), TransDispatcher(func))
+    def trans_function(prog: Program) -> 'RequestHandlerBuilder':
+        return RequestHandlerBuilder(FunctionMethod(), prog)
 
     @staticmethod
-    def trans_autocmd(func: Callable[..., B]) -> 'RequestHandlerBuilder':
-        return RequestHandlerBuilder(AutocmdMethod(), TransDispatcher(func))
+    def trans_autocmd(prog: Program) -> 'RequestHandlerBuilder':
+        return RequestHandlerBuilder(AutocmdMethod(), prog)
 
     @property
     def allow_sync(self) -> Boolean:
-        return self.dispatcher.allow_sync
+        return self.program.allow_sync
 
     @property
     def options(self) -> Map[str, Any]:
-        return self.extra_options ** Map(sync=self.sync) ** self.dispatcher.rpc_options
+        return self.extra_options ** Map(sync=self.sync) ** program_rpc_options(self.program)
 
     @property
     def method_str(self) -> str:
@@ -74,20 +76,12 @@ class RequestHandler(Generic[Meth, DP], ADT['RequestHandler'], Logging):
         return RpcHandlerSpec.cons(self.method.spec_type, self.sync, self.vim_cmd_name(name, prefix), self.options,
                                    self.method_str, True)
 
-    @property
-    def legacy(self) -> bool:
-        return isinstance(self.dispatcher, MsgDispatcher)
 
-    def parser(self, params_spec: ParamsSpec) -> ArgParser:
-        tpe = JsonArgParser if self.json else TokenArgParser
-        return tpe(params_spec)
+class RequestHandlerBuilder(Generic[Meth]):
 
-
-class RequestHandlerBuilder(Generic[Meth, DP]):
-
-    def __init__(self, method: Meth, dispatcher: DP) -> None:
+    def __init__(self, method: Meth, program: Program) -> None:
         self.method = method
-        self.dispatcher = dispatcher
+        self.program = program
 
     @property
     def sync_default(self) -> Boolean:
@@ -101,11 +95,11 @@ class RequestHandlerBuilder(Generic[Meth, DP]):
             json: Boolean=false,
             **options: Any,
     ) -> RequestHandler:
-        name1 = name or self.dispatcher.name
+        name1 = name or self.program.name
         sync1 = self.sync_default if sync is None else sync
         return RequestHandler(
             self.method,
-            self.dispatcher,
+            self.program,
             name1,
             prefix,
             sync1,
@@ -128,16 +122,6 @@ class RequestHandlers(ToStr):
 
     def rpc_specs(self, name: str, prefix: str) -> List[RpcHandlerSpec]:
         return self.handlers.v / __.spec(name, prefix)
-
-    @property
-    def trans_handlers(self) -> List[TransF]:
-        return (
-            self.handlers
-            .v
-            .map(_.dispatcher)
-            .filter_type(TransDispatcher)
-            .map(_.handler)
-        )
 
 
 __all__ = ('RequestHandler', 'RequestHandlers')

@@ -40,9 +40,13 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
     def from_maybe(a: Maybe[A], err: CallByName) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(N.from_maybe(a, err))
 
+    m = from_maybe
+
     @staticmethod
     def from_either(e: Either[str, A]) -> 'NvimIOState[S, A]':
         return NvimIOState.lift(N.from_either(e))
+
+    e = from_either
 
     @staticmethod
     def from_either_state(st: EitherState[S, A]) -> 'NvimIOState[S, A]':
@@ -69,7 +73,7 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
         return NS.delay(__.call(name, *args, **kw))
 
 
-tcs(NvimIO, NvimIOState)  # type: ignore
+tcs(NvimIO, NvimIOState)
 
 NS = NvimIOState
 

@@ -4,20 +4,21 @@ from amino import Lists, Map, List, __, Either, Left, Right, do, Do, Nil
 from amino.dat import Dat
 from amino.lenses.lens import lens
 
-from ribosome.dispatch.run import DispatchJob, DispatchState
-from ribosome.dispatch.data import Dispatch, DIO
+from ribosome.dispatch.data import DIO
 from ribosome.host import init_state
-from ribosome.dispatch.execute import dispatch_job, compute_dispatches, compute_dispatch
+from ribosome.dispatch.execute import dispatch_job, traverse_programs, run_request_handler
 from ribosome.nvim.io.state import NvimIOState, NS
 from ribosome.config.config import Config, Resources
 from ribosome.trans.run import TransComplete
 from ribosome.config.settings import Settings
 from ribosome.dispatch.component import ComponentData
-from ribosome.nvim.api.data import NvimApi, StrictNvimApi, StrictNvimHandler, StrictNvimHandler
+from ribosome.nvim.api.data import NvimApi, StrictNvimApi, StrictNvimHandler
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.io.api import N
+from ribosome.dispatch.job import DispatchJob
+from ribosome.compute.prog import Program
 
 C = TypeVar('C')
 D = TypeVar('D')
@@ -122,22 +123,21 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
     def settings(self) -> S:
         return self.state.settings
 
-    def dispatch_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[DispatchJob, List[Dispatch]]:
+    def dispatch_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[DispatchJob, List[Program]]:
         job = dispatch_job(self.holder, name, (args,), sync)
         dc = job.state.state.dispatch_config
-        return job, dc.dispatches.lift(job.name).get_or_fail(f'no matching dispatch for `{job.name}`')
+        return job, dc.programs.lift(job.name).get_or_fail(f'no matching dispatch for `{job.name}`')
 
-    def compute_dispatches(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[DispatchState, Any]:
+    def traverse_programs(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[PluginState[S, D, CC], Any]:
         job, dispatch = self.dispatch_job(name, args, sync)
-        return compute_dispatches(dispatch, Lists.wrap(args))
+        return traverse_programs(dispatch, Lists.wrap(args))
 
     def run(self, name: str, args=(), sync: bool=True) -> NvimIO[Tuple[PluginState, Any]]:
         job, dispatches = self.dispatch_job(name, args, sync)
         dispatch = dispatches.head.get_or_fail('multiple dispatches')
         return (
-            compute_dispatch(dispatch, Lists.wrap(args))
-            .run(DispatchState(self.state, dispatch.aff))
-            .map2(lambda s, a: (s.state, a))
+            run_request_handler(dispatch, Lists.wrap(args))
+            .run(self.state)
         )
 
     def run_s(self, name: str, args=(), sync: bool=True) -> NvimIO[PluginState]:

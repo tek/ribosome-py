@@ -8,7 +8,7 @@ from ribosome.request.rpc import RpcHandlerSpec, RpcCommandSpec, RpcFunctionSpec
 RHS = TypeVar('RHS', bound=RpcHandlerSpec)
 
 
-class RpcMethod(ADT['RpcMethod'], base=True):
+class RpcMethod(ADT['RpcMethod']):
 
     @abc.abstractproperty
     def spec_type(self) -> Type[RHS]:

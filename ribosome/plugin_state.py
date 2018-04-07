@@ -1,7 +1,7 @@
 import abc
 import queue
 import logging
-from typing import TypeVar, Generic, Callable, Optional, Any
+from typing import TypeVar, Generic, Callable, Optional, Any, Type
 from threading import Lock
 from uuid import UUID
 
@@ -11,10 +11,10 @@ from amino import Map, List, Boolean, Nil, Either, _, Maybe, Nothing, Try, do, D
 from amino.dat import Dat, ADT
 from amino.util.string import camelcase
 
-from ribosome.dispatch.component import Component, Components
+from ribosome.dispatch.component import Component, Components, NoComponentData
 from ribosome.nvim.io.state import NS
-from ribosome.dispatch.data import DIO, Dispatch, DispatchAsync
-from ribosome.trans.handler import TransF
+from ribosome.dispatch.data import DIO
+from ribosome.compute.prog import Program
 from ribosome.nvim.io.compute import NvimIO, lift_n_result
 from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
@@ -28,59 +28,11 @@ from ribosome.nvim.io.data import NResult
 A = TypeVar('A')
 D = TypeVar('D')
 C = TypeVar('C')
-DP = TypeVar('DP', bound=Dispatch)
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
 
-class DispatchAffiliation(ADT['DispatchAffiliation']):
-
-    @property
-    def is_component(self) -> Boolean:
-        return Boolean.isinstance(self, ComponentDispatch)
-
-    @abc.abstractproperty
-    def name(self) -> str:
-        ...
-
-
-class RootDispatch(DispatchAffiliation):
-
-    @property
-    def name(self) -> str:
-        return '<root>'
-
-
-class ComponentDispatch(DispatchAffiliation):
-
-    def __init__(self, component: Component) -> None:
-        self.component = component
-
-    @property
-    def name(self) -> str:
-        return self.component.name
-
-
-class AffiliatedDispatch(Generic[DP], Dat['AffiliatedDispatch[DP]']):
-
-    def __init__(self, dispatch: DP, aff: DispatchAffiliation) -> None:
-        self.dispatch = dispatch
-        self.aff = aff
-
-    @property
-    def sync(self) -> Boolean:
-        return self.dispatch.sync
-
-    @property
-    def async(self) -> Boolean:
-        return self.dispatch.async
-
-    @property
-    def desc(self) -> str:
-        return self.dispatch.desc
-
-
-Dispatches = Map[str, List[AffiliatedDispatch[DispatchAsync]]]
+Programs = Map[str, Program]
 
 
 class DispatchConfig(Generic[S, D, CC], Dat['DispatchConfig']):
@@ -88,21 +40,21 @@ class DispatchConfig(Generic[S, D, CC], Dat['DispatchConfig']):
     @staticmethod
     def cons(
             config: Config[S, D, CC],
-            dispatches: Dispatches=Map(),
+            programs: Programs=Map(),
             io_executor: Callable[[DIO], NS['PluginState[S, D, CC]', TransComplete]]=None,
             rpc_handlers: List[DefinedHandler]=Nil,
     ) -> 'DispatchConfig':
-        return DispatchConfig(config, dispatches, Maybe.optional(io_executor), rpc_handlers)
+        return DispatchConfig(config, programs, Maybe.optional(io_executor), rpc_handlers)
 
     def __init__(
             self,
             config: 'ribosome.config.Config',
-            dispatches: Dispatches,
+            programs: Programs,
             io_executor: Maybe[Callable[[DIO], NS['PluginState[S, D, CC]', TransComplete]]],
             rpc_handlers: List[DefinedHandler],
     ) -> None:
         self.config = config
-        self.dispatches = dispatches
+        self.programs = programs
         self.io_executor = io_executor
         self.rpc_handlers = rpc_handlers
 
@@ -115,18 +67,16 @@ class DispatchConfig(Generic[S, D, CC], Dat['DispatchConfig']):
         return self.config.prefix
 
     @property
-    def dispatch(self) -> List[Dispatch]:
-        return self.dispatches.v.join
-
-    @property
     def specs(self) -> List[RpcHandlerSpec]:
-        return self.dispatch / __.dispatch.spec(self.name, self.config.prefix)
+        return self.programs.v.join / __.spec(self.name, self.config.prefix)
 
     @property
     def distinct_specs(self) -> List[RpcHandlerSpec]:
         return self.specs.distinct_by(_.rpc_method)
 
 
+# FIXME in order to allow transparent updating of components, the data and config part must be separated
+# FIXME using state type as a key won't work if multiple comps have the same type
 class PluginState(Generic[S, D, CC], Dat['PluginState']):
 
     @staticmethod
@@ -137,8 +87,8 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
             trans_log: List[str]=Nil,
             log_handler: Maybe[logging.Handler]=Nothing,
             logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D, CC], None]']]=Nothing,
-            component_data: Map[str, Any]=Map(),
-            active_mappings: Map[UUID, TransF]=Map(),
+            component_data: Map[type, Any]=Map(),
+            active_mappings: Map[UUID, Program]=Map(),
     ) -> 'PluginState':
         components = Components.cons(components, dispatch_config.config.component_config_type)
         return PluginState(
@@ -160,8 +110,8 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
             trans_log: List[str],
             log_handler: Maybe[logging.Handler],
             logger: Maybe[Callable[[LogMessage], 'NS[PluginState[S, D, CC], None]']],
-            component_data: Map[str, Any],
-            active_mappings: Map[UUID, TransF],
+            component_data: Map[type, Any],
+            active_mappings: Map[UUID, Program],
     ) -> None:
         self.dispatch_config = dispatch_config
         self.data = data
@@ -193,14 +143,20 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
     def component(self, name: str) -> Either[str, Component]:
         return self.components.by_name(name)
 
+    def ctor_by_type(self, tpe: Type[C]) -> Callable[[], C]:
+        return self.components.by_type(tpe) / _.state_ctor | (lambda: NoComponentData)
+
+    def data_by_type(self, tpe: Type[C]) -> C:
+        return self.component_data.lift(tpe) | (lambda: self.ctor_by_type(tpe)())
+
     def data_for(self, component: Component) -> Any:
-        return self.component_data.lift(component.name) | component.state_ctor
+        return self.component_data.lift(component.state_type) | component.state_ctor
 
     def data_by_name(self, name: str) -> Either[str, Any]:
         return self.component(name) / self.data_for
 
-    def update_component_data(self, name: str, new: Any) -> 'PluginState[S, D, CC]':
-        return self.mod.component_data(__.cat((name, new)))
+    def update_component_data(self, tpe: Type[C], new: C) -> 'PluginState[S, D, CC]':
+        return self.mod.component_data(__.cat((tpe, new)))
 
     def modify_component_data(self, name: str, mod: Callable[[Any], Any]) -> 'PluginState[S, D, CC]':
         comp = self.data_by_name(name)
@@ -212,10 +168,6 @@ class PluginState(Generic[S, D, CC], Dat['PluginState']):
     @property
     def resources(self) -> Resources[S, D, CC]:
         return self.resources_with(self.data)
-
-    def reaffiliate(self, handler: TransF, current: DispatchAffiliation) -> DispatchAffiliation:
-        c = self.components.for_handler(handler)
-        return c.cata(ComponentDispatch, current)
 
     @property
     def camelcase_name(self) -> str:
@@ -278,7 +230,7 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
 
     @do(NvimIO[None])
     def acquire(self) -> Do:
-        '''acquire the state lock that prevents multiple dispatches from updating the state asynchronously.
+        '''acquire the state lock that prevents multiple programs from updating the state asynchronously.
         If the lock is already acquired, an async dispatch is currently executing while another (sync or async) has been
         requested. In order not to block on requests to vim from the running dispatch, the greenlet that was started by
         the vim session must be suspended, giving control back to the running async dispatch at the point where the vim

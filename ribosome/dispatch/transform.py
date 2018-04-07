@@ -58,6 +58,7 @@ class TransformNvimIOState(TransformTransState[NvimIO], tpe=NvimIOState):
         return st
 
 
+# FIXME `Case`
 class TransValidator(Logging):
 
     def __init__(self, name: str) -> None:

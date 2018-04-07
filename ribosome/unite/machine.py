@@ -4,7 +4,7 @@ from amino import List, __, _
 
 from ribosome.unite import UniteMessage, UniteSource
 from ribosome.unite.data import UniteKind, UniteSyntax
-from ribosome.trans.api import trans
+from ribosome.compute.api import prog
 from ribosome.dispatch.component import Component
 
 

@@ -1,16 +1,13 @@
 import abc
-from typing import TypeVar, Union, Any, Generic, Type
+from typing import TypeVar, Union, Any, Generic
 
 from amino import List, Boolean, Nil, Maybe, Just, Nothing, IO, Either, Right, Left
 from amino.dat import Dat, ADT, DatMeta
 
-from ribosome.request.rpc import RpcHandlerSpec
-from ribosome.request.handler.handler import RequestHandler
-from ribosome.request.handler.dispatcher import TransDispatcher
 from ribosome.request.handler.method import RpcMethod
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.trans.action import TransDo, TransLog
-from ribosome.trans.handler import TransF
+from ribosome.compute.prog import Program
 from ribosome.trans.recursive_effects import GatherIOs, GatherSubprocs
 
 B = TypeVar('B')
@@ -18,54 +15,7 @@ Meth = TypeVar('Meth', bound=RpcMethod)
 D = TypeVar('D')
 
 
-# TODO remove
-class Dispatch:
-
-    def __init__(self, handler: RequestHandler) -> None:
-        self.handler = handler
-
-    @property
-    def sync(self) -> Boolean:
-        return Boolean.isinstance(self, DispatchSync)
-
-    @property
-    def async(self) -> Boolean:
-        return Boolean.isinstance(self, DispatchAsync)
-
-    @property
-    def name(self) -> str:
-        return self.handler.name
-
-    def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
-        return self.handler.spec(name, prefix)
-
-    @property
-    def method(self) -> str:
-        return self.handler.method.method
-
-
-DP = TypeVar('DP', bound=Dispatch)
-
-
-class DispatchSync(ADT['DispatchSync'], Dispatch, base=True):
-    pass
-
-
-class DispatchAsync(ADT['DispatchAsync'], Dispatch, base=True):
-    pass
-
-
-class TransDispatch(Generic[Meth, B], DispatchSync, DispatchAsync):
-
-    def __init__(self, handler: RequestHandler[Meth, TransDispatcher[B]]) -> None:
-        self.handler = handler
-
-    @property
-    def desc(self) -> str:
-        return f'trans `{self.name}`'
-
-
-class DispatchOutput(ADT, base=True): pass
+class DispatchOutput(ADT['DispatchOutput']): pass
 
 
 class DispatchError(DispatchOutput):
@@ -131,7 +81,7 @@ R = TypeVar('R')
 I = TypeVar('I')
 
 
-class DIO(Generic[I], ADT['DIO[I]'], base=True):
+class DIO(Generic[I], ADT['DIO[I]']):
 
     @staticmethod
     def cons(io: I) -> Either[str, 'DIO[I]']:
@@ -148,7 +98,7 @@ class DIO(Generic[I], ADT['DIO[I]'], base=True):
         )
 
     @abc.abstractproperty
-    def handle_result(self) -> TransF:
+    def handle_result(self) -> Program:
         ...
 
 
@@ -158,8 +108,8 @@ class IODIO(Generic[A], DIO[IO[A]]):
         self.io = io
 
     @property
-    def handle_result(self) -> TransF:
-        return TransF.id
+    def handle_result(self) -> Program:
+        return Program.id
 
 
 class GatherIOsDIO(Generic[A], DIO[GatherIOs[A]]):
@@ -168,7 +118,7 @@ class GatherIOsDIO(Generic[A], DIO[GatherIOs[A]]):
         self.io = io
 
     @property
-    def handle_result(self) -> TransF:
+    def handle_result(self) -> Program:
         return self.io.handle_result
 
 
@@ -178,7 +128,7 @@ class GatherSubprocsDIO(Generic[A, R], DIO[GatherSubprocs[A, R]]):
         self.io = io
 
     @property
-    def handle_result(self) -> TransF:
+    def handle_result(self) -> Program:
         return self.io.handle_result
 
 
@@ -188,8 +138,8 @@ class NvimIODIO(Generic[A], DIO[NvimIO[A]]):
         self.io = io
 
     @property
-    def handle_result(self) -> TransF:
-        return TransF.id
+    def handle_result(self) -> Program:
+        return Program.id
 
 
 class DispatchIO(Generic[I], DispatchOutput):
@@ -198,7 +148,7 @@ class DispatchIO(Generic[I], DispatchOutput):
         self.io = io
 
 
-class DispatchContinuation(ADT['DispatchContinuation'], base=True):
+class DispatchContinuation(ADT['DispatchContinuation']):
     pass
 
 
