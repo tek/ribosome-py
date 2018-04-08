@@ -6,7 +6,6 @@ from amino.dat import ADTMeta
 from amino.func import CallByName, call_by_name
 from amino.case import Case
 
-from ribosome.compute.tpe_data import ProgType
 from ribosome.compute.wrap_data import ProgWrappers
 from ribosome.compute.output import ProgOutputInterpreter
 from ribosome.nvim.io.state import NS
@@ -17,6 +16,8 @@ B = TypeVar('B')
 D = TypeVar('D')
 M = TypeVar('M')
 P = TypeVar('P')
+S = TypeVar('S')
+R = TypeVar('R')
 
 
 class ProgMeta(ADTMeta):
@@ -24,12 +25,6 @@ class ProgMeta(ADTMeta):
     @property
     def unit(self) -> 'Prog[None]':
         return Prog.pure(None)
-
-    @property
-    def id(self) -> 'Prog[A]':
-        def f(a: A) -> A:
-            return a
-        return ProgMap(f)
 
 
 class Prog(Generic[A], ADT['Prog[A]'], metaclass=ProgMeta):
@@ -51,17 +46,15 @@ class Prog(Generic[A], ADT['Prog[A]'], metaclass=ProgMeta):
         return ProgError(call_by_name(error))
 
 
-class ProgExec(Generic[A, B], Prog[B]):
+class ProgExec(Generic[A, B, S, R], Prog[B]):
 
     def __init__(
             self,
-            code: NS[D, A],
-            prog_type: ProgType,
-            wrappers: ProgWrappers,
+            code: NS[R, A],
+            wrappers: ProgWrappers[S, R],
             interpreter: ProgOutputInterpreter[A, B],
     ) -> None:
         self.code = code
-        self.prog_type = prog_type
         self.wrappers = wrappers
         self.interpreter = interpreter
 
@@ -79,51 +72,43 @@ class ProgPure(Generic[A], Prog[A]):
         self.value = value
 
 
-class ProgMap(Generic[A, B], Prog[B]):
-
-    def __init__(self, f: Callable[[A], B]) -> None:
-        self.f = f
-
-
 class ProgError(Generic[A], Prog[A]):
 
     def __init__(self, msg: str) -> None:
         self.msg = msg
 
 
-class ProgramCode(ADT['Program']):
+class ProgramCode(Generic[A], ADT['ProgramCode[A]']):
     pass
 
 
 # TODO restrict the function to a single value parameter of type ProgramArgs[A, B], where A is a custom data type
 # containing the positional args and B an optional json decoded parameter.
-class ProgramBlock(ProgramCode):
+class ProgramBlock(Generic[A, B, D], ProgramCode[B]):
 
     def __init__(
             self,
             code: Callable[..., NS[D, A]],
-            prog_type: ProgType,
             wrappers: ProgWrappers,
             interpreter: ProgOutputInterpreter[A, B],
     ) -> None:
         self.code = code
-        self.prog_type = prog_type
         self.wrappers = wrappers
         self.interpreter = interpreter
 
 
-class ProgramCompose(ProgramCode):
+class ProgramCompose(Generic[A], ProgramCode[A]):
 
-    def __init__(self, code: Callable[..., ProgBind]) -> None:
+    def __init__(self, code: Callable[..., ProgBind[Any, A]]) -> None:
         self.code = code
 
 
-class Program(Generic[A, B], Dat['Program']):
+class Program(Generic[A], Dat['Program[A]']):
 
     def __init__(
             self,
             name: str,
-            code: ProgramCode,
+            code: ProgramCode[A],
             params_spec: ParamsSpec,
     ) -> None:
         self.name = name
@@ -134,19 +119,19 @@ class Program(Generic[A, B], Dat['Program']):
         return bind_program(self, Lists.wrap(args))
 
 
-class bind_program_code(Case[ProgramCode, Prog], alg=ProgramCode):
+class bind_program_code(Case[ProgramCode[A], Prog[A]], alg=ProgramCode):
 
-    def __init__(self, program: Program, args: List[Any]) -> None:
+    def __init__(self, program: Program[A], args: List[Any]) -> None:
         self.args = args
 
-    def program_compose(self, code: ProgramCompose) -> Prog:
+    def program_compose(self, code: ProgramCompose[A]) -> Prog[A]:
         return code.code(*self.args)
 
-    def program_block(self, code: ProgramBlock) -> Prog:
-        return ProgExec(code.code(*self.args), code.prog_type, code.wrappers, code.interpreter)
+    def program_block(self, code: ProgramBlock[Any, A, Any]) -> Prog[A]:
+        return ProgExec(code.code(*self.args), code.wrappers, code.interpreter)
 
 
-def bind_program(program: Program, args: List[Any]) -> Prog:
+def bind_program(program: Program[A], args: List[Any]) -> Prog[A]:
     return bind_program_code(program, args)(program.code)
 
 

@@ -2,14 +2,13 @@ from typing import Callable, TypeVar, Generic
 
 from amino import Dat
 
-A = TypeVar('A')
-B = TypeVar('B')
-D = TypeVar('D')
+R = TypeVar('R')
+S = TypeVar('S')
 
 
-class ProgWrappers(Generic[A, B, D], Dat['TransWrappers[A, B, D]']):
+class ProgWrappers(Generic[R, S], Dat['TransWrappers[R, S]']):
 
-    def __init__(self, get: Callable[[D, A], B], put: Callable[[B], A]) -> None:
+    def __init__(self, get: Callable[[R], S], put: Callable[[R, S], R]) -> None:
         self.get = get
         self.put = put
 

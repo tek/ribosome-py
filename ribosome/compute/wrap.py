@@ -1,7 +1,7 @@
-from typing import Callable, Tuple, Union, TypeVar, Type, Generic, Any
+from typing import TypeVar, Type, Generic, Callable, Any
 
 from amino.case import Case
-from amino import ADT
+
 from ribosome.data.plugin_state import PluginState
 from ribosome.config.component import ComponentData
 from ribosome.compute.tpe_data import (ProgType, UnknownProgType, StateProgType, AffiliationProgType, RootProgType,
@@ -14,43 +14,38 @@ from ribosome.compute.wrap_data import ProgWrappers
 
 A = TypeVar('A')
 D = TypeVar('D')
+M = TypeVar('M')
+R = TypeVar('R')
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 C = TypeVar('C')
-TD = Union[PluginState[S, D, CC], Resources[S, D, CC], D]
-TT = Union[TD, ComponentData[TD, C]]
-AWWrap = Callable[[PluginState[S, D, CC], TD], TT]
-AWUnwrap = Callable[[TT], TD]
-AWStore = Callable[[TT, PluginState[S, D, CC]], PluginState[S, D, CC]]
-AWR = Tuple[AWWrap, AWUnwrap, AWStore]
-MDWrap = Callable[[PluginState[S, D, CC]], TD]
+PS = PluginState[S, D, CC]
 
 
-class ResourcesWrapping(Generic[S, C, CC, A], ADT['ResourcesWrapping[S, C, CC, A]']):
+class zoom_main_data(
+        Generic[S, D, CC, M],
+        Case[MainDataProgType, Callable[[PS], M]],
+        alg=MainDataProgType,
+):
 
-    def __init__(self, data: A) -> None:
-        self.data = data
+    def plain_main_data_prog_type(self, tpe: PlainMainDataProgType[M]) -> Callable[[PS], D]:
+        return lambda a: a.data
+
+    def internal_main_data_prog_type(self, tpe: InternalMainDataProgType[S, D, CC]) -> Callable[[PS], PS]:
+        return lambda a: a
 
 
-class ResourcesWrapped(Generic[S, C, CC], ResourcesWrapping[S, C, CC, Resources[S, C, CC]]):
-    pass
+class pick_main_data(
+        Generic[S, D, CC, M],
+        Case[MainDataProgType[M], Callable[[PS, M], PS]],
+        alg=MainDataProgType,
+):
 
+    def plain_main_data_prog_type(self, tpe: PlainMainDataProgType[M]) -> Callable[[PS, D], PS]:
+        return lambda ps, data: ps.set.data(data)
 
-class ResourcesPlain(Generic[S, C, CC], ResourcesWrapping[S, C, CC, C]):
-    pass
-
-
-class zoom_main_data(Generic[S, D, CC], Case[MainDataProgType, MDWrap], alg=MainDataProgType):
-
-    def plain_main_data_trans_type(self, tpe: PlainMainDataProgType) -> MDWrap:
-        def zoom(ps: PluginState[S, D, CC]) -> D:
-            return ps.data
-        return zoom
-
-    def internal_main_data_trans_type(self, tpe: InternalMainDataProgType) -> MDWrap:
-        def zoom(ps: PluginState[S, D, CC]) -> PluginState[S, D, CC]:
-            return ps
-        return zoom
+    def internal_main_data_prog_type(self, tpe: InternalMainDataProgType[S, D, CC]) -> Callable[[PS, PS], PS]:
+        return lambda ps, data: data
 
 
 # TODO optimize
@@ -58,95 +53,82 @@ def data_for_type(ps: PluginState[S, D, CC], tpe: Type[C]) -> C:
     return ps.data_by_type(tpe)
 
 
-class wrap_affiliation(Case[AffiliationProgType, AWWrap], alg=AffiliationProgType):
+class wrap_affiliation(
+        Generic[C, S, D, CC, M],
+        Case[AffiliationProgType, Callable[[PluginState[S, D, CC]], C]],
+        alg=AffiliationProgType,
+):
 
-    def root_trans_type(self, tpe: RootProgType) -> AWWrap:
-        inner = zoom_main_data.match(tpe.main)
-        def wrap(ps: PluginState[S, D, CC]) -> None:
-            return inner(ps)
-        return wrap
+    def root_prog_type(self, tpe: RootProgType[M]) -> Callable[[PluginState[S, D, CC]], M]:
+        return zoom_main_data.match(tpe.main)
 
-    def component_trans_type(self, tpe: ComponentProgType) -> AWWrap:
-        inner = zoom_main_data.match(tpe.main)
-        def wrap(ps: PluginState[S, D, CC]) -> TT:
+    def component_prog_type(self, tpe: ComponentProgType[C, D]) -> Callable[[PS], ComponentData[M, Any]]:
+        inner: Callable[[PluginState[S, D, CC]], M] = zoom_main_data.match(tpe.main)
+        def wrap(ps: PluginState[S, D, CC]) -> ComponentData[M, Any]:
             return ComponentData(inner(ps), data_for_type(ps, tpe.comp))
         return wrap
 
 
-class wrap_resources(Case[StateProgType, AWWrap], alg=StateProgType):
+class unwrap_affiliation(
+        Generic[C, S, D, CC, M],
+        Case[AffiliationProgType[M, C], Callable[[PS, C], PS]],
+        alg=AffiliationProgType,
+):
 
-    def resources_state_trans_type(self, tpe: ResourcesStateProgType) -> AWWrap:
-        inner = wrap_affiliation.match(tpe.affiliation)
-        def wrap(ps) -> None:
-            return ResourcesWrapped(ps.resources_with(inner(ps)))
-        return wrap
-
-    def plain_state_trans_type(self, tpe: PlainStateProgType) -> AWWrap:
-        inner = wrap_affiliation.match(tpe.affiliation)
-        return lambda ps: ResourcesPlain(inner(ps))
-
-
-class pick_main_data(Generic[S, D, CC], Case[MainDataProgType, MDWrap], alg=MainDataProgType):
-
-    def plain_main_data_trans_type(self, tpe: PlainMainDataProgType) -> MDWrap:
-        def pick(ps: PluginState[S, D, CC], data: D) -> PluginState[S, D, CC]:
-            return ps.set.data(data)
-        return pick
-
-    def internal_main_data_trans_type(self, tpe: InternalMainDataProgType) -> MDWrap:
-        def pick(ps: PluginState[S, D, CC], data: PluginState[S, D, CC]) -> PluginState[S, D, CC]:
-            return data
-        return pick
-
-
-class unwrap_affiliation(Generic[C, S, D, CC], Case[AffiliationProgType[C], AWWrap], alg=AffiliationProgType):
-
-    def root_trans_type(self, tpe: RootProgType[C]) -> AWWrap:
+    def root_prog_type(self, tpe: RootProgType[M]) -> Callable[[PS, M], PS]:
         return pick_main_data.match(tpe.main)
 
-    def component_trans_type(self, tpe: ComponentProgType[C]) -> AWWrap:
-        inner = pick_main_data.match(tpe.main)
-        def unwrap(ps: PluginState[S, D, CC], data: ComponentData) -> PluginState[S, D, CC]:
+    def component_prog_type(self, tpe: ComponentProgType[M, C]) -> Callable[[PS, ComponentData[M, Any]], PS]:
+        inner: Callable[[PS, M], PS] = pick_main_data.match(tpe.main)
+        def unwrap(ps: PS, data: ComponentData[M, Any]) -> PS:
             ps1 = inner(ps, data.main)
             return ps1.update_component_data(tpe.comp, data.comp)
         return unwrap
 
 
-class unwrap_resources(Generic[C, S, D, CC], Case[StateProgType[C], AWWrap], alg=StateProgType):
+class wrap_resources(
+        Generic[C, S, D, CC, M, R],
+        Case[StateProgType[M, C, R], Callable[[PluginState[S, D, CC]], R]],
+        alg=StateProgType,
+):
 
-    def resources_state_trans_type(self, tpe: ResourcesStateProgType[C]) -> AWWrap:
-        inner = unwrap_affiliation.match(tpe.affiliation)
-        def unwrap(ps: PluginState[S, D, CC], res_wrapped: ResourcesWrapped[S, C, CC]) -> PluginState[S, D, CC]:
-            return inner(ps, res_wrapped.data.data)
+    def resources_state_prog_type(self, tpe: ResourcesStateProgType[M, C, S, D, CC]
+                                  ) -> Callable[[PS], Resources[S, C, CC]]:
+        inner: Callable[[PluginState[S, D, CC]], C] = wrap_affiliation.match(tpe.affiliation)
+        return lambda ps: ps.resources_with(inner(ps))
+
+    def plain_state_prog_type(self, tpe: PlainStateProgType[M, C]) -> Callable[[PS], C]:
+        return wrap_affiliation.match(tpe.affiliation)
+
+
+class unwrap_resources(
+        Generic[C, S, D, CC, M, R],
+        Case[StateProgType[M, C, R], Callable[[PluginState[S, D, CC], R], PluginState[S, D, CC]]],
+        alg=StateProgType,
+):
+
+    def resources_state_prog_type(self, tpe: ResourcesStateProgType[M, C, S, D, CC]
+                                  ) -> Callable[[PS, Resources[S, C, CC]], PS]:
+        inner: Callable[[PS, C], PS] = unwrap_affiliation.match(tpe.affiliation)
+        def unwrap(ps: PS, res_wrapped: Resources[S, C, CC]) -> PS:
+            return inner(ps, res_wrapped.data)
         return unwrap
 
-    def plain_state_trans_type(self, tpe: PlainStateProgType[C]) -> AWWrap:
-        inner = unwrap_affiliation.match(tpe.affiliation)
-        def unwrap(ps: PluginState[S, D, CC], res_plain: ResourcesPlain[S, C, CC]) -> PluginState[S, D, CC]:
-            return inner(ps, res_plain.data)
-        return unwrap
+    def plain_state_prog_type(self, tpe: PlainStateProgType[M, C]) -> Callable[[PS, R], PS]:
+        return unwrap_affiliation.match(tpe.affiliation)
 
 
-class wrap_trans(Generic[C, S, D, CC], Case[ProgType[C], AWWrap], alg=ProgType):
+class prog_wrappers(
+        Generic[M, C, R, S, D, CC],
+        Case[ProgType[M, C, R], ProgWrappers[PS, R]],
+        alg=ProgType,
+):
 
-    def unknown_trans_type(self, tpe: UnknownProgType[C]) -> AWWrap:
-        return lambda a: a
+    def unknown_prog_type(self, tpe: UnknownProgType[M, C]) -> ProgWrappers[PS, R]:
+        raise Exception('unknown prog type')
 
-    def state_trans(self, tpe: StateProg[C]) -> AWWrap:
-        return wrap_resources.match(tpe.tpe)
-
-
-class unwrap_trans(Case[ProgType, AWUnwrap], alg=ProgType):
-
-    def unknown_trans_type(self, tpe: UnknownProgType) -> AWUnwrap:
-        return lambda a, b: a
-
-    def state_trans(self, tpe: StateProg) -> AWUnwrap:
-        return unwrap_resources.match(tpe.tpe)
-
-
-def prog_wrappers(tpe: ProgType) -> ProgWrappers:
-    return ProgWrappers(wrap_trans.match(tpe), unwrap_trans.match(tpe))
+    def state_prog(self, tpe: StateProg[M, C, R]) -> ProgWrappers[PS, R]:
+        return ProgWrappers(wrap_resources.match(tpe.tpe), unwrap_resources.match(tpe.tpe))
 
 
 __all__ = ('prog_wrappers',)

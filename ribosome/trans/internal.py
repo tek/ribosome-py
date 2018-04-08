@@ -42,7 +42,7 @@ def trans_log() -> Do:
 
 
 @prog.unit
-def set_log_level(level: str) -> None:
+def set_log_level(level: str) -> NS[PluginState[S, D, CC], None]:
     handler = yield NS.inspect_f(_.file_log_handler)
     handler.setLevel(level)
 
@@ -116,8 +116,8 @@ def update_component_state(comp: str, query: UpdateQuery) -> Do:
 
 
 @prog.unit
-def poll() -> None:
-    pass
+def poll() -> NS[D, None]:
+    return NS.unit
 
 
 @prog.unit

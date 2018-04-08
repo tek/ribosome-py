@@ -1,7 +1,4 @@
-from typing import Callable, TypeVar, Any
-
-from amino import List
-from amino.case import Case
+from typing import Callable, TypeVar
 
 from ribosome.compute.prog import Program, Prog, ProgramBlock, ProgramCompose
 
@@ -10,19 +7,27 @@ from ribosome.compute.wrap import prog_wrappers
 from ribosome.compute.output import ProgOutputInterpreter, ProgOutputUnit, ProgOutputResult, ProgOutputIO
 from ribosome.nvim.io.state import NS
 from ribosome.request.args import ParamsSpec
+from ribosome.compute.wrap_data import ProgWrappers
+from ribosome.config.settings import Settings
+from ribosome.data.plugin_state import PluginState
 
 A = TypeVar('A')
 B = TypeVar('B')
 D = TypeVar('D')
+M = TypeVar('M')
 P = TypeVar('P')
+R = TypeVar('R')
+S = TypeVar('S', bound=Settings)
+CC = TypeVar('CC')
+C = TypeVar('C')
 PIO = TypeVar('PIO')
 
 
-def prog_state(func: Callable[[P], NS[D, A]], interpreter: ProgOutputInterpreter[A, B]) -> Program:
+def prog_state(func: Callable[[P], NS[R, A]], interpreter: ProgOutputInterpreter[A, B]) -> Program:
     params_spec = ParamsSpec.from_function(func)
     tpe = analyse_trans_tpe(params_spec).get_or_raise()
-    wrappers = prog_wrappers(tpe)
-    return Program(func.__name__, ProgramBlock(func, tpe, wrappers, interpreter), params_spec)
+    wrappers: ProgWrappers[PluginState[S, D, CC], R] = prog_wrappers.match(tpe)
+    return Program(func.__name__, ProgramBlock(func, wrappers, interpreter), params_spec)
 
 
 class prog:
@@ -50,4 +55,4 @@ class prog:
         return decorate
 
 
-__all__ = ('ProgApi', 'prog')
+__all__ = ('prog',)

@@ -32,8 +32,9 @@ def trans_free(a: int, b: str='b') -> NS[None, int]:
 
 
 @prog.result
-def trans_io() -> IO[int]:
-    return IO.pure(5)
+@do(NS[HsData, IO[int]])
+def trans_io() -> Do:
+    return NS.pure(IO.pure(5))
 
 
 # TODO allow args here
