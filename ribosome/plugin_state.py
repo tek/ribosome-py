@@ -11,7 +11,7 @@ from amino import Map, List, Boolean, Nil, Either, _, Maybe, Nothing, Try, do, D
 from amino.dat import Dat, ADT
 from amino.util.string import camelcase
 
-from ribosome.dispatch.component import Component, Components, NoComponentData
+from ribosome.config.component import Component, Components, NoComponentData
 from ribosome.nvim.io.state import NS
 from ribosome.dispatch.data import DIO
 from ribosome.compute.prog import Program
@@ -20,10 +20,11 @@ from ribosome.logging import Logging
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
 from ribosome.trans.action import LogMessage
 from ribosome.config.settings import Settings
-from ribosome.config.config import Config, Resources
+from ribosome.config.config import Config
 from ribosome.trans.run import TransComplete
 from ribosome.nvim.io.api import N
 from ribosome.nvim.io.data import NResult
+from ribosome.config.resources import Resources
 
 A = TypeVar('A')
 D = TypeVar('D')

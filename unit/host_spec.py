@@ -11,7 +11,7 @@ from amino.dat import Dat
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.api import prog
-from ribosome.dispatch.component import Component, ComponentData
+from ribosome.config.component import Component, ComponentData
 from ribosome.host import request_handler
 from ribosome.config.config import Config
 from ribosome.nvim.api.data import StrictNvimApi

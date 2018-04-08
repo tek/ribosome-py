@@ -1,25 +1,25 @@
-from amino import Map, __, List
+from amino import Map, List, do, Do
 
 from ribosome.compute.api import prog
-from ribosome.nvim.io.compute import NvimIO
-from ribosome.dispatch.component import Component
+from ribosome.config.component import Component
 from ribosome.request.handler.prefix import Plain
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.config.config import Config
+from ribosome.config.config import Config, NoData
 from ribosome.nvim.api.variable import variable_set
+from ribosome.nvim.io.state import NS
 
 val = 71
 
 
 @prog.unit
-def trans1() -> NvimIO[None]:
-    return variable_set('autocmd_success', val)
+def trans1() -> NS[NoData, None]:
+    return NS.lift(variable_set('autocmd_success', val))
 
 
-core = Component.cons('core')
+core: Component = Component.cons('core')
 
 
-config = Config.cons(
+config: Config = Config.cons(
     name='plug',
     components=Map(core=core),
     request_handlers=List(

@@ -2,7 +2,7 @@ from kallikrein import k, Expectation
 from kallikrein.matchers.maybe import be_just
 
 from ribosome.test.integration.run import DispatchHelper
-from ribosome.dispatch.component import Component
+from ribosome.config.component import Component
 from ribosome.config.config import Config
 
 from amino.test.spec import SpecBase

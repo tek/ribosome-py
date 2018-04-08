@@ -2,10 +2,11 @@ from amino import List, do, Do, _, __
 
 from ribosome.compute.api import prog
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.config.config import Config, Resources, NoData
+from ribosome.config.config import Config, NoData
 from ribosome.nvim.io.state import NS
 from ribosome.config.settings import Settings, int_setting
-from ribosome.dispatch.component import NoComponentData
+from ribosome.config.component import NoComponentData
+from ribosome.config.resources import Resources
 
 
 class PlugSettings(Settings):

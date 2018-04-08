@@ -15,7 +15,7 @@ from ribosome.test.config import default_config_name
 from ribosome.test.integration.default import ExternalSpec
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.plugin_state import PluginState
-from ribosome.dispatch.component import Component, ComponentData
+from ribosome.config.component import Component, ComponentData
 from ribosome.config.config import Config, NoData
 from ribosome.dispatch.mapping import Mappings, Mapping, mapmode
 from ribosome.trans.mapping import activate_mapping

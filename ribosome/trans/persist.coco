@@ -7,7 +7,7 @@ from amino.json import decode_json, dump_json
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.state import NS
-from ribosome.config.config import Resources
+from ribosome.config.resources import Resources
 from ribosome.config.settings import Settings
 from ribosome.nvim.io.api import N
 

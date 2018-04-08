@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# __coconut_hash__ = 0x301356b8
+# __coconut_hash__ = 0x6a61a38b
 
 # Compiled with Coconut version 1.3.0 [Dead Parrot]
 
@@ -31,7 +31,7 @@ from amino.json import dump_json  # line 6
 
 from ribosome.nvim.io.compute import NvimIO  # line 8
 from ribosome.nvim.io.state import NS  # line 9
-from ribosome.config.config import Resources  # line 10
+from ribosome.config.resources import Resources  # line 10
 from ribosome.config.settings import Settings  # line 11
 from ribosome.nvim.io.api import N  # line 12
 

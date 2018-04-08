@@ -3,13 +3,13 @@ from typing import Callable, Tuple, Union, TypeVar, Type, Generic, Any
 from amino.case import Case
 from amino import ADT
 from ribosome.plugin_state import PluginState
-from ribosome.dispatch.component import ComponentData
+from ribosome.config.component import ComponentData
 from ribosome.compute.tpe_data import (ProgType, UnknownProgType, StateProgType, AffiliationProgType, RootProgType,
                                        ComponentProgType, MainDataProgType, PlainMainDataProgType,
                                        InternalMainDataProgType, StateProg, ResourcesStateProgType,
                                        PlainStateProgType)
 from ribosome.config.settings import Settings
-from ribosome.config.config import Resources
+from ribosome.config.resources import Resources
 from ribosome.compute.wrap_data import ProgWrappers
 
 A = TypeVar('A')

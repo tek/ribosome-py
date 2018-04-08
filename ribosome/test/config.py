@@ -1,6 +1,6 @@
 from typing import Any
 
-from ribosome.dispatch.component import Component
+from ribosome.config.component import Component
 
 from amino import Map, Lists
 from ribosome.request.handler.handler import RequestHandler

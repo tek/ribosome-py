@@ -11,8 +11,8 @@ from amino import List, Map, do, Do, Dat, _, Nil, __
 from amino.state import State
 from amino.lenses.lens import lens
 
-from ribosome.config.config import Config, Resources
-from ribosome.dispatch.component import Component, ComponentData
+from ribosome.config.config import Config
+from ribosome.config.component import Component, ComponentData
 from ribosome.trans.action import Prog
 from ribosome.plugin_state import DispatchConfig
 from ribosome.test.integration.run import DispatchHelper
@@ -23,6 +23,8 @@ from ribosome.compute.api import prog
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.run import run_prog
 from ribosome.test.klk import kn
+from ribosome.compute.prog import Program
+from ribosome.config.resources import Resources
 
 A = TypeVar('A')
 
@@ -161,11 +163,11 @@ def root() -> Do:
     yield NS.pure(13)
 
 
-def run_a(t: Prog[A]) -> A:
+def run_a(t: Program) -> A:
     return kn(helper.vim, lambda: run_prog(t, Nil).run_a(helper.state))
 
 
-def run(t: Prog[A]) -> A:
+def run(t: Program) -> A:
     return kn(helper.vim, lambda: run_prog(t, Nil).run(helper.state))
 
 

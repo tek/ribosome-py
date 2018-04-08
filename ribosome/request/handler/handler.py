@@ -1,4 +1,4 @@
-from typing import Callable, Type, Generic, Any, TypeVar
+from typing import Generic, Any, TypeVar
 
 from amino import List, Lists, Map, _, Boolean, __
 from amino.func import flip
@@ -10,8 +10,6 @@ from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.logging import Logging
 from ribosome.request.handler.prefix import PrefixStyle, Short
 from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod, AutocmdMethod
-from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
-from ribosome.request.args import ParamsSpec
 from ribosome.compute.prog import Program
 
 B = TypeVar('B')

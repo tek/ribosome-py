@@ -17,13 +17,14 @@ from ribosome.plugin_state import PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
 from ribosome.nvim.io.state import NS
-from ribosome.dispatch.component import Component, ComponentData
+from ribosome.config.component import Component, ComponentData
 from ribosome.config.settings import Settings
 from ribosome.dispatch.update import undef_handlers, def_handlers
 from ribosome.compute.prog import Program
 from ribosome.trans.action import Prog
 from ribosome.config.config import NoData
 from ribosome import ribo_log
+from ribosome.util.setting import setting
 
 D = TypeVar('D')
 S = TypeVar('S', bound=Settings)
@@ -122,13 +123,13 @@ def poll() -> None:
 
 
 @prog.unit
-def append_python_path(path: str) -> IO[None]:
-    return IO.delay(sys.path.append, path)
+def append_python_path(path: str) -> NS[D, None]:
+    return NS.from_io(IO.delay(sys.path.append, path))
 
 
 @prog.result
-def show_python_path() -> Iterable[str]:
-    return sys.path
+def show_python_path() -> NS[D, Iterable[str]]:
+    return NS.pure(sys.path)
 
 
 # FIXME need to update component type map
@@ -181,7 +182,7 @@ def internal_init_trans() -> Do:
 @prog.do
 @do(Prog)
 def internal_init() -> Do:
-    enabled = yield NS.inspect(_.settings.run_internal_init.value_or_default).program_with(resources=true)
+    enabled = yield prog(setting)(_.run_internal_init)
     if enabled:
         handler = yield internal_init_trans()
         yield handler | Prog.unit

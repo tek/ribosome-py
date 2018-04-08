@@ -3,7 +3,7 @@ from amino.mod import instance_from_module
 
 from ribosome.logging import Logging, ribo_log
 from ribosome.config.config import Config
-from ribosome.dispatch.component import Component
+from ribosome.config.component import Component
 
 
 class ComponentResolver(Logging):

@@ -27,6 +27,9 @@ def prog_state(func: Callable[[P], NS[D, A]], interpreter: ProgOutputInterpreter
 
 class prog:
 
+    def __new__(self, func: Callable[[P], NS[D, A]]) -> Program:
+        return prog_state(func, ProgOutputResult())
+
     @staticmethod
     def unit(func: Callable[[P], NS[D, None]]) -> Program:
         return prog_state(func, ProgOutputUnit())

@@ -8,10 +8,10 @@ from ribosome.dispatch.data import DIO
 from ribosome.host import init_state
 from ribosome.dispatch.execute import dispatch_job, traverse_programs, run_request_handler
 from ribosome.nvim.io.state import NvimIOState, NS
-from ribosome.config.config import Config, Resources
+from ribosome.config.config import Config
 from ribosome.trans.run import TransComplete
 from ribosome.config.settings import Settings
-from ribosome.dispatch.component import ComponentData
+from ribosome.config.component import ComponentData
 from ribosome.nvim.api.data import NvimApi, StrictNvimApi, StrictNvimHandler
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
@@ -19,6 +19,7 @@ from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.io.api import N
 from ribosome.dispatch.job import DispatchJob
 from ribosome.compute.prog import Program
+from ribosome.config.resources import Resources
 
 C = TypeVar('C')
 D = TypeVar('D')

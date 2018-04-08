@@ -7,13 +7,14 @@ from amino import List, Map, do, Do, Dat, _
 from amino.lenses.lens import lens
 
 from ribosome.test.integration.run import DispatchHelper
-from ribosome.config.config import Config, Resources, NoData
+from ribosome.config.config import Config, NoData
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.api import prog
-from ribosome.dispatch.component import Component, ComponentData
+from ribosome.config.component import Component, ComponentData
 from ribosome.trans.action import Prog
 from ribosome.config.settings import Settings
 from ribosome.nvim.io.state import NS
+from ribosome.config.resources import Resources
 
 
 class CoreData(Dat['CoreData']):

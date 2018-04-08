@@ -15,10 +15,11 @@ from ribosome.test.config import single_trans_config
 from ribosome.test.integration.default import ExternalSpec
 from ribosome.nvim.api.ui import buffer_content, buffers, windows, current_buffer
 from ribosome.nvim.api.data import Window, Buffer
+from ribosome.config.config import NoData
 
 
 @prog.result
-@do(NS[None, None])
+@do(NS[NoData, None])
 def create_scratch(lines: List[str], options: CreateScratchBufferOptions) -> Do:
     yield NS.lift(show_in_scratch_buffer(lines, options))
     yield NS.unit

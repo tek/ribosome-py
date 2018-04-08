@@ -1,4 +1,4 @@
-from typing import Callable, TypeVar, Generic, Union, Optional, Type, Any
+from typing import Callable, TypeVar, Generic, Optional, Type, Any
 
 from amino import List, Nil, Map, Either, Right, do, Do, Maybe
 from amino.dat import Dat
@@ -10,7 +10,7 @@ from amino.state import StateT
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import Settings
 from ribosome.request.rpc import RpcHandlerSpec
-from ribosome.dispatch.component import Components, Component
+from ribosome.config.component import Components, Component
 from ribosome.compute.prog import Program
 
 A = TypeVar('A')
@@ -109,20 +109,6 @@ class ConfigDecoder(Decoder[Config], tpe=Config):
         f = yield data.field('name')
         name = yield decode(f)
         yield Right(Config.cons(name))
-
-
-class Resources(Generic[S, D, CC], Dat['Resources[S, D, CC]']):
-
-    def __init__(self, data: D, settings: S, components: Components[D, CC]) -> None:
-        self.data = data
-        self.settings = settings
-        self.components = components
-
-
-def resources_lift(st: StateT[G, D, A]) -> StateT[G, Resources[S, D, CC], A]:
-    def trans(r: Resources[S, D, CC]) -> G:
-        return st.run(r.data).map2(lambda s, a: (Resources(s, r.settings, r.components), a))
-    return st.cls.apply(trans)
 
 
 __all__ = ('Config', 'NoData', 'Resources')

@@ -9,7 +9,7 @@ from ribosome.plugin_state import PluginState, Programs
 from ribosome.dispatch.resolve import ComponentResolver
 from ribosome.config.config import Config
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
-from ribosome.dispatch.component import Components, Component
+from ribosome.config.component import Components, Component
 from ribosome.request.rpc import define_handlers, RpcHandlerSpec
 from ribosome.config.settings import Settings
 from ribosome.compute.prog import Program
