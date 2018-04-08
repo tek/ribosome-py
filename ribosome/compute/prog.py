@@ -1,8 +1,6 @@
-from types import SimpleNamespace
 from typing import TypeVar, Generic, Callable, Any
 
 from amino import ADT, Dat, Maybe, Either, List, Lists
-from amino.tc.base import Implicits, ImplicitsMeta
 from amino.tc.monad import Monad
 from amino.dat import ADTMeta
 from amino.func import CallByName, call_by_name
@@ -21,11 +19,7 @@ M = TypeVar('M')
 P = TypeVar('P')
 
 
-# TODO remove Implicits, was used for `.m` probably
-class ProgMeta(ADTMeta, ImplicitsMeta):
-
-    def __new__(cls, name: str, bases: tuple, namespace: SimpleNamespace, **kw: Any) -> type:
-        return super().__new__(cls, name, bases, namespace, **kw)
+class ProgMeta(ADTMeta):
 
     @property
     def unit(self) -> 'Prog[None]':
@@ -38,7 +32,7 @@ class ProgMeta(ADTMeta, ImplicitsMeta):
         return ProgMap(f)
 
 
-class Prog(Generic[A], ADT['Prog'], Implicits, implicits=True, auto=True, metaclass=ProgMeta):
+class Prog(Generic[A], ADT['Prog[A]'], metaclass=ProgMeta):
 
     @staticmethod
     def from_maybe(fa: Maybe[A], error: CallByName) -> 'Prog[A]':
@@ -140,7 +134,6 @@ class Program(Generic[A, B], Dat['Program']):
         return bind_program(self, Lists.wrap(args))
 
 
-# TODO arg validation here
 class bind_program_code(Case[ProgramCode, Prog], alg=ProgramCode):
 
     def __init__(self, program: Program, args: List[Any]) -> None:

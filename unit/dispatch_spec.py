@@ -8,7 +8,7 @@ from amino.boolean import true
 from amino.dat import Dat, ADT
 
 from ribosome.compute.api import prog
-from ribosome.plugin_state import PluginState, DispatchConfig
+from ribosome.data.plugin_state import PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import DispatchHelper
@@ -39,7 +39,7 @@ def trans_io() -> IO[int]:
 # TODO allow args here
 @prog.result
 def trans_internal() -> NS[PluginState, str]:
-    return NS.inspect(_.name)
+    return NS.inspect(_.basic.name)
 
 
 @prog.unit
@@ -84,7 +84,6 @@ config: Config[Settings, HsData, Any] = Config.cons(
     ),
     state_ctor=HsData,
 )
-dispatch_conf = DispatchConfig.cons(config)
 
 
 # TODO test free trans function with invalid arg count
@@ -113,7 +112,7 @@ class DispatchSpec(SpecBase):
     def internal(self) -> Expectation:
         helper = DispatchHelper.strict(config)
         state, result = helper.unsafe_run('function:int')
-        return k(result) == state.name
+        return k(result) == state.basic.name
 
     def data(self) -> Expectation:
         helper = DispatchHelper.strict(config)

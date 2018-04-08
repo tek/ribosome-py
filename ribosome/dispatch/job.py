@@ -3,7 +3,8 @@ from typing import TypeVar, Any, Generic
 from amino import List, Boolean
 from amino.dat import Dat
 
-from ribosome.plugin_state import PluginStateHolder, Programs
+from ribosome.data.plugin_state import Programs
+from ribosome.data.plugin_state_holder import PluginStateHolder
 
 D = TypeVar('D')
 
@@ -26,7 +27,7 @@ class DispatchJob(Generic[D], Dat['DispatchJob']):
 
     @property
     def plugin_name(self) -> str:
-        return self.state.state.config.name
+        return self.state.state.basic.name
 
     @property
     def sync_prefix(self) -> str:
@@ -38,7 +39,7 @@ class DispatchJob(Generic[D], Dat['DispatchJob']):
 
     @property
     def programs(self) -> Programs:
-        return self.state.state.dispatch_config.programs
+        return self.state.state.programs
 
 
 __all__ = ('DispatchJob',)

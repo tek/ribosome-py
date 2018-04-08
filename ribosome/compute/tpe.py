@@ -5,7 +5,7 @@ from amino import Lists, Either, do, Do, Maybe, Try, Right, Left
 from ribosome.config.resources import Resources
 from ribosome.config.component import ComponentData
 from ribosome.request.args import ParamsSpec
-from ribosome.plugin_state import PluginState
+from ribosome.data.plugin_state import PluginState
 from ribosome.compute.tpe_data import (MainDataProgType, InternalMainDataProgType, PlainMainDataProgType,
                                      ComponentProgType, AffiliationProgType, PlainStateProgType,
                                      ResourcesStateProgType, StateProg, ProgType, UnknownProgType, RootProgType)

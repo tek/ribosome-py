@@ -11,10 +11,10 @@ from ribosome.config.config import Config, NoData
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.api import prog
 from ribosome.config.component import Component, ComponentData
-from ribosome.trans.action import Prog
 from ribosome.config.settings import Settings
 from ribosome.nvim.io.state import NS
 from ribosome.config.resources import Resources
+from ribosome.compute.prog import Prog
 
 
 class CoreData(Dat['CoreData']):

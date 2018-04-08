@@ -15,14 +15,10 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.logging import ribo_log
 from ribosome.config.config import Config
 from ribosome.nvim.io.state import NS
-from ribosome.dispatch.data import (DispatchError, DispatchReturn, DispatchUnit, DispatchOutput,
-                                    DispatchIO, IODIO, DIO, DispatchErrors, NvimIODIO,
-                                    DispatchOutputAggregate, GatherIOsDIO, DispatchDo, GatherSubprocsDIO, DispatchLog)
-from ribosome.plugin_state import PluginState, PluginStateHolder
-from ribosome.trans.action import LogMessage, Info, Error
+from ribosome.data.plugin_state import PluginState
+# from ribosome.trans.action import LogMessage, Info, Error
 from ribosome.compute.prog import Program
 from ribosome.config.settings import Settings
-from ribosome.trans.run import TransComplete
 from ribosome import NvimApi
 from ribosome.nvim.io.data import NResult, NSuccess, NError, NFatal
 from ribosome.nvim.io.api import N
@@ -31,6 +27,7 @@ from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.args import ParamsSpec
 from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
 from ribosome.compute.run import run_prog
+from ribosome.data.plugin_state_holder import PluginStateHolder
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
@@ -54,27 +51,27 @@ def gather_ios(ios: List[IO[A]], timeout: float) -> List[Either[IOException, A]]
         return Lists.wrap(completed).map(__.result(timeout=timeout))
 
 
-class execute_io(Case, alg=DIO):
+# class execute_io(Case, alg=DIO):
 
-    def iodio(self, io: IODIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
-        return NS.from_io(io.io)
+#     def iodio(self, io: IODIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
+#         return NS.from_io(io.io)
 
-    def gather_i_os_dio(self, io: GatherIOsDIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
-        def gather() -> R:
-            gio = io.io
-            return gather_ios(gio.ios, gio.timeout)
-        return NS.from_io(IO.delay(gather))
+#     def gather_i_os_dio(self, io: GatherIOsDIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
+#         def gather() -> R:
+#             gio = io.io
+#             return gather_ios(gio.ios, gio.timeout)
+#         return NS.from_io(IO.delay(gather))
 
-    def gather_subprocs_dio(self, io: GatherSubprocsDIO[A, TransComplete]) -> NS[PluginState[S, D, CC], TransComplete]:
-        ribo_log.debug(f'gathering {io}')
-        def gather() -> TransComplete:
-            gio = io.io
-            popens = gio.procs.map(__.execute(gio.timeout))
-            return gather_ios(popens, gio.timeout)
-        return NS.from_io(IO.delay(gather))
+#     def gather_subprocs_dio(self, io: GatherSubprocsDIO[A, TransComplete]) -> NS[PluginState[S, D, CC], TransComplete]:
+#         ribo_log.debug(f'gathering {io}')
+#         def gather() -> TransComplete:
+#             gio = io.io
+#             popens = gio.procs.map(__.execute(gio.timeout))
+#             return gather_ios(popens, gio.timeout)
+#         return NS.from_io(IO.delay(gather))
 
-    def nvim_iodio(self, io: NvimIODIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
-        return NS.lift(io.io)
+#     def nvim_iodio(self, io: NvimIODIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
+#         return NS.lift(io.io)
 
 
 @do(NS[PluginState[S, D, CC], R])
@@ -84,50 +81,50 @@ def run_trans_f(handler: Program) -> Do:
     yield execute_dispatch_output.match(result)
 
 
-class dispatch_log(Case, alg=LogMessage):
+# class dispatch_log(Case, alg=LogMessage):
 
-    def info(self, msg: Info) -> NS[D, None]:
-        return NS.delay(lambda v: ribo_log.info(msg.message))
+#     def info(self, msg: Info) -> NS[D, None]:
+#         return NS.delay(lambda v: ribo_log.info(msg.message))
 
-    def error(self, msg: Error) -> NS[D, None]:
-        return NS.delay(lambda v: ribo_log.error(msg))
+#     def error(self, msg: Error) -> NS[D, None]:
+#         return NS.delay(lambda v: ribo_log.error(msg))
 
 
-class execute_dispatch_output(Case, alg=DispatchOutput):
+# class execute_dispatch_output(Case, alg=DispatchOutput):
 
-    def dispatch_error(self, result: DispatchError) -> NS[PluginState[S, D, CC], R]:
-        io = result.exception / N.exception | N.error(result.message)
-        return NS.lift(io)
+#     def dispatch_error(self, result: DispatchError) -> NS[PluginState[S, D, CC], R]:
+#         io = result.exception / N.exception | N.error(result.message)
+#         return NS.lift(io)
 
-    def dispatch_errors(self, result: DispatchErrors) -> NS[PluginState[S, D, CC], R]:
-        return result.errors.traverse(self.dispatch_error, NS)
+#     def dispatch_errors(self, result: DispatchErrors) -> NS[PluginState[S, D, CC], R]:
+#         return result.errors.traverse(self.dispatch_error, NS)
 
-    def dispatch_return(self, result: DispatchReturn) -> NS[PluginState[S, D, CC], R]:
-        return NS.pure(result.value)
+#     def dispatch_return(self, result: DispatchReturn) -> NS[PluginState[S, D, CC], R]:
+#         return NS.pure(result.value)
 
-    def dispatch_unit(self, result: DispatchUnit) -> NS[PluginState[S, D, CC], R]:
-        return NS.pure(0)
+#     def dispatch_unit(self, result: DispatchUnit) -> NS[PluginState[S, D, CC], R]:
+#         return NS.pure(0)
 
-    @do(NS[PluginState[S, D, CC], R])
-    def dispatch_io(self, result: DispatchIO) -> Do:
-        custom_executor = yield NS.inspect(_.state.dispatch_config.io_executor)
-        executor = custom_executor | (lambda: execute_io.match)
-        io_result = yield executor(result.io)
-        yield eval_trans.match(result.io.handle_result(io_result))
+#     @do(NS[PluginState[S, D, CC], R])
+#     def dispatch_io(self, result: DispatchIO) -> Do:
+#         custom_executor = yield NS.inspect(_.state.io_executor)
+#         executor = custom_executor | (lambda: execute_io.match)
+#         io_result = yield executor(result.io)
+#         yield eval_trans.match(result.io.handle_result(io_result))
 
-    @do(NS[PluginState[S, D, CC], R])
-    def dispatch_output_aggregate(self, result: DispatchOutputAggregate) -> Do:
-        yield result.results.traverse(execute_dispatch_output.match, NS)
+#     @do(NS[PluginState[S, D, CC], R])
+#     def dispatch_output_aggregate(self, result: DispatchOutputAggregate) -> Do:
+#         yield result.results.traverse(execute_dispatch_output.match, NS)
 
-    @do(NS[PluginState[S, D, CC], R])
-    def dispatch_do(self, result: DispatchDo) -> Do:
-        yield eval_trans.match(result.trans.action)
+#     @do(NS[PluginState[S, D, CC], R])
+#     def dispatch_do(self, result: DispatchDo) -> Do:
+#         yield eval_trans.match(result.trans.action)
 
-    @do(NS[PluginState[S, D, CC], R])
-    def dispatch_log(self, result: DispatchLog) -> Do:
-        custom_logger = yield NS.inspect(_.state.logger)
-        logger = custom_logger | (lambda: dispatch_log.match)
-        yield logger(result.trans)
+#     @do(NS[PluginState[S, D, CC], R])
+#     def dispatch_log(self, result: DispatchLog) -> Do:
+#         custom_logger = yield NS.inspect(_.state.logger)
+#         logger = custom_logger | (lambda: dispatch_log.match)
+#         yield logger(result.trans)
 
 
 def arg_parser(handler: RequestHandler, params_spec: ParamsSpec) -> ArgParser:

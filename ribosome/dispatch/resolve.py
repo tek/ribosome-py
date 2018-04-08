@@ -1,30 +1,39 @@
-from amino import Either, List, Left, do, Right, curried, Do
+from typing import Any, TypeVar
+
+from amino import Either, List, Left, do, Right, curried, Do, Map
 from amino.mod import instance_from_module
 
-from ribosome.logging import Logging, ribo_log
-from ribosome.config.config import Config
+from ribosome.logging import Logging
 from ribosome.config.component import Component
+
+D = TypeVar('D')
+CC = TypeVar('CC')
 
 
 class ComponentResolver(Logging):
 
-    def __init__(self, config: Config, user_components: Either[str, List[str]]) -> None:
-        self.config = config
-        self.user_components = user_components
+    def __init__(
+            self,
+            name: str,
+            available_components: Map[str, Component[D, Any, CC]],
+            core: List[str],
+            default: List[str],
+            requested: Either[str, List[str]],
+    ) -> None:
+        self.name = name
+        self.available_components = available_components
+        self.core = core
+        self.default = default
+        self.requested = requested
 
-    @property
-    def name(self) -> str:
-        return self.config.name
-
-    @property
     def run(self) -> Either[str, List[Component]]:
         return self.components.traverse(self.create_components, Either)
 
     @property
     def components(self) -> List[str]:
-        additional = self.user_components | self.config.default_components
-        components = self.config.core_components + additional
-        ribo_log.debug(f'starting {self.config.name} with components {components}')
+        additional = self.requested | self.default
+        components = self.core + additional
+        self.log.debug(f'starting {self.name} with components {components}')
         return components
 
     def create_components(self, name: str) -> Either[str, List[Component]]:
@@ -44,7 +53,7 @@ class ComponentResolver(Logging):
 
     def declared_component(self, name: str) -> Either[List[str], Component]:
         return (
-            self.config.components
+            self.available_components
             .lift(name)
             .to_either(List(f'no auto component defined for `{name}`'))
         )

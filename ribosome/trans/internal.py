@@ -13,18 +13,16 @@ from amino.lenses.lens import lens
 from amino.regex import Match
 
 from ribosome.compute.api import prog
-from ribosome.plugin_state import PluginState
+from ribosome.data.plugin_state import PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.handler.prefix import Full
 from ribosome.nvim.io.state import NS
 from ribosome.config.component import Component, ComponentData
 from ribosome.config.settings import Settings
 from ribosome.dispatch.update import undef_handlers, def_handlers
-from ribosome.compute.prog import Program
-from ribosome.trans.action import Prog
-from ribosome.config.config import NoData
-from ribosome import ribo_log
+from ribosome.compute.prog import Program, Prog
 from ribosome.util.setting import setting
+from ribosome.config.basic_config import NoData
 
 D = TypeVar('D')
 S = TypeVar('S', bound=Settings)
@@ -57,7 +55,7 @@ def state_data() -> Do:
 
 @prog.result
 def rpc_handlers() -> EitherState[PluginState[S, D, CC], str]:
-    return EitherState.inspect_f(lambda s: dump_json(s.main.dispatch_config.distinct_specs))
+    return EitherState.inspect_f(lambda s: dump_json(s.main.distinct_specs))
 
 
 class PatchQuery(Dat['PatchQuery']):
@@ -138,7 +136,7 @@ def show_python_path() -> NS[D, Iterable[str]]:
 def enable_components(*names: str) -> Do:
     comps = (
         yield NS.inspect_either(
-            __.config.components.lift_all(*names).to_either(f'couldn\'t find some components: {names}'))
+            __.comp.available.lift_all(*names).to_either(f'couldn\'t find some components: {names}'))
     )
     yield undef_handlers()
     yield NS.modify(lens.components.all.modify(__.add(comps)))
@@ -176,7 +174,7 @@ def mapping(uuid_s: str, keys: str) -> Do:
 @prog.result
 @do(NS[PluginState[S, D, CC], Maybe[Program]])
 def internal_init_trans() -> Do:
-    yield NS.inspect(_.config.init)
+    yield NS.inspect(_.init)
 
 
 @prog.do

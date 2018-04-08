@@ -4,28 +4,29 @@ from amino import Lists, Map, List, __, Either, Left, Right, do, Do, Nil
 from amino.dat import Dat
 from amino.lenses.lens import lens
 
-from ribosome.dispatch.data import DIO
+# from ribosome.dispatch.data import DIO
 from ribosome.host import init_state
 from ribosome.dispatch.execute import dispatch_job, traverse_programs, run_request_handler
 from ribosome.nvim.io.state import NvimIOState, NS
 from ribosome.config.config import Config
-from ribosome.trans.run import TransComplete
 from ribosome.config.settings import Settings
 from ribosome.config.component import ComponentData
 from ribosome.nvim.api.data import NvimApi, StrictNvimApi, StrictNvimHandler
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
+from ribosome.data.plugin_state import PluginState
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.io.api import N
 from ribosome.dispatch.job import DispatchJob
 from ribosome.compute.prog import Program
 from ribosome.config.resources import Resources
+from ribosome.data.plugin_state_holder import PluginStateHolder
 
 C = TypeVar('C')
 D = TypeVar('D')
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
-IOExec = Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]
+DIO = TypeVar('DIO')
+IOExec = Callable[[DIO], NS[PluginState[S, D, CC], Any]]
 
 
 def api_info(vim: NvimApi, name: str, args: List[Any]) -> Either[str, Any]:
@@ -80,11 +81,10 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
             cons_vim: Callable[[dict], NvimApi],
             io_executor: IOExec=None,
     ) -> 'DispatchHelper':
-        comps_var = Map({f'{config.name}_components': Lists.wrap(comps)})
+        comps_var = Map({f'{config.basic.name}_components': Lists.wrap(comps)})
         vim = cons_vim(vars ** comps_var)
-        dc = DispatchConfig.cons(config, io_executor=io_executor)
-        vim1, state = init_state(dc).unsafe_run(vim)
-        return DispatchHelper(vim, dc, state)
+        vim1, state = init_state(config, io_executor=io_executor).unsafe_run(vim)
+        return DispatchHelper(vim, config, state)
 
     @staticmethod
     def nvim(
@@ -106,14 +106,14 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
             *comps: str,
             vars: Map[str, Any]=Map(),
             request_handler: StrictNvimHandler=lambda v, n, a: Left(f'no handler for {n}'),
-            io_executor: Callable[[DIO], NS[PluginState[S, D, CC], TransComplete]]=None,
+            io_executor: Callable[[DIO], NS[PluginState[S, D, CC], Any]]=None,
     ) -> 'DispatchHelper':
-        cons_vim = lambda vs: StrictNvimApi(config.name, vs, StrictRequestHandler(request_handler), Nil)
+        cons_vim = lambda vs: StrictNvimApi(config.basic.name, vs, StrictRequestHandler(request_handler), Nil)
         return DispatchHelper.create(config, *comps, vars=vars, cons_vim=cons_vim, io_executor=io_executor)
 
-    def __init__(self, vim: NvimApi, dispatch_config: DispatchConfig, state: PluginState[S, D, CC]) -> None:
+    def __init__(self, vim: NvimApi, config: Config, state: PluginState[S, D, CC]) -> None:
         self.vim = vim
-        self.dispatch_config = dispatch_config
+        self.config = config
         self.state = state
 
     @property
@@ -126,8 +126,7 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
 
     def dispatch_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[DispatchJob, List[Program]]:
         job = dispatch_job(self.holder, name, (args,), sync)
-        dc = job.state.state.dispatch_config
-        return job, dc.programs.lift(job.name).get_or_fail(f'no matching dispatch for `{job.name}`')
+        return job, job.state.state.programs.lift(job.name).get_or_fail(f'no matching dispatch for `{job.name}`')
 
     def traverse_programs(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[PluginState[S, D, CC], Any]:
         job, dispatch = self.dispatch_job(name, args, sync)

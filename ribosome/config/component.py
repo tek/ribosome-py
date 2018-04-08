@@ -1,14 +1,15 @@
 from typing import TypeVar, Callable, Generic, Any, Type, Union
 
-from amino import List, Either, _, Nil, Maybe, Boolean, __
+from amino import List, Either, _, Nil, Maybe, Boolean, __, Map
 from amino.dat import Dat
 
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.dispatch.mapping import Mappings
 from ribosome.nvim.io.state import NS
-from ribosome.compute.prog import Program
 
+# FIXME typevar P is temporary
 D = TypeVar('D')
+P = TypeVar('P')
 CC = TypeVar('CC')
 CD = TypeVar('CD')
 
@@ -76,10 +77,10 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
         self.config = config
         self.mappings = mappings
 
-    def handler_by_name(self, name: str) -> Either[str, Program]:
+    def handler_by_name(self, name: str) -> Either[str, P]:
         return self.handlers.find(_.name == name).to_either(f'component `{self.name}` has no handler `name`')
 
-    def contains(self, handler: Program) -> Boolean:
+    def contains(self, handler: P) -> Boolean:
         return self.request_handlers.trans_handlers.exists(_.fun == handler.fun)
 
 
@@ -88,17 +89,11 @@ class Components(Generic[D, CC], Dat['Components']):
     @staticmethod
     def cons(
             all: List[Component[D, Any, CC]]=Nil,
-            config_type: Type[CC]=Any,
     ) -> 'Components[D, CC]':
-        return Components(all, config_type)
+        return Components(all)
 
-    def __init__(self, all: List[Component[D, Any, CC]], config_type: Type[CC]) -> None:
+    def __init__(self, all: List[Component[D, Any, CC]]) -> None:
         self.all = all
-        self.config_type = config_type
-
-    @property
-    def has_config(self) -> Boolean:
-        return self.config_type is not Any
 
     def by_name(self, name: str) -> Either[str, Component[D, CD, CC]]:
         return self.all.find(_.name == name).to_either(f'no component named {name}')
@@ -110,8 +105,22 @@ class Components(Generic[D, CC], Dat['Components']):
     def config(self) -> List[CC]:
         return self.all.collect(_.config)
 
-    def for_handler(self, handler: Program) -> Maybe[Component]:
+    def for_handler(self, handler: P) -> Maybe[Component]:
         return self.all.find(__.contains(handler))
+
+
+class ComponentConfig(Dat['ComponentConfig']):
+
+    @staticmethod
+    def cons(
+            available: Map[str, Component[D, Any, CC]],
+    ) -> 'ComponentConfig':
+        return ComponentConfig(
+            available,
+        )
+
+    def __init__(self, available: Map[str, Component[D, Any, CC]]) -> None:
+        self.available = available
 
 
 __all__ = ('Component', 'Components')

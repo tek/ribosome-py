@@ -13,8 +13,6 @@ from amino.lenses.lens import lens
 
 from ribosome.config.config import Config
 from ribosome.config.component import Component, ComponentData
-from ribosome.trans.action import Prog
-from ribosome.plugin_state import DispatchConfig
 from ribosome.test.integration.run import DispatchHelper
 from ribosome.nvim.io.data import NError
 from ribosome.nvim.io.state import NS
@@ -23,7 +21,7 @@ from ribosome.compute.api import prog
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.run import run_prog
 from ribosome.test.klk import kn
-from ribosome.compute.prog import Program
+from ribosome.compute.prog import Program, Prog
 from ribosome.config.resources import Resources
 
 A = TypeVar('A')
@@ -124,7 +122,6 @@ config: Config = Config.cons(
         RequestHandler.trans_function(t3)(),
     ),
 )
-dispatch_conf = DispatchConfig.cons(config)
 helper = DispatchHelper.strict(config)
 
 

@@ -6,16 +6,11 @@ from amino.lenses.lens import lens
 from amino.case import Case
 
 from ribosome.nvim.io.state import NS
-from ribosome.compute.prog import Prog, ProgBind, ProgPure, ProgError, ProgMap, Program, ProgExec, bind_program
-from ribosome.compute.data import CompilationSuccess
+from ribosome.compute.prog import Prog, ProgBind, ProgPure, ProgError, ProgMap, ProgExec, bind_program
 from ribosome.compute.output import ProgOutputInterpreter, ProgOutputResult, ProgOutputUnit
 from ribosome.compute.wrap_data import ProgWrappers
-
-
-from ribosome.request.args import ArgValidator
-from ribosome.compute.data import Compilation, CompilationFailure
 from ribosome.config.settings import Settings
-from ribosome.plugin_state import PluginState
+from ribosome.data.plugin_state import PluginState
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -24,15 +19,7 @@ S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
 
-def compile_program(prog: Program[B, A]) -> Compilation[D, A]:
-    val = ArgValidator(prog.params_spec)
-    return val.either(prog.args, 'prog', prog.name).cata(
-        CompilationFailure,
-        lambda a: CompilationSuccess(prog.fun(*prog.args))
-    )
-
-
-@do(NS[PluginState[S, D, CC], Any])
+@do(NS[PluginState[S, D, CC], A])
 def transform_prog_state(st: NS[D, A], wrappers: ProgWrappers[A, B, D]) -> Do:
     yield st.zoom(lens.data).transform_s(wrappers.get, wrappers.put)
 
@@ -52,13 +39,12 @@ class interpret(Generic[A, B], Case[ProgOutputInterpreter[A, B], Prog[B]], alg=P
         return Prog.error(f'`interpret` not implemented for {i}')
 
 
-# FIXME recursive
-class eval_prog(Case[Prog, A], alg=Prog):
+class eval_prog(Case[Prog[A], NS[PluginState[S, D, CC], A]], alg=Prog):
 
     @do(NS[PluginState[S, D, CC], A])
-    def prog_exec(self, program: ProgExec[Any, A]) -> Do:
-        output = yield transform_prog_state(program.code, program.wrappers)
-        yield self(interpret(output)(program.interpreter))
+    def prog_exec(self, prog: ProgExec[Any, A]) -> Do:
+        output = yield transform_prog_state(prog.code, prog.wrappers)
+        yield self(interpret(output)(prog.interpreter))
 
     @do(NS[PluginState[S, D, CC], A])
     def prog_bind(self, prog: ProgBind[Any, A]) -> Do:
@@ -79,9 +65,9 @@ class eval_prog(Case[Prog, A], alg=Prog):
         yield NS.error(prog.msg)
 
 
-@do(NS)
+@do(NS[PluginState[S, D, CC], A])
 def run_prog(program: Prog[A], args: List[Any]) -> Do:
     yield eval_prog.match(bind_program(program, args))
 
 
-__all__ = ('compile_program',)
+__all__ = ('run_prog',)

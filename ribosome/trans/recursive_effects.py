@@ -5,10 +5,10 @@ from amino.tc.base import Implicits
 from amino.tc.functor import Functor
 from amino.dat import DatImplicitsMeta
 
-from ribosome.trans.effect import TransEffect
-from ribosome.compute.prog import Prog, Program
-from ribosome.trans.step import Lift, TransEffectError, TransStep
-from ribosome.trans.action import TransDo, TransIO
+# from ribosome.trans.effect import TransEffect
+from ribosome.compute.prog import Program
+# from ribosome.trans.step import Lift, TransEffectError, TransStep
+# from ribosome.trans.action import TransDo, TransIO
 from ribosome.process import Subprocess
 
 

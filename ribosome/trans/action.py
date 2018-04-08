@@ -1,110 +1,110 @@
-import abc
-from typing import TypeVar, Generic
-from logging import INFO, ERROR
+# import abc
+# from typing import TypeVar, Generic
+# from logging import INFO, ERROR
 
-from amino import List, Id
-from amino.state import StateT
-from amino.dat import ADT
-from amino.logging import LogError
+# from amino import List, Id
+# from amino.state import StateT
+# from amino.dat import ADT
+# from amino.logging import LogError
 
-from ribosome.compute.prog import Prog
+# from ribosome.compute.prog import Prog
 
-A = TypeVar('A')
-B = TypeVar('B')
-D = TypeVar('D')
-R = TypeVar('R')
-O = TypeVar('O')
-G = TypeVar('G')
-I = TypeVar('I')
-
-
-class TransAction(ADT['TransAction']):
-    pass
+# A = TypeVar('A')
+# B = TypeVar('B')
+# D = TypeVar('D')
+# R = TypeVar('R')
+# O = TypeVar('O')
+# G = TypeVar('G')
+# I = TypeVar('I')
 
 
-class Transit(Generic[D], TransAction):
-
-    def __init__(self, trans: StateT[Id, D, None]) -> None:
-        self.trans = trans
-
-    def _arg_desc(self) -> List[str]:
-        return List(str(self.trans))
+# class TransAction(ADT['TransAction']):
+#     pass
 
 
-class TransUnit(TransAction):
+# class Transit(Generic[D], TransAction):
 
-    def _arg_desc(self) -> List[str]:
-        return List()
+#     def __init__(self, trans: StateT[Id, D, None]) -> None:
+#         self.trans = trans
 
-
-class TransResult(Generic[A], TransAction):
-
-    def __init__(self, data: A) -> None:
-        self.data = data
+#     def _arg_desc(self) -> List[str]:
+#         return List(str(self.trans))
 
 
-class TransFailure(TransAction):
+# class TransUnit(TransAction):
 
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-    def _arg_desc(self) -> List[str]:
-        return List(self.message)
+#     def _arg_desc(self) -> List[str]:
+#         return List()
 
 
-class TransIO(Generic[I], TransAction):
+# class TransResult(Generic[A], TransAction):
 
-    def __init__(self, io: I) -> None:
-        self.io = io
-
-
-class TransDo(TransAction):
-
-    def __init__(self, action: Prog) -> None:
-        self.action = action
+#     def __init__(self, data: A) -> None:
+#         self.data = data
 
 
-class LogMessage(ADT['LogMessage']):
+# class TransFailure(TransAction):
 
-    def __init__(self, message: str) -> None:
-        self.message = message
+#     def __init__(self, message: str) -> None:
+#         self.message = message
 
-    @abc.abstractproperty
-    def level(self) -> int:
-        ...
-
-
-class Info(LogMessage):
-
-    @property
-    def level(self) -> int:
-        return INFO
+#     def _arg_desc(self) -> List[str]:
+#         return List(self.message)
 
 
-class Error(LogMessage, LogError):
+# class TransIO(Generic[I], TransAction):
 
-    def __init__(self, message: str, prefix: str='') -> None:
-        super().__init__(message)
-        self.prefix = prefix
-
-    @property
-    def level(self) -> int:
-        return ERROR
-
-    @property
-    def full(self) -> str:
-        pre = f'{self.prefix}: ' if self.prefix else ''
-        return f'{pre}{self.message}'
-
-    @property
-    def short(self) -> str:
-        return self.message
+#     def __init__(self, io: I) -> None:
+#         self.io = io
 
 
-class TransLog(TransAction):
+# class TransDo(TransAction):
 
-    def __init__(self, message: LogMessage) -> None:
-        self.message = message
+#     def __init__(self, action: Prog) -> None:
+#         self.action = action
 
 
-__all__ = ('TransAction', 'Transit', 'TransUnit', 'TransResult', 'TransFailure')
+# class LogMessage(ADT['LogMessage']):
+
+#     def __init__(self, message: str) -> None:
+#         self.message = message
+
+#     @abc.abstractproperty
+#     def level(self) -> int:
+#         ...
+
+
+# class Info(LogMessage):
+
+#     @property
+#     def level(self) -> int:
+#         return INFO
+
+
+# class Error(LogMessage, LogError):
+
+#     def __init__(self, message: str, prefix: str='') -> None:
+#         super().__init__(message)
+#         self.prefix = prefix
+
+#     @property
+#     def level(self) -> int:
+#         return ERROR
+
+#     @property
+#     def full(self) -> str:
+#         pre = f'{self.prefix}: ' if self.prefix else ''
+#         return f'{pre}{self.message}'
+
+#     @property
+#     def short(self) -> str:
+#         return self.message
+
+
+# class TransLog(TransAction):
+
+#     def __init__(self, message: LogMessage) -> None:
+#         self.message = message
+
+
+# __all__ = ('TransAction', 'Transit', 'TransUnit', 'TransResult', 'TransFailure')

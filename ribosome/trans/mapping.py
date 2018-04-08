@@ -2,7 +2,7 @@ from amino import do, curried, Do, __, _, Either
 from amino.lenses.lens import lens
 
 from ribosome.nvim.io.state import NS
-from ribosome.plugin_state import PluginState
+from ribosome.data.plugin_state import PluginState
 from ribosome.dispatch.mapping import Mapping, MapMode
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.compute.prog import Program

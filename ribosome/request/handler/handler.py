@@ -7,27 +7,26 @@ from amino.dat import ADT
 from amino.boolean import false
 
 from ribosome.request.rpc import RpcHandlerSpec
-from ribosome.logging import Logging
 from ribosome.request.handler.prefix import PrefixStyle, Short
 from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod, AutocmdMethod
-from ribosome.compute.prog import Program
 
 B = TypeVar('B')
 D = TypeVar('D')
+P = TypeVar('P')
 RHS = TypeVar('RHS', bound=RpcHandlerSpec)
 Meth = TypeVar('Meth', bound=RpcMethod)
 
 
-def program_rpc_options(program: Program) -> Map[str, str]:
+def program_rpc_options(program: P) -> Map[str, str]:
     return Map(nargs=program.params_spec.nargs.for_vim)
 
 
-class RequestHandler(Generic[Meth], ADT['RequestHandler'], Logging):
+class RequestHandler(Generic[Meth, P], ADT['RequestHandler[Meth, P]']):
 
     def __init__(
             self,
             method: Meth,
-            program: Program,
+            program: P,
             name: str,
             prefix: PrefixStyle,
             sync: Boolean,
@@ -43,20 +42,16 @@ class RequestHandler(Generic[Meth], ADT['RequestHandler'], Logging):
         self.extra_options = extra_options
 
     @staticmethod
-    def trans_cmd(prog: Program) -> 'RequestHandlerBuilder':
+    def trans_cmd(prog: P) -> 'RequestHandlerBuilder':
         return RequestHandlerBuilder(CmdMethod(), prog)
 
     @staticmethod
-    def trans_function(prog: Program) -> 'RequestHandlerBuilder':
+    def trans_function(prog: P) -> 'RequestHandlerBuilder':
         return RequestHandlerBuilder(FunctionMethod(), prog)
 
     @staticmethod
-    def trans_autocmd(prog: Program) -> 'RequestHandlerBuilder':
+    def trans_autocmd(prog: P) -> 'RequestHandlerBuilder':
         return RequestHandlerBuilder(AutocmdMethod(), prog)
-
-    @property
-    def allow_sync(self) -> Boolean:
-        return self.program.allow_sync
 
     @property
     def options(self) -> Map[str, Any]:
@@ -70,14 +65,14 @@ class RequestHandler(Generic[Meth], ADT['RequestHandler'], Logging):
         pre = name if self.prefix.full else prefix if self.prefix.short else ''
         return f'{camelcase(pre)}{camelcase(self.name)}'
 
-    def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
-        return RpcHandlerSpec.cons(self.method.spec_type, self.sync, self.vim_cmd_name(name, prefix), self.options,
-                                   self.method_str, True)
+#     def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
+#         return RpcHandlerSpec.cons(self.method.spec_type, self.sync, self.vim_cmd_name(name, prefix), self.options,
+#                                    self.method_str, True)
 
 
 class RequestHandlerBuilder(Generic[Meth]):
 
-    def __init__(self, method: Meth, program: Program) -> None:
+    def __init__(self, method: Meth, program: P) -> None:
         self.method = method
         self.program = program
 

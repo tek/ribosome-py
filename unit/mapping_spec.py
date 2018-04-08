@@ -14,7 +14,7 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.config import default_config_name
 from ribosome.test.integration.default import ExternalSpec
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.plugin_state import PluginState
+from ribosome.data.plugin_state import PluginState
 from ribosome.config.component import Component, ComponentData
 from ribosome.config.config import Config, NoData
 from ribosome.dispatch.mapping import Mappings, Mapping, mapmode

@@ -16,15 +16,19 @@ from ribosome.config.config import Config
 from ribosome.dispatch.execute import execute_request
 from ribosome.logging import ribo_log, nvim_logging
 from ribosome.nvim.api.data import NvimApi, NativeNvimApi
-from ribosome.plugin_state import PluginState, PluginStateHolder, DispatchConfig
+from ribosome.data.plugin_state import PluginState
 from ribosome.dispatch.update import init_rpc
 from ribosome.config.settings import Settings
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.variable import variable_set_prefixed
 from ribosome.nvim.io.api import N
+from ribosome.data.plugin_state_holder import PluginStateHolder
+from ribosome.nvim.io.state import NS
+from ribosome.config.component import ComponentConfig
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
+DIO = TypeVar('DIO')
 C = TypeVar('C', bound=Config)
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
@@ -42,16 +46,25 @@ def request_handler(vim: NvimApi, sync: bool, state: PluginStateHolder[D]) -> Ca
 
 
 @do(NvimIO[PluginState[S, D, CC]])
-def init_state(dispatch_config: DispatchConfig) -> Do:
-    data = dispatch_config.config.state()
+def init_state(config: Config, io_executor: Callable[[DIO], NS['PluginState[S, D, CC]', Any]]=None) -> Do:
+    data = config.basic.state_ctor()
     log_handler = yield N.delay(nvim_logging)
-    state = yield N.pure(PluginState.cons(dispatch_config, data, Nil, log_handler=Just(log_handler)))
+    state = PluginState.cons(
+        config.basic,
+        ComponentConfig(config.components),
+        config.request_handlers,
+        data,
+        Nil,
+        config.init,
+        log_handler=Just(log_handler),
+        io_executor=io_executor,
+    )
     yield init_rpc().run_s(state)
 
 
 @do(NvimIO[int])
-def run_session(session: Session, dispatch_config: DispatchConfig) -> Do:
-    state = yield init_state(dispatch_config)
+def run_session(session: Session, config: Config) -> Do:
+    state = yield init_state(config)
     holder = PluginStateHolder.concurrent(state)
     ribo_log.debug(f'running session')
     yield N.from_io(IO.delay(session._enqueue_notification, 'function:internal_init', ()))
@@ -70,17 +83,13 @@ def no_listen_address(err: Exception) -> None:
     raise Exception('could not connect to the vim server from within the host')
 
 
-def run_loop(session: Session, prefix: str, dispatch_config: DispatchConfig) -> int:
-    vim = NativeNvimApi(dispatch_config.name, Nvim.from_session(session)._session)
-    return run_session(session, dispatch_config).unsafe(vim)
+def run_loop(session: Session, config: Config) -> int:
+    vim = NativeNvimApi(config.basic.name, Nvim.from_session(session)._session)
+    return run_session(session, config).unsafe(vim)
 
 
 def session(*args: str, loop: Type[Loop]=UvEventLoop, transport_type: str='stdio', **kwargs: str) -> Session:
     return Session(AsyncSession(MsgpackStream(loop(transport_type, *args, **kwargs))))
-
-
-def start_host(prefix: str, dispatch_config: DispatchConfig) -> int:
-    return run_loop(session(), prefix, dispatch_config)
 
 
 def config_from_module(mod: ModuleType) -> Either[str, Type[C]]:
@@ -105,9 +114,13 @@ def nvim_log() -> Logger:
     return ribo_log
 
 
+def config(config: Config) -> Config:
+    return Config.cons(config.basic.name, config.state_ctor)
+
+
 def start_config_stage_2(config: Config) -> int:
-    amino_log.debug(f'starting plugin from {config.name}')
-    return start_host(config.name, DispatchConfig.cons(config))
+    amino_log.debug(f'starting plugin from {config.basic.name}')
+    return run_loop(session(), config)
 
 
 def error(msg: str) -> int:
