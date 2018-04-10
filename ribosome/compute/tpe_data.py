@@ -5,6 +5,7 @@ from amino import ADT
 from ribosome.data.plugin_state import PluginState
 from ribosome.config.resources import Resources
 from ribosome.config.component import ComponentData
+from ribosome.compute.ribosome import Ribosome
 
 C = TypeVar('C')
 CC = TypeVar('CC')
@@ -44,17 +45,25 @@ class ComponentProgType(Generic[M, C], AffiliationProgType[M, ComponentData[M, C
 
 
 class StateProgType(Generic[M, C, R], ADT['StateProgType[M, C, R]']):
+    pass
+
+
+class ResourcesStateProgType(Generic[M, C, S, D, CC], StateProgType[M, C, Resources[S, D, CC]]):
 
     def __init__(self, affiliation: AffiliationProgType[M, C]) -> None:
         self.affiliation = affiliation
 
 
-class ResourcesStateProgType(Generic[M, C, S, D, CC], StateProgType[M, C, Resources[S, D, CC]]):
-    pass
-
-
 class PlainStateProgType(Generic[M, C], StateProgType[M, C, C]):
-    pass
+
+    def __init__(self, affiliation: AffiliationProgType[M, C]) -> None:
+        self.affiliation = affiliation
+
+
+class RibosomeStateProgType(Generic[S, D, CC, C], StateProgType[PluginState[S, D, CC], C, Ribosome[S, D, CC, C]]):
+
+    def __init__(self, comp: Type[C]) -> None:
+        self.comp = comp
 
 
 class ProgType(Generic[M, C, R], ADT['ProgType[M, C, R]']):
@@ -73,4 +82,4 @@ class StateProg(Generic[M, C, R], ProgType[M, C, R]):
 
 __all__ = ('MainDataProgType', 'InternalMainDataProgType', 'PlainMainDataProgType', 'AffiliationProgType',
            'RootProgType', 'ComponentProgType', 'StateProgType', 'ResourcesStateProgType', 'PlainStateProgType',
-           'ProgType', 'UnknownProgType', 'StateProg')
+           'ProgType', 'UnknownProgType', 'StateProg', 'RibosomeProg')

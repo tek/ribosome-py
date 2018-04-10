@@ -1,23 +1,25 @@
 from typing import Iterable
 
-from amino import Lists, Either, do, Do, Maybe, Try, Right, Left
+from amino import Lists, Either, do, Do, Maybe, Right, Left
 
 from ribosome.config.resources import Resources
 from ribosome.config.component import ComponentData
 from ribosome.request.args import ParamsSpec
 from ribosome.data.plugin_state import PluginState
 from ribosome.compute.tpe_data import (MainDataProgType, InternalMainDataProgType, PlainMainDataProgType,
-                                     ComponentProgType, AffiliationProgType, PlainStateProgType,
-                                     ResourcesStateProgType, StateProg, ProgType, UnknownProgType, RootProgType)
+                                       ComponentProgType, AffiliationProgType, PlainStateProgType,
+                                       ResourcesStateProgType, StateProg, ProgType, UnknownProgType, RootProgType,
+                                       RibosomeStateProgType)
+from ribosome.compute.ribosome import Ribosome
 
 
 @do(Either[str, type])
 def type_arg(tpe: type, index: int) -> Do:
     def error() -> str:
-        return f'invalid trans type: {tpe} has no type args'
+        return f'{tpe} has no type args'
     raw = yield Maybe.getattr(tpe, '__args__').to_either_f(error)
     types = yield Right(Lists.wrap(raw)) if isinstance(raw, Iterable) else Left(error())
-    yield types.lift(index).to_either_f(lambda: f'invalid trans type: {tpe} has less than {index + 1} args')
+    yield types.lift(index).to_either_f(lambda: f'{tpe} has less than {index + 1} args')
 
 
 def first_type_arg(tpe: type) -> Either[str, type]:
@@ -61,22 +63,30 @@ def resources_trans(resources_type: type) -> Do:
     return ResourcesStateProgType(affiliation)
 
 
-# TODO `Reader`
+@do(Either[str, RibosomeStateProgType])
+def ribosome_trans(resources_type: type) -> Do:
+    tpe = yield type_arg(resources_type, 3)
+    return RibosomeStateProgType(tpe)
+
+
 @do(Either[str, StateProg])
 def state_trans(state_type: type) -> Do:
     state_trans_type = yield (
         resources_trans(state_type)
         if issubclass(state_type, Resources) else
+        ribosome_trans(state_type)
+        if issubclass(state_type, Ribosome) else
         plain_trans(state_type)
     )
     return StateProg(state_trans_type)
 
 
-def analyse_trans_tpe(params: ParamsSpec) -> Either[str, ProgType]:
+# TODO types
+def analyse_prog_tpe(params: ParamsSpec) -> Either[str, ProgType]:
     return params.state_type.cata(
         state_trans,
         lambda: Right(UnknownProgType())
     )
 
 
-__all__ = ('analyse_trans_tpe')
+__all__ = ('analyse_prog_tpe')

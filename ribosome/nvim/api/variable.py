@@ -35,6 +35,14 @@ def variable(name: str, cons: Callable[[Any], Either[str, A]]) -> Do:
     return value
 
 
+def variable_str(name: str) -> NvimIO[Either[str, str]]:
+    return variable(name, cons_decode_str)
+
+
+def variable_num(name: str) -> NvimIO[Either[str, Number]]:
+    return variable(name, cons_checked_e(Number, I))
+
+
 @do(NvimIO[Either[str, A]])
 def variable_prefixed(name: str, cons: Callable[[Any], Either[str, A]]) -> Do:
     plug = yield plugin_name()
@@ -64,4 +72,5 @@ def buffer_var_raw(buffer: Buffer, name: str) -> NvimIO[Any]:
 
 
 __all__ = ('variable_raw', 'variable_prefixed_raw', 'variable', 'variable_prefixed', 'variable_prefixed_str',
-           'variable_prefixed_num', 'variable_set', 'variable_set_prefixed', 'buffer_var_raw')
+           'variable_prefixed_num', 'variable_set', 'variable_set_prefixed', 'buffer_var_raw', 'variable_str',
+           'variable_num')

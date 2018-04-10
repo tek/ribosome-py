@@ -1,12 +1,13 @@
-from kallikrein import Expectation, k
+from kallikrein import Expectation
+from kallikrein.matchers import contain
 
-from ribosome.nvim.api.variable import variable_set
+from ribosome.nvim.api.variable import variable_set, variable_num
 
 from amino import do, Do
-from ribosome.nvim.api.command import command_once_defined
 from ribosome.test.integration.default import ExternalSpec
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.integration.run import DispatchHelper
+from ribosome.test.klk import kn
 
 from integration._support.settings import config
 
@@ -29,8 +30,8 @@ class SettingsSpec(ExternalSpec):
         @do(NvimIO[None])
         def run() -> Do:
             s = yield helper.run_s('command:check', args=())
-        result = run().unsafe(self.vim)
-        return k(1) == 1
+            yield variable_num('counter')
+        return kn(helper.vim, run).must(contain(21))
 
 
 __all__ = ('SettingsSpec',)

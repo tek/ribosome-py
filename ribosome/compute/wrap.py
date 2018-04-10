@@ -2,15 +2,20 @@ from typing import TypeVar, Type, Generic, Callable, Any
 
 from amino.case import Case
 
+from lenses import UnboundLens  # type: ignore
+from amino import Left, Right
+from amino.lenses.lens import lens
+
 from ribosome.data.plugin_state import PluginState
 from ribosome.config.component import ComponentData
 from ribosome.compute.tpe_data import (ProgType, UnknownProgType, StateProgType, AffiliationProgType, RootProgType,
                                        ComponentProgType, MainDataProgType, PlainMainDataProgType,
-                                       InternalMainDataProgType, StateProg, ResourcesStateProgType,
-                                       PlainStateProgType)
+                                       InternalMainDataProgType, StateProg, ResourcesStateProgType, PlainStateProgType,
+                                       RibosomeStateProgType)
 from ribosome.config.settings import Settings
 from ribosome.config.resources import Resources
 from ribosome.compute.wrap_data import ProgWrappers
+from ribosome.compute.ribosome import Ribosome
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -19,7 +24,7 @@ R = TypeVar('R')
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 C = TypeVar('C')
-PS = PluginState[S, D, CC]
+PS = PluginState[S, D, CC]  # type: ignore
 
 
 class zoom_main_data(
@@ -86,6 +91,18 @@ class unwrap_affiliation(
         return unwrap
 
 
+def comp_get(ribo: Ribosome[S, D, CC, C]) -> C:
+    return ribo.state.data_by_type(ribo.comp_type)
+
+
+def comp_set(ribo: Ribosome[S, D, CC, C], comp: C) -> Ribosome[S, D, CC, C]:
+    return ribo.mod.state(lambda ps: ps.update_component_data(ribo.comp_type, comp))
+
+
+def ribosome_comp_lens(tpe: Type[C]) -> UnboundLens[Ribosome[S, D, CC, C], Ribosome[S, D, CC, C], C, C]:
+    return lens.Lens(comp_get, comp_set)
+
+
 class wrap_resources(
         Generic[C, S, D, CC, M, R],
         Case[StateProgType[M, C, R], Callable[[PluginState[S, D, CC]], R]],
@@ -99,6 +116,12 @@ class wrap_resources(
 
     def plain_state_prog_type(self, tpe: PlainStateProgType[M, C]) -> Callable[[PS], C]:
         return wrap_affiliation.match(tpe.affiliation)
+
+    def wrap_ribosome(self, tpe: RibosomeStateProgType[S, D, CC, C]) -> Callable[[PS], Ribosome[S, D, CC, C]]:
+        comp_lens = ribosome_comp_lens(tpe.comp)
+        def wrap(ps: PS) -> Ribosome[S, D, CC, C]:
+            return Ribosome(ps, tpe.comp, comp_lens)
+        return wrap
 
 
 class unwrap_resources(
@@ -117,6 +140,11 @@ class unwrap_resources(
     def plain_state_prog_type(self, tpe: PlainStateProgType[M, C]) -> Callable[[PS, R], PS]:
         return unwrap_affiliation.match(tpe.affiliation)
 
+    def unwrap_ribosome(self, tpe: RibosomeStateProgType[S, D, CC, C]) -> Callable[[PS, Ribosome[S, D, CC, C]], PS]:
+        def wrap(ps: PS, ribo: Ribosome[S, D, CC, C]) -> PS:
+            return ribo.state
+        return wrap
+
 
 class prog_wrappers(
         Generic[M, C, R, S, D, CC],
@@ -125,10 +153,10 @@ class prog_wrappers(
 ):
 
     def unknown_prog_type(self, tpe: UnknownProgType[M, C]) -> ProgWrappers[PS, R]:
-        raise Exception('unknown prog type')
+        raise Left('not an `NvimIOState`')
 
     def state_prog(self, tpe: StateProg[M, C, R]) -> ProgWrappers[PS, R]:
-        return ProgWrappers(wrap_resources.match(tpe.tpe), unwrap_resources.match(tpe.tpe))
+        return Right(ProgWrappers(wrap_resources.match(tpe.tpe), unwrap_resources.match(tpe.tpe)))
 
 
 __all__ = ('prog_wrappers',)

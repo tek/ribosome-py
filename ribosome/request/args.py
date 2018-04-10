@@ -47,7 +47,7 @@ class ParamsSpec(Dat['ParamsSpec']):
             method: Boolean,
             types: List[type],
             rettype: type,
-            state_type: type,
+            state_type: Maybe[type],
     ) -> None:
         self.nargs = nargs
         self.min = min

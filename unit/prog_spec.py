@@ -23,6 +23,8 @@ from ribosome.compute.run import run_prog
 from ribosome.test.klk import kn
 from ribosome.compute.prog import Program, Prog
 from ribosome.config.resources import Resources
+from ribosome.compute.ribosome import Ribosome
+from ribosome.compute.ribosome_api import Ribo
 
 A = TypeVar('A')
 
@@ -168,12 +170,20 @@ def run(t: Program) -> A:
     return kn(helper.vim, lambda: run_prog(t, Nil).run(helper.state))
 
 
+@prog.result
+@do(NS[Ribosome[Settings, CoreData, Compon, ExtraData], int])
+def rib() -> Do:
+    yield Ribo.modify_comp(__.set.y(954))
+    yield Ribo.comp()
+
+
 class ProgSpec(SpecBase):
     '''
     nest several trans $nest
     fail on error $error
     component with resources $comp_res
     root without extras $root
+    rib $rib
     '''
 
     def nest(self) -> Expectation:
@@ -189,6 +199,9 @@ class ProgSpec(SpecBase):
 
     def root(self) -> Expectation:
         return run_a(root).must(contain(13))
+
+    def rib(self) -> Expectation:
+        return run_a(rib).must(contain(ExtraData.cons(954)))
 
 
 __all__ = ('ProgSpec',)

@@ -6,7 +6,8 @@ from ribosome.config.config import Config, NoData
 from ribosome.nvim.io.state import NS
 from ribosome.config.settings import Settings, int_setting
 from ribosome.config.component import NoComponentData
-from ribosome.config.resources import Resources
+from ribosome.compute.ribosome import Ribosome
+from ribosome.compute.ribosome_api import Ribo
 
 
 class PlugSettings(Settings):
@@ -18,11 +19,11 @@ class PlugSettings(Settings):
 
 
 @prog.unit
-@do(NS[Resources[Settings, NoData, NoComponentData], None])
+@do(NS[Ribosome[Settings, NoData, NoComponentData, NoData], None])
 def check() -> Do:
-    counter = yield NS.inspect_f(_.settings.counter.value_or_default)
-    inc = yield NS.inspect_f(_.settings.inc.value_or_default)
-    yield NS.inspect_f(__.settings.counter.update(counter + inc))
+    counter = yield Ribo.setting(_.counter)
+    inc = yield Ribo.setting(_.inc)
+    yield NS.inspect_f(__.state.basic.settings.counter.update(counter + inc))
 
 
 config: Config = Config.cons(
