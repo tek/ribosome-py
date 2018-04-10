@@ -3,11 +3,11 @@ from amino.lenses.lens import lens
 
 from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PluginState
-from ribosome.dispatch.mapping import Mapping, MapMode
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.compute.prog import Program
 from ribosome.config.component import Components
 from ribosome.nvim.api.command import nvim_command
+from ribosome.data.mapping import Mapping, MapMode
 
 
 def mapping_handler(mapping: Mapping, components: Components) -> Either[str, Program]:

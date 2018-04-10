@@ -13,11 +13,10 @@ from amino.do import do, Do
 from amino.mod import instance_from_module
 
 from ribosome.config.config import Config
-from ribosome.dispatch.execute import execute_request
+from ribosome.request.execute import execute_request
 from ribosome.logging import ribo_log, nvim_logging
 from ribosome.nvim.api.data import NvimApi, NativeNvimApi
 from ribosome.data.plugin_state import PluginState
-from ribosome.dispatch.update import init_rpc
 from ribosome.config.settings import Settings
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.variable import variable_set_prefixed
@@ -25,6 +24,7 @@ from ribosome.nvim.io.api import N
 from ribosome.data.plugin_state_holder import PluginStateHolder
 from ribosome.nvim.io.state import NS
 from ribosome.config.component import ComponentConfig
+from ribosome.components.internal.update import init_rpc
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')

@@ -1,7 +1,7 @@
 from kallikrein import k, Expectation
 from kallikrein.matchers.maybe import be_just
 
-from ribosome.test.integration.run import DispatchHelper
+from ribosome.test.integration.run import RequestHelper
 from ribosome.config.component import Component
 from ribosome.config.config import Config
 
@@ -66,21 +66,21 @@ class UpdateStateSpec(SpecBase):
     '''
 
     def scalar(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         new = 'new'
         data = dump_json(dict(patch=dict(query='d.d', data=dict(a=new)))).get_or_raise()
         r = helper.unsafe_run_s('command:update_state', args=data.split(' '))
         return k(r.data.d) == D1(D2(new, items))
 
     def list(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         new = 21
         data = dump_json(dict(patch=dict(query='d.d.items(name=second)', data=dict(value=new)))).get_or_raise()
         r = helper.unsafe_run_s('command:update_state', args=data.split(' '))
         return k(r.data.d) == D1(D2('value', List(Item('first', 4), Item('second', new))))
 
     def component(self) -> Expectation:
-        helper = DispatchHelper.strict(config, 'c1').mod.state(__.update_component_data('c1', C1Data.cons()))
+        helper = RequestHelper.strict(config, 'c1').mod.state(__.update_component_data('c1', C1Data.cons()))
         new = 'new'
         data = dump_json(dict(patch=dict(query='d.d', data=dict(a=new)))).get_or_raise()
         r = helper.unsafe_run_s('command:update_component_state', args=['c1'] + data.split(' '))

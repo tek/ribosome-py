@@ -11,9 +11,9 @@ from ribosome.compute.api import prog
 from ribosome.data.plugin_state import PluginState
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.nvim.io.state import NS
-from ribosome.test.integration.run import DispatchHelper
+from ribosome.test.integration.run import RequestHelper
 from ribosome.config.config import Config
-from ribosome.dispatch.execute import execute_request
+from ribosome.request.execute import execute_request
 from ribosome.config.settings import Settings
 from ribosome.nvim.io.api import N
 
@@ -100,39 +100,39 @@ class DispatchSpec(SpecBase):
     '''
 
     def trans_free(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         result = helper.unsafe_run_a('command:trfree', args=('x',))
         return k(result) == 8
 
     @pending
     def io(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         result = helper.unsafe_run_a('command:trio')
         return k(result) == 5
 
     def internal(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         state, result = helper.unsafe_run('function:int')
         return k(result) == state.basic.name
 
     def data(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         state = helper.unsafe_run_s('function:dat')
         return k(state.data.counter) == 23
 
     def json(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
         result = helper.unsafe_run_a('command:json', args=(7, 'one', *Lists.split(js, ' ')))
         return k(result) == 9
 
     def autocmd(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         state = helper.unsafe_run_s('autocmd:vim_enter')
         return k(state.data.counter) == 19
 
     def error(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         result = execute_request(helper.vim, helper.holder, 'command:error', (), True)
         return k(result) == 1
 

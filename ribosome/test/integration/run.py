@@ -4,9 +4,8 @@ from amino import Lists, Map, List, __, Either, Left, Right, do, Do, Nil
 from amino.dat import Dat
 from amino.lenses.lens import lens
 
-# from ribosome.dispatch.data import DIO
 from ribosome.host import init_state
-from ribosome.dispatch.execute import dispatch_job, traverse_programs, run_request_handler
+from ribosome.request.execute import request_job, traverse_programs, run_request_handler
 from ribosome.nvim.io.state import NvimIOState, NS
 from ribosome.config.config import Config
 from ribosome.config.settings import Settings
@@ -16,7 +15,7 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.data.plugin_state import PluginState
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.io.api import N
-from ribosome.dispatch.job import DispatchJob
+from ribosome.request.job import RequestJob
 from ribosome.compute.prog import Program
 from ribosome.config.resources import Resources
 from ribosome.data.plugin_state_holder import PluginStateHolder
@@ -71,7 +70,7 @@ class StrictRequestHandler:
         )
 
 
-class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
+class RequestHelper(Generic[S, D, CC], Dat['RequestHelper']):
 
     @staticmethod
     def create(
@@ -80,11 +79,11 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
             vars: Map[str, Any]=Map(),
             cons_vim: Callable[[dict], NvimApi],
             io_executor: IOExec=None,
-    ) -> 'DispatchHelper':
+    ) -> 'RequestHelper':
         comps_var = Map({f'{config.basic.name}_components': Lists.wrap(comps)})
         vim = cons_vim(vars ** comps_var)
         vim1, state = init_state(config, io_executor=io_executor).unsafe_run(vim)
-        return DispatchHelper(vim, config, state)
+        return RequestHelper(vim, config, state)
 
     @staticmethod
     def nvim(
@@ -93,12 +92,12 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
             *comps: str,
             vars: dict=dict(),
             io_executor: IOExec=None,
-    ) -> 'DispatchHelper':
+    ) -> 'RequestHelper':
         def cons_vim(vars: dict) -> NvimApi:
             for k, v in vars.items():
                 variable_set(k, v).unsafe(vim)
             return vim
-        return DispatchHelper.create(config, *comps, vars=Map(vars), cons_vim=cons_vim, io_executor=io_executor)
+        return RequestHelper.create(config, *comps, vars=Map(vars), cons_vim=cons_vim, io_executor=io_executor)
 
     @staticmethod
     def strict(
@@ -107,9 +106,9 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
             vars: Map[str, Any]=Map(),
             request_handler: StrictNvimHandler=lambda v, n, a: Left(f'no handler for {n}'),
             io_executor: Callable[[DIO], NS[PluginState[S, D, CC], Any]]=None,
-    ) -> 'DispatchHelper':
+    ) -> 'RequestHelper':
         cons_vim = lambda vs: StrictNvimApi(config.basic.name, vs, StrictRequestHandler(request_handler), Nil)
-        return DispatchHelper.create(config, *comps, vars=vars, cons_vim=cons_vim, io_executor=io_executor)
+        return RequestHelper.create(config, *comps, vars=vars, cons_vim=cons_vim, io_executor=io_executor)
 
     def __init__(self, vim: NvimApi, config: Config, state: PluginState[S, D, CC]) -> None:
         self.vim = vim
@@ -124,19 +123,19 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
     def settings(self) -> S:
         return self.state.settings
 
-    def dispatch_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[DispatchJob, List[Program]]:
-        job = dispatch_job(self.holder, name, (args,), sync)
-        return job, job.state.state.programs.lift(job.name).get_or_fail(f'no matching dispatch for `{job.name}`')
+    def request_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[RequestJob, List[Program]]:
+        job = request_job(self.holder, name, (args,), sync)
+        return job, job.state.state.programs.lift(job.name).get_or_fail(f'no matching program for `{job.name}`')
 
     def traverse_programs(self, name: str, args: tuple=(), sync: bool=True) -> NvimIOState[PluginState[S, D, CC], Any]:
-        job, dispatch = self.dispatch_job(name, args, sync)
-        return traverse_programs(dispatch, Lists.wrap(args))
+        job, program = self.request_job(name, args, sync)
+        return traverse_programs(program, Lists.wrap(args))
 
     def run(self, name: str, args=(), sync: bool=True) -> NvimIO[Tuple[PluginState, Any]]:
-        job, dispatches = self.dispatch_job(name, args, sync)
-        dispatch = dispatches.head.get_or_fail('multiple dispatches')
+        job, programs = self.request_job(name, args, sync)
+        program = programs.head.get_or_fail('multiple programs')
         return (
-            run_request_handler(dispatch, Lists.wrap(args))
+            run_request_handler(program, Lists.wrap(args))
             .run(self.state)
         )
 
@@ -155,10 +154,10 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
     def unsafe_run_a(self, name: str, args=(), sync: bool=True) -> Any:
         return self.run_a(name, args=args, sync=sync).unsafe(self.vim)
 
-    def update_data(self, **kw: Any) -> 'DispatchHelper[S, D, CC]':
+    def update_data(self, **kw: Any) -> 'RequestHelper[S, D, CC]':
         return lens.state.data.modify(__.copy(**kw))(self)
 
-    def update_component(self, name: str, **kw: Any) -> 'DispatchHelper[S, D, CC]':
+    def update_component(self, name: str, **kw: Any) -> 'RequestHelper[S, D, CC]':
         return self.mod.state(__.modify_component_data(name, __.copy(**kw)))
 
     def component_res(self, data: C) -> Resources[S, C, CC]:
@@ -169,13 +168,13 @@ class DispatchHelper(Generic[S, D, CC], Dat['DispatchHelper']):
         return self.state.resources_with(ComponentData(self.state.data, data))
 
 
-def dispatch_helper(
+def request_helper(
         config: Config[S, D, CC],
         *comps: str,
         vars: dict=dict(),
         io_executor: IOExec=None,
-) -> NvimIO[DispatchHelper[S, D, CC]]:
-    return N.delay(lambda v: DispatchHelper.nvim(config, v, *comps, vars=vars, io_executor=io_executor))
+) -> NvimIO[RequestHelper[S, D, CC]]:
+    return N.delay(lambda v: RequestHelper.nvim(config, v, *comps, vars=vars, io_executor=io_executor))
 
 
-__all__ = ('DispatchHelper', 'dispatch_helper')
+__all__ = ('DispatchHelper', 'request_helper')

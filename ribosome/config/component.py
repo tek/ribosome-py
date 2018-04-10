@@ -4,8 +4,8 @@ from amino import List, Either, _, Nil, Maybe, Boolean, __, Map
 from amino.dat import Dat
 
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
-from ribosome.dispatch.mapping import Mappings
 from ribosome.nvim.io.state import NS
+from ribosome.data.mapping import Mappings
 
 # FIXME typevar P is temporary
 D = TypeVar('D')

@@ -2,27 +2,24 @@ import sys
 from typing import TypeVar, Any, Iterable
 from uuid import UUID
 
-from amino.state import EitherState
-
 from lenses import UnboundLens
-from amino import do, Do, __, Either, _, List, Map, Maybe, Lists, Just, Regex, L, IO, Nil, Try
+
+from amino.state import EitherState
+from amino import do, Do, __, Either, _, Map, Maybe, Lists, Just, Regex, L, IO, Try
 from amino.json import dump_json
-from amino.boolean import true, false
 from amino.dat import Dat
 from amino.lenses.lens import lens
 from amino.regex import Match
 
 from ribosome.compute.api import prog
 from ribosome.data.plugin_state import PluginState
-from ribosome.request.handler.handler import RequestHandler
-from ribosome.request.handler.prefix import Full
 from ribosome.nvim.io.state import NS
-from ribosome.config.component import Component, ComponentData
+from ribosome.config.component import ComponentData
 from ribosome.config.settings import Settings
-from ribosome.dispatch.update import undef_handlers, def_handlers
 from ribosome.compute.prog import Program, Prog
 from ribosome.util.setting import setting
 from ribosome.config.basic_config import NoData
+from ribosome.components.internal.update import undef_handlers, def_handlers
 
 D = TypeVar('D')
 S = TypeVar('S', bound=Settings)
@@ -186,39 +183,4 @@ def internal_init() -> Do:
         yield handler | Prog.unit
 
 
-message_log_handler = RequestHandler.trans_function(message_log)(prefix=Full(), sync=true)
-trans_log_handler = RequestHandler.trans_function(trans_log)(prefix=Full(), sync=true)
-set_log_level_handler = RequestHandler.trans_function(set_log_level)(prefix=Full())
-update_state_handler = RequestHandler.trans_cmd(update_state)(json=true)
-update_component_state_handler = RequestHandler.trans_cmd(update_component_state)(json=true)
-state_handler = RequestHandler.trans_function(state_data)(name='state', sync=true, prefix=Full())
-rpc_handlers_handler = RequestHandler.trans_function(rpc_handlers)(internal=true, sync=true, prefix=Full())
-poll_handler = RequestHandler.trans_cmd(poll)(prefix=Full())
-append_python_path_handler = RequestHandler.trans_function(append_python_path)(prefix=Full())
-show_python_path_handler = RequestHandler.trans_function(show_python_path)(prefix=Full())
-enable_components_handler = RequestHandler.trans_cmd(enable_components)(prefix=Full())
-map_handler = RequestHandler.trans_function(mapping)(name='map', prefix=Full())
-internal_init_handler = RequestHandler.trans_function(internal_init)(prefix=Full())
-
-
-internal = Component.cons(
-    'internal',
-    request_handlers=List(
-        message_log_handler,
-        trans_log_handler,
-        set_log_level_handler,
-        update_state_handler,
-        update_component_state_handler,
-        state_handler,
-        rpc_handlers_handler,
-        poll_handler,
-        append_python_path_handler,
-        show_python_path_handler,
-        enable_components_handler,
-        map_handler,
-        internal_init_handler,
-    ),
-)
-
-
-__all__ = ('internal',)
+__all__ = ()

@@ -12,7 +12,7 @@ from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.config.component import Component
 from ribosome.compute.prog import Program
 from ribosome.config.basic_config import NoData, BasicConfig
-from ribosome.trans.internal import internal
+from ribosome.components.internal.config import internal
 
 A = TypeVar('A')
 D = TypeVar('D')

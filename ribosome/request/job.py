@@ -9,7 +9,7 @@ from ribosome.data.plugin_state_holder import PluginStateHolder
 D = TypeVar('D')
 
 
-class DispatchJob(Generic[D], Dat['DispatchJob']):
+class RequestJob(Generic[D], Dat['RequestJob']):
 
     def __init__(
             self,
@@ -42,4 +42,4 @@ class DispatchJob(Generic[D], Dat['DispatchJob']):
         return self.state.state.programs
 
 
-__all__ = ('DispatchJob',)
+__all__ = ('RequestJob',)

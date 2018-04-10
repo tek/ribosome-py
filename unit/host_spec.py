@@ -8,7 +8,7 @@ from amino.state import State
 from amino.lenses.lens import lens
 from amino.dat import Dat
 
-from ribosome.test.integration.run import DispatchHelper
+from ribosome.test.integration.run import RequestHelper
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.api import prog
 from ribosome.config.component import Component, ComponentData
@@ -66,14 +66,14 @@ class HostSpec(SpecBase):
     '''
 
     def multi(self) -> Expectation:
-        helper = DispatchHelper.strict(config, 'extra')
+        helper = RequestHelper.strict(config, 'extra')
         holder = helper.holder
         as_handler = request_handler(helper.vim, False, holder)
         as_handler('function:core_fun', ((1,),))
         return k(holder.state.data.counter) == 4
 
     def sync_force(self) -> Expectation:
-        helper = DispatchHelper.strict(config, 'extra')
+        helper = RequestHelper.strict(config, 'extra')
         holder = helper.holder
         as_handler = request_handler(helper.vim, False, holder)
         as_handler('sync:function:core_fun', ((1,),))

@@ -6,7 +6,7 @@ from ribosome.nvim.api.variable import variable_set, variable_num
 from amino import do, Do
 from ribosome.test.integration.default import ExternalSpec
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.test.integration.run import DispatchHelper
+from ribosome.test.integration.run import RequestHelper
 from ribosome.test.klk import kn
 
 from integration._support.settings import config
@@ -26,7 +26,7 @@ class SettingsSpec(ExternalSpec):
         variable_set('inc', 14).unsafe(self.vim)
 
     def update(self) -> Expectation:
-        helper = DispatchHelper.nvim(config, self.vim)
+        helper = RequestHelper.nvim(config, self.vim)
         @do(NvimIO[None])
         def run() -> Do:
             s = yield helper.run_s('command:check', args=())

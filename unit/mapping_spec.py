@@ -9,7 +9,7 @@ from amino.lenses.lens import lens
 
 from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
-from ribosome.test.integration.run import DispatchHelper
+from ribosome.test.integration.run import RequestHelper
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.config import default_config_name
 from ribosome.test.integration.default import ExternalSpec
@@ -17,10 +17,10 @@ from ribosome.request.handler.handler import RequestHandler
 from ribosome.data.plugin_state import PluginState
 from ribosome.config.component import Component, ComponentData
 from ribosome.config.config import Config, NoData
-from ribosome.dispatch.mapping import Mappings, Mapping, mapmode
-from ribosome.trans.mapping import activate_mapping
 from ribosome.nvim.api.command import nvim_command_output
 from ribosome.config.settings import Settings
+from ribosome.data.mapping import Mappings, Mapping, mapmode
+from ribosome.components.internal.mapping import activate_mapping
 
 keys = 'gs'
 gs_mapping = Mapping.cons('gs', true, List(mapmode.Normal(), mapmode.Visual()))
@@ -73,7 +73,7 @@ class MappingSpec(ExternalSpec):
     '''
 
     def buffer(self) -> Expectation:
-        helper = DispatchHelper.nvim(config, self.vim, 'main')
+        helper = RequestHelper.nvim(config, self.vim, 'main')
         @do(NvimIO[None])
         def run() -> Do:
             s = yield helper.run_s('function:setup_map', args=())

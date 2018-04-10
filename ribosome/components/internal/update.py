@@ -6,7 +6,7 @@ from amino.state import EitherState
 
 from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PluginState, Programs, handler_spec
-from ribosome.dispatch.resolve import ComponentResolver
+from ribosome.config.resolve import ComponentResolver
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.component import Components, Component
 from ribosome.request.rpc import define_handlers, RpcHandlerSpec
@@ -22,12 +22,12 @@ P = TypeVar('P')
 S = TypeVar('S', bound=Settings)
 
 
-def request_handlers_dispatches(handlers: RequestHandlers) -> List[Program]:
+def request_handlers_programs(handlers: RequestHandlers) -> List[Program]:
     return handlers.handlers.v
 
 
-def component_dispatches(component: Component) -> List[Program]:
-    return request_handlers_dispatches(component.request_handlers)
+def component_programs(component: Component) -> List[Program]:
+    return request_handlers_programs(component.request_handlers)
 
 
 def rpc_method(name: str, prefix: str) -> str:
@@ -36,12 +36,12 @@ def rpc_method(name: str, prefix: str) -> str:
     return rpc_method
 
 
-def dispatches(state: PluginState[S, D, CC]) -> Programs:
-    cfg_dispatches = request_handlers_dispatches(state.request_handlers)
-    compo_dispatches = state.components.all // component_dispatches
-    dispatch = compo_dispatches + cfg_dispatches
+def programs(state: PluginState[S, D, CC]) -> Programs:
+    cfg_programs = request_handlers_programs(state.request_handlers)
+    compo_programs = state.components.all // component_programs
+    programs = compo_programs + cfg_programs
     method = rpc_method(state.basic.name, state.basic.prefix)
-    return dispatch.group_by(method)
+    return programs.group_by(method)
 
 
 @do(EitherState[PluginState[S, D, CC], None])
@@ -53,16 +53,16 @@ def update_components(from_user: Either[str, List[str]]) -> Do:
     resolver = ComponentResolver(name, components_map, core_components, default_components, from_user)
     components = yield EitherState.lift(resolver.run())
     yield EitherState.modify(__.copy(components=Components.cons(components)))
-    dispatch = yield EitherState.inspect(dispatches)
-    yield EitherState.modify(lens.programs.set(dispatch))
+    progs = yield EitherState.inspect(programs)
+    yield EitherState.modify(lens.programs.set(progs))
 
 
+# TODO finish
 @do(NS[PluginState[S, D, CC], None])
 def undef_handler(handler: RpcHandlerSpec) -> Do:
     yield NS.unit
 
 
-# TODO finish
 @do(NS[PluginState[S, D, CC], None])
 def undef_handlers() -> Do:
     handlers = yield NS.inspect(_.rpc_handlers)
@@ -84,4 +84,4 @@ def init_rpc() -> Do:
     yield def_handlers()
 
 
-__all__ = ('init_rpc', 'undef_handlers', 'def_handlers', 'dispatches')
+__all__ = ('init_rpc', 'undef_handlers', 'def_handlers', 'programs')

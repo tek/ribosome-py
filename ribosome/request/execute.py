@@ -22,7 +22,7 @@ from ribosome.config.settings import Settings
 from ribosome import NvimApi
 from ribosome.nvim.io.data import NResult, NSuccess, NError, NFatal
 from ribosome.nvim.io.api import N
-from ribosome.dispatch.job import DispatchJob
+from ribosome.request.job import RequestJob
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.request.args import ParamsSpec
 from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
@@ -74,57 +74,13 @@ def gather_ios(ios: List[IO[A]], timeout: float) -> List[Either[IOException, A]]
 #         return NS.lift(io.io)
 
 
-@do(NS[PluginState[S, D, CC], R])
-def run_trans_f(handler: Program) -> Do:
-    yield plugin_to_dispatch(log_trans(handler))
-    result = yield run_program(aff, handler, Nil)
-    yield execute_dispatch_output.match(result)
-
-
-# class dispatch_log(Case, alg=LogMessage):
+# class program_log(Case, alg=LogMessage):
 
 #     def info(self, msg: Info) -> NS[D, None]:
 #         return NS.delay(lambda v: ribo_log.info(msg.message))
 
 #     def error(self, msg: Error) -> NS[D, None]:
 #         return NS.delay(lambda v: ribo_log.error(msg))
-
-
-# class execute_dispatch_output(Case, alg=DispatchOutput):
-
-#     def dispatch_error(self, result: DispatchError) -> NS[PluginState[S, D, CC], R]:
-#         io = result.exception / N.exception | N.error(result.message)
-#         return NS.lift(io)
-
-#     def dispatch_errors(self, result: DispatchErrors) -> NS[PluginState[S, D, CC], R]:
-#         return result.errors.traverse(self.dispatch_error, NS)
-
-#     def dispatch_return(self, result: DispatchReturn) -> NS[PluginState[S, D, CC], R]:
-#         return NS.pure(result.value)
-
-#     def dispatch_unit(self, result: DispatchUnit) -> NS[PluginState[S, D, CC], R]:
-#         return NS.pure(0)
-
-#     @do(NS[PluginState[S, D, CC], R])
-#     def dispatch_io(self, result: DispatchIO) -> Do:
-#         custom_executor = yield NS.inspect(_.state.io_executor)
-#         executor = custom_executor | (lambda: execute_io.match)
-#         io_result = yield executor(result.io)
-#         yield eval_trans.match(result.io.handle_result(io_result))
-
-#     @do(NS[PluginState[S, D, CC], R])
-#     def dispatch_output_aggregate(self, result: DispatchOutputAggregate) -> Do:
-#         yield result.results.traverse(execute_dispatch_output.match, NS)
-
-#     @do(NS[PluginState[S, D, CC], R])
-#     def dispatch_do(self, result: DispatchDo) -> Do:
-#         yield eval_trans.match(result.trans.action)
-
-#     @do(NS[PluginState[S, D, CC], R])
-#     def dispatch_log(self, result: DispatchLog) -> Do:
-#         custom_logger = yield NS.inspect(_.state.logger)
-#         logger = custom_logger | (lambda: dispatch_log.match)
-#         yield logger(result.trans)
 
 
 def arg_parser(handler: RequestHandler, params_spec: ParamsSpec) -> ArgParser:
@@ -142,15 +98,14 @@ def log_trans(trans: Program) -> NS[PluginState[S, D, CC], None]:
 
 @do(NS)
 def run_request_handler(handler: RequestHandler, args: List[Any]) -> Do:
-    program = handler.program
     parsed_args = yield NS.from_either(parse_args(handler, args))
-    yield log_trans(program)
-    yield run_prog(program, parsed_args)
+    yield log_trans(handler.program)
+    yield run_prog(handler.program, parsed_args)
 
 
 @do(NS)
-def traverse_programs(dispatches: List[Program], args: List[Any]) -> Do:
-    yield dispatches.traverse(lambda a: run_request_handler(a, args), NS)
+def traverse_programs(programs: List[Program], args: List[Any]) -> Do:
+    yield programs.traverse(lambda a: run_request_handler(a, args), NS)
 
 
 # TODO use from request_handler, since there is no concurrency handling anywhere else anymore.
@@ -167,53 +122,53 @@ def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[PluginStat
     yield N.pure(response)
 
 
-def exclusive_dispatch(holder: PluginStateHolder, dispatch: Program, args: List[Any], desc: str) -> NvimIO[R]:
+def exclusive_program(holder: PluginStateHolder, program: Program, args: List[Any], desc: str) -> NvimIO[R]:
     return exclusive(
         holder,
-        lambda: run_request_handler(dispatch, args).run(holder.state),
+        lambda: run_request_handler(program, args).run(holder.state),
         desc
     )
 
 
 def execute(state: PluginStateHolder[D], program: Program, args: List[Any]) -> NvimIO[Any]:
-    return exclusive_dispatch(state, program, args, program.name)
+    return exclusive_program(state, program, args, program.name)
 
 
-def regular_dispatches(name: str) -> EitherState[DispatchJob, List[Program]]:
-    return EitherState.inspect_f(lambda job: job.programs.lift(name).to_either(f'no dispatch for {name}'))
+def regular_programs(name: str) -> EitherState[RequestJob, List[Program]]:
+    return EitherState.inspect_f(lambda job: job.programs.lift(name).to_either(f'no program for {name}'))
 
 
-def special_dispatches_sync(parts: List[str]) -> EitherState[DispatchJob, List[Program]]:
-    return regular_dispatches(parts.mk_string(':'))
+def special_programs_sync(parts: List[str]) -> EitherState[RequestJob, List[Program]]:
+    return regular_programs(parts.mk_string(':'))
 
 
-def special_dispatches(head: str, tail: List[str]) -> EitherState[DispatchJob, List[Program]]:
+def special_programs(head: str, tail: List[str]) -> EitherState[RequestJob, List[Program]]:
     return (
-        special_dispatches_sync(tail)
+        special_programs_sync(tail)
         if head == 'sync' else
-        regular_dispatches(tail.cons(head).mk_string(':'))
+        regular_programs(tail.cons(head).mk_string(':'))
     )
 
 
-@do(EitherState[DispatchJob, List[Program]])
-def job_dispatches() -> Do:
+@do(EitherState[RequestJob, List[Program]])
+def job_programs() -> Do:
     name = yield EitherState.inspect(_.name)
     parts = Lists.split(name, ':')
-    yield parts.detach_head.map2(special_dispatches) | (lambda: regular_dispatches(name))
+    yield parts.detach_head.map2(special_programs) | (lambda: regular_programs(name))
 
 
 @do(NvimIO[List[Any]])
-def execute_dispatch_job(job: DispatchJob) -> Do:
-    dispatches = yield N.e(job_dispatches().run_a(job))
-    result = yield dispatches.traverse(L(execute)(job.state, _, job.args), NvimIO)
+def execute_request_job(job: RequestJob) -> Do:
+    programs = yield N.e(job_programs().run_a(job))
+    result = yield programs.traverse(L(execute)(job.state, _, job.args), NvimIO)
     ribo_log.debug(f'async job {job.name} completed')
-    yield N.from_io(job.state.dispatch_complete())
+    yield N.from_io(job.state.request_complete())
     yield N.pure(result)
 
 
 class request_result(Case, alg=NResult):
 
-    def __init__(self, job: DispatchJob) -> None:
+    def __init__(self, job: RequestJob) -> None:
         self.job = job
 
     def n_success(self, result: NSuccess[List[Any]]) -> Any:
@@ -241,21 +196,21 @@ class request_result(Case, alg=NResult):
         return 2
 
 
-def dispatch_job(state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> DispatchJob:
+def request_job(state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> RequestJob:
     decoded_args = decode(args)
     fun_args = decoded_args.head | Nil
     bang = decoded_args.lift(1).contains(1)
-    return DispatchJob(state, decode(name), fun_args, sync, bang)
+    return RequestJob(state, decode(name), fun_args, sync, bang)
 
 
 def execute_request(vim: NvimApi, state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> Any:
     sync_prefix = '' if sync else 'a'
-    job = dispatch_job(state, name, args, sync)
-    ribo_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
-    result = request_result(job)(execute_dispatch_job(job).result(vim))
+    job = request_job(state, name, args, sync)
+    ribo_log.debug(f'programing {sync_prefix}sync request: {job.name}({job.args})')
+    result = request_result(job)(execute_request_job(job).result(vim))
     if sync:
         ribo_log.debug(f'request `{job.name}` completed: {result}')
     return decode(result)
 
 
-__all__ = ('execute_dispatch_job', 'execute', 'traverse_programs', 'compute_dispatch')
+__all__ = ('execute_request_job', 'execute', 'traverse_programs', 'compute_program')

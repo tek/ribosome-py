@@ -1,11 +1,10 @@
 import abc
-from typing import TypeVar, Generic
 from uuid import uuid4, UUID
 
 from amino import Dat, Map, Boolean, ADT, List, Maybe
 from amino.boolean import false
 
-P = TypeVar('P')
+from ribosome.compute.prog import Program
 
 
 class MapMode(ADT['MapMode']):
@@ -86,16 +85,16 @@ class Mapping(Dat['Mapping']):
         self.uuid = uuid
 
 
-class Mappings(Generic[P], Dat['Mappings[P]']):
+class Mappings(Dat['Mappings']):
 
     @staticmethod
-    def cons(mappings: Map[Mapping, P]=Map()) -> 'Mappings':
+    def cons(mappings: Map[Mapping, Program]=Map()) -> 'Mappings':
         return Mappings(mappings)
 
-    def __init__(self, mappings: Map[Mapping, P]) -> None:
+    def __init__(self, mappings: Map[Mapping, Program]) -> None:
         self.mappings = mappings
 
-    def lift(self, mapping: Mapping) -> Maybe[P]:
+    def lift(self, mapping: Mapping) -> Maybe[Program]:
         return self.mappings.lift(mapping)
 
 

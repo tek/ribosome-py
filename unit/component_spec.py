@@ -6,7 +6,7 @@ from amino.test.spec import SpecBase
 from amino import List, Map, do, Do, Dat, _
 from amino.lenses.lens import lens
 
-from ribosome.test.integration.run import DispatchHelper
+from ribosome.test.integration.run import RequestHelper
 from ribosome.config.config import Config, NoData
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.api import prog
@@ -99,12 +99,12 @@ class ComponentSpec(SpecBase):
     '''
 
     def enable_component(self) -> Expectation:
-        helper = DispatchHelper.strict(config)
+        helper = RequestHelper.strict(config)
         s = helper.unsafe_run_s('command:enable_components', args=('extra',))
         return k(s.components.all / _.name).must(contain('extra'))
 
     def switch(self) -> Expectation:
-        helper = DispatchHelper.strict(config, 'extra')
+        helper = RequestHelper.strict(config, 'extra')
         s, r = helper.unsafe_run('function:switch', args=())
         return (
             (k(r) == 17) &

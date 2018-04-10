@@ -47,7 +47,7 @@ class PluginStateHolder(Generic[D], Dat['PluginStateHolder[D]'], Logging):
         ...
 
     @abc.abstractmethod
-    def dispatch_complete(self) -> IO[None]:
+    def request_complete(self) -> IO[None]:
         ...
 
 
@@ -78,13 +78,13 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
     @do(NvimIO[None])
     def acquire(self) -> Do:
         '''acquire the state lock that prevents multiple programs from updating the state asynchronously.
-        If the lock is already acquired, an async dispatch is currently executing while another (sync or async) has been
-        requested. In order not to block on requests to vim from the running dispatch, the greenlet that was started by
-        the vim session must be suspended, giving control back to the running async dispatch at the point where the vim
+        If the lock is already acquired, an async request is currently executing while another (sync or async) has been
+        requested. In order not to block on requests to vim from the running request, the greenlet that was started by
+        the vim session must be suspended, giving control back to the running async request at the point where the vim
         request was made.
         '''
         def switch() -> None:
-            self.log.debug(f'acquire: switching to running dispatch')
+            self.log.debug(f'acquire: switching to running request')
             self._enqueue_greenlet()
             Try(lambda: greenlet.getcurrent().parent.switch()).leffect(self._pop_greenlet)
         if self.running:
@@ -101,12 +101,12 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
             yield lift_n_result.match(result)
 
     @do(IO[None])
-    def dispatch_complete(self) -> Do:
-        '''switch back to the dispatch that was suspended in `acquire` while the dispatch executing this method was
+    def request_complete(self) -> Do:
+        '''switch back to the request that was suspended in `acquire` while the request executing this method was
         running.
         '''
         if not self.waiting_greenlets.empty():
-            self.log.debug('release: switching to waiting dispatch')
+            self.log.debug('release: switching to waiting request')
             gr = yield IO.delay(self._pop_greenlet)
             yield IO.delay(gr.switch)
         yield IO.pure(None)
@@ -121,8 +121,8 @@ class StrictPluginStateHolder(Generic[D], PluginStateHolder[D]):
     def release(self, result: Optional[NResult[A]]=None) -> NvimIO[None]:
         return N.pure(None)
 
-    def dispatch_complete(self) -> IO[None]:
+    def request_complete(self) -> IO[None]:
         return IO.pure(None)
 
 
-__all__ = ()
+__all__ = ('PluginStateHolder', 'ConcurrentPluginStateHolder', 'StrictPluginStateHolder')

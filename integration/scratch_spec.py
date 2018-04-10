@@ -8,7 +8,7 @@ from amino.boolean import true
 
 from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
-from ribosome.test.integration.run import DispatchHelper
+from ribosome.test.integration.run import RequestHelper
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.scratch import CreateScratchBufferOptions, show_in_scratch_buffer
 from ribosome.test.config import single_trans_config
@@ -34,7 +34,7 @@ class ScratchSpec(ExternalSpec):
     '''
 
     def launch(self) -> Expectation:
-        helper = DispatchHelper.nvim(config, self.vim, 'main')
+        helper = RequestHelper.nvim(config, self.vim, 'main')
         lines = List('1', '2', '3')
         @do(NvimIO[Tuple[List[Window], List[Buffer], List[str]]])
         def run() -> Do:
