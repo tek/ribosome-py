@@ -27,15 +27,9 @@ CC = TypeVar('CC')
 
 
 @prog.result
-@do(EitherState[PluginState[S, D, CC], str])
-def message_log() -> Do:
-    yield EitherState.inspect_f(__.message_log.traverse(dump_json, Either))
-
-
-@prog.result
 @do(EitherState[ComponentData[PluginState[S, D, CC], NoData], str])
-def trans_log() -> Do:
-    yield EitherState.inspect_f(lambda s: dump_json(s.main.trans_log))
+def program_log() -> Do:
+    yield EitherState.inspect_f(lambda s: dump_json(s.main.program_log))
 
 
 @prog.unit
@@ -183,4 +177,5 @@ def internal_init() -> Do:
         yield handler | Prog.unit
 
 
-__all__ = ()
+__all__ = ('internal_init', 'mapping', 'MapOptions', 'enable_components', 'show_python_path', 'append_python_path',
+           'poll', 'program_log', 'set_log_level', 'state_data', 'rpc_handlers', 'update_state', 'update_component_state')

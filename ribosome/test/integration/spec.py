@@ -269,7 +269,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
     def content(self) -> List[str]:
         return self.vim.buffer.content
 
-    def trans_log(self) -> Either[str, List['str']]:
+    def program_log(self) -> Either[str, List['str']]:
         return self.vim.call(f'{self.full_cmd_prefix()}TransLog') // decode_json
 
     @property

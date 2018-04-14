@@ -2,16 +2,14 @@ from amino.boolean import true
 from amino import List
 
 from ribosome.request.handler.handler import RequestHandler
-from ribosome.components.internal.prog import (message_log, trans_log, set_log_level, update_state,
-                                               update_component_state, state_data, rpc_handlers, poll,
-                                               append_python_path, show_python_path, enable_components, mapping,
-                                               internal_init)
+from ribosome.components.internal.prog import (program_log, set_log_level, update_state, update_component_state,
+                                               state_data, rpc_handlers, poll, append_python_path, show_python_path,
+                                               enable_components, mapping, internal_init)
 from ribosome.request.handler.prefix import Full
 from ribosome.config.component import Component
 
 
-message_log_handler = RequestHandler.trans_function(message_log)(prefix=Full(), sync=true)
-trans_log_handler = RequestHandler.trans_function(trans_log)(prefix=Full(), sync=true)
+program_log_handler = RequestHandler.trans_function(program_log)(prefix=Full(), sync=true)
 set_log_level_handler = RequestHandler.trans_function(set_log_level)(prefix=Full())
 update_state_handler = RequestHandler.trans_cmd(update_state)(json=true)
 update_component_state_handler = RequestHandler.trans_cmd(update_component_state)(json=true)
@@ -28,8 +26,7 @@ internal_init_handler = RequestHandler.trans_function(internal_init)(prefix=Full
 internal: Component = Component.cons(
     'internal',
     request_handlers=List(
-        message_log_handler,
-        trans_log_handler,
+        program_log_handler,
         set_log_level_handler,
         update_state_handler,
         update_component_state_handler,
