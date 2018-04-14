@@ -1,9 +1,7 @@
-from typing import Tuple, Any
-
 from kallikrein import k, Expectation
 
 from amino.test.spec import SpecBase
-from amino import List, Map, _, Right, Either, Left, do, Do
+from amino import List, Map, _, do, Do
 from amino.state import State
 from amino.lenses.lens import lens
 from amino.dat import Dat
@@ -14,8 +12,6 @@ from ribosome.compute.api import prog
 from ribosome.config.component import Component, ComponentData
 from ribosome.host import request_handler
 from ribosome.config.config import Config
-from ribosome.nvim.api.data import StrictNvimApi
-from ribosome import NvimApi
 
 
 class HSData(Dat['HSData']):

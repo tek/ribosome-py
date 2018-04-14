@@ -16,7 +16,7 @@ from ribosome.data.plugin_state import PluginState
 from ribosome.nvim.io.state import NS
 from ribosome.config.component import ComponentData
 from ribosome.config.settings import Settings
-from ribosome.compute.prog import Program, Prog
+from ribosome.compute.prog import Program, Prog, bind_nullary_program
 from ribosome.util.setting import setting
 from ribosome.config.basic_config import NoData
 from ribosome.components.internal.update import undef_handlers, def_handlers
@@ -96,8 +96,7 @@ def update_state(query: UpdateQuery) -> Do:
 @do(NS[PluginState[S, D, CC], None])
 def patch_update_component(comp: str, query: PatchQuery) -> Do:
     lns = yield NS.m(mk_lens(query.query), f'invalid component state update query for {comp}: {query.query}')
-    lns1 = lens.component_data.GetItem(comp) & lns
-    yield NS.modify(lns1.modify(__.typed_copy(**query.data)))
+    yield NS.modify(__.modify_component_data(comp, lns.modify(__.typed_copy(**query.data))))
 
 
 @prog.unit
@@ -132,6 +131,7 @@ def enable_components(*names: str) -> Do:
     yield undef_handlers()
     yield NS.modify(lens.components.all.modify(__.add(comps)))
     yield def_handlers()
+    print
 
 
 class MapOptions(Dat['MapOptions']):
@@ -174,7 +174,7 @@ def internal_init() -> Do:
     enabled = yield prog(setting)(_.run_internal_init)
     if enabled:
         handler = yield internal_init_trans()
-        yield handler | Prog.unit
+        yield handler / bind_nullary_program | Prog.unit
 
 
 __all__ = ('internal_init', 'mapping', 'MapOptions', 'enable_components', 'show_python_path', 'append_python_path',

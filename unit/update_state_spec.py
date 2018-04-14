@@ -80,11 +80,11 @@ class UpdateStateSpec(SpecBase):
         return k(r.data.d) == D1(D2('value', List(Item('first', 4), Item('second', new))))
 
     def component(self) -> Expectation:
-        helper = RequestHelper.strict(config, 'c1').mod.state(__.update_component_data('c1', C1Data.cons()))
+        helper = RequestHelper.strict(config, 'c1').mod.state(__.update_component_data(C1Data.cons()))
         new = 'new'
         data = dump_json(dict(patch=dict(query='d.d', data=dict(a=new)))).get_or_raise()
         r = helper.unsafe_run_s('command:update_component_state', args=['c1'] + data.split(' '))
-        return k(r.component_data.lift('c1') / _.d).must(be_just(D1(D2(new, items))))
+        return k(r.component_data.lift(C1Data) / _.d).must(be_just(D1(D2(new, items))))
 
 
 __all__ = ('UpdateStateSpec',)

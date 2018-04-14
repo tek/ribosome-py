@@ -51,7 +51,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
             data: D,
             components: List[Component],
             init: Program,
-            trans_log: List[str]=Nil,
+            program_log: List[str]=Nil,
             log_handler: Maybe[logging.Handler]=Nothing,
             logger: Maybe[Callable[[Any], 'NS[PluginState[S, D, CC], None]']]=Nothing,
             component_data: Map[type, Any]=Map(),
@@ -68,7 +68,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
             data,
             components,
             init,
-            trans_log,
+            program_log,
             log_handler,
             logger,
             component_data,
@@ -86,7 +86,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
             data: D,
             components: Components,
             init: Program,
-            trans_log: List[str],
+            program_log: List[str],
             log_handler: Maybe[logging.Handler],
             logger: Maybe[Callable[[Any], 'NS[PluginState[S, D, CC], None]']],
             component_data: Map[type, Any],
@@ -100,7 +100,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
         self.data = data
         self.components = components
         self.init = init
-        self.trans_log = trans_log
+        self.program_log = program_log
         self.log_handler = log_handler
         self.logger = logger
         self.component_data = component_data
@@ -114,7 +114,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
         return self.copy(data=data)
 
     def log_trans(self, trans: str) -> 'PluginState[S, D, CC]':
-        return self.append1.trans_log(trans)
+        return self.append1.program_log(trans)
 
     def component(self, name: str) -> Either[str, Component]:
         return self.components.by_name(name)
@@ -131,12 +131,12 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
     def data_by_name(self, name: str) -> Either[str, Any]:
         return self.component(name) / self.data_for
 
-    def update_component_data(self, tpe: Type[C], new: C) -> 'PluginState[S, D, CC]':
-        return self.mod.component_data(__.cat((tpe, new)))
+    def update_component_data(self, new: C) -> 'PluginState[S, D, CC]':
+        return self.mod.component_data(__.cat((type(new), new)))
 
     def modify_component_data(self, name: str, mod: Callable[[Any], Any]) -> 'PluginState[S, D, CC]':
         comp = self.data_by_name(name)
-        return comp / mod / L(self.update_component_data)(name, _) | self
+        return comp / mod / self.update_component_data | self
 
     def resources_with(self, data: A) -> Resources[S, A, CC]:
         return Resources(data, self.basic.settings, self.components)

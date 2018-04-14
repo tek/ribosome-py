@@ -93,7 +93,7 @@ def parse_args(handler: RequestHandler, args: List[Any]) -> NS[D, List[Any]]:
 
 
 def log_trans(trans: Program) -> NS[PluginState[S, D, CC], None]:
-    return NS.pure(None) if trans.name in ('trans_log', 'pure') else NS.modify(__.log_trans(trans.name))
+    return NS.pure(None) if trans.name in ('program_log', 'pure') else NS.modify(__.log_trans(trans.name))
 
 
 @do(NS)
@@ -206,7 +206,7 @@ def request_job(state: PluginStateHolder[D], name: str, args: tuple, sync: bool)
 def execute_request(vim: NvimApi, state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> Any:
     sync_prefix = '' if sync else 'a'
     job = request_job(state, name, args, sync)
-    ribo_log.debug(f'programing {sync_prefix}sync request: {job.name}({job.args})')
+    ribo_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
     result = request_result(job)(execute_request_job(job).result(vim))
     if sync:
         ribo_log.debug(f'request `{job.name}` completed: {result}')

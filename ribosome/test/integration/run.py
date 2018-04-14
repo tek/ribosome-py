@@ -121,7 +121,7 @@ class RequestHelper(Generic[S, D, CC], Dat['RequestHelper']):
 
     @property
     def settings(self) -> S:
-        return self.state.settings
+        return self.state.basic.settings
 
     def request_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[RequestJob, List[Program]]:
         job = request_job(self.holder, name, (args,), sync)

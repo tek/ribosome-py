@@ -86,8 +86,7 @@ class unwrap_affiliation(
     def component_prog_type(self, tpe: ComponentProgType[M, C]) -> Callable[[PS, ComponentData[M, Any]], PS]:
         inner: Callable[[PS, M], PS] = pick_main_data.match(tpe.main)
         def unwrap(ps: PS, data: ComponentData[M, Any]) -> PS:
-            ps1 = inner(ps, data.main)
-            return ps1.update_component_data(tpe.comp, data.comp)
+            return inner(ps, data.main).update_component_data(data.comp)
         return unwrap
 
 
@@ -96,7 +95,7 @@ def comp_get(ribo: Ribosome[S, D, CC, C]) -> C:
 
 
 def comp_set(ribo: Ribosome[S, D, CC, C], comp: C) -> Ribosome[S, D, CC, C]:
-    return ribo.mod.state(lambda ps: ps.update_component_data(ribo.comp_type, comp))
+    return ribo.mod.state(lambda ps: ps.update_component_data(comp))
 
 
 def ribosome_comp_lens(tpe: Type[C]) -> UnboundLens[Ribosome[S, D, CC, C], Ribosome[S, D, CC, C], C, C]:
@@ -153,7 +152,7 @@ class prog_wrappers(
 ):
 
     def unknown_prog_type(self, tpe: UnknownProgType[M, C]) -> ProgWrappers[PS, R]:
-        raise Left('not an `NvimIOState`')
+        return Left('not an `NvimIOState`')
 
     def state_prog(self, tpe: StateProg[M, C, R]) -> ProgWrappers[PS, R]:
         return Right(ProgWrappers(wrap_resources.match(tpe.tpe), unwrap_resources.match(tpe.tpe)))

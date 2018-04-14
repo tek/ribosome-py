@@ -5,7 +5,7 @@ from amino.do import do, Do
 from amino.case import Case
 
 from ribosome.nvim.io.state import NS
-from ribosome.compute.prog import Prog, ProgBind, ProgPure, ProgError, ProgExec, bind_program
+from ribosome.compute.prog import Prog, ProgBind, ProgPure, ProgError, ProgExec, bind_program, Program
 from ribosome.compute.output import ProgOutputInterpreter, ProgOutputResult, ProgOutputUnit
 from ribosome.compute.wrap_data import ProgWrappers
 from ribosome.config.settings import Settings
@@ -59,7 +59,7 @@ class eval_prog(Case[Prog[A], NS[PluginState[S, D, CC], A]], alg=Prog):
 
 
 @do(NS[PluginState[S, D, CC], A])
-def run_prog(program: Prog[A], args: List[Any]) -> Do:
+def run_prog(program: Program[A], args: List[Any]) -> Do:
     yield eval_prog.match(bind_program(program, args))
 
 

@@ -1,11 +1,24 @@
 import inspect
-from typing import Callable, Any
+from typing import Callable, Any, Tuple
 
 from amino import Maybe, _, Just, Boolean, Lists, Nothing, Either, L, List, Nil, Map
 from amino.dat import Dat
 from amino.state import StateT
 
 from ribosome.request.nargs import Nargs
+
+
+def analyse_state_type(tpe: type) -> Maybe[type]:
+    return (
+        Maybe.getattr(tpe, '__args__') / Lists.wrap // _.head
+        if tpe is not None and issubclass(tpe, StateT)
+        else Nothing
+    )
+
+
+def analyse_return_type(fun: Callable[..., Any], annotations: Map[str, type]) -> Tuple[type, Maybe[type]]:
+    rettype = getattr(fun, 'tpe', annotations.lift('return') | None)
+    return rettype, analyse_state_type(rettype)
 
 
 def cons_params_spec(fun: Callable[..., Any]) -> None:
@@ -19,12 +32,7 @@ def cons_params_spec(fun: Callable[..., Any]) -> None:
     max = (~Boolean(argspec.varargs or argspec.varkw)).m(param_count)
     nargs = Nargs.cons(min, max)
     types = params.traverse(annotations.lift, Maybe) | Nil
-    rettype = getattr(fun, 'tpe', annotations.lift('return') | None)
-    state_type = (
-        Maybe.getattr(rettype, '__args__') / Lists.wrap // _.head
-        if rettype is not None and issubclass(rettype, StateT)
-        else Nothing
-    )
+    rettype, state_type = analyse_return_type(fun, annotations)
     return ParamsSpec(nargs, min, max, method, types, rettype, state_type)
 
 

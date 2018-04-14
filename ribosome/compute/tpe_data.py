@@ -80,6 +80,13 @@ class StateProg(Generic[M, C, R], ProgType[M, C, R]):
         self.tpe = tpe
 
 
+trivial_state_prog = StateProg(PlainStateProgType(RootProgType(PlainMainDataProgType())))
+
+
+def ribo_state_prog(comp: Type[C]) -> StateProg[PluginState[S, D, CC], C, Ribosome[S, D, CC, C]]:
+    return StateProg(RibosomeStateProgType(comp))
+
+
 __all__ = ('MainDataProgType', 'InternalMainDataProgType', 'PlainMainDataProgType', 'AffiliationProgType',
            'RootProgType', 'ComponentProgType', 'StateProgType', 'ResourcesStateProgType', 'PlainStateProgType',
-           'ProgType', 'UnknownProgType', 'StateProg', 'RibosomeProg')
+           'ProgType', 'UnknownProgType', 'StateProg', 'RibosomeProg', 'trivial_state_prog', 'ribo_state_prog')

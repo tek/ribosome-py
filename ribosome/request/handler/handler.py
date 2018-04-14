@@ -1,4 +1,4 @@
-from typing import Generic, Any, TypeVar
+from typing import Generic, Any, TypeVar, Callable
 
 from amino import List, Lists, Map, _, Boolean, __
 from amino.func import flip
@@ -9,7 +9,9 @@ from amino.boolean import false
 from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.request.handler.prefix import PrefixStyle, Short
 from ribosome.request.handler.method import RpcMethod, CmdMethod, FunctionMethod, AutocmdMethod
+from ribosome.nvim.io.compute import NvimIO
 
+A = TypeVar('A')
 B = TypeVar('B')
 D = TypeVar('D')
 P = TypeVar('P')
@@ -42,15 +44,15 @@ class RequestHandler(Generic[Meth, P], ADT['RequestHandler[Meth, P]']):
         self.extra_options = extra_options
 
     @staticmethod
-    def trans_cmd(prog: P) -> 'RequestHandlerBuilder':
+    def trans_cmd(prog: P) -> 'RequestHandlerBuilder[CmdMethod]':
         return RequestHandlerBuilder(CmdMethod(), prog)
 
     @staticmethod
-    def trans_function(prog: P) -> 'RequestHandlerBuilder':
+    def trans_function(prog: P) -> 'RequestHandlerBuilder[FunctionMethod]':
         return RequestHandlerBuilder(FunctionMethod(), prog)
 
     @staticmethod
-    def trans_autocmd(prog: P) -> 'RequestHandlerBuilder':
+    def trans_autocmd(prog: P) -> 'RequestHandlerBuilder[AutocmdMethod]':
         return RequestHandlerBuilder(AutocmdMethod(), prog)
 
     @property
@@ -64,10 +66,6 @@ class RequestHandler(Generic[Meth, P], ADT['RequestHandler[Meth, P]']):
     def vim_cmd_name(self, name: str, prefix: str) -> str:
         pre = name if self.prefix.full else prefix if self.prefix.short else ''
         return f'{camelcase(pre)}{camelcase(self.name)}'
-
-#     def spec(self, name: str, prefix: str) -> RpcHandlerSpec:
-#         return RpcHandlerSpec.cons(self.method.spec_type, self.sync, self.vim_cmd_name(name, prefix), self.options,
-#                                    self.method_str, True)
 
 
 class RequestHandlerBuilder(Generic[Meth]):
@@ -115,6 +113,17 @@ class RequestHandlers(ToStr):
 
     def rpc_specs(self, name: str, prefix: str) -> List[RpcHandlerSpec]:
         return self.handlers.v / __.spec(name, prefix)
+
+
+class rpc:
+
+    def __new__(self, prog: P) -> RequestHandlerBuilder[CmdMethod]:
+        return RequestHandlerBuilder(CmdMethod(), prog)
+
+    @staticmethod
+    def simple(f: Callable[..., NvimIO[A]]) -> RequestHandlerBuilder[CmdMethod]:
+        ...
+
 
 
 __all__ = ('RequestHandler', 'RequestHandlers')

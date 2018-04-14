@@ -172,7 +172,14 @@ def run(t: Program) -> A:
 
 @prog.result
 @do(NS[Ribosome[Settings, CoreData, Compon, ExtraData], int])
-def rib() -> Do:
+def mod_main() -> Do:
+    yield Ribo.modify_main(__.set.x(437))
+    yield Ribo.main()
+
+
+@prog.result
+@do(NS[Ribosome[Settings, CoreData, Compon, ExtraData], int])
+def mod_comp() -> Do:
     yield Ribo.modify_comp(__.set.y(954))
     yield Ribo.comp()
 
@@ -183,7 +190,10 @@ class ProgSpec(SpecBase):
     fail on error $error
     component with resources $comp_res
     root without extras $root
-    rib $rib
+
+    Ribosome state
+    modify main data $mod_main
+    modify component $mod_comp
     '''
 
     def nest(self) -> Expectation:
@@ -200,8 +210,11 @@ class ProgSpec(SpecBase):
     def root(self) -> Expectation:
         return run_a(root).must(contain(13))
 
-    def rib(self) -> Expectation:
-        return run_a(rib).must(contain(ExtraData.cons(954)))
+    def mod_main(self) -> Expectation:
+        return run_a(mod_main).must(contain(CoreData.cons(437)))
+
+    def mod_comp(self) -> Expectation:
+        return run_a(mod_comp).must(contain(ExtraData.cons(954)))
 
 
 __all__ = ('ProgSpec',)
