@@ -1,4 +1,5 @@
 from typing import TypeVar, Generic, Any
+import logging
 
 from amino import ADT, IO, List, Dat
 from ribosome.process import Subprocess
@@ -39,6 +40,19 @@ class ProgScalarSubprocess(ProgIOInterpreter[Subprocess]):
 
 
 class ProgGatherSubprocesses(ProgIOInterpreter[List[Subprocess]]):
+    pass
+
+
+class Echo(Dat['Echo']):
+    info = logging.INFO
+    error = logging.ERROR
+
+    def __init__(self, messages: List[str], level: int) -> None:
+        self.messages = messages
+        self.level = level
+
+
+class ProgIOEcho(ProgIOInterpreter[None]):
     pass
 
 

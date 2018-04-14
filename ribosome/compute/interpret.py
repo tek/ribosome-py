@@ -7,7 +7,8 @@ from amino.io import IOException
 
 from ribosome.compute.output import (ProgOutputInterpreter, ProgIOInterpreter, ProgOutputIO, ProgScalarIO,
                                      ProgGatherIOs, ProgScalarSubprocess, ProgGatherSubprocesses, GatherIOs,
-                                     GatherSubprocesses, ProgIOCustom, ProgOutputUnit, ProgOutputResult)
+                                     GatherSubprocesses, ProgIOCustom, ProgOutputUnit, ProgOutputResult, ProgIOEcho,
+                                     Echo)
 from ribosome.compute.prog import Prog
 from ribosome.compute.program import ProgramInterpreter
 from ribosome import ribo_log
@@ -50,6 +51,10 @@ class interpret_io(Case[ProgIOInterpreter, Prog[A]], alg=ProgIOInterpreter):
 
     def prog_gather_subprocesses(self, po: ProgGatherSubprocesses, output: GatherSubprocesses[A]) -> Prog[A]:
         return Prog.pure(gather_subprocesses(output))
+
+    def prog_io_echo(self, po: ProgIOEcho, output: Echo) -> Prog[A]:
+        io = output.messages.traverse(lambda m: IO.delay(ribo_log.log, output.level, m), IO)
+        return Prog.from_either(io.attempt).replace(None)
 
     def prog_io_custom(self, po: ProgIOCustom, output: Any) -> Prog[A]:
         return self.custom(output)

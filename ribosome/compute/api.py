@@ -5,7 +5,8 @@ from amino import Either, do, Do, _, IO, List
 from ribosome.compute.tpe import analyse_prog_tpe, first_type_arg
 from ribosome.compute.wrap import prog_wrappers
 from ribosome.compute.output import (ProgOutputInterpreter, ProgOutputUnit, ProgOutputResult, ProgOutputIO,
-                                     ProgScalarIO, ProgGatherIOs, ProgScalarSubprocess, ProgGatherSubprocesses)
+                                     ProgScalarIO, ProgGatherIOs, ProgScalarSubprocess, ProgGatherSubprocesses, Echo,
+                                     ProgIOEcho)
 from ribosome.nvim.io.state import NS
 from ribosome.request.args import ParamsSpec
 from ribosome.compute.wrap_data import ProgWrappers
@@ -112,12 +113,6 @@ class prog:
     io = prog_io
     subproc = prog_subproc
 
-    # @staticmethod
-    # def io(interpreter: Callable[[PIO], NS[D, A]]) -> Callable[[Callable[[P], PIO]], Program]:
-    #     def decoration(func: Callable[[P], PIO]) -> Program:
-    #         return prog_state(func, ProgOutputIO(interpreter))
-    #     return decoration
-
     @staticmethod
     def comp(f: Callable[[P], NS[C, A]]) -> Program[A]:
         params_spec, wrappers = func_state_data(f)
@@ -126,6 +121,10 @@ class prog:
             comp_lens = yield NS.inspect(_.comp_lens)
             yield f(*p).zoom(comp_lens)
         return program_from_data(zoomed, params_spec, wrappers, ProgOutputResult())
+
+    @staticmethod
+    def echo(f: Callable[[P], NS[D, Echo]]) -> Program[None]:
+        return prog_state(f, ProgOutputIO(ProgIOEcho()))
 
 
 __all__ = ('prog',)

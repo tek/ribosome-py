@@ -29,6 +29,7 @@ from ribosome.compute.ribosome_api import Ribo
 from ribosome.compute.program import Program
 from ribosome.compute.interpret import GatherIOs, GatherSubprocesses
 from ribosome.process import Subprocess, SubprocessResult
+from ribosome.compute.output import Echo
 
 A = TypeVar('A')
 
@@ -214,6 +215,12 @@ def gather_subprocs() -> Do:
     ), 1.0))
 
 
+@prog.echo
+@do(NS[CoreData, Echo])
+def log_message() -> Do:
+    yield NS.pure(Echo(List('hello'), Echo.info))
+
+
 class ProgSpec(SpecBase):
     '''
     nest several trans $nest
@@ -230,6 +237,7 @@ class ProgSpec(SpecBase):
     gather IOs nondeterministically $gather_ios
     scalar subprocess $scalar_subproc
     gather subprocesses $gather_subprocs
+    log a message $log_message
     '''
 
     def nest(self) -> Expectation:
@@ -266,6 +274,9 @@ class ProgSpec(SpecBase):
             contain(Right(SubprocessResult(0, List('84'), Nil, None))) &
             contain(Right(SubprocessResult(0, List('39'), Nil, None)))
         ))
+
+    def log_message(self) -> Expectation:
+        return run_a(log_message).must(contain(None))
 
 
 __all__ = ('ProgSpec',)
