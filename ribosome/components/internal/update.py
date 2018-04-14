@@ -11,7 +11,7 @@ from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.component import Components, Component
 from ribosome.request.rpc import define_handlers, RpcHandlerSpec
 from ribosome.config.settings import Settings
-from ribosome.compute.prog import Program
+from ribosome.compute.program import Program
 from ribosome.request.handler.method import RpcMethod
 from ribosome.util.setting import setting_ps_e
 

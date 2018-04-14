@@ -16,7 +16,7 @@ from ribosome.data.plugin_state import PluginState
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.io.api import N
 from ribosome.request.job import RequestJob
-from ribosome.compute.prog import Program
+from ribosome.compute.program import Program
 from ribosome.config.resources import Resources
 from ribosome.data.plugin_state_holder import PluginStateHolder
 

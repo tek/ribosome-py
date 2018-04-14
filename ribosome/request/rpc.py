@@ -369,5 +369,6 @@ def rpc_handler_functions(plugin: Any) -> List[RpcHandlerFunction]:
         Lists.wrap(funs).flat_map2(L(handler_function1)(_, _, plugin.name, plugin.prefix))
     )
 
+
 __all__ = ('RpcHandlerSpec', 'handler', 'define_handler', 'define_handlers', 'rpc_handlers', 'rpc_handlers_json',
            'rpc_handler_functions')

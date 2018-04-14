@@ -1,24 +1,27 @@
 import inspect
 from typing import Callable, Any, Tuple
 
-from amino import Maybe, _, Just, Boolean, Lists, Nothing, Either, L, List, Nil, Map
+from amino import Maybe, _, Just, Boolean, Lists, Nothing, Either, L, List, Nil, Map, Left
 from amino.dat import Dat
 from amino.state import StateT
+from amino.util.tpe import first_type_arg, type_arg
 
 from ribosome.request.nargs import Nargs
 
 
-def analyse_state_type(tpe: type) -> Maybe[type]:
+def analyse_state_type(tpe: type) -> Tuple[Either[str, type], Either[str, type]]:
     return (
-        Maybe.getattr(tpe, '__args__') / Lists.wrap // _.head
+        (first_type_arg(tpe), type_arg(tpe, 1))
         if tpe is not None and issubclass(tpe, StateT)
-        else Nothing
+        else (Left('not a StateT'), Left('not a StateT'))
     )
 
 
-def analyse_return_type(fun: Callable[..., Any], annotations: Map[str, type]) -> Tuple[type, Maybe[type]]:
-    rettype = getattr(fun, 'tpe', annotations.lift('return') | None)
-    return rettype, analyse_state_type(rettype)
+def analyse_return_type(fun: Callable[..., Any], annotations: Map[str, type]
+                        ) -> Tuple[type, Either[str, type], Either[str, type]]:
+    main_rettype = getattr(fun, 'tpe', annotations.lift('return') | None)
+    state_type, return_type = analyse_state_type(main_rettype)
+    return main_rettype, state_type, return_type
 
 
 def cons_params_spec(fun: Callable[..., Any]) -> None:
@@ -32,8 +35,8 @@ def cons_params_spec(fun: Callable[..., Any]) -> None:
     max = (~Boolean(argspec.varargs or argspec.varkw)).m(param_count)
     nargs = Nargs.cons(min, max)
     types = params.traverse(annotations.lift, Maybe) | Nil
-    rettype, state_type = analyse_return_type(fun, annotations)
-    return ParamsSpec(nargs, min, max, method, types, rettype, state_type)
+    main_rettype, state_type, return_type = analyse_return_type(fun, annotations)
+    return ParamsSpec(nargs, min, max, method, types, main_rettype, state_type, return_type | main_rettype)
 
 
 class ParamsSpec(Dat['ParamsSpec']):
@@ -56,6 +59,7 @@ class ParamsSpec(Dat['ParamsSpec']):
             types: List[type],
             rettype: type,
             state_type: Maybe[type],
+            return_type: type,
     ) -> None:
         self.nargs = nargs
         self.min = min
@@ -64,6 +68,7 @@ class ParamsSpec(Dat['ParamsSpec']):
         self.types = types
         self.rettype = rettype
         self.state_type = state_type
+        self.return_type = return_type
 
     @property
     def exact_count(self) -> Maybe[int]:

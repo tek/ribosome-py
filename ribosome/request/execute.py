@@ -17,7 +17,7 @@ from ribosome.config.config import Config
 from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PluginState
 # from ribosome.trans.action import LogMessage, Info, Error
-from ribosome.compute.prog import Program
+from ribosome.compute.program import Program
 from ribosome.config.settings import Settings
 from ribosome import NvimApi
 from ribosome.nvim.io.data import NResult, NSuccess, NError, NFatal
@@ -38,17 +38,6 @@ R = TypeVar('R')
 RDP = TypeVar('RDP')
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
-
-
-def gather_ios(ios: List[IO[A]], timeout: float) -> List[Either[IOException, A]]:
-    with ThreadPoolExecutor(thread_name_prefix='ribosome_dio') as executor:
-        ribo_log.debug(f'executing ios {ios}')
-        futures = ios.map(lambda i: executor.submit(i.attempt_run))
-        completed, timed_out = wait(futures, timeout=timeout)
-        ribo_log.debug(f'completed ios {completed}')
-        if timed_out:
-            ribo_log.debug(f'ios timed out: {timed_out}')
-        return Lists.wrap(completed).map(__.result(timeout=timeout))
 
 
 # class execute_io(Case, alg=DIO):

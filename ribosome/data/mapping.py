@@ -4,7 +4,7 @@ from uuid import uuid4, UUID
 from amino import Dat, Map, Boolean, ADT, List, Maybe
 from amino.boolean import false
 
-from ribosome.compute.prog import Program
+from ribosome.compute.program import Program
 
 
 class MapMode(ADT['MapMode']):

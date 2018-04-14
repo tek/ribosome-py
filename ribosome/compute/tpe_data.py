@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Type
+from typing import TypeVar, Generic, Type, Any
 
 from amino import ADT
 
@@ -7,6 +7,7 @@ from ribosome.config.resources import Resources
 from ribosome.config.component import ComponentData
 from ribosome.compute.ribosome import Ribosome
 
+A = TypeVar('A')
 C = TypeVar('C')
 CC = TypeVar('CC')
 D = TypeVar('D')
@@ -74,17 +75,18 @@ class UnknownProgType(Generic[M, C], ProgType[M, C, None]):
     pass
 
 
-class StateProg(Generic[M, C, R], ProgType[M, C, R]):
+class StateProg(Generic[M, C, R, A], ProgType[M, C, R]):
 
-    def __init__(self, tpe: StateProgType[M, C, R]) -> None:
+    def __init__(self, tpe: StateProgType[M, C, R], return_type: A) -> None:
         self.tpe = tpe
+        self.return_type = return_type
 
 
-trivial_state_prog = StateProg(PlainStateProgType(RootProgType(PlainMainDataProgType())))
+trivial_state_prog = StateProg(PlainStateProgType(RootProgType(PlainMainDataProgType())), Any)
 
 
-def ribo_state_prog(comp: Type[C]) -> StateProg[PluginState[S, D, CC], C, Ribosome[S, D, CC, C]]:
-    return StateProg(RibosomeStateProgType(comp))
+def ribo_state_prog(comp: Type[C]) -> StateProg[PluginState[S, D, CC], C, Ribosome[S, D, CC, C], Any]:
+    return StateProg(RibosomeStateProgType(comp), Any)
 
 
 __all__ = ('MainDataProgType', 'InternalMainDataProgType', 'PlainMainDataProgType', 'AffiliationProgType',
