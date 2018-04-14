@@ -1,7 +1,8 @@
 from typing import TypeVar, Generic, Any
 import logging
 
-from amino import ADT, IO, List, Dat
+from amino import ADT, IO, List, Dat, Nil
+from amino.dat import DatMeta
 from ribosome.process import Subprocess
 
 A = TypeVar('A')
@@ -43,9 +44,24 @@ class ProgGatherSubprocesses(ProgIOInterpreter[List[Subprocess]]):
     pass
 
 
-class Echo(Dat['Echo']):
-    info = logging.INFO
-    error = logging.ERROR
+class EchoMeta(DatMeta):
+
+    @property
+    def unit(self) -> 'Echo':
+        return Echo(Nil, 0)
+
+
+class Echo(Dat['Echo'], metaclass=EchoMeta):
+    info_level = logging.INFO
+    error_level = logging.ERROR
+
+    @staticmethod
+    def info(msg: str) -> 'Echo':
+        return Echo(List(msg), Echo.info_level)
+
+    @staticmethod
+    def error(msg: str) -> 'Echo':
+        return Echo(List(msg), Echo.error_level)
 
     def __init__(self, messages: List[str], level: int) -> None:
         self.messages = messages

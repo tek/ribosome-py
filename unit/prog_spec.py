@@ -218,7 +218,7 @@ def gather_subprocs() -> Do:
 @prog.echo
 @do(NS[CoreData, Echo])
 def log_message() -> Do:
-    yield NS.pure(Echo(List('hello'), Echo.info))
+    yield NS.pure(Echo.info('hello'))
 
 
 class ProgSpec(SpecBase):
