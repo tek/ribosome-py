@@ -10,7 +10,7 @@ from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.settings import Settings
 from ribosome.request.rpc import RpcHandlerSpec
 from ribosome.config.component import Component
-from ribosome.compute.prog import Program
+from ribosome.compute.program import Program
 from ribosome.config.basic_config import NoData, BasicConfig
 from ribosome.components.internal.config import internal
 

@@ -1,13 +1,14 @@
 from typing import TypeVar
 
-from kallikrein import Expectation, kf, k
+from kallikrein import Expectation, k
 from kallikrein.matchers import contain, equal
 from kallikrein.matchers.tuple import tupled
 from kallikrein.matchers.either import be_right
 from kallikrein.matchers.match_with import match_with
+from kallikrein.expectable import Expectable
 
 from amino.test.spec import SpecBase
-from amino import List, Map, do, Do, Dat, _, Nil, __
+from amino import List, Map, do, Do, Dat, _, Nil, __, IO, Right
 from amino.state import State
 from amino.lenses.lens import lens
 
@@ -21,10 +22,13 @@ from ribosome.compute.api import prog
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.run import run_prog
 from ribosome.test.klk import kn
-from ribosome.compute.prog import Program, Prog
+from ribosome.compute.prog import Prog
 from ribosome.config.resources import Resources
 from ribosome.compute.ribosome import Ribosome
 from ribosome.compute.ribosome_api import Ribo
+from ribosome.compute.program import Program
+from ribosome.compute.interpret import GatherIOs, GatherSubprocesses
+from ribosome.process import Subprocess, SubprocessResult
 
 A = TypeVar('A')
 
@@ -162,11 +166,11 @@ def root() -> Do:
     yield NS.pure(13)
 
 
-def run_a(t: Program) -> A:
+def run_a(t: Program) -> Expectable:
     return kn(helper.vim, lambda: run_prog(t, Nil).run_a(helper.state))
 
 
-def run(t: Program) -> A:
+def run(t: Program) -> Expectable:
     return kn(helper.vim, lambda: run_prog(t, Nil).run(helper.state))
 
 
@@ -184,6 +188,32 @@ def mod_comp() -> Do:
     yield Ribo.comp()
 
 
+@prog.io
+@do(NS[CoreData, IO[int]])
+def scalar_io() -> Do:
+    yield NS.pure(IO.pure(1046))
+
+
+@prog.io.gather
+@do(NS[CoreData, IO[int]])
+def gather_ios() -> Do:
+    yield NS.pure(GatherIOs(List(IO.pure(5), IO.pure(8)), 1.0))
+
+
+@prog.subproc
+@do(NS[CoreData, Subprocess[str]])
+def scalar_subproc() -> Do:
+    yield NS.pure(Subprocess('echo', List('692'), None, 1.0))
+
+
+@prog.subproc.gather
+@do(NS[CoreData, GatherSubprocesses[str]])
+def gather_subprocs() -> Do:
+    yield NS.pure(GatherSubprocesses(List(
+        Subprocess('echo', List('84'), None, 1.0), Subprocess('echo', List('39'), None, 1.0)
+    ), 1.0))
+
+
 class ProgSpec(SpecBase):
     '''
     nest several trans $nest
@@ -194,6 +224,12 @@ class ProgSpec(SpecBase):
     Ribosome state
     modify main data $mod_main
     modify component $mod_comp
+
+    IO output
+    scalar IO $scalar_io
+    gather IOs nondeterministically $gather_ios
+    scalar subprocess $scalar_subproc
+    gather subprocesses $gather_subprocs
     '''
 
     def nest(self) -> Expectation:
@@ -215,6 +251,21 @@ class ProgSpec(SpecBase):
 
     def mod_comp(self) -> Expectation:
         return run_a(mod_comp).must(contain(ExtraData.cons(954)))
+
+    def scalar_io(self) -> Expectation:
+        return run_a(scalar_io).must(contain(1046))
+
+    def gather_ios(self) -> Expectation:
+        return run_a(gather_ios).must(contain(contain(Right(5)) & contain(Right(8))))
+
+    def scalar_subproc(self) -> Expectation:
+        return run_a(scalar_subproc).must(contain(SubprocessResult(0, List('692'), Nil, None)))
+
+    def gather_subprocs(self) -> Expectation:
+        return run_a(gather_subprocs).must(contain(
+            contain(Right(SubprocessResult(0, List('84'), Nil, None))) &
+            contain(Right(SubprocessResult(0, List('39'), Nil, None)))
+        ))
 
 
 __all__ = ('ProgSpec',)

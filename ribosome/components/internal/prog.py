@@ -16,10 +16,11 @@ from ribosome.data.plugin_state import PluginState
 from ribosome.nvim.io.state import NS
 from ribosome.config.component import ComponentData
 from ribosome.config.settings import Settings
-from ribosome.compute.prog import Program, Prog, bind_nullary_program
+from ribosome.compute.prog import Prog
 from ribosome.util.setting import setting
 from ribosome.config.basic_config import NoData
 from ribosome.components.internal.update import undef_handlers, def_handlers
+from ribosome.compute.program import Program, bind_nullary_program
 
 D = TypeVar('D')
 S = TypeVar('S', bound=Settings)
@@ -27,9 +28,9 @@ CC = TypeVar('CC')
 
 
 @prog.result
-@do(EitherState[ComponentData[PluginState[S, D, CC], NoData], str])
+@do(NS[ComponentData[PluginState[S, D, CC], NoData], str])
 def program_log() -> Do:
-    yield EitherState.inspect_f(lambda s: dump_json(s.main.program_log))
+    yield NS.inspect_either(lambda s: dump_json(s.main.program_log))
 
 
 @prog.unit

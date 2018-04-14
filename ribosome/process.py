@@ -263,18 +263,19 @@ class Subprocess(Generic[A], Dat['Subprocess']):
     def fatal(*a, **kw) -> IO[Either[str, Tuple[int, List[str], List[str]]]]:
         ...
 
-    def __init__(self, exe: Path, args: List[str], data: A) -> None:
+    def __init__(self, exe: Path, args: List[str], data: A, timeout: float) -> None:
         self.exe = exe
         self.args = args
         self.data = data
+        self.timeout = timeout
 
     @property
     def args_tuple(self) -> tuple:
         return tuple(self.args.cons(str(self.exe)))
 
     @do(IO[SubprocessResult[A]])
-    def execute(self, timeout: float, **kw: Any) -> Do:
-        retval, out, err = yield Subprocess.popen(*self.args_tuple, timeout=timeout, **kw)
+    def execute(self, **kw: Any) -> Do:
+        retval, out, err = yield Subprocess.popen(*self.args_tuple, timeout=self.timeout, **kw)
         yield IO.pure(SubprocessResult(retval, out, err, self.data))
 
 __all__ = ('ProcessExecutor', 'Result', 'Job', 'NvimProcessExecutor', 'Subprocess')

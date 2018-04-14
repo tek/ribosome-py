@@ -8,7 +8,7 @@ from amino.util.string import camelcase
 
 from ribosome.config.component import Component, Components, NoComponentData, ComponentConfig
 from ribosome.nvim.io.state import NS
-from ribosome.compute.prog import Program
+from ribosome.compute.program import Program, ProgramInterpreter
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
 # from ribosome.trans.action import LogMessage
 from ribosome.config.settings import Settings
@@ -16,6 +16,7 @@ from ribosome.config.resources import Resources
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.request.handler.method import RpcMethod
 from ribosome.config.basic_config import BasicConfig
+from ribosome.compute.interpret import default_interpreter, plain_default_interpreter
 
 A = TypeVar('A')
 C = TypeVar('C')
@@ -59,6 +60,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
             io_executor: Callable[[DIO], NS['PluginState[S, D, CC]', Any]]=None,
             rpc_handlers: List[DefinedHandler]=Nil,
             programs: Programs=Map(),
+            program_interpreter: ProgramInterpreter['PluginState[S, D, CC]', Any, Any]=None,
     ) -> 'PluginState':
         components = Components.cons(components)
         return PluginState(
@@ -76,6 +78,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
             rpc_handlers,
             Maybe.optional(io_executor),
             programs,
+            program_interpreter or plain_default_interpreter,
         )
 
     def __init__(
@@ -94,6 +97,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
             io_executor: Maybe[Callable[[DIO], NS['PluginState[S, D, CC]', Any]]],
             rpc_handlers: List[DefinedHandler],
             programs: Programs,
+            program_interpreter: ProgramInterpreter['PluginState[S, D, CC]', Any, Any],
     ) -> None:
         self.basic = basic
         self.comp = comp
@@ -109,6 +113,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
         self.rpc_handlers = rpc_handlers
         self.programs = programs
         self.request_handlers = request_handlers
+        self.program_interpreter = program_interpreter
 
     def update(self, data: D) -> 'PluginState[S, D, CC]':
         return self.copy(data=data)

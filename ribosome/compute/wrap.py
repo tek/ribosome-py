@@ -154,7 +154,7 @@ class prog_wrappers(
     def unknown_prog_type(self, tpe: UnknownProgType[M, C]) -> ProgWrappers[PS, R]:
         return Left('not an `NvimIOState`')
 
-    def state_prog(self, tpe: StateProg[M, C, R]) -> ProgWrappers[PS, R]:
+    def state_prog(self, tpe: StateProg[M, C, R, A]) -> ProgWrappers[PS, R]:
         return Right(ProgWrappers(wrap_resources.match(tpe.tpe), unwrap_resources.match(tpe.tpe)))
 
 
