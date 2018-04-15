@@ -1,9 +1,7 @@
 from typing import Any, TypeVar
 
-from amino import L
-
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.nvim.api.util import run_once_defined, cons_split_lines
+from ribosome.nvim.api.util import cons_split_lines
 from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
@@ -21,16 +19,12 @@ def nvim_command_output(cmd: str, *args: Any) -> NvimIO[None]:
     return N.read_cons('nvim_command_output', cons_split_lines, f'{cmd} {arg_string}')
 
 
-def command_once_defined(name: str, *args: str, timeout: int=10) -> NvimIO[A]:
-    return run_once_defined(
-        L(nvim_command)(name, *args),
-        f'cmd `{name}` did not appear',
-        timeout=timeout
-    )
-
-
 def doautocmd(name: str, pattern: str='', verbose: bool=False) -> NvimIO[None]:
     return nvim_command(f'doautocmd', '<nomodeline>', name, pattern, verbose=verbose)
 
 
-__all__ = ('nvim_command', 'nvim_command_output', 'command_once_defined', 'doautocmd')
+def runtime(path: str, verbose: bool=True) -> NvimIO[None]:
+    return nvim_command('runtime!', f'{path}.vim', verbose=verbose)
+
+
+__all__ = ('nvim_command', 'nvim_command_output', 'doautocmd', 'runtime')

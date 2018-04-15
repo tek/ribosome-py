@@ -12,20 +12,6 @@ A = TypeVar('A')
 B = TypeVar('B')
 
 
-def run_once_defined(job: Callable[[], NvimIO[A]], err: str, timeout: int=10) -> NvimIO[A]:
-    start = time.time()
-    def loop() -> NvimIO[A]:
-        def recurse(err: Exception) -> NvimIO[A]:
-            time.sleep(.1)
-            return loop()
-        return (
-            N.recover_fatal(job(), recurse)
-            if time.time() - start < timeout else
-            N.error(err)
-        )
-    return loop()
-
-
 def cons_checked_e(tpe: Type[A], cons: Callable[[A], Either[str, B]]) -> Callable[[Any], Either[str, B]]:
     def cons_data(data: Any) -> Either[str, A]:
         return cons(data) if isinstance(data, tpe) else Left(f'invalid nvim data for `{tpe}`: {data}')
@@ -67,6 +53,13 @@ cons_decode_str_list = cons_checked_e(list, check_str_list)
 cons_split_lines = cons_checked(str, Lists.lines)
 
 
+def check_bool(a: Any) -> Either[str, bool]:
+    return Right(a == 1) if a == 1 or a == 0 else Left(f'nvim result is not a boolean: {a}')
+
+
+cons_decode_bool = cons_checked_e(int, check_bool)
+
+
 def extract_int_pair(data: list) -> Either[str, Tuple[int, int]]:
     data_l = Lists.wrap(data)
     @do(Maybe[Tuple[int, int]])
@@ -84,6 +77,28 @@ def split_option(value: str) -> List[str]:
 cons_decode_str_list_option = cons_checked(str, split_option)
 
 
-__all__ = ('run_once_defined', 'cons_checked_e', 'cons_checked', 'cons_ext', 'cons_checked_list', 'cons_ext_list',
-           'check_str_list', 'cons_decode_str', 'cons_decode_str_list', 'extract_int_pair', 'split_option',
-           'cons_decode_str_list_option', 'cons_split_lines')
+@do(NvimIO[A])
+def nvimio_repeat_timeout(
+        thunk: Callable[[], NvimIO[A]],
+        check: Callable[[A], bool],
+        error: str,
+        timeout: float,
+) -> Do:
+    start = yield N.simple(time.time)
+    @do(NvimIO[None])
+    def recurse() -> Do:
+        result = yield thunk()
+        done = check(result)
+        yield (
+            N.pure(result)
+            if done else
+            N.error(error)
+            if time.time() - start > timeout else
+            recurse()
+        )
+    yield recurse()
+
+
+__all__ = ('cons_checked_e', 'cons_checked', 'cons_ext', 'cons_checked_list', 'cons_ext_list', 'check_str_list',
+           'cons_decode_str', 'cons_decode_str_list', 'extract_int_pair', 'split_option', 'cons_decode_str_list_option',
+           'cons_split_lines', 'cons_decode_bool', 'nvimio_repeat_timeout')
