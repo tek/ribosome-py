@@ -49,7 +49,7 @@ def setup_map() -> Do:
     yield NS.unit
 
 
-component = Component.cons(
+component: Component = Component.cons(
     'main',
     state_type=CData,
     request_handlers=List(
@@ -60,7 +60,7 @@ component = Component.cons(
         Map({gs_mapping: handle_map}),
     )
 )
-config = Config.cons(
+config: Config = Config.cons(
     name=default_config_name,
     prefix=default_config_name,
     components=Map(main=component),

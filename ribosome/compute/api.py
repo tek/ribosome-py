@@ -2,9 +2,9 @@ from typing import Callable, TypeVar, Tuple
 
 from amino import Either, do, Do, _, IO, List
 
-from ribosome.compute.tpe import analyse_prog_tpe, first_type_arg
+from ribosome.compute.tpe import analyse_prog_tpe, prog_type
 from ribosome.compute.wrap import prog_wrappers
-from ribosome.compute.output import (ProgOutputInterpreter, ProgOutputUnit, ProgOutputResult, ProgOutputIO,
+from ribosome.compute.output import (ProgOutput, ProgOutputUnit, ProgOutputResult, ProgOutputIO,
                                      ProgScalarIO, ProgGatherIOs, ProgScalarSubprocess, ProgGatherSubprocesses, Echo,
                                      ProgIOEcho)
 from ribosome.nvim.io.state import NS
@@ -30,12 +30,6 @@ C = TypeVar('C')
 PIO = TypeVar('PIO')
 
 
-@do(Either[str, ProgWrappers])
-def prog_type(func: Callable[[P], NS[R, A]], params_spec: ParamsSpec) -> Do:
-    tpe = yield analyse_prog_tpe(params_spec)
-    yield prog_wrappers.match(tpe)
-
-
 def prog_type_error(func: Callable[[P], NS[R, A]], error: str) -> None:
     raise Exception(f'program `{func.__name__}` has invalid type: {error}')
 
@@ -44,12 +38,12 @@ def program_from_data(
         func: Callable[[P], NS[R, A]],
         params_spec: ParamsSpec,
         wrappers: ProgWrappers,
-        interpreter: ProgOutputInterpreter[A, B],
+        interpreter: ProgOutput[A, B],
 ) -> Program[A]:
     return Program(func.__name__, ProgramBlock(func, wrappers, interpreter), params_spec)
 
 
-def prog_state(func: Callable[[P], NS[R, A]], interpreter: ProgOutputInterpreter[A, B]) -> Program:
+def prog_state(func: Callable[[P], NS[R, A]], interpreter: ProgOutput[A, B]) -> Program:
     params_spec = ParamsSpec.from_function(func)
     wrappers = prog_type(func, params_spec).value_or(lambda err: prog_type_error(func, err))
     return Program(func.__name__, ProgramBlock(func, wrappers, interpreter), params_spec)
@@ -106,9 +100,10 @@ class prog:
         return prog_state(wrap, ProgOutputResult())
 
     @staticmethod
-    def do(func: Callable[[P], Prog[A]]) -> Program:
-        params_spec = ParamsSpec.from_function(func)
-        return Program(func.__name__, ProgramCompose(func), params_spec)
+    def do(func: Callable[[P], Do]) -> Program:
+        f = do(Prog[A])(func)
+        params_spec = ParamsSpec.from_function(f)
+        return Program(func.__name__, ProgramCompose(f), params_spec)
 
     io = prog_io
     subproc = prog_subproc

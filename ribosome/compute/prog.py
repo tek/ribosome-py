@@ -8,6 +8,7 @@ from amino.tc.base import ImplicitsMeta, Implicits
 
 from ribosome.compute.wrap_data import ProgWrappers
 from ribosome.nvim.io.state import NS
+from ribosome.compute.output import ProgOutput
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -50,16 +51,11 @@ class ProgExec(Generic[A, B, S, R], Prog[B]):
             self,
             code: NS[R, A],
             wrappers: ProgWrappers[S, R],
+            output_type: ProgOutput,
     ) -> None:
         self.code = code
         self.wrappers = wrappers
-
-
-class ProgInterpret(Generic[A, B], Prog[B]):
-
-    def __init__(self, prog: Prog[A], interpret: Callable[[A], Prog[B]]) -> None:
-        self.prog = prog
-        self.interpret = interpret
+        self.output_type = output_type
 
 
 class ProgBind(Generic[A, B], Prog[B]):
@@ -90,5 +86,4 @@ class Monad_Prog(Monad, tpe=Prog):
         return ProgBind(fa, f)
 
 
-__all__ = ('Prog', 'ProgBind', 'ProgPure', 'ProgPure', 'ProgError', 'bind_program', 'bind_nullary_program',
-           'bind_programs', 'ProgInterpret')
+__all__ = ('Prog', 'ProgBind', 'ProgPure', 'ProgPure', 'ProgError')

@@ -12,35 +12,35 @@ P = TypeVar('P')
 PIO = TypeVar('PIO')
 
 
-class ProgOutputInterpreter(Generic[A, B], ADT['ProgOutputInterpreter[A, B]']):
+class ProgOutput(Generic[A, B], ADT['ProgOutput[A, B]']):
     pass
 
 
-class ProgOutputUnit(ProgOutputInterpreter[None, None]):
+class ProgOutputUnit(ProgOutput[None, None]):
     pass
 
 
-class ProgOutputResult(Generic[A], ProgOutputInterpreter[A, A]):
+class ProgOutputResult(Generic[A], ProgOutput[A, A]):
     pass
 
 
-class ProgIOInterpreter(Generic[PIO], ADT['ProgIOInterpreter[PIO]']):
+class ProgIO(Generic[PIO], ADT['ProgIO[PIO]']):
     pass
 
 
-class ProgScalarIO(ProgIOInterpreter[IO]):
+class ProgScalarIO(ProgIO[IO]):
     pass
 
 
-class ProgGatherIOs(ProgIOInterpreter[List[IO]]):
+class ProgGatherIOs(ProgIO[List[IO]]):
     pass
 
 
-class ProgScalarSubprocess(ProgIOInterpreter[Subprocess]):
+class ProgScalarSubprocess(ProgIO[Subprocess]):
     pass
 
 
-class ProgGatherSubprocesses(ProgIOInterpreter[List[Subprocess]]):
+class ProgGatherSubprocesses(ProgIO[List[Subprocess]]):
     pass
 
 
@@ -68,18 +68,18 @@ class Echo(Dat['Echo'], metaclass=EchoMeta):
         self.level = level
 
 
-class ProgIOEcho(ProgIOInterpreter[None]):
+class ProgIOEcho(ProgIO[None]):
     pass
 
 
-class ProgIOCustom(ProgIOInterpreter[Any]):
+class ProgIOCustom(ProgIO[Any]):
     pass
 
 
-class ProgOutputIO(Generic[PIO, A], ProgOutputInterpreter[PIO, A]):
+class ProgOutputIO(Generic[PIO, A], ProgOutput[PIO, A]):
 
-    def __init__(self, interpreter: ProgIOInterpreter[PIO]) -> None:
-        self.interpreter = interpreter
+    def __init__(self, io: ProgIO[PIO]) -> None:
+        self.io = io
 
 
 class GatherIOs(Generic[A], Dat['GatherIOs[A]']):
@@ -96,6 +96,6 @@ class GatherSubprocesses(Generic[A], Dat['Generic[A]']):
         self.timeout = timeout
 
 
-__all__ = ('ProgOutputInterpreter', 'ProgOutputUnit', 'ProgOutputResult', 'ProgOutputIO', 'ProgResult', 'ProgReturn',
-           'ProgIOInterpreter', 'ProgScalarIO', 'ProgGatherIOs', 'ProgScalarSubprocess', 'ProgGatherSubprocesses',
+__all__ = ('ProgOutput', 'ProgOutputUnit', 'ProgOutputResult', 'ProgOutputIO', 'ProgResult', 'ProgReturn',
+           'ProgIO', 'ProgScalarIO', 'ProgGatherIOs', 'ProgScalarSubprocess', 'ProgGatherSubprocesses',
            'ProgIOCustom', 'ProgOutputIO', 'GatherIOs', 'GatherSubprocesses')

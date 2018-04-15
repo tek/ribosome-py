@@ -1,4 +1,6 @@
-from amino import Lists, Either, do, Do, Maybe, Right, Left
+from typing import Callable, TypeVar
+
+from amino import Either, do, Do, Right
 from amino.util.tpe import first_type_arg, type_arg
 
 from ribosome.config.resources import Resources
@@ -10,6 +12,13 @@ from ribosome.compute.tpe_data import (MainDataProgType, InternalMainDataProgTyp
                                        ResourcesStateProgType, StateProg, ProgType, UnknownProgType, RootProgType,
                                        RibosomeStateProgType)
 from ribosome.compute.ribosome import Ribosome
+from ribosome.compute.wrap import prog_wrappers
+from ribosome.compute.wrap_data import ProgWrappers
+from ribosome.nvim.io.state import NS
+
+A = TypeVar('A')
+P = TypeVar('P')
+R = TypeVar('R')
 
 
 def main_data_trans(data_type: type) -> MainDataProgType:
@@ -74,4 +83,10 @@ def analyse_prog_tpe(params: ParamsSpec) -> Either[str, ProgType]:
     )
 
 
-__all__ = ('analyse_prog_tpe')
+@do(Either[str, ProgWrappers])
+def prog_type(func: Callable[[P], NS[R, A]], params_spec: ParamsSpec) -> Do:
+    tpe = yield analyse_prog_tpe(params_spec)
+    yield prog_wrappers.match(tpe)
+
+
+__all__ = ('analyse_prog_tpe', 'prog_type')

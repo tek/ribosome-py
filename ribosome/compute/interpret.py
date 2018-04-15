@@ -2,20 +2,22 @@ from typing import TypeVar, Callable, Any
 from concurrent.futures import wait, ThreadPoolExecutor
 
 from amino.case import Case
-from amino import IO, List, Either, Lists, __
+from amino import IO, List, Either, Lists, __, Maybe, Nothing, do, Do
 from amino.io import IOException
 
-from ribosome.compute.output import (ProgOutputInterpreter, ProgIOInterpreter, ProgOutputIO, ProgScalarIO,
+from ribosome import ribo_log
+from ribosome.compute.output import (ProgOutput, ProgIO, ProgOutputIO, ProgScalarIO,
                                      ProgGatherIOs, ProgScalarSubprocess, ProgGatherSubprocesses, GatherIOs,
                                      GatherSubprocesses, ProgIOCustom, ProgOutputUnit, ProgOutputResult, ProgIOEcho,
                                      Echo)
 from ribosome.compute.prog import Prog
-from ribosome.compute.program import ProgramInterpreter
-from ribosome import ribo_log
+from ribosome.compute.program import Program
 from ribosome.process import Subprocess
+from ribosome.nvim.io.state import NS
 
 A = TypeVar('A')
 B = TypeVar('B')
+D = TypeVar('D')
 
 
 def gather_ios(gio: GatherIOs[A]) -> List[Either[IOException, A]]:
@@ -35,10 +37,22 @@ def gather_subprocesses(gio: GatherSubprocesses[A]) -> List[Either[IOException, 
     return gather_ios(GatherIOs(popens, gio.timeout))
 
 
-class interpret_io(Case[ProgIOInterpreter, Prog[A]], alg=ProgIOInterpreter):
+ProgIOInterpreter = Callable[[ProgIO, Any], Prog[A]]
 
-    def __init__(self, custom: Callable[[Any], Prog[A]]) -> None:
+
+def default_logger(echo: Echo) -> NS[D, None]:
+    io = echo.messages.traverse(lambda m: IO.delay(ribo_log.log, echo.level, m), IO)
+    return NS.from_io(io).replace(None)
+
+
+default_logger_program = Program.lift(default_logger)
+
+
+class interpret_io(Case[ProgIO, Prog[A]], alg=ProgIO):
+
+    def __init__(self, custom: Callable[[Any], Prog[A]], logger: Maybe[Program]=Nothing) -> None:
         self.custom = custom
+        self.logger = logger
 
     def prog_scalar_io(self, po: ProgScalarIO, output: IO[A]) -> Prog[A]:
         return Prog.from_either(output.attempt)
@@ -52,21 +66,22 @@ class interpret_io(Case[ProgIOInterpreter, Prog[A]], alg=ProgIOInterpreter):
     def prog_gather_subprocesses(self, po: ProgGatherSubprocesses, output: GatherSubprocesses[A]) -> Prog[A]:
         return Prog.pure(gather_subprocesses(output))
 
-    def prog_io_echo(self, po: ProgIOEcho, output: Echo) -> Prog[A]:
-        io = output.messages.traverse(lambda m: IO.delay(ribo_log.log, output.level, m), IO)
-        return Prog.from_either(io.attempt).replace(None)
+    @do(Prog[None])
+    def prog_io_echo(self, po: ProgIOEcho, output: Echo) -> Do:
+        logger = self.logger | (lambda: default_logger_program)
+        yield logger(output).replace(None)
 
     def prog_io_custom(self, po: ProgIOCustom, output: Any) -> Prog[A]:
         return self.custom(output)
 
 
-class interpret(Case[ProgOutputInterpreter, Prog[B]], alg=ProgOutputInterpreter):
+class interpret(Case[ProgOutput, Prog[B]], alg=ProgOutput):
 
-    def __init__(self, custom: Callable[[A], Prog[B]]) -> None:
-        self.custom = custom
+    def __init__(self, io: ProgIOInterpreter[B]) -> None:
+        self.io = io
 
     def prog_output_io(self, po: ProgOutputIO, output: IO[B]) -> Prog[B]:
-        return interpret_io(self.custom)(po.interpreter, output)
+        return self.io(po.io, output)
 
     def prog_output_unit(self, po: ProgOutputUnit, output: Any) -> Prog[None]:
         return Prog.pure(None)
@@ -75,11 +90,8 @@ class interpret(Case[ProgOutputInterpreter, Prog[B]], alg=ProgOutputInterpreter)
         return Prog.pure(output)
 
 
-def default_interpreter(custom: Callable[[A], Prog[B]]) -> ProgramInterpreter:
-    return ProgramInterpreter(lambda a: lambda r: interpret(custom)(a, r))
+def no_interpreter(po: ProgOutputIO, a: Any) -> Prog[A]:
+    return Prog.error(f'no custom interpreter ({a})')
 
 
-plain_default_interpreter = default_interpreter(lambda a: Prog.error(f'no custom interpreter ({a})'))
-
-
-__all__ = ('default_interpreter',)
+__all__ = ('ProgIOInterpreter', 'interpret_io', 'interpret', 'no_interpreter')

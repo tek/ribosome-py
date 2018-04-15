@@ -58,7 +58,6 @@ def extra_fun(a: int) -> Do:
 
 
 @prog.do
-@do(Prog)
 def switch() -> Do:
     a = yield core_fun(3)
     yield extra_fun(a)

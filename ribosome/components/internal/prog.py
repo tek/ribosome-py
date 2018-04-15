@@ -156,7 +156,6 @@ def mapping_handler(uuid: UUID, keys: str) -> Do:
 
 
 @prog.do
-@do(Prog)
 def mapping(uuid_s: str, keys: str) -> Do:
     uuid = yield Prog.from_either(Try(UUID, hex=uuid_s))
     handler = yield mapping_handler(uuid, keys)
@@ -170,7 +169,6 @@ def internal_init_trans() -> Do:
 
 
 @prog.do
-@do(Prog)
 def internal_init() -> Do:
     enabled = yield prog(setting)(_.run_internal_init)
     if enabled:

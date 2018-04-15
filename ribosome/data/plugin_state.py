@@ -1,5 +1,5 @@
 import logging
-from typing import TypeVar, Generic, Callable, Any, Type, Callable
+from typing import TypeVar, Generic, Callable, Any, Type
 from uuid import UUID
 
 from amino import Map, List, Nil, Either, _, Maybe, Nothing, __, L
@@ -8,15 +8,16 @@ from amino.util.string import camelcase
 
 from ribosome.config.component import Component, Components, NoComponentData, ComponentConfig
 from ribosome.nvim.io.state import NS
-from ribosome.compute.program import Program, ProgramInterpreter
+from ribosome.compute.program import Program
 from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
-# from ribosome.trans.action import LogMessage
 from ribosome.config.settings import Settings
 from ribosome.config.resources import Resources
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.request.handler.method import RpcMethod
 from ribosome.config.basic_config import BasicConfig
-from ribosome.compute.interpret import default_interpreter, plain_default_interpreter
+from ribosome.compute.output import ProgIO
+from ribosome.compute.prog import Prog
+from ribosome.compute.interpret import interpret_io, no_interpreter
 
 A = TypeVar('A')
 C = TypeVar('C')
@@ -53,14 +54,15 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
             components: List[Component],
             init: Program,
             program_log: List[str]=Nil,
-            log_handler: Maybe[logging.Handler]=Nothing,
-            logger: Maybe[Callable[[Any], 'NS[PluginState[S, D, CC], None]']]=Nothing,
+            logger: Program[None]=None,
+            log_handler: logging.Handler=None,
             component_data: Map[type, Any]=Map(),
             active_mappings: Map[UUID, Program]=Map(),
             io_executor: Callable[[DIO], NS['PluginState[S, D, CC]', Any]]=None,
             rpc_handlers: List[DefinedHandler]=Nil,
             programs: Programs=Map(),
-            program_interpreter: ProgramInterpreter['PluginState[S, D, CC]', Any, Any]=None,
+            io_interpreter: Callable[[ProgIO], Prog]=None,
+            custom_io: Callable[[Any], Prog[A]]=None,
     ) -> 'PluginState':
         components = Components.cons(components)
         return PluginState(
@@ -72,13 +74,12 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
             init,
             program_log,
             log_handler,
-            logger,
             component_data,
             active_mappings,
             rpc_handlers,
             Maybe.optional(io_executor),
             programs,
-            program_interpreter or plain_default_interpreter,
+            io_interpreter or interpret_io(custom_io or no_interpreter, Maybe.optional(logger)),
         )
 
     def __init__(
@@ -91,13 +92,12 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
             init: Program,
             program_log: List[str],
             log_handler: Maybe[logging.Handler],
-            logger: Maybe[Callable[[Any], 'NS[PluginState[S, D, CC], None]']],
             component_data: Map[type, Any],
             active_mappings: Map[UUID, Program],
             io_executor: Maybe[Callable[[DIO], NS['PluginState[S, D, CC]', Any]]],
             rpc_handlers: List[DefinedHandler],
             programs: Programs,
-            program_interpreter: ProgramInterpreter['PluginState[S, D, CC]', Any, Any],
+            io_interpreter: Callable[[ProgIO], Prog],
     ) -> None:
         self.basic = basic
         self.comp = comp
@@ -106,14 +106,13 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
         self.init = init
         self.program_log = program_log
         self.log_handler = log_handler
-        self.logger = logger
         self.component_data = component_data
         self.active_mappings = active_mappings
         self.io_executor = io_executor
         self.rpc_handlers = rpc_handlers
         self.programs = programs
         self.request_handlers = request_handlers
-        self.program_interpreter = program_interpreter
+        self.io_interpreter = io_interpreter
 
     def update(self, data: D) -> 'PluginState[S, D, CC]':
         return self.copy(data=data)

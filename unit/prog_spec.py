@@ -78,7 +78,6 @@ def t2_b(a: int) -> Do:
 
 
 @prog.do
-@do(Prog)
 def t2(a: int) -> Do:
     yield t2_b(a)
 
@@ -91,7 +90,6 @@ def t3(a: int) -> Do:
 
 
 @prog.do
-@do(Prog)
 def tm() -> Do:
     a = yield t1(0)
     b = yield t2(a)
@@ -133,19 +131,16 @@ helper = RequestHelper.strict(config)
 
 
 @prog.do
-@do(Prog[None])
 def n3(a: int) -> Do:
     yield Prog.error('stop')
 
 
 @prog.do
-@do(Prog[None])
 def n2() -> Do:
     yield Prog.pure(7)
 
 
 @prog.do
-@do(Prog[None])
 def n1() -> Do:
     a = yield n2()
     b = yield n3(a)

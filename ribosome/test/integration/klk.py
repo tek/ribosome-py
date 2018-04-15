@@ -40,18 +40,6 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
     def _wait_for(self, pred: Callable[..., bool], *a: Any, **kw: Any) -> Expectation:
         return later(kf(pred, *a, **kw).true)
 
-    @property
-    def buffer(self) -> Any:
-        return self.vim.buffer
-
-    @property
-    def _buffer_out(self) -> List[str]:
-        return self.buffer.content
-
-    @property
-    def contentkf(self) -> Expectable:
-        return kf(lambda: self._buffer_out)
-
     def _list_line(self, log: Callable[[], List[str]], index: int, matcher: BoundMatcher) -> Expectation:
         minlen = index if index >= 0 else abs(index + 1)
         return later(

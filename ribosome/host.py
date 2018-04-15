@@ -25,13 +25,19 @@ from ribosome.data.plugin_state_holder import PluginStateHolder
 from ribosome.nvim.io.state import NS
 from ribosome.config.component import ComponentConfig
 from ribosome.components.internal.update import init_rpc
+from ribosome.compute.output import ProgOutput
+from ribosome.compute.prog import Prog
+from ribosome.compute.interpret import ProgIOInterpreter
+from ribosome.compute.program import Program
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
 DIO = TypeVar('DIO')
+B = TypeVar('B')
 C = TypeVar('C', bound=Config)
 S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
+R = TypeVar('R')
 
 
 def request_handler(vim: NvimApi, sync: bool, state: PluginStateHolder[D]) -> Callable[[str, tuple], Any]:
@@ -46,7 +52,7 @@ def request_handler(vim: NvimApi, sync: bool, state: PluginStateHolder[D]) -> Ca
 
 
 @do(NvimIO[PluginState[S, D, CC]])
-def init_state(config: Config, io_executor: Callable[[DIO], NS['PluginState[S, D, CC]', Any]]=None) -> Do:
+def init_state(config: Config, io_interpreter: ProgIOInterpreter=None, logger: Program[None]=None) -> Do:
     data = config.basic.state_ctor()
     log_handler = yield N.delay(nvim_logging)
     state = PluginState.cons(
@@ -56,8 +62,9 @@ def init_state(config: Config, io_executor: Callable[[DIO], NS['PluginState[S, D
         data,
         Nil,
         config.init,
-        log_handler=Just(log_handler),
-        io_executor=io_executor,
+        logger=logger,
+        io_interpreter=io_interpreter,
+        log_handler=log_handler,
     )
     yield init_rpc().run_s(state)
 

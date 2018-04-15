@@ -7,7 +7,8 @@ from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 from ribosome.config.settings import Settings
 from ribosome.config.config import NoData
 from ribosome.test.klk import kn
-from ribosome.nvim.api.function import call_once_defined, nvim_call_tpe
+from ribosome.nvim.api.function import nvim_call_tpe
+from ribosome.nvim.api.exists import call_once_defined
 
 from integration._support.default_handler import class_name
 
