@@ -75,7 +75,7 @@ class NvimIORequest(Generic[A], NvimIO[A]):
 class NvimIOSuspend(Generic[A], NvimIO[A]):
 
     @staticmethod
-    def cons(thunk: Callable[[NvimApi], Tuple[NvimApi, NvimIO[A]]]) -> 'NvimIOSuspend[A]':
+    def cons(thunk: State[NvimApi, NvimIO[A]]) -> 'NvimIOSuspend[A]':
         return NvimIOSuspend(Thunk.cons(thunk))
 
     def __init__(self, thunk: Thunk[NvimApi, NvimIO[A]]) -> None:
@@ -170,7 +170,7 @@ class flat_map_nvim_io(Case[Callable[[A], NvimIO[B]], NvimIO[B]], alg=NvimIO):
         return NvimIOBind(Thunk.cons(execute_nvim_request(io)), self.f)
 
     def nvim_io_bind(self, io: NvimIOBind[C, A]) -> NvimIO[B]:
-        return NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f))
+        return NvimIOSuspend.cons(State.pure(NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f))))
 
     def nvim_io_error(self, io: NvimIOError[A]) -> NvimIO[B]:
         return cast(NvimIO[B], io)
