@@ -90,13 +90,18 @@ def no_listen_address(err: Exception) -> None:
     raise Exception('could not connect to the vim server from within the host')
 
 
-def run_loop(session: Session, config: Config) -> int:
-    vim = NativeNvimApi(config.basic.name, Nvim.from_session(session)._session)
-    return run_session(session, config).unsafe(vim)
-
-
 def session(*args: str, loop: Type[Loop]=UvEventLoop, transport_type: str='stdio', **kwargs: str) -> Session:
     return Session(AsyncSession(MsgpackStream(loop(transport_type, *args, **kwargs))))
+
+
+def connect_nvim(name: str) -> NvimApi:
+    return NativeNvimApi(name, Nvim.from_session(session())._session)
+
+
+def run_loop(session: Session, config: Config) -> int:
+    amino_log.debug(f'starting plugin from {config.basic}')
+    vim = connect_nvim(config.basic.name)
+    return run_session(vim.session, config).unsafe(vim)
 
 
 def config_from_module(mod: ModuleType) -> Either[str, Type[C]]:
@@ -108,7 +113,7 @@ log_initialized = False
 
 def nvim_stdio_with_logging(name: str) -> NvimApi:
     from ribosome.logging import nvim_logging
-    vim = NvimApi(name, session())
+    vim = NativeNvimApi(name, session())
     nvim_logging(vim)
     return vim
 
@@ -123,11 +128,6 @@ def nvim_log() -> Logger:
 
 def config(config: Config) -> Config:
     return Config.cons(config.basic.name, config.state_ctor)
-
-
-def start_config_stage_2(config: Config) -> int:
-    amino_log.debug(f'starting plugin from {config.basic.name}')
-    return run_loop(session(), config)
 
 
 def error(msg: str) -> int:
@@ -154,7 +154,7 @@ def exception(e: Exception, desc: str) -> int:
 
 
 def start_config_stage_1(mod: ModuleType) -> int:
-    return config_from_module(mod).cata(error, start_config_stage_2)
+    return config_from_module(mod).cata(error, run_loop)
 
 
 def setup_log() -> None:
