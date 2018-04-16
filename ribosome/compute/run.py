@@ -1,6 +1,6 @@
 from typing import TypeVar, Any, Generic
 
-from amino import List, _
+from amino import List, _, __
 from amino.do import do, Do
 from amino.case import Case
 
@@ -25,10 +25,15 @@ def transform_prog_state(st: NS[R, A], wrappers: ProgWrappers[PluginState[D, S, 
     yield st.transform_s(wrappers.get, wrappers.put)
 
 
+def log_prog(prog: ProgExec) -> NS[PluginState[S, D, CC], None]:
+    return NS.pure(None) if prog.name in ('program_log', 'pure') else NS.modify(__.log_prog(prog.name))
+
+
 class eval_prog(Generic[A, B, R, D, S, CC], Case[Prog[A], NS[PluginState[S, D, CC], A]], alg=Prog):
 
     @do(NS[PluginState[S, D, CC], A])
     def prog_exec(self, prog: ProgExec[B, A, R, Any]) -> Do:
+        yield log_prog(prog)
         io_interpreter = yield NS.inspect(_.io_interpreter)
         output = yield transform_prog_state(prog.code, prog.wrappers)
         yield self(interpret(io_interpreter)(prog.output_type, output))

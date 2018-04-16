@@ -49,10 +49,12 @@ class ProgExec(Generic[A, B, S, R], Prog[B]):
 
     def __init__(
             self,
+            name: str,
             code: NS[R, A],
             wrappers: ProgWrappers[S, R],
             output_type: ProgOutput,
     ) -> None:
+        self.name = name
         self.code = code
         self.wrappers = wrappers
         self.output_type = output_type

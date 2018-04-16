@@ -117,7 +117,7 @@ class PluginState(Generic[S, D, CC], Dat['PluginState[S, D, CC]']):
     def update(self, data: D) -> 'PluginState[S, D, CC]':
         return self.copy(data=data)
 
-    def log_trans(self, trans: str) -> 'PluginState[S, D, CC]':
+    def log_prog(self, trans: str) -> 'PluginState[S, D, CC]':
         return self.append1.program_log(trans)
 
     def component(self, name: str) -> Either[str, Component]:

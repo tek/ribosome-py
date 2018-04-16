@@ -46,7 +46,7 @@ def program_from_data(
 def prog_state(func: Callable[[P], NS[R, A]], interpreter: ProgOutput[A, B]) -> Program:
     params_spec = ParamsSpec.from_function(func)
     wrappers = prog_type(func, params_spec).value_or(lambda err: prog_type_error(func, err))
-    return Program(func.__name__, ProgramBlock(func, wrappers, interpreter), params_spec)
+    return Program(func.__name__, ProgramBlock(func.__name__, func, wrappers, interpreter), params_spec)
 
 
 def func_state_data(f: Callable[..., NS[R, A]]) -> Tuple[ParamsSpec, ProgWrappers]:

@@ -81,14 +81,9 @@ def parse_args(handler: RequestHandler, args: List[Any]) -> NS[D, List[Any]]:
     return arg_parser(handler, handler.program.params_spec).parse(args)
 
 
-def log_trans(trans: Program) -> NS[PluginState[S, D, CC], None]:
-    return NS.pure(None) if trans.name in ('program_log', 'pure') else NS.modify(__.log_trans(trans.name))
-
-
 @do(NS)
 def run_request_handler(handler: RequestHandler, args: List[Any]) -> Do:
     parsed_args = yield NS.from_either(parse_args(handler, args))
-    yield log_trans(handler.program)
     yield run_prog(handler.program, parsed_args)
 
 

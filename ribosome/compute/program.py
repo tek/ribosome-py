@@ -26,10 +26,12 @@ class ProgramBlock(Generic[A, B, D], ProgramCode[B]):
 
     def __init__(
             self,
+            name: str,
             code: Callable[..., NS[D, A]],
             wrappers: ProgWrappers,
             interpreter: ProgOutput[A, B],
     ) -> None:
+        self.name = name
         self.code = code
         self.wrappers = wrappers
         self.interpreter = interpreter
@@ -47,7 +49,7 @@ class Program(Generic[A], Dat['Program[A]']):
     def lift(f: Callable[..., NS[D, A]]) -> 'Program[A]':
         return Program(
             f.__name__,
-            ProgramBlock(f, ProgWrappers.id(), ProgOutputResult()),
+            ProgramBlock(f.__name__, f, ProgWrappers.id(), ProgOutputResult()),
             ParamsSpec.from_function(f)
         )
 
@@ -74,7 +76,7 @@ class bind_program_code(Generic[A, B, R], Case[ProgramCode[A], Prog[B]], alg=Pro
         return code.code(*self.args)
 
     def program_block(self, code: ProgramBlock[Any, A, R]) -> Prog[A]:
-        return ProgExec(code.code(*self.args), code.wrappers, code.interpreter)
+        return ProgExec(code.name, code.code(*self.args), code.wrappers, code.interpreter)
 
 
 def bind_program(program: Program[A], args: List[Any]) -> Prog[B]:

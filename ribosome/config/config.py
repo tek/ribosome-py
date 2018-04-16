@@ -68,9 +68,6 @@ class Config(Generic[S, D, CC], Dat['Config[S, D, CC]']):
         self.request_handlers = request_handlers
         self.init = init
 
-    def _arg_desc(self) -> List[str]:
-        return List(str(self.components), str(self.settings), str(self.request_handlers))
-
     def vim_cmd_name(self, handler: RequestHandler) -> str:
         return handler.vim_cmd_name(self.name, self.prefix)
 
