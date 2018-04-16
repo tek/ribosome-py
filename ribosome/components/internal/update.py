@@ -14,6 +14,8 @@ from ribosome.config.settings import Settings
 from ribosome.compute.program import Program
 from ribosome.request.handler.method import RpcMethod
 from ribosome.util.setting import setting_ps_e
+from ribosome.nvim.api.command import nvim_command
+from ribosome.nvim.io.compute import NvimIO
 
 CC = TypeVar('CC')
 D = TypeVar('D')
@@ -57,16 +59,15 @@ def update_components(from_user: Either[str, List[str]]) -> Do:
     yield EitherState.modify(lens.programs.set(progs))
 
 
-# TODO finish
-@do(NS[PluginState[S, D, CC], None])
-def undef_handler(handler: RpcHandlerSpec) -> Do:
-    yield NS.unit
+@do(NvimIO[None])
+def undef_handler(spec: RpcHandlerSpec) -> Do:
+    yield nvim_command(spec.undef_cmdline)
 
 
 @do(NS[PluginState[S, D, CC], None])
 def undef_handlers() -> Do:
     handlers = yield NS.inspect(_.rpc_handlers)
-    yield handlers.traverse(undef_handler, NS)
+    yield NS.lift(handlers.traverse(undef_handler, NvimIO))
 
 
 @do(NS[PluginState[S, D, CC], None])
