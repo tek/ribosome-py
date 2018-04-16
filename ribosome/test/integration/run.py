@@ -229,6 +229,9 @@ class RequestHelper(Generic[S, D, CC], Dat['RequestHelper[S, D, CC]']):
     def k(self, f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> Expectable:
         return kn(self.vim, f, *a, **kw)
 
+    def k_s(self, prog: str, *a: Any, **kw: Any) -> Expectable:
+        return self.k(self.run_s, prog, a, **kw)
+
 
 def request_helper(
         config: Config[S, D, CC],
@@ -239,4 +242,4 @@ def request_helper(
     return N.delay(lambda v: RequestHelper.nvim(config, v, *comps, vars=vars, io_interpreter=io_interpreter))
 
 
-__all__ = ('DispatchHelper', 'request_helper')
+__all__ = ('RequestHelper', 'request_helper')
