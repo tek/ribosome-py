@@ -4,6 +4,8 @@ from typing import Callable, TypeVar, Type, Any, List as TList, Tuple
 from msgpack import ExtType
 
 from amino import Either, Left, Right, List, Lists, Try, do, Maybe, Do, Just, Nothing
+from amino.json import decode_json
+from amino.json.decoder import decode_json_type
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
@@ -76,6 +78,12 @@ def split_option(value: str) -> List[str]:
 
 cons_decode_str_list_option = cons_checked(str, split_option)
 
+cons_json = cons_checked_e(str, decode_json)
+
+
+def cons_json_tpe(tpe: Type[A]) -> NvimIO[A]:
+    return cons_checked_e(str, lambda a: decode_json_type(a, tpe))
+
 
 @do(NvimIO[A])
 def nvimio_repeat_timeout(
@@ -101,4 +109,4 @@ def nvimio_repeat_timeout(
 
 __all__ = ('cons_checked_e', 'cons_checked', 'cons_ext', 'cons_checked_list', 'cons_ext_list', 'check_str_list',
            'cons_decode_str', 'cons_decode_str_list', 'extract_int_pair', 'split_option', 'cons_decode_str_list_option',
-           'cons_split_lines', 'cons_decode_bool', 'nvimio_repeat_timeout')
+           'cons_split_lines', 'cons_decode_bool', 'nvimio_repeat_timeout', 'cons_json', 'cons_json_tpe')
