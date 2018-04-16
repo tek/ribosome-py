@@ -5,16 +5,13 @@ import json
 import time
 import asyncio
 import subprocess
-from functools import wraps
-from threading import Thread
 from datetime import datetime
-from contextlib import contextmanager
 from typing import Any, Callable, Generic, TypeVar
 
 import neovim
 from neovim.api import Nvim
 
-from amino import List, Either, __, env, Path, Lists, Map, do, Do, Nil, _, Maybe, Just, Nothing
+from amino import List, Either, __, env, Path, Lists, Map, do, Do, Nil, _
 from amino.lazy import lazy
 from amino.test import fixture_path, temp_dir
 from amino.test.path import base_dir, pkg_dir
@@ -23,14 +20,13 @@ from amino.util.string import camelcase
 from amino.json import decode_json
 from amino.json.data import JsonError
 
-import ribosome
 from ribosome.logging import Logging
 from ribosome.nvim.api.data import NvimApi
 from ribosome.config.settings import Settings
 from ribosome.nvim.api.data import NativeNvimApi
 from ribosome.nvim.api.option import option_cat
 from ribosome.nvim.api.variable import variable_set_prefixed
-from ribosome.nvim.api.function import define_function, nvim_call_function
+from ribosome.nvim.api.function import define_function, nvim_call_function, nvim_call_json
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.command import nvim_command
 
@@ -270,96 +266,11 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return self.vim.buffer.content
 
     def program_log(self) -> Either[str, List['str']]:
-        return self.vim.call(f'{self.full_cmd_prefix()}TransLog') // decode_json
+        return nvim_call_json(f'{self.full_cmd_prefix()}ProgramLog').unsafe(self.vim)
 
     @property
     def state(self) -> Any:
-        def error(err: JsonError) -> None:
-            self.log.error(f'{err.error}: {err.data}')
-            raise err.exception
-        response = self.vim.call(f'{self.full_cmd_prefix()}State').get_or_raise()
-        return decode_json(response).value_or(error)
-
-
-def main_looped(fun):
-    @wraps(fun)
-    def wrapper(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        asyncio.get_child_watcher().attach_loop(loop)
-        done = asyncio.Future(loop=loop)
-        exc = None
-        ret = None
-        def runner():
-            nonlocal ret
-            local_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(local_loop)
-            try:
-                ret = fun(self)
-            except Exception as e:
-                nonlocal exc
-                exc = e
-            finally:
-                loop.call_soon_threadsafe(lambda: done.set_result(True))
-                local_loop.close()
-        Thread(target=runner).start()
-        loop.run_until_complete(done)
-        loop.close()
-        if exc is not None:
-            raise exc
-        return ret
-    return wrapper
-
-
-@contextmanager
-def _nop_main_loop(self):
-    yield
-
-
-def _mock_async(self, f):
-    ret = f(self)
-    return ret
-
-
-def _mock_proxy(self):
-    return self
-
-
-class ExternalIntegrationSpec(VimIntegrationSpec):
-
-    def __init__(self) -> None:
-        VimIntegrationSpec.__init__(self)
-        self._report_expensive = False
-
-    def _pre_start_neovim(self):
-        super()._pre_start_neovim()
-        ribosome.in_vim = False
-        # NvimApi.async = _mock_async
-        # NvimApi.main_event_loop = _nop_main_loop
-        # NvimApi.proxy = property(_mock_proxy)
-        # NvimApi.clean = lambda self: True
-
-    def _post_start_neovim(self):
-        cls = self.plugin_class.get_or_raise()
-        self.plugin = cls(self.neovim)
-
-    def _await(self):
-        if self.root is not None:
-            self.root.await_state()
-
-    @property
-    def root(self):
-        return self.plugin.state()
-
-    def teardown(self):
-        VimIntegrationSpec.teardown(self)
-        if self.root is not None:
-            self.root.stop(shutdown=False)
-            if self._debug and self._report_expensive:
-                self._report()
-
-    def _report(self):
-        self.root.sub.cat(self.root) % __.report()
+        return nvim_call_json(f'{self.full_cmd_prefix()}State').unsafe(self.vim)
 
 
 S = TypeVar('S', bound=Settings)
@@ -380,8 +291,7 @@ class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
     def autostart_plugin(self) -> bool:
         return True
 
-    def _post_start_neovim(self) -> None:
-        super()._post_start_neovim()
+    def _start_plugin(self) -> None:
         if self.autostart_plugin:
             self.start_plugin()
 
@@ -400,12 +310,12 @@ class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
         opts = dict(rpc=True, on_stderr=stderr_handler_name)
         nvim_call_function('jobstart', args, opts).unsafe(self.vim)
 
-    def send_json(self, data: str) -> None:
-        self.vim.call(f'{self.plugin_name()}Send', data)
-
-    def _pre_start(self) -> None:
+    def _post_start(self) -> None:
         if self.autostart_plugin:
             self.pvar_becomes('started', True)
+
+    def send_json(self, data: str) -> None:
+        self.vim.call(f'{self.plugin_name()}Send', data)
 
 
 __all__ = ('VimIntegrationSpec', 'ExternalIntegrationSpec', 'AutoPluginIntegrationSpec')

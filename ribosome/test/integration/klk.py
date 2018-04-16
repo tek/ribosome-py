@@ -10,16 +10,16 @@ from kallikrein.expectable import Expectable
 from kallikrein.matcher import BoundMatcher
 from kallikrein.matchers.length import have_length
 from kallikrein.matchers.comparison import greater
-from kallikrein.matchers import contain, equal
+from kallikrein.matchers import contain, equal, equal
 from kallikrein.matchers.lines import have_lines
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.either import be_right
 
-from ribosome.test.integration.spec import (VimIntegrationSpecI, VimIntegrationSpec, ExternalIntegrationSpec,
-                                            AutoPluginIntegrationSpec)
+from ribosome.test.integration.spec import VimIntegrationSpecI, VimIntegrationSpec, AutoPluginIntegrationSpec
 from ribosome.config.settings import Settings
 from ribosome.test.klk import kn
 from ribosome.nvim.api.variable import variable_prefixed_raw, variable_raw
+from ribosome.nvim.api.exists import command_exists
 
 
 def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> Expectation:
@@ -90,8 +90,8 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
     def _messages_contain(self, line: str) -> Expectation:
         return later(kf(lambda: self.vim.messages).must(contain(line)))
 
-    def seen_trans(self, name: str, **kw) -> Expectation:
-        return later(kf(self.program_log).must(be_right(contain(name))), **kw)
+    def seen_program(self, name: str, **kw) -> Expectation:
+        return later(kf(self.program_log).must(contain(name)), **kw)
 
     def var_is(self, name: str, value: Any) -> Expectation:
         return kn(self.vim, variable_raw, name).must(contain(be_right(value)))
@@ -110,17 +110,13 @@ class VimIntegrationKlkHelpers(VimIntegrationSpecI):
         return self._wait_for(lambda: self.vim.vars.p(name).map(f).contains(value))
 
     def command_exists(self, name: str, **kw) -> Expectation:
-        return later(kf(self.vim.command_exists, name).true, **kw)
+        return later(kn(self.vim, command_exists, name).must(contain(True)), **kw)
 
     def command_exists_not(self, name: str, **kw: Any) -> Expectation:
-        return later(kf(self.vim.command_exists, name).false, **kw)
+        return later(kn(self.vim, command_exists, name).must(contain(False)), **kw)
 
 
 class VimIntegrationKlkSpec(VimIntegrationSpec, VimIntegrationKlkHelpers):
-    pass
-
-
-class ExternalIntegrationKlkSpec(ExternalIntegrationSpec, VimIntegrationKlkHelpers):
     pass
 
 
@@ -131,5 +127,4 @@ S = TypeVar('S', bound=Settings)
 class AutoPluginIntegrationKlkSpec(Generic[S, D], AutoPluginIntegrationSpec[S, D], VimIntegrationKlkHelpers):
     pass
 
-__all__ = ('VimIntegrationKlkHelpers', 'VimIntegrationKlkSpec', 'ExternalIntegrationKlkSpec',
-           'AutoPluginIntegrationKlkSpec')
+__all__ = ('VimIntegrationKlkHelpers', 'VimIntegrationKlkSpec', 'AutoPluginIntegrationKlkSpec')
