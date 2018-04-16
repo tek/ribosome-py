@@ -46,8 +46,8 @@ def state_data() -> Do:
 
 
 @prog.result
-def rpc_handlers() -> EitherState[PluginState[S, D, CC], str]:
-    return EitherState.inspect_f(lambda s: dump_json(s.main.distinct_specs))
+def rpc_handlers() -> NS[PluginState[S, D, CC], str]:
+    return NS.inspect_either(lambda s: dump_json(s.distinct_specs))
 
 
 class PatchQuery(Dat['PatchQuery']):
