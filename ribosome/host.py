@@ -98,7 +98,7 @@ def connect_nvim(name: str) -> NvimApi:
     return NativeNvimApi(name, Nvim.from_session(session())._session)
 
 
-def run_loop(session: Session, config: Config) -> int:
+def run_loop(config: Config) -> int:
     amino_log.debug(f'starting plugin from {config.basic}')
     vim = connect_nvim(config.basic.name)
     return run_session(vim.session, config).unsafe(vim)
