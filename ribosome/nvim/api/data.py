@@ -5,7 +5,7 @@ from neovim.msgpack_rpc import Session
 
 from msgpack import ExtType
 
-from amino import List, Either, Map, Left, Try, Dat, Nil, do, Do
+from amino import List, Either, Map, Left, Try, Dat, Nil, do, Do, Right
 from amino.logging import module_log
 
 log = module_log()
@@ -64,23 +64,40 @@ class StrictNvimApi(NvimApi):
         self.request_handler = request_handler
         self.request_log = request_log
 
-    def request(self, method: str, args: List[Any]) -> Either[str, Tuple['NvimApi', Any]]:
+    def request(self, method: str, args: List[Any]) -> Either[str, Tuple[NvimApi, Any]]:
         vim = self.append1.request_log((method, args))
-        return self.request_handler(vim, method, args).accum_error_lift(self.try_var, vim, method, args)
-
-    def try_var(self, vim: 'StrictNvimApi', method: str, args: List[Any]) -> Either[str, Any]:
-        return (
-            args
-            .detach_head
-            .to_either('no variable name given')
-            .flat_map2(lambda h, t: vim.var(h))
-            .map(lambda a: (vim, a))
-            if method == 'nvim_get_var' else
-            Left(f'not a variable request')
-        )
+        return self.request_handler(vim, method, args).accum_error_lift(variable_request, vim, method, args)
 
     def var(self, name: str) -> Either[str, Any]:
         return self.vars.lift(name).to_either(f'no variable `{name}` defined')
+
+
+@do(Either[str, Tuple[NvimApi, Any]])
+def get_var(vim: StrictNvimApi, name: str) -> Do:
+    value = yield vim.var(name)
+    return (vim, value)
+
+
+@do(Either[str, Tuple[NvimApi, Any]])
+def set_var(vim: StrictNvimApi, name: str, rest: List[Any]) -> Do:
+    value, rest1 = yield rest.detach_head.to_either(f'no value specified for updating var `{name}`')
+    return vim.append.vars((name, value)), None
+
+
+def manipulate_vars(vim: StrictNvimApi, method: str, name: str, rest: List[Any]) -> Either[str, Tuple[NvimApi, Any]]:
+    return (
+        get_var(vim, name)
+        if method == 'nvim_get_var' else
+        set_var(vim, name, rest)
+        if method == 'nvim_set_var' else
+        Left(f'not a variable request')
+    )
+
+
+@do(Either[str, Tuple[NvimApi, Any]])
+def variable_request(vim: StrictNvimApi, method: str, args: List[Any]) -> Do:
+    name, rest = yield args.detach_head.to_either('no variable name given')
+    yield manipulate_vars(vim, method, name, rest)
 
 
 class Tabpage(Dat['Tabpage']):
