@@ -1,16 +1,15 @@
 import time
 from datetime import datetime
-from typing import Callable, Any, Union, Type, TypeVar, Generic
+from typing import Callable, Any, Union, TypeVar, Generic
 
 from amino.test.spec import default_timeout
 from amino import List
 
 from kallikrein import Expectation, kf
-from kallikrein.expectable import Expectable
 from kallikrein.matcher import BoundMatcher
 from kallikrein.matchers.length import have_length
 from kallikrein.matchers.comparison import greater
-from kallikrein.matchers import contain, equal, equal
+from kallikrein.matchers import contain, equal
 from kallikrein.matchers.lines import have_lines
 from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.either import be_right

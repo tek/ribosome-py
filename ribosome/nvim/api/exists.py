@@ -34,12 +34,22 @@ def function_exists(name: str) -> NvimIO[bool]:
     return nvim_exists(f'*{name}')
 
 
+@do(NvimIO[bool])
+def function_exists_not(name: str) -> Do:
+    exists = yield function_exists(name)
+    return not exists
+
+
 def command_exists(name: str) -> NvimIO[bool]:
     return nvim_exists(f':{name}')
 
 
 def wait_for_function(name: str, timeout: int=30) -> NvimIO[None]:
     return wait_until_valid(name, function_exists, timeout)
+
+
+def wait_for_function_undef(name: str, timeout: int=30) -> NvimIO[None]:
+    return wait_until_valid(name, function_exists_not, timeout)
 
 
 def wait_for_command(name: str, timeout: int=30) -> NvimIO[None]:
@@ -59,4 +69,5 @@ def call_once_defined(name: str, *args: str, timeout: int=10) -> Do:
 
 
 __all__ = ('nvim_exists', 'wait_until_valid', 'function_exists', 'command_exists', 'wait_for_function',
-           'wait_for_command', 'command_once_defined', 'call_once_defined')
+           'wait_for_command', 'command_once_defined', 'call_once_defined', 'function_exists_not',
+           'wait_for_function_undef')
