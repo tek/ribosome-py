@@ -72,6 +72,10 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
     def call(name: str, *args: Any, **kw: Any) -> 'NvimIOState[S, A]':
         return NS.delay(__.call(name, *args, **kw))
 
+    @staticmethod
+    def simple(f: Callable[..., A], *a: Any, **kw: Any) -> 'NvimIOState[S, A]':
+        return NS.lift(N.simple(f, *a, **kw))
+
 
 tcs(NvimIO, NvimIOState)
 
