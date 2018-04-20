@@ -1,6 +1,6 @@
 from typing import TypeVar
 
-from amino import do, Do, _, __, List, Either, L
+from amino import do, Do, _, __, List, Either, Map
 from amino.lenses.lens import lens
 from amino.state import EitherState
 
@@ -9,7 +9,7 @@ from ribosome.data.plugin_state import PluginState, Programs, handler_spec
 from ribosome.config.resolve import ComponentResolver
 from ribosome.request.handler.handler import RequestHandler, RequestHandlers
 from ribosome.config.component import Components, Component
-from ribosome.request.rpc import define_handlers, RpcHandlerSpec
+from ribosome.request.rpc import define_handlers, DefinedHandler
 from ribosome.config.settings import Settings
 from ribosome.compute.program import Program
 from ribosome.request.handler.method import RpcMethod
@@ -24,12 +24,12 @@ P = TypeVar('P')
 S = TypeVar('S', bound=Settings)
 
 
-def request_handlers_programs(handlers: RequestHandlers) -> List[Program]:
+def request_handlers_handlers(handlers: RequestHandlers) -> List[RequestHandler]:
     return handlers.handlers.v
 
 
-def component_programs(component: Component) -> List[Program]:
-    return request_handlers_programs(component.request_handlers)
+def component_handlers(component: Component) -> List[RequestHandler]:
+    return request_handlers_handlers(component.request_handlers)
 
 
 def rpc_method(name: str, prefix: str) -> str:
@@ -38,12 +38,12 @@ def rpc_method(name: str, prefix: str) -> str:
     return rpc_method
 
 
-def programs(state: PluginState[S, D, CC]) -> Programs:
-    cfg_programs = request_handlers_programs(state.request_handlers)
-    compo_programs = state.components.all // component_programs
-    programs = compo_programs + cfg_programs
+def programs(state: PluginState[S, D, CC]) -> Map[str, RequestHandler]:
+    cfg_handlers = request_handlers_handlers(state.request_handlers)
+    compo_handlers = state.components.all // component_handlers
+    handlers = compo_handlers + cfg_handlers
     method = rpc_method(state.basic.name, state.basic.prefix)
-    return programs.group_by(method)
+    return handlers.group_by(method)
 
 
 @do(EitherState[PluginState[S, D, CC], None])
@@ -60,8 +60,8 @@ def update_components(from_user: Either[str, List[str]]) -> Do:
 
 
 @do(NvimIO[None])
-def undef_handler(spec: RpcHandlerSpec) -> Do:
-    yield nvim_command(spec.undef_cmdline)
+def undef_handler(dh: DefinedHandler) -> Do:
+    yield nvim_command(dh.spec.undef_cmdline)
 
 
 @do(NS[PluginState[S, D, CC], None])

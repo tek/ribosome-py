@@ -40,7 +40,7 @@ def program_from_data(
         wrappers: ProgWrappers,
         interpreter: ProgOutput[A, B],
 ) -> Program[A]:
-    return Program(func.__name__, ProgramBlock(func, wrappers, interpreter), params_spec)
+    return Program(func.__name__, ProgramBlock(func.__name__, func, wrappers, interpreter), params_spec)
 
 
 def prog_state(func: Callable[[P], NS[R, A]], interpreter: ProgOutput[A, B]) -> Program:

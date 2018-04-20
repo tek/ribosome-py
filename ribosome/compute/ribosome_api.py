@@ -82,7 +82,7 @@ class Ribo(metaclass=RMeta):
     @do(Prog[A])
     def lift_state_prog(self, fa: NS[Ribosome[S, D, CC, C], A], state_type: StateProg[M, C, R, A]) -> Do:
         wrappers = yield Prog.from_either(prog_wrappers.match(state_type))
-        yield ProgExec(fa, wrappers, ProgOutputResult())
+        yield ProgExec('lift', fa, wrappers, ProgOutputResult())
 
     @classmethod
     @do(Prog[A])

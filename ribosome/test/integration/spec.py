@@ -73,7 +73,7 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         self.tmux_pane_id = None
         self.keep_tmux_pane = False
         self.vimlog = temp_dir('log') / 'vim'
-        self.nvim_cmdline = List('nvim', '-V{}'.format(self.vimlog), '-n', '-u', 'NONE')
+        self.nvim_cmdline = List('nvim', f'-V{self.vimlog}', '-n', '-u', 'NONE')
         self.log_format = '{levelname} {name}:{message}'
         self.subproc = None
         self.ribo_tmux = None
@@ -96,7 +96,6 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         self._post_start()
 
     def start_neovim(self) -> None:
-        asyncio.get_child_watcher().attach_loop(asyncio.get_event_loop())
         if self.tmux_nvim:
             self.start_neovim_tmux_pane()
         elif self.tmux_nvim_external:

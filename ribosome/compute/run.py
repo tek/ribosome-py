@@ -26,7 +26,7 @@ def transform_prog_state(st: NS[R, A], wrappers: ProgWrappers[PluginState[D, S, 
 
 
 def log_prog(prog: ProgExec) -> NS[PluginState[S, D, CC], None]:
-    return NS.pure(None) if prog.name in ('program_log', 'pure') else NS.modify(__.log_prog(prog.name))
+    return NS.pure(None) if prog.name in ('program_log', 'pure', 'lift') else NS.modify(__.log_prog(prog.name))
 
 
 class eval_prog(Generic[A, B, R, D, S, CC], Case[Prog[A], NS[PluginState[S, D, CC], A]], alg=Prog):
