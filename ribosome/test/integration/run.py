@@ -5,6 +5,7 @@ from amino import Lists, Map, List, __, Either, Left, Right, do, Do, Nil
 from kallikrein.expectable import Expectable
 from amino.dat import Dat
 from amino.lenses.lens import lens
+from amino.logging import module_log
 
 from ribosome.host import init_state
 from ribosome.request.execute import request_job, traverse_programs, run_request_handler
@@ -24,7 +25,9 @@ from ribosome.data.plugin_state_holder import PluginStateHolder
 from ribosome.compute.output import ProgOutput
 from ribosome.compute.prog import Prog
 from ribosome.test.klk import kn
+from ribosome.nvim.io.data import NSuccess, NResult
 
+log = module_log()
 A = TypeVar('A')
 B = TypeVar('B')
 C = TypeVar('C')
@@ -190,27 +193,29 @@ class RequestHelper(Generic[S, D, CC], Dat['RequestHelper[S, D, CC]']):
         job, program = self.request_job(name, args, sync)
         return traverse_programs(program, Lists.wrap(args))
 
-    def run(self, name: str, args=(), sync: bool=True) -> NvimIO[Tuple[PluginState, Any]]:
+    def run(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> NvimIO[Tuple[PluginState, Any]]:
         job, programs = self.request_job(name, args, sync)
         program = programs.head.get_or_fail('multiple programs')
-        return (
-            run_request_handler(program, Lists.wrap(args))
-            .run(self.state)
-        )
+        def check_error(result: NResult) -> NvimIO[None]:
+            if warn_error:
+                log.error(f'NvimIO failed: {result}')
+            return N.unit
+        io = run_request_handler(program, Lists.wrap(args)).run(self.state)
+        return N.ensure_failure(io, check_error)
 
-    def run_s(self, name: str, args=(), sync: bool=True) -> NvimIO[PluginState]:
+    def run_s(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> NvimIO[PluginState]:
         return self.run(name, args, sync).map2(lambda s, a: s)
 
-    def run_a(self, name: str, args=(), sync: bool=True) -> NvimIO[Any]:
+    def run_a(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> NvimIO[Any]:
         return self.run(name, args, sync).map2(lambda s, a: a)
 
-    def unsafe_run(self, name: str, args=(), sync: bool=True) -> Tuple[PluginState, Any]:
+    def unsafe_run(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> Tuple[PluginState, Any]:
         return self.run(name, args=args, sync=sync).unsafe(self.vim)
 
-    def unsafe_run_s(self, name: str, args=(), sync: bool=True) -> PluginState:
+    def unsafe_run_s(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> PluginState:
         return self.run_s(name, args=args, sync=sync).unsafe(self.vim)
 
-    def unsafe_run_a(self, name: str, args=(), sync: bool=True) -> Any:
+    def unsafe_run_a(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> Any:
         return self.run_a(name, args=args, sync=sync).unsafe(self.vim)
 
     def update_data(self, **kw: Any) -> 'RequestHelper[S, D, CC]':
@@ -236,7 +241,7 @@ class RequestHelper(Generic[S, D, CC], Dat['RequestHelper[S, D, CC]']):
 def request_helper(
         config: Config[S, D, CC],
         *comps: str,
-        vars: dict=dict(),
+        vars: Map[str, Any]=Map(),
         io_interpreter: ProgInt=None,
 ) -> NvimIO[RequestHelper[S, D, CC]]:
     return N.delay(lambda v: RequestHelper.nvim(config, v, *comps, vars=vars, io_interpreter=io_interpreter))
