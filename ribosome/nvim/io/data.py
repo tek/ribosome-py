@@ -1,5 +1,5 @@
 import abc
-from typing import Generic, TypeVar, Tuple
+from typing import Generic, TypeVar, Tuple, Callable
 from traceback import FrameSummary
 
 from amino import ADT, Either, Right, Left, Dat, Nil
@@ -10,6 +10,7 @@ from ribosome.nvim.io.trace import NvimIOException
 
 A = TypeVar('A')
 B = TypeVar('B')
+C = TypeVar('C')
 
 
 class NResult(Generic[A], ADT['NResult[A]']):
@@ -49,20 +50,20 @@ class NFatal(Generic[A], NResult[A]):
         return Left(self.exception)
 
 
-class Thunk(Generic[A, B], Dat['Thunk[A, B]']):
+class Thunk(Generic[A, B, C], Dat['Thunk[A, B, C]']):
 
     @staticmethod
-    def cons(thunk: State[A, B], frame: FrameSummary=None) -> 'Thunk[A, B]':
+    def cons(thunk: Callable[[C], State[A, B]], frame: FrameSummary=None) -> 'Thunk[A, B, C]':
         return Thunk(thunk, frame or cframe())
 
-    def __init__(self, thunk: State[A, B], frame: FrameSummary) -> None:
+    def __init__(self, thunk: Callable[[C], State[A, B]], frame: FrameSummary) -> None:
         self.thunk = thunk
         self.frame = frame
 
 
-def eval_thunk(resource: A, thunk: Thunk[A, B]) -> Tuple[A, B]:
+def eval_thunk(conf: C, resource: A, thunk: Thunk[A, B, C]) -> Tuple[A, B]:
     try:
-        return thunk.thunk.run(resource).value
+        return thunk.thunk(conf).run(resource).value
     except NvimIOException as e:
         raise e
     except Exception as e:

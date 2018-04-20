@@ -95,7 +95,7 @@ class StrictRequestHandler:
         self.function_handler = function_handler
         self.command_handler = command_handler
 
-    def __call__(self, vim: NvimApi, name: str, args: List[Any]) -> Either[List[str], Tuple[NvimApi, Any]]:
+    def __call__(self, vim: NvimApi, name: str, args: List[Any], sync: bool) -> Either[List[str], Tuple[NvimApi, Any]]:
         return (
             self.extra(vim, name, args)
             .lmap(List)

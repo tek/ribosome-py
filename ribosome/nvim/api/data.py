@@ -5,7 +5,7 @@ from neovim.msgpack_rpc import Session
 
 from msgpack import ExtType
 
-from amino import List, Either, Map, Left, Try, Dat, Nil, do, Do, Right
+from amino import List, Either, Map, Left, Try, Dat, Nil, do, Do
 from amino.logging import module_log
 
 log = module_log()
@@ -17,7 +17,7 @@ class NvimApi(Dat['NvimApi']):
         self.name = name
 
     @abc.abstractmethod
-    def request(self, method: str, args: List[Any]) -> Either[str, Tuple['NvimApi', Any]]:
+    def request(self, method: str, args: List[Any], sync: bool) -> Either[str, Tuple['NvimApi', Any]]:
         ...
 
 
@@ -28,16 +28,17 @@ class NativeNvimApi(NvimApi):
         self.session = session
 
     @do(Either[str, Tuple['NvimApi', Any]])
-    def request(self, method: str, args: List[Any]) -> Do:
+    def request(self, method: str, args: List[Any], sync: bool) -> Do:
         log.debug1(lambda: f'executing nvim request {method}({args.join_comma})')
-        result = yield Try(self.session.request, method, *args)
+        result = yield Try(self.session.request, method, *args, async=not sync)
         return self, result
 
 
-StrictNvimHandler = Callable[['StrictNvimApi', str, List[Any]], Either[List[str], Tuple[NvimApi, Any]]]
+StrictNvimHandler = Callable[['StrictNvimApi', str, List[Any], bool], Either[List[str], Tuple[NvimApi, Any]]]
 
 
-def no_request_handler(vim: 'StrictNvimApi', method: str, args: List[Any]) -> Either[List[str], Tuple[NvimApi, Any]]:
+def no_request_handler(vim: 'StrictNvimApi', method: str, args: List[Any], sync: bool
+                       ) -> Either[List[str], Tuple[NvimApi, Any]]:
     return Left(List('no request handler defined'))
 
 
@@ -64,9 +65,9 @@ class StrictNvimApi(NvimApi):
         self.request_handler = request_handler
         self.request_log = request_log
 
-    def request(self, method: str, args: List[Any]) -> Either[str, Tuple[NvimApi, Any]]:
+    def request(self, method: str, args: List[Any], sync: bool) -> Either[str, Tuple[NvimApi, Any]]:
         vim = self.append1.request_log((method, args))
-        return self.request_handler(vim, method, args).accum_error_lift(variable_request, vim, method, args)
+        return self.request_handler(vim, method, args, sync).accum_error_lift(variable_request, vim, method, args)
 
     def var(self, name: str) -> Either[str, Any]:
         return self.vars.lift(name).to_either(f'no variable `{name}` defined')

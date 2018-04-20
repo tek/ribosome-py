@@ -11,12 +11,12 @@ A = TypeVar('A')
 B = TypeVar('B')
 
 
-def nvimio_delay(f: Callable[..., A], *a: Any, **kw: Any) -> NvimIO[A]:
-    return NvimIOSuspend.cons(State.inspect(lambda vim: NvimIOPure(f(vim, *a, **kw))))
-
-
 def nvimio_suspend(f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> NvimIO[A]:
-    return NvimIOSuspend.cons(State.inspect(lambda vim: f(vim, *a, **kw)))
+    return NvimIOSuspend.cons(lambda sync: State.inspect(lambda vim: f(vim, *a, **kw)))
+
+
+def nvimio_delay(f: Callable[..., A], *a: Any, **kw: Any) -> NvimIO[A]:
+    return nvimio_suspend(lambda vim: NvimIOPure(f(vim, *a, **kw)))
 
 
 def nvimio_recover_error(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
