@@ -28,21 +28,25 @@ def decode_ext_type(a: ExtType) -> ExtType:
 
 
 @do(NvimIO[Either[str, A]])
-def nvim_nonfatal_request(name: str, *args: Any) -> Do:
-    request = NvimIORequest(name, Lists.wrap(args))
+def nvim_nonfatal_request(name: str, *args: Any, sync: bool=True) -> Do:
+    request = NvimIORequest(name, Lists.wrap(args), sync)
     value = yield nvimio_recover_fatal(request, lambda a: nvim_request_error(name, args, 'fatal error', a))
     return value / decode
 
 
 @do(NvimIO[A])
-def nvim_request(name: str, *args: Any) -> Do:
-    result = yield nvim_nonfatal_request(name, *args)
+def nvim_request(name: str, *args: Any, sync: bool=True) -> Do:
+    result = yield nvim_nonfatal_request(name, *args, sync=sync)
     yield nvimio_from_either(result)
+
+
+def nvim_sync_request(name: str, *args: Any) -> NvimIO[A]:
+    return nvim_request(name, *args, sync=True)
 
 
 @do(NvimIO[A])
 def typechecked_request(name: str, tpe: Type[A], *args: Any) -> Do:
-    raw = yield nvim_request(name, *args)
+    raw = yield nvim_sync_request(name, *args)
     yield (
         NvimIOPure(raw)
         if isinstance(raw, tpe) else
@@ -52,13 +56,13 @@ def typechecked_request(name: str, tpe: Type[A], *args: Any) -> Do:
 
 @do(NvimIO[A])
 def data_cons_request(name: str, cons: Callable[[Any], Either[str, A]], *args: Any) -> Do:
-    raw = yield nvim_request(name, *args)
+    raw = yield nvim_sync_request(name, *args)
     yield nvimio_from_either(cons(raw))
 
 
 @do(NvimIO[Either[str, A]])
 def data_cons_request_nonfatal(name: str, cons: Callable[[Either[str, Any]], Either[str, A]], *args: Any) -> Do:
-    raw = yield nvim_nonfatal_request(name, *args)
+    raw = yield nvim_nonfatal_request(name, *args, sync=True)
     return cons(raw)
 
 

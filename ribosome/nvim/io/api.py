@@ -73,8 +73,8 @@ class NMeta(type):
     def read_ext(self, cmd: str, *args: Any) -> NvimIO[ExtType]:
         return N.read_tpe(cmd, ExtType, *args)
 
-    def write(self, cmd: str, *args: Any) -> NvimIO[A]:
-        return nvim_request(cmd, *args).replace(None)
+    def write(self, cmd: str, *args: Any, sync: bool=False) -> NvimIO[A]:
+        return nvim_request(cmd, *args, sync=sync).replace(None)
 
     def recover_error(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
         return nvimio_recover_error(fa, f)

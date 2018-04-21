@@ -7,11 +7,15 @@ from ribosome.nvim.io.api import N
 A = TypeVar('A')
 
 
-def nvim_command(cmd: str, *args: Any, verbose: bool=False) -> NvimIO[None]:
+def nvim_command(cmd: str, *args: Any, verbose: bool=False, sync: bool=False) -> NvimIO[None]:
     arg_string = ' '.join(map(str, args))
     arg_suffix = '' if len(args) == 0 else f' {arg_string}'
     silent = '' if verbose else 'silent! '
-    return N.write('nvim_command', f'{silent}{cmd}{arg_suffix}')
+    return N.write('nvim_command', f'{silent}{cmd}{arg_suffix}', sync=sync)
+
+
+def nvim_sync_command(cmd: str, *args: Any, verbose: bool=False) -> NvimIO[None]:
+    return nvim_command(cmd, *args, verbose=verbose, sync=True)
 
 
 def nvim_command_output(cmd: str, *args: Any) -> NvimIO[None]:
@@ -19,12 +23,12 @@ def nvim_command_output(cmd: str, *args: Any) -> NvimIO[None]:
     return N.read_cons('nvim_command_output', cons_split_lines, f'{cmd} {arg_string}')
 
 
-def doautocmd(name: str, pattern: str='', verbose: bool=False) -> NvimIO[None]:
-    return nvim_command(f'doautocmd', '<nomodeline>', name, pattern, verbose=verbose)
+def doautocmd(name: str, pattern: str='', verbose: bool=False, sync: bool=False) -> NvimIO[None]:
+    return nvim_command(f'doautocmd', '<nomodeline>', name, pattern, verbose=verbose, sync=sync)
 
 
-def runtime(path: str, verbose: bool=True) -> NvimIO[None]:
-    return nvim_command('runtime!', f'{path}.vim', verbose=verbose)
+def runtime(path: str, verbose: bool=True, sync: bool=False) -> NvimIO[None]:
+    return nvim_command('runtime!', f'{path}.vim', verbose=verbose, sync=sync)
 
 
-__all__ = ('nvim_command', 'nvim_command_output', 'doautocmd', 'runtime')
+__all__ = ('nvim_command', 'nvim_command_output', 'doautocmd', 'runtime', 'nvim_sync_command')

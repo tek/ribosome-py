@@ -1,7 +1,7 @@
 from typing import TypeVar, Callable, Generic, Union, Tuple, cast
 
 from amino.tc.base import F, ImplicitsMeta, Implicits
-from amino import Either, List, options, Do, Boolean, Dat
+from amino import Either, List, options, Do, Boolean
 from amino.state import State
 from amino.func import tailrec
 from amino.do import do
@@ -58,10 +58,6 @@ class NvimIO(
     def unsafe(self, vim: NvimApi) -> A:
         return self.either(vim).get_or_raise()
 
-    @property
-    def async(self) -> 'NvimIO[A]':
-        return NvimIOBind(Thunk.cons(lambda sync: State.pure(self)), lambda a: NvimIOPure(a), True)
-
 
 class NvimIOPure(Generic[A], NvimIO[A]):
 
@@ -71,18 +67,19 @@ class NvimIOPure(Generic[A], NvimIO[A]):
 
 class NvimIORequest(Generic[A], NvimIO[A]):
 
-    def __init__(self, method: str, args: List[str]) -> None:
+    def __init__(self, method: str, args: List[str], sync: bool) -> None:
         self.method = method
         self.args = args
+        self.sync = sync
 
 
 class NvimIOSuspend(Generic[A], NvimIO[A]):
 
     @staticmethod
-    def cons(thunk: Callable[[bool], State[NvimApi, NvimIO[A]]]) -> 'NvimIOSuspend[A]':
+    def cons(thunk: State[NvimApi, NvimIO[A]]) -> 'NvimIOSuspend[A]':
         return NvimIOSuspend(Thunk.cons(thunk))
 
-    def __init__(self, thunk: Thunk[NvimApi, NvimIO[A], bool]) -> None:
+    def __init__(self, thunk: Thunk[NvimApi, NvimIO[A]]) -> None:
         self.thunk = thunk
 
 
@@ -90,13 +87,11 @@ class NvimIOBind(Generic[A, B], NvimIO[B]):
 
     def __init__(
             self,
-            thunk: Thunk[NvimApi, NvimIO[A], bool],
+            thunk: Thunk[NvimApi, NvimIO[A]],
             kleisli: Callable[[A], NvimIO[B]],
-            async_request: bool=False,
     ) -> None:
         self.thunk = thunk
         self.kleisli = kleisli
-        self.async_request = async_request
 
 
 class NvimIOError(Generic[A], NvimIO[A]):
@@ -137,9 +132,9 @@ class lift_n_result(Case[NResult[A], NvimIO[A]], alg=NResult):
 
 
 @do(State[NvimApi, NvimIO[Either[List[str], A]]])
-def execute_nvim_request(io: NvimIORequest[A], sync: bool) -> Do:
+def execute_nvim_request(io: NvimIORequest[A]) -> Do:
     def make_request(vim: NvimApi) -> Tuple[NvimApi, Either[List[str], A]]:
-        response = vim.request(io.method, io.args, sync)
+        response = vim.request(io.method, io.args, io.sync)
         updated_vim = response.map2(lambda v, a: v) | vim
         result = response.map2(lambda v, a: a)
         return updated_vim, NvimIOPure(result)
@@ -167,17 +162,16 @@ class flat_map_nvim_io(Case[Callable[[A], NvimIO[B]], NvimIO[B]], alg=NvimIO):
 
     def nvim_io_pure(self, io: NvimIOPure[A]) -> NvimIO[B]:
         thunk = State.delay(self.f, io.value)
-        return NvimIOSuspend.cons(lambda sync: thunk)
+        return NvimIOSuspend.cons(thunk)
 
     def nvim_io_suspend(self, io: NvimIOSuspend[A]) -> NvimIO[B]:
         return NvimIOBind(io.thunk, self.f)
 
     def nvim_io_request(self, io: NvimIORequest[A]) -> NvimIO[B]:
-        return NvimIOBind(Thunk.cons(lambda sync: execute_nvim_request(io, sync)), self.f, False)
+        return NvimIOBind(Thunk.cons(execute_nvim_request(io)), self.f)
 
     def nvim_io_bind(self, io: NvimIOBind[C, A]) -> NvimIO[B]:
-        return NvimIOSuspend.cons(lambda sync: State.pure(NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f),
-                                                                     sync)))
+        return NvimIOSuspend.cons(State.pure(NvimIOBind(io.thunk, lambda a: io.kleisli(a).flat_map(self.f))))
 
     def nvim_io_error(self, io: NvimIOError[A]) -> NvimIO[B]:
         return cast(NvimIO[B], io)
@@ -186,7 +180,7 @@ class flat_map_nvim_io(Case[Callable[[A], NvimIO[B]], NvimIO[B]], alg=NvimIO):
         return cast(NvimIO[B], io)
 
     def nvim_io_recover(self, io: NvimIORecover[A]) -> NvimIO[B]:
-        return NvimIOBind(Thunk.cons(lambda sync: execute_nvim_recover(io)), self.f)
+        return NvimIOBind(Thunk.cons(execute_nvim_recover(io)), self.f)
 
 
 EvalRes = RecStep[NvimIO[A], Tuple[NvimApi, NResult[A]]]
@@ -201,16 +195,16 @@ class eval_step(CaseRec[NvimIO[A], NResult[A]], alg=NvimIO):
         return Term((self.vim, NSuccess(io.value)))
 
     def nvim_io_request(self, io: NvimIORequest[A]) -> EvalRes:
-        thunk = Thunk.cons(lambda sync: execute_nvim_request(io, sync))
+        thunk = Thunk.cons(execute_nvim_request(io))
         return self(NvimIOSuspend(thunk))
 
     def nvim_io_suspend(self, io: NvimIOSuspend[A]) -> EvalRes:
-        vim, next = eval_thunk(True, self.vim, io.thunk)
+        vim, next = eval_thunk(self.vim, io.thunk)
         return eval_step(vim)(next)
 
     def nvim_io_bind(self, io: NvimIOBind[B, A]) -> EvalRes:
-        vim, next = eval_thunk(not io.async_request, self.vim, io.thunk)
-        return eval_step(vim)(next.flat_map(io.kleisli).copy(async_request=io.async_request))
+        vim, next = eval_thunk(self.vim, io.thunk)
+        return eval_step(vim)(next.flat_map(io.kleisli))
 
     def nvim_io_error(self, io: NvimIOError[A]) -> EvalRes:
         return Term((self.vim, NError(io.error)))
@@ -221,7 +215,7 @@ class eval_step(CaseRec[NvimIO[A], NResult[A]], alg=NvimIO):
     def nvim_io_recover(self, io: NvimIORecover[A]) -> NvimIO[B]:
         '''calls `map` to shift the recover execution to flat_map_nvim_io
         '''
-        return eval_step(self)(io.map(lambda a: a))
+        return eval_step(self.vim)(io.map(lambda a: a))
 
 
 @do(State[NvimApi, A])

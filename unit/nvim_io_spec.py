@@ -18,18 +18,11 @@ from ribosome.nvim.io.data import NError
 vars = dict(a=1)
 
 
-def handler(vim: StrictNvimApi, method: str, args: List[str], sync: bool) -> Either[List[str], Tuple[NvimApi, Any]]:
+def handler(vim: StrictNvimApi, method: str, args: List[str]) -> Either[List[str], Tuple[NvimApi, Any]]:
     return Right((vim.copy(vars=vars), (args.head | 9) + 2))
 
 
 vim = StrictNvimApi.cons('test', request_handler=handler)
-
-
-def handler_a(vim: StrictNvimApi, method: str, args: List[str], sync: bool) -> Either[List[str], Tuple[NvimApi, Any]]:
-    return Right((vim, sync))
-
-
-vim_async = StrictNvimApi.cons('test', request_handler=handler_a)
 
 
 class NvimIoSpec(SpecBase):
@@ -43,8 +36,6 @@ class NvimIoSpec(SpecBase):
     preserve resource state in `recover` $recover
     recover an exception with `recover_failure` $recover_failure
     execute an effect after error $ensure_failure
-    async request $async_request
-    bind on async request $async_request_bind
     '''
 
     def suspend(self) -> Expectation:
@@ -117,31 +108,11 @@ class NvimIoSpec(SpecBase):
         def inc(v: NvimApi) -> None:
             nonlocal x
             x = 2
-        run = N.ensure_failure(N.error('booze'), lambda a: N.delay(inc))
-        result = run.run_a(vim)
-        return (k(x) == 2) & (k(result) == NError('booze'))
-
-    def async_request(self) -> Expectation:
-        return k(N.request('blub', Nil).async.run_a(vim_async)).must(contain(be_right(False)))
-
-    def async_request_bind(self) -> Expectation:
-        @do(NvimIO[int])
-        def req() -> Do:
-            yield N.pure(1)
-            ae = yield N.request('blub', List(5))
-            yield N.e(ae)
-        @do(NvimIO[int])
-        def level1() -> Do:
-            yield N.pure(1)
-            yield req()
-        @do(NvimIO[int])
+        @do(NvimIO[None])
         def run() -> Do:
-            yield N.pure(1)
-            first = yield level1().async
-            ae = yield N.request('blub', List(1))
-            second = yield N.e(ae)
-            return first, second
-        return kn(vim_async, run).must(contain((False, True)))
+            yield N.ensure_failure(N.error('booze'), lambda a: N.delay(inc))
+        result = run().run_a(vim)
+        return (k(x) == 2) & (k(result) == NError('booze'))
 
 
 __all__ = ('NvimIoSpec',)

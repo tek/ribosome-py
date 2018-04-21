@@ -12,7 +12,7 @@ B = TypeVar('B')
 
 
 def nvimio_suspend(f: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> NvimIO[A]:
-    return NvimIOSuspend.cons(lambda sync: State.inspect(lambda vim: f(vim, *a, **kw)))
+    return NvimIOSuspend.cons(State.inspect(lambda vim: f(vim, *a, **kw)))
 
 
 def nvimio_delay(f: Callable[..., A], *a: Any, **kw: Any) -> NvimIO[A]:
