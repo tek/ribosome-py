@@ -18,7 +18,7 @@ from ribosome.nvim.io.data import NError
 vars = dict(a=1)
 
 
-def handler(vim: StrictNvimApi, method: str, args: List[str]) -> Either[List[str], Tuple[NvimApi, Any]]:
+def handler(vim: StrictNvimApi, method: str, args: List[str], sync: bool) -> Either[List[str], Tuple[NvimApi, Any]]:
     return Right((vim.copy(vars=vars), (args.head | 9) + 2))
 
 

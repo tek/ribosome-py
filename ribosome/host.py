@@ -6,7 +6,7 @@ from neovim.api import Nvim
 from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
 from neovim.msgpack_rpc.event_loop.uv import UvEventLoop
 
-from amino import Either, _, L, amino_log, Logger, __, Path, Nil, Just, IO
+from amino import Either, _, L, amino_log, Logger, __, Path, Nil, Just, IO, List
 from amino.either import ImportFailure
 from amino.logging import amino_root_file_logging
 from amino.do import do, Do
@@ -40,6 +40,39 @@ CC = TypeVar('CC')
 R = TypeVar('R')
 
 
+def cons_state(
+        config: Config,
+        io_interpreter: ProgIOInterpreter=None,
+        logger: Program[None]=None,
+        **kw: Any,
+) -> PluginState:
+    data = config.basic.state_ctor()
+    return PluginState.cons(
+        config.basic,
+        ComponentConfig(config.components),
+        config.request_handlers,
+        data,
+        Nil,
+        config.init,
+        logger=logger,
+        io_interpreter=io_interpreter,
+        **kw,
+    )
+
+
+@do(NvimIO[PluginState[S, D, CC]])
+def init_state(config: Config, io_interpreter: ProgIOInterpreter=None, logger: Program[None]=None) -> Do:
+    log_handler = yield N.delay(nvim_logging)
+    state = cons_state(config, io_interpreter, logger, log_handler=log_handler)
+    yield init_rpc().run_s(state)
+
+
+@do(NvimIO[PluginStateHolder])
+def prepare_plugin(config: Config) -> Do:
+    state = yield init_state(config)
+    return PluginStateHolder.concurrent(state)
+
+
 def request_handler(vim: NvimApi, sync: bool, state: PluginStateHolder[D]) -> Callable[[str, tuple], Any]:
     def handle(name: str, args: tuple) -> Any:
         try:
@@ -51,31 +84,12 @@ def request_handler(vim: NvimApi, sync: bool, state: PluginStateHolder[D]) -> Ca
     return handle
 
 
-@do(NvimIO[PluginState[S, D, CC]])
-def init_state(config: Config, io_interpreter: ProgIOInterpreter=None, logger: Program[None]=None) -> Do:
-    data = config.basic.state_ctor()
-    log_handler = yield N.delay(nvim_logging)
-    state = PluginState.cons(
-        config.basic,
-        ComponentConfig(config.components),
-        config.request_handlers,
-        data,
-        Nil,
-        config.init,
-        logger=logger,
-        io_interpreter=io_interpreter,
-        log_handler=log_handler,
-    )
-    yield init_rpc().run_s(state)
-
-
 @do(NvimIO[int])
 def run_session(session: Session, config: Config) -> Do:
-    state = yield init_state(config)
-    holder = PluginStateHolder.concurrent(state)
-    ribo_log.debug(f'running session')
+    holder = yield prepare_plugin(config)
     yield N.from_io(IO.delay(session._enqueue_notification, 'function:internal_init', ()))
     yield variable_set_prefixed('started', True)
+    ribo_log.debug(f'running session')
     yield N.delay(
         lambda vim:
         session.run(

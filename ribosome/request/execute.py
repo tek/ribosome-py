@@ -152,11 +152,12 @@ def execute_request_job(job: RequestJob) -> Do:
 
 class request_result(Case, alg=NResult):
 
-    def __init__(self, job: RequestJob) -> None:
-        self.job = job
+    def __init__(self, desc: str, sync: bool) -> None:
+        self.desc = desc
+        self.sync = sync
 
     def n_success(self, result: NSuccess[List[Any]]) -> Any:
-        desc = self.job.desc
+        desc = self.desc
         def multiple_results() -> int:
             ribo_log.error(f'multiple request handlers for {desc}')
             return 4
@@ -165,7 +166,7 @@ class request_result(Case, alg=NResult):
         def empty_result() -> int:
             ribo_log.error(f'no result in {desc}')
             return 3
-        return result.value.detach_head.map2(sync_result) | empty_result if self.job.sync else 0
+        return result.value.detach_head.map2(sync_result) | empty_result if self.sync else 0
 
     def n_error(self, result: NError[List[Any]]) -> Any:
         ribo_log.error(result.error)
@@ -174,24 +175,34 @@ class request_result(Case, alg=NResult):
     def n_fatal(self, result: NFatal[List[Any]]) -> Any:
         exc = result.exception
         tb = format_exception(exc).join_lines
-        desc = self.job.desc
+        desc = self.desc
         ribo_log.error(f'fatal error in {desc}')
         ribo_log.debug(f'{desc} failed:\n{tb}')
         return 2
 
 
-def request_job(state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> RequestJob:
+def request_job(state: PluginStateHolder[D], name: str, args: List[Any], sync: bool) -> RequestJob:
     decoded_args = decode(args)
     fun_args = decoded_args.head | Nil
     bang = decoded_args.lift(1).contains(1)
     return RequestJob(state, decode(name), fun_args, sync, bang)
 
 
-def execute_request(vim: NvimApi, state: PluginStateHolder[D], name: str, args: tuple, sync: bool) -> Any:
+@do(NvimIO[Any])
+def execute_request_io(state: PluginStateHolder[D], name: str, args: List[Any], sync: bool) -> Do:
     sync_prefix = '' if sync else 'a'
     job = request_job(state, name, args, sync)
     ribo_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
-    result = request_result(job)(execute_request_job(job).result(vim))
+    result = yield execute_request_job(job)
+    if sync:
+        ribo_log.debug(f'request `{job.name}` completed: {result}')
+    return decode(result)
+
+
+def execute_request(vim: NvimApi, state: PluginStateHolder[D], name: str, args: List[Any], sync: bool) -> Any:
+    job = request_job(state, name, args, sync)
+    ribo_log.debug(f'dispatching {job.desc}')
+    result = request_result(job.desc, job.sync)(execute_request_job(job).result(vim))
     if sync:
         ribo_log.debug(f'request `{job.name}` completed: {result}')
     return decode(result)

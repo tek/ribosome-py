@@ -55,8 +55,8 @@ class NMeta(type):
     def delay(self, f: Callable[..., A], *a: Any, **kw: Any) -> NvimIO[A]:
         return nvimio_delay(f, *a, **kw)
 
-    def request(self, method: str, args: List[str]) -> NvimIO[A]:
-        return NvimIORequest(method, args)
+    def request(self, method: str, args: List[str], sync: bool=True) -> NvimIO[A]:
+        return NvimIORequest(method, args, sync)
 
     def simple(self, f: Callable[..., A], *a: Any, **kw: Any) -> NvimIO[A]:
         return N.delay(lambda v: f(*a, **kw))
