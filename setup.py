@@ -16,6 +16,7 @@ setup(
         'amino==13.0.0a23',
         'neovim~=0.1.13',
         'pyuv~=1.4.0',
+        'mypy_extensions==0.3.0',
     ],
     tests_require=[
         'chiasma~=0.1.0.a13',

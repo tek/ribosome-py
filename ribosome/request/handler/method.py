@@ -1,29 +1,23 @@
 import abc
-from typing import Type, TypeVar
 
 from amino.dat import ADT
 
-from ribosome.request.rpc import RpcHandlerSpec, RpcCommandSpec, RpcFunctionSpec, RpcAutocommandSpec
-
-RHS = TypeVar('RHS', bound=RpcHandlerSpec)
-
 
 class RpcMethod(ADT['RpcMethod']):
-
-    @abc.abstractproperty
-    def spec_type(self) -> Type[RHS]:
-        ...
 
     @abc.abstractproperty
     def method(self) -> str:
         ...
 
 
-class CmdMethod(RpcMethod):
+class CommandMethod(RpcMethod):
 
-    @property
-    def spec_type(self) -> Type[RHS]:
-        return RpcCommandSpec
+    @staticmethod
+    def cons(bang: bool=False) -> 'CommandMethod':
+        return CommandMethod(bang)
+
+    def __init__(self, bang: bool) -> None:
+        self.bang = bang
 
     @property
     def method(self) -> str:
@@ -33,23 +27,22 @@ class CmdMethod(RpcMethod):
 class FunctionMethod(RpcMethod):
 
     @property
-    def spec_type(self) -> Type[RHS]:
-        return RpcFunctionSpec
-
-    @property
     def method(self) -> str:
         return 'function'
 
 
 class AutocmdMethod(RpcMethod):
 
-    @property
-    def spec_type(self) -> Type[RHS]:
-        return RpcAutocommandSpec
+    @staticmethod
+    def cons(pattern: str='*') -> 'AutocmdMethod':
+        return AutocmdMethod(pattern)
+
+    def __init__(self, pattern: str) -> None:
+        self.pattern = pattern
 
     @property
     def method(self) -> str:
         return 'autocmd'
 
 
-__all__ = ('RpcMethod', 'CmdMethod', 'FunctionMethod', 'AutocmdMethod')
+__all__ = ('RpcMethod', 'CommandMethod', 'FunctionMethod', 'AutocmdMethod',)

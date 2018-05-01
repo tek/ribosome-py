@@ -1,153 +1,53 @@
 from typing import TypeVar, Type, Callable, Any
 from types import ModuleType
 
-from neovim.msgpack_rpc import MsgpackStream, AsyncSession, Session
-from neovim.api import Nvim
-from neovim.msgpack_rpc.event_loop.base import BaseEventLoop
-from neovim.msgpack_rpc.event_loop.uv import UvEventLoop
+from amino import Either, _, L, amino_log, Logger, __, Path, Nil, Just, IO, List, do, Do
 
-from amino import Either, _, L, amino_log, Logger, __, Path, Nil, Just, IO, List
 from amino.either import ImportFailure
 from amino.logging import amino_root_file_logging
-from amino.do import do, Do
 from amino.mod import instance_from_module
+from amino.json import decode_json
+from amino.util.exception import format_exception
 
 from ribosome.config.config import Config
-from ribosome.request.execute import execute_request
-from ribosome.logging import ribo_log, nvim_logging
-from ribosome.nvim.api.data import NvimApi, NativeNvimApi
-from ribosome.data.plugin_state import PluginState
-from ribosome.config.settings import Settings
-from ribosome.nvim.io.compute import NvimIO
-from ribosome.nvim.api.variable import variable_set_prefixed
-from ribosome.nvim.io.api import N
-from ribosome.data.plugin_state_holder import PluginStateHolder
-from ribosome.nvim.io.state import NS
-from ribosome.config.component import ComponentConfig
-from ribosome.components.internal.update import init_rpc
-from ribosome.compute.output import ProgOutput
-from ribosome.compute.prog import Prog
-from ribosome.compute.interpret import ProgIOInterpreter
-from ribosome.compute.program import Program
+from ribosome.rpc.neovim import connect_nvim, run_session
+from ribosome import ribo_log
+from ribosome.rpc.uv.uv import start_uv_plugin_sync
 
-Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
 DIO = TypeVar('DIO')
 B = TypeVar('B')
-C = TypeVar('C', bound=Config)
-S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 R = TypeVar('R')
 
 
-def cons_state(
-        config: Config,
-        io_interpreter: ProgIOInterpreter=None,
-        logger: Program[None]=None,
-        **kw: Any,
-) -> PluginState:
-    data = config.basic.state_ctor()
-    return PluginState.cons(
-        config.basic,
-        ComponentConfig(config.components),
-        config.request_handlers,
-        data,
-        Nil,
-        config.init,
-        logger=logger,
-        io_interpreter=io_interpreter,
-        **kw,
-    )
-
-
-@do(NvimIO[PluginState[S, D, CC]])
-def init_state(config: Config, io_interpreter: ProgIOInterpreter=None, logger: Program[None]=None) -> Do:
-    log_handler = yield N.delay(nvim_logging)
-    state = cons_state(config, io_interpreter, logger, log_handler=log_handler)
-    yield init_rpc().run_s(state)
-
-
-@do(NvimIO[PluginStateHolder])
-def prepare_plugin(config: Config) -> Do:
-    state = yield init_state(config)
-    return PluginStateHolder.concurrent(state)
-
-
-def request_handler(vim: NvimApi, sync: bool, state: PluginStateHolder[D]) -> Callable[[str, tuple], Any]:
-    def handle(name: str, args: tuple) -> Any:
-        try:
-            return execute_request(vim, state, name, args, sync)
-        except Exception as e:
-            desc = f'dispatching request {name}({args})'
-            amino_log.caught_exception(desc, e)
-            ribo_log.error(f'fatal error {desc}')
-    return handle
-
-
-@do(NvimIO[int])
-def run_session(session: Session, config: Config) -> Do:
-    holder = yield prepare_plugin(config)
-    yield N.from_io(IO.delay(session._enqueue_notification, 'function:internal_init', ()))
-    yield variable_set_prefixed('started', True)
-    ribo_log.debug(f'running session')
-    yield N.delay(
-        lambda vim:
-        session.run(
-            request_handler(vim, True, holder),
-            request_handler(vim, False, holder)
-        )
-    )
-    yield N.pure(0)
-
-
-def no_listen_address(err: Exception) -> None:
-    raise Exception('could not connect to the vim server from within the host')
-
-
-def session(*args: str, loop: Type[Loop]=UvEventLoop, transport_type: str='stdio', **kwargs: str) -> Session:
-    return Session(AsyncSession(MsgpackStream(loop(transport_type, *args, **kwargs))))
-
-
-def connect_nvim(name: str) -> NvimApi:
-    return NativeNvimApi(name, Nvim.from_session(session())._session)
-
-
-def run_loop(config: Config) -> int:
+def run_loop_session(config: Config) -> int:
     amino_log.debug(f'starting plugin from {config.basic}')
     vim = connect_nvim(config.basic.name)
     return run_session(vim.session, config).unsafe(vim)
 
 
-def config_from_module(mod: ModuleType) -> Either[str, Type[C]]:
+def report_runtime_error(result: Any) -> int:
+    amino_log.error(f'error in plugin execution: {result}')
+    return 1
+
+
+def run_loop_uv(config: Config) -> int:
+    amino_log.debug(f'starting plugin from {config.basic}')
+    result = start_uv_plugin_sync(config).attempt
+    return result.cata(report_runtime_error, lambda a: 0)
+
+
+def config_from_module(mod: ModuleType) -> Either[str, Type[Config]]:
     return instance_from_module(mod, Config)
 
 
 log_initialized = False
 
 
-def nvim_stdio_with_logging(name: str) -> NvimApi:
-    from ribosome.logging import nvim_logging
-    vim = NativeNvimApi(name, session())
-    nvim_logging(vim)
-    return vim
-
-
-def nvim_log() -> Logger:
-    global log_initialized
-    if not log_initialized:
-        nvim_stdio_with_logging('ribosome_start_host')
-        log_initialized = True
-    return ribo_log
-
-
-def config(config: Config) -> Config:
-    return Config.cons(config.basic.name, config.state_ctor)
-
-
 def error(msg: str) -> int:
     try:
         amino_log.error(msg)
-        nvim_log().error(msg)
     except Exception as e:
         pass
     return 1
@@ -161,14 +61,14 @@ def exception(e: Exception, desc: str) -> int:
     f = __.caught_exception_error(f'starting host from {desc}', e)
     try:
         f(amino_log)
-        f(nvim_log())
     except Exception as e:
         pass
     return 1
 
 
-def start_config_stage_1(mod: ModuleType) -> int:
-    return config_from_module(mod).cata(error, run_loop)
+def start_module_config(mod: ModuleType) -> int:
+    # return config_from_module(mod).cata(error, run_loop_session)
+    return config_from_module(mod).cata(error, run_loop_uv)
 
 
 def setup_log() -> None:
@@ -179,7 +79,7 @@ def start_from(source: str, importer: Callable[[str], Either[ImportFailure, Modu
     try:
         setup_log()
         amino_log.debug(f'start_{desc}: {source}')
-        return importer(source).cata(L(import_error)(_, source), start_config_stage_1)
+        return importer(source).cata(L(import_error)(_, source), start_module_config)
     except Exception as e:
         return exception(e, source)
 
@@ -194,4 +94,21 @@ def start_file(path: str) -> int:
     return start_from(str(file), Either.import_file, 'file')
 
 
-__all__ = ('start_host', 'start_module', 'start_file')
+def start_json_config(data: str) -> int:
+    @do(Either[str, int])
+    def decode_and_run() -> Do:
+        config = yield decode_json(data)
+        return run_loop_uv(config)
+    try:
+        setup_log()
+        amino_log.debug('starting plugin from json')
+        return decode_and_run().value_or(error)
+    except Exception as e:
+        error(e)
+        try:
+            error(format_exception(e))
+        except Exception as e:
+            error(e)
+
+
+__all__ = ('start_host', 'start_module', 'start_file', 'start_json_config')

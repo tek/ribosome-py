@@ -14,8 +14,8 @@ from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import RequestHelper
 from ribosome.config.config import Config
 from ribosome.request.execute import execute_request
-from ribosome.config.settings import Settings
 from ribosome.nvim.io.api import N
+from ribosome.request.handler.prefix import Plain
 
 specimen = Lists.random_string()
 
@@ -72,7 +72,7 @@ def trans_error() -> NS[HsData, int]:
     return NS.lift(N.error('error'))
 
 
-config: Config[Settings, HsData, Any] = Config.cons(
+config: Config[HsData, Any] = Config.cons(
     'hs',
     request_handlers=List(
         RequestHandler.trans_cmd(trans_free)('trfree'),
@@ -80,7 +80,7 @@ config: Config[Settings, HsData, Any] = Config.cons(
         RequestHandler.trans_function(trans_internal)('int'),
         RequestHandler.trans_function(trans_data)('dat'),
         RequestHandler.trans_cmd(trans_json)('json', json=true),
-        RequestHandler.trans_autocmd(vim_enter)(),
+        RequestHandler.trans_autocmd(vim_enter)(prefix=Plain()),
         RequestHandler.trans_cmd(trans_error)('error'),
     ),
     state_ctor=HsData,
@@ -117,7 +117,7 @@ class DispatchSpec(SpecBase):
 
     def data(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        state = helper.unsafe_run_s('function:dat')
+        state = helper.unsafe_run_s('dat')
         return k(state.data.counter) == 23
 
     def json(self) -> Expectation:
@@ -128,7 +128,7 @@ class DispatchSpec(SpecBase):
 
     def autocmd(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        state = helper.unsafe_run_s('autocmd:vim_enter')
+        state = helper.unsafe_run_s('vim_enter')
         return k(state.data.counter) == 19
 
     def error(self) -> Expectation:

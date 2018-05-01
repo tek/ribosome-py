@@ -1,33 +1,38 @@
 from kallikrein import Expectation
 
-from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
-from ribosome.config.config import NoData
-from ribosome.config.settings import Settings
+from amino.test.spec import SpecBase
+from amino import do, Do
+
 from ribosome.nvim.api.variable import variable_set_prefixed
 from ribosome.nvim.api.command import doautocmd
+from ribosome.test.integration.embed import TestConfig, plugin_test
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.test.klk.matchers.variable import var_must_become
 
-from integration._support.autocmd import val
+from integration._support.autocmd import val, autocmd_spec_config
 
 
-class AutocmdSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
+@do(NvimIO[None])
+def pre() -> Do:
+    yield variable_set_prefixed('components', ['core'])
+
+
+test_config = TestConfig.cons(autocmd_spec_config, pre)
+
+
+@do(NvimIO[Expectation])
+def autocmd_spec() -> Do:
+    yield doautocmd('VimResized')
+    yield var_must_become('autocmd_success', val)
+
+
+class AutocmdSpec(SpecBase):
     '''
     execute handler when triggering an autocmd $autocmd
     '''
 
-    def plugin_name(self) -> str:
-        return 'plug'
-
-    def module(self) -> str:
-        return 'integration._support.autocmd'
-
-    def _pre_start(self) -> None:
-        super()._pre_start()
-        variable_set_prefixed('components', ['core']).unsafe(self.vim)
-
     def autocmd(self) -> Expectation:
-        self._wait(2)
-        doautocmd('VimResized').unsafe(self.vim)
-        return self.var_becomes('autocmd_success', val)
+        return plugin_test(test_config, autocmd_spec)
 
 
 __all__ = ('AutocmdSpec',)

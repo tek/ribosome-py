@@ -15,13 +15,11 @@ from amino.lenses.lens import lens
 from ribosome.config.config import Config
 from ribosome.config.component import Component, ComponentData
 from ribosome.test.integration.run import RequestHelper
-from ribosome.nvim.io.data import NError
 from ribosome.nvim.io.state import NS
-from ribosome.config.settings import Settings
 from ribosome.compute.api import prog
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.run import run_prog
-from ribosome.test.klk import kn
+from ribosome.test.klk.expectable import kn
 from ribosome.compute.prog import Prog
 from ribosome.config.resources import Resources
 from ribosome.compute.ribosome import Ribosome
@@ -30,6 +28,7 @@ from ribosome.compute.program import Program
 from ribosome.compute.interpret import GatherIOs, GatherSubprocesses
 from ribosome.process import Subprocess, SubprocessResult
 from ribosome.compute.output import Echo
+from ribosome.test.klk.matchers.nresult import nsuccess, nerror
 
 A = TypeVar('A')
 
@@ -148,7 +147,7 @@ def n1() -> Do:
 
 
 @prog.result
-@do(NS[Resources[Settings, ComponentData[CoreData, ExtraData], Compon], str])
+@do(NS[Resources[ComponentData[CoreData, ExtraData], Compon], str])
 def comp_res() -> Do:
     s = yield NS.inspect(_.components)
     comp = yield NS.from_either(s.by_type(ExtraData))
@@ -171,14 +170,14 @@ def run(t: Program) -> Expectable:
 
 
 @prog.result
-@do(NS[Ribosome[Settings, CoreData, Compon, ExtraData], int])
+@do(NS[Ribosome[CoreData, Compon, ExtraData], int])
 def mod_main() -> Do:
     yield Ribo.modify_main(__.set.x(437))
     yield Ribo.main()
 
 
 @prog.result
-@do(NS[Ribosome[Settings, CoreData, Compon, ExtraData], int])
+@do(NS[Ribosome[CoreData, Compon, ExtraData], int])
 def mod_comp() -> Do:
     yield Ribo.modify_comp(__.set.y(954))
     yield Ribo.comp()
@@ -236,42 +235,42 @@ class ProgSpec(SpecBase):
     '''
 
     def nest(self) -> Expectation:
-        return run_a(tm).must(contain(27))
+        return run_a(tm).must(nsuccess(27))
 
     def error(self) -> Expectation:
-        return run_a(n1) == NError('stop')
+        return run_a(n1).must(nerror('stop'))
 
     def comp_res(self) -> Expectation:
         def state_updated(a) -> Expectation:
             return k(a.data_by_name(c1.name) / _.y).must(be_right(29))
-        return run(comp_res).must((contain(tupled(2)((match_with(state_updated), equal(c1.name))))))
+        return run(comp_res).must((nsuccess(tupled(2)((match_with(state_updated), equal(c1.name))))))
 
     def root(self) -> Expectation:
-        return run_a(root).must(contain(13))
+        return run_a(root).must(nsuccess(13))
 
     def mod_main(self) -> Expectation:
-        return run_a(mod_main).must(contain(CoreData.cons(437)))
+        return run_a(mod_main).must(nsuccess(CoreData.cons(437)))
 
     def mod_comp(self) -> Expectation:
-        return run_a(mod_comp).must(contain(ExtraData.cons(954)))
+        return run_a(mod_comp).must(nsuccess(ExtraData.cons(954)))
 
     def scalar_io(self) -> Expectation:
-        return run_a(scalar_io).must(contain(1046))
+        return run_a(scalar_io).must(nsuccess(1046))
 
     def gather_ios(self) -> Expectation:
-        return run_a(gather_ios).must(contain(contain(Right(5)) & contain(Right(8))))
+        return run_a(gather_ios).must(nsuccess(contain(Right(5)) & contain(Right(8))))
 
     def scalar_subproc(self) -> Expectation:
-        return run_a(scalar_subproc).must(contain(SubprocessResult(0, List('692'), Nil, None)))
+        return run_a(scalar_subproc).must(nsuccess(SubprocessResult(0, List('692'), Nil, None)))
 
     def gather_subprocs(self) -> Expectation:
-        return run_a(gather_subprocs).must(contain(
+        return run_a(gather_subprocs).must(nsuccess(
             contain(Right(SubprocessResult(0, List('84'), Nil, None))) &
             contain(Right(SubprocessResult(0, List('39'), Nil, None)))
         ))
 
     def log_message(self) -> Expectation:
-        return run_a(log_message).must(contain(None))
+        return run_a(log_message).must(nsuccess(None))
 
 
 __all__ = ('ProgSpec',)

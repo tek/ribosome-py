@@ -51,7 +51,7 @@ class LoggerSpec(SpecBase):
     '''
 
     def logger(self) -> Expectation:
-        def check(state: PluginState[Settings, LSData, NoComponentData]) -> Expectation:
+        def check(state: PluginState[LSData, NoComponentData]) -> Expectation:
             return k(state.data.log).must(contain(test_echo))
         return helper.k(helper.run_s, 'function:log_something').must(contain(match_with(check)))
 

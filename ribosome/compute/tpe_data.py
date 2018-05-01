@@ -20,7 +20,7 @@ class MainDataProgType(Generic[M], ADT['MainDataProgType[M]']):
     pass
 
 
-class InternalMainDataProgType(Generic[S, D, CC], MainDataProgType[PluginState[S, D, CC]]):
+class InternalMainDataProgType(Generic[D, CC], MainDataProgType[PluginState[D, CC]]):
     pass
 
 
@@ -49,7 +49,7 @@ class StateProgType(Generic[M, C, R], ADT['StateProgType[M, C, R]']):
     pass
 
 
-class ResourcesStateProgType(Generic[M, C, S, D, CC], StateProgType[M, C, Resources[S, D, CC]]):
+class ResourcesStateProgType(Generic[M, C, D, CC], StateProgType[M, C, Resources[D, CC]]):
 
     def __init__(self, affiliation: AffiliationProgType[M, C]) -> None:
         self.affiliation = affiliation
@@ -61,7 +61,7 @@ class PlainStateProgType(Generic[M, C], StateProgType[M, C, C]):
         self.affiliation = affiliation
 
 
-class RibosomeStateProgType(Generic[S, D, CC, C], StateProgType[PluginState[S, D, CC], C, Ribosome[S, D, CC, C]]):
+class RibosomeStateProgType(Generic[D, CC, C], StateProgType[PluginState[D, CC], C, Ribosome[D, CC, C]]):
 
     def __init__(self, comp: Type[C]) -> None:
         self.comp = comp
@@ -85,7 +85,7 @@ class StateProg(Generic[M, C, R, A], ProgType[M, C, R]):
 trivial_state_prog = StateProg(PlainStateProgType(RootProgType(PlainMainDataProgType())), Any)
 
 
-def ribo_state_prog(comp: Type[C]) -> StateProg[PluginState[S, D, CC], C, Ribosome[S, D, CC, C], Any]:
+def ribo_state_prog(comp: Type[C]) -> StateProg[PluginState[D, CC], C, Ribosome[D, CC, C], Any]:
     return StateProg(RibosomeStateProgType(comp), Any)
 
 

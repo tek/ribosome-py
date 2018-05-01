@@ -10,7 +10,6 @@ from ribosome.compute.output import (ProgOutput, ProgOutputUnit, ProgOutputResul
 from ribosome.nvim.io.state import NS
 from ribosome.request.args import ParamsSpec
 from ribosome.compute.wrap_data import ProgWrappers
-from ribosome.config.settings import Settings
 from ribosome.config.basic_config import NoData
 from ribosome.compute.ribosome import Ribosome
 from ribosome.compute.tpe_data import ribo_state_prog
@@ -24,7 +23,6 @@ D = TypeVar('D')
 M = TypeVar('M')
 P = TypeVar('P')
 R = TypeVar('R')
-S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 C = TypeVar('C')
 PIO = TypeVar('PIO')
@@ -111,7 +109,7 @@ class prog:
     @staticmethod
     def comp(f: Callable[[P], NS[C, A]]) -> Program[A]:
         params_spec, wrappers = func_state_data(f)
-        @do(NS[Ribosome[S, D, CC, C], A])
+        @do(NS[Ribosome[D, CC, C], A])
         def zoomed(*p: P) -> Do:
             comp_lens = yield NS.inspect(_.comp_lens)
             yield f(*p).zoom(comp_lens)

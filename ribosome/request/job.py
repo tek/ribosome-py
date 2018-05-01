@@ -3,8 +3,8 @@ from typing import TypeVar, Any, Generic
 from amino import List, Boolean
 from amino.dat import Dat
 
-from ribosome.data.plugin_state import Programs
 from ribosome.data.plugin_state_holder import PluginStateHolder
+from ribosome.compute.program import Program
 
 D = TypeVar('D')
 
@@ -38,7 +38,7 @@ class RequestJob(Generic[D], Dat['RequestJob']):
         return f'{self.sync_prefix}sync request {self.name}({self.args}) to `{self.plugin_name}`'
 
     @property
-    def programs(self) -> Programs:
+    def programs(self) -> List[Program]:
         return self.state.state.programs
 
 

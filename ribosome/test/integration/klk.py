@@ -15,8 +15,7 @@ from kallikrein.matchers.maybe import be_just
 from kallikrein.matchers.either import be_right
 
 from ribosome.test.integration.spec import VimIntegrationSpecI, VimIntegrationSpec, AutoPluginIntegrationSpec
-from ribosome.config.settings import Settings
-from ribosome.test.klk import kn
+from ribosome.test.klk.expectable import kn
 from ribosome.nvim.api.variable import variable_prefixed_raw, variable_raw
 from ribosome.nvim.api.exists import command_exists
 
@@ -120,10 +119,10 @@ class VimIntegrationKlkSpec(VimIntegrationSpec, VimIntegrationKlkHelpers):
 
 
 D = TypeVar('D')
-S = TypeVar('S', bound=Settings)
 
 
-class AutoPluginIntegrationKlkSpec(Generic[S, D], AutoPluginIntegrationSpec[S, D], VimIntegrationKlkHelpers):
+class AutoPluginIntegrationKlkSpec(Generic[D], AutoPluginIntegrationSpec[D], VimIntegrationKlkHelpers):
     pass
+
 
 __all__ = ('VimIntegrationKlkHelpers', 'VimIntegrationKlkSpec', 'AutoPluginIntegrationKlkSpec')

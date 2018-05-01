@@ -10,6 +10,7 @@ from ribosome.nvim.api.util import cons_decode_str, cons_checked_e
 from ribosome.nvim.api.data import Buffer
 from ribosome.nvim.request import nvim_nonfatal_request, data_cons_request_nonfatal, nvim_request
 from ribosome.nvim.io.api import N
+from ribosome.nvim.api.exists import wait_until_valid
 
 log = module_log()
 A = TypeVar('A')
@@ -69,6 +70,24 @@ def variable_set_prefixed(name: str, value: Any) -> Do:
 
 def buffer_var_raw(buffer: Buffer, name: str) -> NvimIO[Any]:
     return nvim_request('nvim_buf_get_var', buffer.data, name)
+
+
+def var_equals(target: Any) -> Callable[[str], NvimIO[bool]]:
+    @do(NvimIO[bool])
+    def var_equals(name: str) -> Do:
+        actual = yield variable_raw(name)
+        return actual.to_maybe.contains(target)
+    return var_equals
+
+
+def var_becomes(name: str, value: Any, timeout: float=3, interval: float=.01) -> NvimIO[None]:
+    return wait_until_valid(name, var_equals(value), timeout=timeout, interval=interval, desc=f'become {value}')
+
+
+@do(NvimIO[None])
+def pvar_becomes(name: str, value: Any, timeout: float=3, interval: float=.01) -> Do:
+    prefix = yield plugin_name()
+    yield var_becomes(f'{prefix}_{name}', value, timeout=timeout, interval=interval)
 
 
 __all__ = ('variable_raw', 'variable_prefixed_raw', 'variable', 'variable_prefixed', 'variable_prefixed_str',

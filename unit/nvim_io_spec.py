@@ -10,7 +10,7 @@ from amino.test.spec import SpecBase
 
 from ribosome.nvim.api.data import NvimApi, StrictNvimApi
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.test.klk import kn
+from ribosome.test.klk.expectable import kn
 from ribosome.nvim.io.api import N
 from ribosome.nvim.io.data import NError
 

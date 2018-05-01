@@ -91,8 +91,13 @@ def nvimio_repeat_timeout(
         check: Callable[[A], bool],
         error: str,
         timeout: float,
+        interval: float=.01,
 ) -> Do:
     start = yield N.simple(time.time)
+    @do(NvimIO[None])
+    def wait_and_recurse() -> Do:
+        yield N.delay(lambda a: time.sleep(interval))
+        yield recurse()
     @do(NvimIO[None])
     def recurse() -> Do:
         result = yield thunk()
@@ -102,7 +107,7 @@ def nvimio_repeat_timeout(
             if done else
             N.error(error)
             if time.time() - start > timeout else
-            recurse()
+            wait_and_recurse()
         )
     yield recurse()
 

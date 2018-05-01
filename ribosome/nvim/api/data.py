@@ -81,7 +81,7 @@ def get_var(vim: StrictNvimApi, name: str) -> Do:
 
 @do(Either[str, Tuple[NvimApi, Any]])
 def set_var(vim: StrictNvimApi, name: str, rest: List[Any]) -> Do:
-    value, rest1 = yield rest.detach_head.to_either(f'no value specified for updating var `{name}`')
+    value, rest1 = yield rest.uncons.to_either(f'no value specified for updating var `{name}`')
     return vim.append.vars((name, value)), None
 
 
@@ -97,7 +97,7 @@ def manipulate_vars(vim: StrictNvimApi, method: str, name: str, rest: List[Any])
 
 @do(Either[str, Tuple[NvimApi, Any]])
 def variable_request(vim: StrictNvimApi, method: str, args: List[Any]) -> Do:
-    name, rest = yield args.detach_head.to_either('no variable name given')
+    name, rest = yield args.uncons.to_either('no variable name given')
     yield manipulate_vars(vim, method, name, rest)
 
 

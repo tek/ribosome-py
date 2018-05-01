@@ -4,16 +4,15 @@ from kallikrein.matchers import contain
 from amino.test import temp_dir
 
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
-from ribosome.config.settings import Settings
 from ribosome.config.config import NoData
-from ribosome.test.klk import kn
+from ribosome.test.klk.expectable import kn
 from ribosome.nvim.api.function import nvim_call_tpe
 from ribosome.nvim.api.exists import call_once_defined
 
 from integration._support.default_handler import class_name
 
 
-class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
+class DefaultHandlerSpec(AutoPluginIntegrationKlkSpec[NoData]):
     '''
     append a directory to the plugin's `sys.path` $append_path
     '''

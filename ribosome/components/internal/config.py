@@ -25,7 +25,7 @@ internal_init_handler = RequestHandler.trans_function(internal_init)(prefix=Full
 
 internal: Component = Component.cons(
     'internal',
-    request_handlers=List(
+    rpc=List(
         program_log_handler,
         set_log_level_handler,
         update_state_handler,

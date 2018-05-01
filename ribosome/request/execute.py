@@ -18,12 +18,11 @@ from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PluginState
 # from ribosome.trans.action import LogMessage, Info, Error
 from ribosome.compute.program import Program
-from ribosome.config.settings import Settings
 from ribosome import NvimApi
 from ribosome.nvim.io.data import NResult, NSuccess, NError, NFatal
 from ribosome.nvim.io.api import N
 from ribosome.request.job import RequestJob
-from ribosome.request.handler.handler import RequestHandler
+from ribosome.request.handler.handler import RequestHandler, RpcProgram
 from ribosome.request.args import ParamsSpec
 from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
 from ribosome.compute.run import run_prog
@@ -36,22 +35,21 @@ B = TypeVar('B')
 C = TypeVar('C', bound=Config)
 R = TypeVar('R')
 RDP = TypeVar('RDP')
-S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
 
 # class execute_io(Case, alg=DIO):
 
-#     def iodio(self, io: IODIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
+#     def iodio(self, io: IODIO[A]) -> NS[PluginState[D, CC], TransComplete]:
 #         return NS.from_io(io.io)
 
-#     def gather_i_os_dio(self, io: GatherIOsDIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
+#     def gather_i_os_dio(self, io: GatherIOsDIO[A]) -> NS[PluginState[D, CC], TransComplete]:
 #         def gather() -> R:
 #             gio = io.io
 #             return gather_ios(gio.ios, gio.timeout)
 #         return NS.from_io(IO.delay(gather))
 
-#     def gather_subprocs_dio(self, io: GatherSubprocsDIO[A, TransComplete]) -> NS[PluginState[S, D, CC], TransComplete]:
+#     def gather_subprocs_dio(self, io: GatherSubprocsDIO[A, TransComplete]) -> NS[PluginState[D, CC], TransComplete]:
 #         ribo_log.debug(f'gathering {io}')
 #         def gather() -> TransComplete:
 #             gio = io.io
@@ -59,7 +57,7 @@ CC = TypeVar('CC')
 #             return gather_ios(popens, gio.timeout)
 #         return NS.from_io(IO.delay(gather))
 
-#     def nvim_iodio(self, io: NvimIODIO[A]) -> NS[PluginState[S, D, CC], TransComplete]:
+#     def nvim_iodio(self, io: NvimIODIO[A]) -> NS[PluginState[D, CC], TransComplete]:
 #         return NS.lift(io.io)
 
 
@@ -72,13 +70,13 @@ CC = TypeVar('CC')
 #         return NS.delay(lambda v: ribo_log.error(msg))
 
 
-def arg_parser(handler: RequestHandler, params_spec: ParamsSpec) -> ArgParser:
-    tpe = JsonArgParser if handler.json else TokenArgParser
+def arg_parser(rpc_program: RpcProgram, params_spec: ParamsSpec) -> ArgParser:
+    tpe = JsonArgParser if rpc_program.options.json else TokenArgParser
     return tpe(params_spec)
 
 
-def parse_args(handler: RequestHandler, args: List[Any]) -> NS[D, List[Any]]:
-    return arg_parser(handler, handler.program.params_spec).parse(args)
+def parse_args(rpc_program: RpcProgram, args: List[Any]) -> NS[D, List[Any]]:
+    return arg_parser(rpc_program, rpc_program.program.params_spec).parse(args)
 
 
 @do(NS)
@@ -92,7 +90,6 @@ def traverse_programs(programs: List[Program], args: List[Any]) -> Do:
     yield programs.traverse(lambda a: run_request_handler(a, args), NS)
 
 
-# TODO use from request_handler, since there is no concurrency handling anywhere else anymore.
 @do(NvimIO[A])
 def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[PluginState, A]]], desc: str) -> Do:
     '''this is the central unsafe function, using a lock and updating the state in `holder` in-place.
@@ -106,20 +103,17 @@ def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[PluginStat
     yield N.pure(response)
 
 
-def exclusive_program(holder: PluginStateHolder, program: Program, args: List[Any], desc: str) -> NvimIO[R]:
+def exclusive_program(holder: PluginStateHolder, program: Program, args: List[Any]) -> NvimIO[R]:
     return exclusive(
         holder,
         lambda: run_request_handler(program, args).run(holder.state),
-        desc
+        program.name
     )
 
 
-def execute(state: PluginStateHolder[D], program: Program, args: List[Any]) -> NvimIO[Any]:
-    return exclusive_program(state, program, args, program.name)
-
-
-def regular_programs(name: str) -> EitherState[RequestJob, List[Program]]:
-    return EitherState.inspect_f(lambda job: job.programs.lift(name).to_either(f'no program for {name}'))
+@do(EitherState[RequestJob, List[Program]])
+def regular_programs(name: str) -> Do:
+    yield EitherState.inspect_f(lambda job: job.programs.lift(name).to_either(f'no program for {name}'))
 
 
 def special_programs_sync(parts: List[str]) -> EitherState[RequestJob, List[Program]]:
@@ -138,13 +132,13 @@ def special_programs(head: str, tail: List[str]) -> EitherState[RequestJob, List
 def job_programs() -> Do:
     name = yield EitherState.inspect(_.name)
     parts = Lists.split(name, ':')
-    yield parts.detach_head.map2(special_programs) | (lambda: regular_programs(name))
+    yield parts.uncons.map2(special_programs) | (lambda: regular_programs(name))
 
 
 @do(NvimIO[List[Any]])
 def execute_request_job(job: RequestJob) -> Do:
     programs = yield N.e(job_programs().run_a(job))
-    result = yield programs.traverse(L(execute)(job.state, _, job.args), NvimIO)
+    result = yield programs.traverse(L(exclusive_program)(job.state, _, job.args), NvimIO)
     ribo_log.debug(f'async job {job.name} completed')
     yield N.from_io(job.state.request_complete())
     yield N.pure(result)
@@ -166,7 +160,7 @@ class request_result(Case, alg=NResult):
         def empty_result() -> int:
             ribo_log.error(f'no result in {desc}')
             return 3
-        return result.value.detach_head.map2(sync_result) | empty_result if self.sync else 0
+        return result.value.uncons.map2(sync_result) | empty_result if self.sync else 0
 
     def n_error(self, result: NError[List[Any]]) -> Any:
         ribo_log.error(result.error)
@@ -190,9 +184,8 @@ def request_job(state: PluginStateHolder[D], name: str, args: List[Any], sync: b
 
 @do(NvimIO[Any])
 def execute_request_io(state: PluginStateHolder[D], name: str, args: List[Any], sync: bool) -> Do:
-    sync_prefix = '' if sync else 'a'
     job = request_job(state, name, args, sync)
-    ribo_log.debug(f'dispatching {sync_prefix}sync request: {job.name}({job.args})')
+    ribo_log.debug(f'dispatching {job.desc}')
     result = yield execute_request_job(job)
     if sync:
         ribo_log.debug(f'request `{job.name}` completed: {result}')
@@ -208,4 +201,4 @@ def execute_request(vim: NvimApi, state: PluginStateHolder[D], name: str, args: 
     return decode(result)
 
 
-__all__ = ('execute_request_job', 'execute', 'traverse_programs', 'compute_program')
+__all__ = ('execute_request_job', 'traverse_programs')

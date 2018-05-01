@@ -4,7 +4,6 @@ from amino.lenses.lens import lens
 from amino import do, Do, _
 
 from ribosome.nvim.io.state import NS
-from ribosome.config.settings import Settings
 from ribosome.compute.ribosome import Ribosome
 from ribosome.config.setting import Setting
 from ribosome.nvim.io.compute import NvimIO
@@ -16,7 +15,6 @@ from ribosome.compute.wrap import prog_wrappers
 from ribosome.data.plugin_state import PluginState
 
 A = TypeVar('A')
-S = TypeVar('S', bound=Settings)
 D = TypeVar('D')
 M = TypeVar('M')
 CC = TypeVar('CC')
@@ -32,62 +30,49 @@ class RMeta(GenericMeta):
 class Ribo(metaclass=RMeta):
 
     @classmethod
-    def setting(self, attr: Callable[[S], Setting[A]]) -> NS[Ribosome[S, D, CC, C], A]:
-        def get(rib: Ribosome[S, D, CC, C]) -> NvimIO[A]:
-            return attr(rib.state.basic.settings).value_or_default
-        return NS.inspect_f(get)
+    def setting(self, setting: Setting) -> NS[Ribosome[D, CC, C], A]:
+        return Ribo.lift_nvimio(setting.value_or_default)
 
     @classmethod
-    @prog
-    def setting_prog(self, attr: Callable[[S], Setting[A]]) -> NS[Ribosome[S, D, CC, C], A]:
-        def get(rib: Ribosome[S, D, CC, C]) -> NvimIO[A]:
-            return attr(rib.state.basic.settings).value_or_default
-        return NS.inspect_f(get)
-
-    @classmethod
-    def settings(self) -> NS[Ribosome[S, D, CC, C], S]:
-        return NS.inspect(lambda a: a.ps.settings)
-
-    @classmethod
-    def comp(self) -> NS[Ribosome[S, D, CC, C], C]:
+    def comp(self) -> NS[Ribosome[D, CC, C], C]:
         return NS.inspect(lambda a: a.comp_lens.get()(a))
 
     @classmethod
-    def inspect_comp(self, f: Callable[[C], A]) -> NS[Ribosome[S, D, CC, C], A]:
+    def inspect_comp(self, f: Callable[[C], A]) -> NS[Ribosome[D, CC, C], A]:
         return NS.inspect(lambda a: f(a.comp_lens.get()(a)))
 
     @classmethod
-    def inspect_comp_e(self, f: Callable[[C], A]) -> NS[Ribosome[S, D, CC, C], A]:
+    def inspect_comp_e(self, f: Callable[[C], A]) -> NS[Ribosome[D, CC, C], A]:
         return NS.inspect_either(lambda a: f(a.comp_lens.get()(a)))
 
     @classmethod
-    def modify_comp(self, f: Callable[[C], C]) -> NS[Ribosome[S, D, CC, C], None]:
+    def modify_comp(self, f: Callable[[C], C]) -> NS[Ribosome[D, CC, C], None]:
         return NS.modify(lambda a: a.comp_lens.modify(f)(a))
 
     @classmethod
-    def main(self) -> NS[Ribosome[S, D, CC, C], C]:
+    def main(self) -> NS[Ribosome[D, CC, C], C]:
         return NS.inspect(lambda a: main_lens.get()(a))
 
     @classmethod
-    def modify_main(self, f: Callable[[D], D]) -> NS[Ribosome[S, D, CC, C], None]:
+    def modify_main(self, f: Callable[[D], D]) -> NS[Ribosome[D, CC, C], None]:
         return NS.modify(lambda a: main_lens.modify(f)(a))
 
     @classmethod
-    @do(NS[Ribosome[S, D, CC, C], A])
+    @do(NS[Ribosome[D, CC, C], A])
     def zoom_comp(self, fa: NS[C, A]) -> Do:
         lens = yield NS.inspect(_.comp_lens)
         yield fa.zoom(lens)
 
     @classmethod
     @do(Prog[A])
-    def lift_state_prog(self, fa: NS[Ribosome[S, D, CC, C], A], state_type: StateProg[M, C, R, A]) -> Do:
+    def lift_state_prog(self, fa: NS[Ribosome[D, CC, C], A], state_type: StateProg[M, C, R, A]) -> Do:
         wrappers = yield Prog.from_either(prog_wrappers.match(state_type))
         yield ProgExec('lift', fa, wrappers, ProgOutputResult())
 
     @classmethod
     @do(Prog[A])
-    def lift(self, fa: NS[Ribosome[S, D, CC, C], A], comp: Type[C]) -> Do:
-        state_type: StateProg[PluginState[S, D, CC], C, Ribosome[S, D, CC, C]] = ribo_state_prog(comp)
+    def lift(self, fa: NS[Ribosome[D, CC, C], A], comp: Type[C]) -> Do:
+        state_type: StateProg[PluginState[D, CC], C, Ribosome[D, CC, C]] = ribo_state_prog(comp)
         yield Ribo.lift_state_prog(fa, state_type)
 
     @classmethod

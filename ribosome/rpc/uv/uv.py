@@ -1,17 +1,22 @@
 import sys
 import abc
-from typing import Any, Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple
+from threading import Thread
 
 import pyuv
 from pyuv import (Pipe, Loop, Process, StdIO, UV_CREATE_PIPE, UV_READABLE_PIPE, UV_WRITABLE_PIPE,  # type: ignore
                   UV_PROCESS_WINDOWS_HIDE)
 
-from amino import Dat, Try, Either, ADT, IO, List, do, Do, Maybe, Just, Nothing
+from amino import Dat, Try, Either, ADT, IO, List, do, Do, Maybe, Just, Nothing, Path
 from amino.logging import module_log
 from amino.case import Case
 
 from ribosome.rpc.comm import RpcComm, OnMessage, OnError
 from ribosome.rpc.error import RpcReadErrorUnknown, RpcProcessExit
+from ribosome.rpc.start import start_plugin_sync, init_comm, cannnot_execute_request
+from ribosome.config.config import Config
+from ribosome.rpc.api import RiboNvimApi
+from ribosome import ribo_log
 
 log = module_log()
 
@@ -87,15 +92,37 @@ class UvEmbedResources(UvResources):
         return Just(self.write)
 
 
+class UvLoopThread(Dat['UvLoopThread']):
+
+    def __init__(self, thread: Maybe[Thread]) -> None:
+        self.thread = thread
+
+    def update(self, thread: Thread) -> None:
+        self.thread = Just(thread)
+
+    def reset(self) -> None:
+        self.thread = Nothing
+
+
 class Uv(Dat['Uv']):
+
+    @staticmethod
+    def cons(
+            loop: Loop,
+            resources: UvResources,
+            thread: UvLoopThread=None,
+    ) -> 'Uv':
+        return Uv(loop, resources, thread or UvLoopThread(Nothing))
 
     def __init__(
             self,
             loop: Loop,
             resources: UvResources,
+            thread: UvLoopThread,
     ) -> None:
         self.loop = loop
         self.resources = resources
+        self.thread = thread
 
 
 # TODO this must stop the loop
@@ -122,7 +149,7 @@ def uv_stdio(loop: Loop) -> UvResources:
     return UvStdioResources(write, read)
 
 
-def embed(loop: Loop, proc: List[str]) -> UvResources:
+def uv_embed(loop: Loop, proc: List[str]) -> UvResources:
     write = Pipe(loop)
     read = Pipe(loop)
     error = Pipe(loop)
@@ -132,12 +159,9 @@ def embed(loop: Loop, proc: List[str]) -> UvResources:
     return UvEmbedResources(write, read, error, stdin, stdout, stderr, proc)
 
 
-def on_async(*a: Any) -> None:
-    print(f'async: {a}')
-
-
 def on_exit(handle: Pipe, exit_status: int, term_signal: int) -> None:
-    print(f'exit: {exit_status}')
+    if exit_status != 0:
+        log.warn(f'uv loop exited with status {exit_status}, signal {term_signal}')
 
 
 OnRead = Callable[[Pipe, Optional[bytes], Optional[int]], None]
@@ -160,25 +184,62 @@ def read_pipe(on_data: OnMessage, on_error: OnError) -> OnRead:
     return read
 
 
+def uv_main_loop(uv: Uv) -> None:
+    try:
+        uv.loop.run()
+    except Exception as e:
+        log.error(e)
+
+
 def start_processing(uv: Uv) -> Callable[[OnMessage, OnError], IO[None]]:
     @do(IO[None])
     def start(on_message: OnMessage, on_error: OnError) -> Do:
         on_read = read_pipe(on_message, on_error)
         yield connect_uv(uv, on_read)(uv.resources)
         yield IO.delay(uv.resources.read_source.start_read, on_read)
+        thread = yield IO.fork(uv_main_loop, uv)
+        yield IO.delay(uv.thread.update, thread)
     return start
 
 
-def uv(cons_resources: Callable[[Loop], UvResources]) -> Tuple[Uv, RpcComm]:
+@do(IO[None])
+def stop_uv_loop(uv: Uv) -> Do:
+    yield IO.delay(uv.loop.stop)
+    yield uv.thread.thread.cata(lambda t: IO.delay(t.join, 3), IO.pure(None))
+    yield IO.delay(uv.thread.reset)
+
+
+def stop_processing(uv: Uv) -> Callable[[], IO[None]]:
+    def stop() -> IO[None]:
+        return stop_uv_loop(uv)
+    return stop
+
+
+def join_uv_loop(uv: Uv) -> IO[None]:
+    return uv.thread.thread.cata(lambda t: IO.delay(t.join), IO.failed(f'no uv loop running'))
+
+
+def uv_join(uv: Uv) -> Callable[[], IO[None]]:
+    def join() -> IO[None]:
+        return join_uv_loop(uv)
+    return join
+
+
+def cons_uv(cons_resources: Callable[[Loop], UvResources]) -> Tuple[Uv, RpcComm]:
     loop = Loop()
     resources = cons_resources(loop)
-    uv = Uv(loop, resources)
-    comm = RpcComm(start_processing(uv), uv_send(resources.write_sink), uv_exit(loop))
+    uv = Uv.cons(loop, resources)
+    comm = RpcComm(start_processing(uv), stop_processing(uv), uv_send(resources.write_sink), uv_join(uv),
+                   uv_exit(loop))
     return uv, comm
 
 
 def cons_uv_embed(proc: List[str]) -> Tuple[Uv, RpcComm]:
-    return uv(lambda loop: embed(loop, proc))
+    return cons_uv(lambda loop: uv_embed(loop, proc))
+
+
+def cons_uv_stdio() -> Tuple[Uv, RpcComm]:
+    return cons_uv(lambda loop: uv_stdio(loop))
 
 
 class UvConnection(ADT['UvConnection']):
@@ -221,6 +282,25 @@ class ConnectedUv(Dat['ConnectedUv']):
     def __init__(self, uv: Uv, connection: UvConnection) -> None:
         self.uv = uv
         self.connection = connection
+
+
+def start_uv_plugin_sync(config: Config) -> IO[None]:
+    uv, rpc_comm = cons_uv_stdio()
+    return start_plugin_sync(config, rpc_comm)
+
+
+embed_nvim_cmdline = List('nvim', '-n', '-u', 'NONE', '--embed')
+
+
+@do(IO[RiboNvimApi])
+def start_uv_embed_nvim_sync(name: str, extra: List[str]) -> Do:
+    uv, rpc_comm = cons_uv(lambda loop: uv_embed(loop, embed_nvim_cmdline + extra))
+    comm = yield init_comm(rpc_comm, cannnot_execute_request)
+    return RiboNvimApi(name, comm)
+
+
+def start_uv_embed_nvim_sync_log(name: str, log: Path) -> IO[RiboNvimApi]:
+    return start_uv_embed_nvim_sync(name, List(f'-V{log}'))
 
 
 __all__ = ()

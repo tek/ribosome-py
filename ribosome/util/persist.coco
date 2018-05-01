@@ -8,16 +8,14 @@ from amino.json import decode_json, dump_json
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.state import NS
 from ribosome.config.resources import Resources
-from ribosome.config.settings import Settings
 from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
 D = TypeVar('D')
-S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
 
-settings: NS[Resources[S, D, CC], S] = NS.inspect(a -> a.settings)
+settings: NS[Resources[D, CC], S] = NS.inspect(a -> a.settings)
 
 
 def mkdir(dir: Path) -> IO[None]:
@@ -47,7 +45,7 @@ def load_json_data(settings: S, name: str) -> Do:
     yield load_json_data_from(file)
 
 
-@do(NS[Resources[S, D, CC], None])
+@do(NS[Resources[D, CC], None])
 def load_json_state(name: str, store: UnboundLens) -> Do:
     s = yield settings
     state = yield NS.lift(load_json_data(s, name))
@@ -62,7 +60,7 @@ def store_json_data(settings: S, name: str, \data: A) -> Do:
     yield N.pure(None)
 
 
-@do(NS[Resources[S, D, CC], None])
+@do(NS[Resources[D, CC], None])
 def store_json_state(name: str, fetch: D -> A) -> Do:
     payload = yield NS.inspect(s -> fetch(s.data))
     s = yield settings

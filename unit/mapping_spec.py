@@ -18,7 +18,6 @@ from ribosome.data.plugin_state import PluginState
 from ribosome.config.component import Component, ComponentData
 from ribosome.config.config import Config, NoData
 from ribosome.nvim.api.command import nvim_command_output
-from ribosome.config.settings import Settings
 from ribosome.data.mapping import Mappings, Mapping, mapmode
 from ribosome.components.internal.mapping import activate_mapping
 
@@ -43,7 +42,7 @@ def handle_map() -> Do:
 
 
 @prog.unit
-@do(NS[PluginState[Settings, NoData, None], None])
+@do(NS[PluginState[NoData, None], None])
 def setup_map() -> Do:
     yield activate_mapping(gs_mapping)
     yield NS.unit

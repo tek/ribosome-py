@@ -1,6 +1,6 @@
 from typing import Any, TypeVar
 
-from amino import Either, List, Left, do, Right, curried, Do, Map
+from amino import Either, List, Left, do, Right, curried, Do, Map, Maybe
 from amino.mod import instance_from_module
 
 from ribosome.logging import Logging
@@ -18,7 +18,7 @@ class ComponentResolver(Logging):
             available_components: Map[str, Component[D, Any, CC]],
             core: List[str],
             default: List[str],
-            requested: Either[str, List[str]],
+            requested: Maybe[List[str]],
     ) -> None:
         self.name = name
         self.available_components = available_components

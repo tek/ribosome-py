@@ -2,6 +2,8 @@ from typing import Any
 
 from amino import List, Try, do, Do, Either, ADT, Left, Right, Lists
 
+from ribosome import ribo_log
+
 
 class Receive(ADT['Receive']):
     pass
@@ -59,7 +61,7 @@ def receive_request(data: List[Any]) -> Do:
     el1, el2, el3 = yield data.lift_all(0, 1, 2).to_either_f(lambda: f'wrong number of elements: {data.length}')
     id = yield Right(el1) if isinstance(el1, int) else Left(f'id is not an int: {el1}')
     method = yield Try(el2.decode) if isinstance(el2, bytes) else Left(f'method is not a str: {el2}')
-    args = yield Right(el3) if isinstance(el3, list) else Left(f'args is not a list: {el3}')
+    args = yield Right(Lists.wrap(el3)) if isinstance(el3, list) else Left(f'args is not a list: {el3}')
     return ReceiveRequest(id, method, args)
 
 
@@ -78,7 +80,7 @@ def receive_response(data: List[Any]) -> Do:
 def receive_notification(data: List[Any]) -> Do:
     el1, el2 = yield data.lift_all(0, 1).to_either_f(lambda: f'wrong number of elements: {data.length}')
     method = yield Try(el1.decode) if isinstance(el1, bytes) else Left(f'method is not a str: {el1}')
-    args = yield Right(el2) if isinstance(el2, list) else Left(f'args is not a list: {el2}')
+    args = yield Right(Lists.wrap(el2)) if isinstance(el2, list) else Left(f'args is not a list: {el2}')
     return ReceiveNotification(method, args)
 
 

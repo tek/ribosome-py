@@ -21,12 +21,19 @@ def nvim_exists(target: str) -> NvimIO[bool]:
     return nvim_call_cons(cons_decode_exists_bool, 'exists', target)
 
 
-def wait_until_valid(name: str, check: Callable[[str], NvimIO[bool]], timeout: int=30) -> NvimIO[None]:
+def wait_until_valid(
+        name: str,
+        check: Callable[[str], NvimIO[bool]],
+        timeout: int=30,
+        interval: float=.01,
+        desc='satify condition',
+) -> NvimIO[None]:
     return nvimio_repeat_timeout(
         lambda: check(name),
         lambda a: a,
-        f'{name} did not appear after {timeout} seconds',
-        timeout
+        f'{name} did not {desc} within {timeout} seconds',
+        timeout,
+        interval,
     )
 
 
@@ -45,7 +52,7 @@ def command_exists(name: str) -> NvimIO[bool]:
 
 
 def wait_for_function(name: str, timeout: int=30) -> NvimIO[None]:
-    return wait_until_valid(name, function_exists, timeout)
+    return wait_until_valid(name, function_exists, timeout, 'appear')
 
 
 def wait_for_function_undef(name: str, timeout: int=30) -> NvimIO[None]:
@@ -53,7 +60,7 @@ def wait_for_function_undef(name: str, timeout: int=30) -> NvimIO[None]:
 
 
 def wait_for_command(name: str, timeout: int=30) -> NvimIO[None]:
-    return wait_until_valid(name, command_exists, timeout)
+    return wait_until_valid(name, command_exists, timeout, 'appear')
 
 
 @do(NvimIO[A])

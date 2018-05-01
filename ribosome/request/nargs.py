@@ -4,7 +4,7 @@ from amino import List, Maybe, Just, Nothing
 from amino.dat import ADT
 
 
-class Nargs(ADT):
+class Nargs(ADT['Nargs']):
 
     @staticmethod
     def cons(min: int, mmax: Maybe[int]) -> 'Nargs':

@@ -53,14 +53,14 @@ def plain_trans(plain_type: type) -> Do:
 
 @do(Either[str, ResourcesStateProgType])
 def resources_trans(resources_type: type) -> Do:
-    tpe = yield type_arg(resources_type, 1)
+    tpe = yield first_type_arg(resources_type)
     affiliation = yield affiliation_trans(tpe)
     return ResourcesStateProgType(affiliation)
 
 
 @do(Either[str, RibosomeStateProgType])
 def ribosome_trans(ribosome_type: type) -> Do:
-    tpe = yield type_arg(ribosome_type, 3)
+    tpe = yield type_arg(ribosome_type, 1)
     return RibosomeStateProgType(tpe)
 
 

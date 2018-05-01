@@ -5,6 +5,7 @@ from amino import _, Either, Map, Left, Right, do, Do
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
 from ribosome.nvim.api.function import nvim_call_function
+from ribosome.nvim.api.command import nvim_command
 
 
 def plugin_name() -> NvimIO[str]:
@@ -43,4 +44,8 @@ def rpcrequest_current(method: str, *args: str) -> Do:
     yield rpcrequest(channel, method, *args)
 
 
-__all__ = ('plugin_name', 'api_info', 'channel_id', 'rpcrequest', 'rpcrequest_current')
+def nvim_quit() -> NvimIO[None]:
+    return nvim_command('quit!')
+
+
+__all__ = ('plugin_name', 'api_info', 'channel_id', 'rpcrequest', 'rpcrequest_current', 'nvim_quit')

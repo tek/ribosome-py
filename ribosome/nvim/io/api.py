@@ -2,14 +2,15 @@ from typing import TypeVar, Callable, Any, Type
 
 from msgpack import ExtType
 
-from amino import Either, IO, Maybe, List, Boolean
+from amino import Either, IO, Maybe, List, Boolean, do, Do
 from amino.func import CallByName
 
 from ribosome.nvim.api.data import NvimApi
 from ribosome.nvim.io.compute import NvimIORequest, NvimIOPure, NvimIOFatal, NvimIOError, NvimIO
 from ribosome.nvim.request import typechecked_request, data_cons_request, nvim_request
 from ribosome.nvim.io.cons import (nvimio_delay, nvimio_recover_error, nvimio_recover_fatal, nvimio_wrap_either,
-                                   nvimio_from_either, nvimio_suspend, nvimio_recover_failure, nvimio_ensure)
+                                   nvimio_from_either, nvimio_suspend, nvimio_recover_failure, nvimio_ensure,
+                                   nvimio_intercept)
 from ribosome.nvim.io.data import NResult, NError, NFatal
 
 A = TypeVar('A')
@@ -76,6 +77,9 @@ class NMeta(type):
     def write(self, cmd: str, *args: Any, sync: bool=False) -> NvimIO[A]:
         return nvim_request(cmd, *args, sync=sync).replace(None)
 
+    def intercept(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
+        return nvimio_intercept(fa, f)
+
     def recover_error(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
         return nvimio_recover_error(fa, f)
 
@@ -85,6 +89,9 @@ class NMeta(type):
     def recover_failure(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
         return nvimio_recover_failure(fa, f)
 
+    def ensure(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]]) -> NvimIO[A]:
+        return nvimio_ensure(fa, f, lambda a: True)
+
     def ensure_error(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]]) -> NvimIO[A]:
         return nvimio_ensure(fa, f, Boolean.is_a(NError))
 
@@ -93,6 +100,11 @@ class NMeta(type):
 
     def ensure_failure(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]]) -> NvimIO[A]:
         return nvimio_ensure(fa, f, Boolean.is_a((NError, NFatal)))
+
+    @do(IO[A])
+    def to_io(self, fa: NvimIO[A], api: NvimApi) -> Do:
+        result = yield IO.delay(fa.run_a, api)
+        yield IO.from_either(result.to_either)
 
 
 class N(metaclass=NMeta):

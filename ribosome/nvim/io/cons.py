@@ -2,6 +2,7 @@ from typing import TypeVar, Callable, Any
 
 from amino import Either, Boolean, do, Do
 from amino.state import State
+from amino.boolean import true
 
 from ribosome.nvim.api.data import NvimApi
 from ribosome.nvim.io.compute import NvimIOSuspend, NvimIOPure, NvimIOError, NvimIO, NvimIORecover, lift_n_result
@@ -23,6 +24,10 @@ def nvimio_recover_error(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) ->
     return NvimIORecover(fa, f, Boolean.is_a(NError))
 
 
+def nvimio_intercept(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
+    return NvimIORecover(fa, f, lambda r: true)
+
+
 def nvimio_recover_fatal(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
     return NvimIORecover(fa, f, Boolean.is_a(NFatal))
 
@@ -31,7 +36,7 @@ def nvimio_recover_failure(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) 
     return NvimIORecover(fa, f, Boolean.is_a((NError, NFatal)))
 
 
-def nvimio_ensure(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]], pred: Callable[[NResult[A]], Boolean]
+def nvimio_ensure(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]], pred: Callable[[NResult[A]], bool]
                   ) -> NvimIO[A]:
     @do(NvimIO[A])
     def effect(error: NResult[A]) -> Do:
@@ -49,4 +54,4 @@ def nvimio_from_either(e: Either[str, A]) -> NvimIO[A]:
 
 
 __all__ = ('nvimio_delay', 'nvimio_wrap_either', 'nvimio_from_either', 'nvimio_suspend', 'nvimio_recover_error',
-           'nvimio_recover_fatal', 'nvimio_recover_failure', 'nvimio_ensure')
+           'nvimio_recover_fatal', 'nvimio_recover_failure', 'nvimio_ensure', 'nvimio_intercept')

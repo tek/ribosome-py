@@ -1,4 +1,4 @@
-from amino import Map, List, do, Do
+from amino import Map, List
 
 from ribosome.compute.api import prog
 from ribosome.config.component import Component
@@ -19,7 +19,7 @@ def trans1() -> NS[NoData, None]:
 core: Component = Component.cons('core')
 
 
-config: Config = Config.cons(
+autocmd_spec_config: Config = Config.cons(
     name='plug',
     components=Map(core=core),
     request_handlers=List(
@@ -27,4 +27,4 @@ config: Config = Config.cons(
     ),
 )
 
-__all__ = ('config',)
+__all__ = ('autocmd_spec_config',)

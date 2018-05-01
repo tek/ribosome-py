@@ -15,38 +15,36 @@ from ribosome.compute.api import prog
 from ribosome.data.plugin_state import PluginState
 from ribosome.nvim.io.state import NS
 from ribosome.config.component import ComponentData
-from ribosome.config.settings import Settings
 from ribosome.compute.prog import Prog
-from ribosome.util.setting import setting
 from ribosome.config.basic_config import NoData
 from ribosome.components.internal.update import undef_handlers, def_handlers
 from ribosome.compute.program import Program, bind_nullary_program
+from ribosome.config.settings import run_internal_init
 
 D = TypeVar('D')
-S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 
 
 @prog.result
-@do(NS[ComponentData[PluginState[S, D, CC], NoData], str])
+@do(NS[ComponentData[PluginState[D, CC], NoData], str])
 def program_log() -> Do:
     yield NS.inspect_either(lambda s: dump_json(s.main.program_log))
 
 
 @prog.unit
-def set_log_level(level: str) -> NS[PluginState[S, D, CC], None]:
+def set_log_level(level: str) -> NS[PluginState[D, CC], None]:
     handler = yield NS.inspect_f(_.file_log_handler)
     handler.setLevel(level)
 
 
 @prog.result
-@do(EitherState[ComponentData[PluginState[S, D, CC], NoData], str])
+@do(EitherState[ComponentData[PluginState[D, CC], NoData], str])
 def state_data() -> Do:
     yield EitherState.inspect_f(lambda s: dump_json(s.main.data))
 
 
 @prog.result
-def rpc_handlers() -> NS[PluginState[S, D, CC], str]:
+def rpc_handlers() -> NS[PluginState[D, CC], str]:
     return NS.inspect_either(lambda s: dump_json(s.distinct_specs))
 
 
@@ -81,7 +79,7 @@ def mk_lens(query: str) -> UnboundLens:
     return Lists.split(query, '.').fold_m(Just(lens))(lens_step)
 
 
-@do(NS[PluginState[S, D, CC], None])
+@do(NS[PluginState[D, CC], None])
 def patch_update(query: PatchQuery) -> Do:
     lns = yield NS.m(mk_lens(query.query), f'invalid state update query: {query.query}')
     lns1 = lens.data & lns
@@ -89,19 +87,19 @@ def patch_update(query: PatchQuery) -> Do:
 
 
 @prog.unit
-@do(NS[PluginState[S, D, CC], None])
+@do(NS[PluginState[D, CC], None])
 def update_state(query: UpdateQuery) -> Do:
     yield query.patch / patch_update | NS.pure(None)
 
 
-@do(NS[PluginState[S, D, CC], None])
+@do(NS[PluginState[D, CC], None])
 def patch_update_component(comp: str, query: PatchQuery) -> Do:
     lns = yield NS.m(mk_lens(query.query), f'invalid component state update query for {comp}: {query.query}')
     yield NS.modify(__.modify_component_data(comp, lns.modify(__.typed_copy(**query.data))))
 
 
 @prog.unit
-@do(NS[PluginState[S, D, CC], None])
+@do(NS[PluginState[D, CC], None])
 def update_component_state(comp: str, query: UpdateQuery) -> Do:
     yield query.patch / L(patch_update_component)(comp, _) | NS.pure(None)
 
@@ -123,7 +121,7 @@ def show_python_path() -> NS[D, Iterable[str]]:
 
 # FIXME need to update component type map
 @prog.unit
-@do(NS[PluginState[S, D, CC], None])
+@do(NS[PluginState[D, CC], None])
 def enable_components(*names: str) -> Do:
     comps = (
         yield NS.inspect_either(
@@ -150,7 +148,7 @@ class MapOptions(Dat['MapOptions']):
 
 
 @prog.result
-@do(NS[PluginState[S, D, CC], Program])
+@do(NS[PluginState[D, CC], Program])
 def mapping_handler(uuid: UUID, keys: str) -> Do:
     yield NS.inspect_either(lambda a: a.active_mappings.lift(uuid).to_either(f'no handler for mapping `{keys}`'))
 
@@ -163,14 +161,15 @@ def mapping(uuid_s: str, keys: str) -> Do:
 
 
 @prog.result
-@do(NS[PluginState[S, D, CC], Maybe[Program]])
+@do(NS[PluginState[D, CC], Maybe[Program]])
 def internal_init_trans() -> Do:
     yield NS.inspect(_.init)
 
 
+# FIXME need special helper to lift setting to prog (or NvimIO)
 @prog.do
 def internal_init() -> Do:
-    enabled = yield prog(setting)(_.run_internal_init)
+    # enabled = yield prog(NS.lift(run_internal_init.value_or_default))
     if enabled:
         handler = yield internal_init_trans()
         yield handler / bind_nullary_program | Prog.unit

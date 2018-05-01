@@ -5,7 +5,7 @@ from kallikrein.matchers.typed import have_type
 from amino import do, Do
 
 from ribosome.test.integration.default import ExternalSpec
-from ribosome.test.klk import kn
+from ribosome.test.klk.expectable import kn
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.rpc import channel_id
 from ribosome.nvim.api.variable import variable_set_prefixed, variable_prefixed_num

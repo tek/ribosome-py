@@ -1,12 +1,12 @@
 import abc
-from typing import Callable, Type, TypeVar, Generic, Generator
+from typing import Callable, Type, TypeVar, Generic, Any
+from mypy_extensions import DefaultArg
 
-from amino import List, Either, __, Left, Eval
-from amino.util.string import ToStr
+from amino import List, Either, __, Left, Eval, ADT, Right, Try, Path, Map, Boolean, Lists
 from amino.do import do, Do
+from amino.boolean import false, true
 
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.logging import Logging
 from ribosome.nvim.api.variable import variable_prefixed, variable, variable_set, variable_set_prefixed
 from ribosome.nvim.api.util import cons_checked_e
 from ribosome.nvim.io.api import N
@@ -15,7 +15,7 @@ A = TypeVar('A', contravariant=True)
 B = TypeVar('B')
 
 
-class Setting(Generic[B], Logging, ToStr):
+class Setting(Generic[B], ADT['Setting[B]']):
 
     @abc.abstractproperty
     def value(self) -> NvimIO[Either[str, B]]:
@@ -37,7 +37,7 @@ class Setting(Generic[B], Logging, ToStr):
     @property
     def value_or_default(self) -> NvimIO[B]:
         @do(NvimIO[B])
-        def run() -> Generator:
+        def run() -> Do:
             value = yield self.value
             yield N.from_either(value.o(self.default_e))
         return run()
@@ -110,11 +110,30 @@ class EvalSetting(Generic[B], Setting[B]):
         return N.pure(None)
 
 
-def setting_ctor(tpe: Type[A], ctor: Callable[[A], B]) -> Callable[[str, str, str, bool, B], Setting[B]]:
-    def setting(name: str, desc: str, help: str, prefix: bool, default: Either[str, B]=Left('no default specified')
-                ) -> Setting[B]:
+SettingCtor = Callable[[str, str, str, bool, Either[str, B]], Setting[B]]
+no_default: Either[str, Any] = Left('no default specified')
+
+
+def setting_ctor(tpe: Type[A], ctor: Callable[[A], DefaultArg(Either[str, B])]) -> SettingCtor:
+    def setting(name: str, desc: str, help: str, prefix: bool, default: Either[str, B]=no_default) -> Setting[B]:
         return StrictSetting(name, desc, help, prefix, tpe, ctor, default)
     return setting
 
 
-__all__ = ('Setting', 'StrictSetting', 'EvalSetting', 'setting_ctor')
+def path_list(data: list) -> Either[str, List[Path]]:
+    return Lists.wrap(data).traverse(lambda a: Try(Path, a) / __.expanduser(), Either)
+
+
+str_setting = setting_ctor(str, Right)
+int_setting = setting_ctor(int, Right)
+float_setting = setting_ctor(float, Right)
+list_setting = setting_ctor(list, Right)
+path_setting = setting_ctor(str, (lambda a: Try(Path, a)))
+path_list_setting = setting_ctor(list, path_list)
+map_setting = setting_ctor(dict, lambda a: Right(Map(a)))
+path_map_setting = setting_ctor(dict, lambda a: Try(Map, a).valmap(lambda b: Path(b).expanduser()))
+bool_setting = setting_ctor(int, lambda a: Right(false if a == 0 else true))
+
+
+__all__ = ('Setting', 'StrictSetting', 'EvalSetting', 'setting_ctor', 'str_setting', 'int_setting', 'float_setting',
+           'list_setting', 'path_setting', 'path_list_setting', 'map_setting', 'path_map_setting', 'bool_setting')

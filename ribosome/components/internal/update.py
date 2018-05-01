@@ -1,58 +1,41 @@
 from typing import TypeVar
 
-from amino import do, Do, _, __, List, Either, Map
+from amino import do, Do, _, __, List, Either, Map, Maybe
 from amino.lenses.lens import lens
 from amino.state import EitherState
 
 from ribosome.nvim.io.state import NS
-from ribosome.data.plugin_state import PluginState, Programs, handler_spec
+from ribosome.data.plugin_state import PluginState
 from ribosome.config.resolve import ComponentResolver
-from ribosome.request.handler.handler import RequestHandler, RequestHandlers
-from ribosome.config.component import Components, Component
+from ribosome.request.handler.handler import RpcProgram
+from ribosome.config.component import Components
 from ribosome.request.rpc import define_handlers, DefinedHandler
-from ribosome.config.settings import Settings
-from ribosome.compute.program import Program
 from ribosome.request.handler.method import RpcMethod
-from ribosome.util.setting import setting_ps_e
 from ribosome.nvim.api.command import nvim_command
 from ribosome.nvim.io.compute import NvimIO
+from ribosome.config import settings
+from ribosome.rpc.define import define_rpc
+from ribosome import ribo_log
 
 CC = TypeVar('CC')
 D = TypeVar('D')
 Meth = TypeVar('Meth', bound=RpcMethod)
 P = TypeVar('P')
-S = TypeVar('S', bound=Settings)
 
 
-def request_handlers_handlers(handlers: RequestHandlers) -> List[RequestHandler]:
-    return handlers.handlers.v
+def programs(state: PluginState[D, CC]) -> List[RpcProgram]:
+    cfg_handlers = state.rpc
+    compo_handlers = state.components.all // _.rpc
+    return compo_handlers + cfg_handlers
 
 
-def component_handlers(component: Component) -> List[RequestHandler]:
-    return request_handlers_handlers(component.request_handlers)
-
-
-def rpc_method(name: str, prefix: str) -> str:
-    def rpc_method(handler: RequestHandler) -> str:
-        return handler_spec(handler, name, prefix).rpc_method
-    return rpc_method
-
-
-def programs(state: PluginState[S, D, CC]) -> Map[str, RequestHandler]:
-    cfg_handlers = request_handlers_handlers(state.request_handlers)
-    compo_handlers = state.components.all // component_handlers
-    handlers = compo_handlers + cfg_handlers
-    method = rpc_method(state.basic.name, state.basic.prefix)
-    return handlers.group_by(method)
-
-
-@do(EitherState[PluginState[S, D, CC], None])
-def update_components(from_user: Either[str, List[str]]) -> Do:
+@do(EitherState[PluginState[D, CC], None])
+def update_components(requested: Either[str, List[str]]) -> Do:
     name = yield EitherState.inspect(_.basic.name)
     components_map = yield EitherState.inspect(_.comp.available)
     core_components = yield EitherState.inspect(_.basic.core_components)
     default_components = yield EitherState.inspect(_.basic.default_components)
-    resolver = ComponentResolver(name, components_map, core_components, default_components, from_user)
+    resolver = ComponentResolver(name, components_map, core_components, default_components, requested)
     components = yield EitherState.lift(resolver.run())
     yield EitherState.modify(__.copy(components=Components.cons(components)))
     progs = yield EitherState.inspect(programs)
@@ -64,25 +47,31 @@ def undef_handler(dh: DefinedHandler) -> Do:
     yield nvim_command(dh.spec.undef_cmdline)
 
 
-@do(NS[PluginState[S, D, CC], None])
+@do(NS[PluginState[D, CC], None])
 def undef_handlers() -> Do:
     handlers = yield NS.inspect(_.rpc_handlers)
     yield NS.lift(handlers.traverse(undef_handler, NvimIO))
 
 
-@do(NS[PluginState[S, D, CC], None])
+@do(NS[PluginState[D, CC], None])
 def def_handlers() -> Do:
     name = yield NS.inspect(_.basic.name)
-    specs = yield NS.inspect(_.distinct_specs)
-    handlers = yield NS.lift(define_handlers(specs, name))
+    prefix = yield NS.inspect(_.basic.prefix)
+    programs = yield NS.inspect(_.programs)
+    handlers = yield NS.lift(define_rpc(programs, name, prefix))
     yield NS.modify(lens.rpc_handlers.set(handlers))
 
 
-@do(NS[PluginState[S, D, CC], None])
-def init_rpc() -> Do:
-    from_user = yield setting_ps_e(_.components)
-    yield update_components(from_user).nvim
+@do(NS[PluginState[D, CC], None])
+def init_rpc(requested_components: Maybe[List[str]]) -> Do:
+    yield update_components(requested_components).nvim
     yield def_handlers()
 
 
-__all__ = ('init_rpc', 'undef_handlers', 'def_handlers', 'programs')
+@do(NS[PluginState[D, CC], None])
+def init_rpc_plugin() -> Do:
+    requested_components = yield NS.lift(settings.components.value)
+    yield init_rpc(requested_components)
+
+
+__all__ = ('init_rpc', 'undef_handlers', 'def_handlers', 'programs', 'init_rpc_plugin',)

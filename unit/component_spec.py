@@ -11,7 +11,6 @@ from ribosome.config.config import Config, NoData
 from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.api import prog
 from ribosome.config.component import Component, ComponentData
-from ribosome.config.settings import Settings
 from ribosome.nvim.io.state import NS
 from ribosome.config.resources import Resources
 from ribosome.compute.prog import Prog
@@ -44,14 +43,14 @@ class CompoComponent(Dat['CompoComponent']):
 
 
 @prog.result
-@do(NS[Resources[Settings, ComponentData[NoData, CoreData], CompoComponent], int])
+@do(NS[Resources[ComponentData[NoData, CoreData], CompoComponent], int])
 def core_fun(a: int) -> Do:
     yield NS.modify(lens.data.comp.x.modify(_ + 5))
     yield NS.pure(a + 5)
 
 
 @prog.result
-@do(NS[Resources[Settings, ComponentData[NoData, ExtraData], CompoComponent], int])
+@do(NS[Resources[ComponentData[NoData, ExtraData], CompoComponent], int])
 def extra_fun(a: int) -> Do:
     yield NS.modify(lens.data.comp.y.modify(_ + 39))
     yield NS.pure(a + 9)

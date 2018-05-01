@@ -22,7 +22,6 @@ from amino.json.data import JsonError
 
 from ribosome.logging import Logging
 from ribosome.nvim.api.data import NvimApi
-from ribosome.config.settings import Settings
 from ribosome.nvim.api.data import NativeNvimApi
 from ribosome.nvim.api.option import option_cat
 from ribosome.nvim.api.variable import variable_set_prefixed
@@ -272,11 +271,10 @@ class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
         return nvim_call_json(f'{self.full_cmd_prefix()}State').unsafe(self.vim)
 
 
-S = TypeVar('S', bound=Settings)
 D = TypeVar('D')
 
 
-class AutoPluginIntegrationSpec(Generic[S, D], VimIntegrationSpec):
+class AutoPluginIntegrationSpec(Generic[D], VimIntegrationSpec):
 
     def setup(self) -> None:
         self.log_format = '{message}'

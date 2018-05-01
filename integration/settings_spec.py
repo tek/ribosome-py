@@ -2,12 +2,11 @@ from kallikrein import Expectation
 
 from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
 from ribosome.config.config import NoData
-from ribosome.config.settings import Settings
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.api.exists import command_once_defined
 
 
-class SettingsSpec(AutoPluginIntegrationKlkSpec[Settings, NoData]):
+class SettingsSpec(AutoPluginIntegrationKlkSpec[NoData]):
     '''
     update a setting $update
     '''

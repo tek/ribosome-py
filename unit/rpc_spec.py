@@ -1,14 +1,11 @@
-from threading import Thread
-from queue import Queue
-from typing import Any
+from typing import Any, Callable, TypeVar
 
-import msgpack
-
-from kallikrein import k, Expectation
+from kallikrein import Expectation, pending, k
 from kallikrein.matchers import contain
 from kallikrein.matchers.either import be_right
+from kallikrein.expectable import kio
 
-from amino import List, do, Do, Path, IO, Dat, Map
+from amino import List, do, Do, Map, IO, Path
 from amino.test import temp_file
 from amino.test.spec import SpecBase
 from amino.logging import module_log
@@ -16,19 +13,24 @@ from amino.logging import module_log
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.variable import variable_set, variable_raw
 from ribosome.nvim.api.command import nvim_command
-from ribosome.nvim.io.data import NSuccess
 from ribosome.nvim.api.rpc import channel_id
 from ribosome.nvim.api.function import nvim_call_function
 from ribosome.nvim.io.api import N
-from ribosome.rpc.uv.uv import Uv, cons_uv_embed
-from ribosome.rpc.comm import Comm, RpcComm
+from ribosome.rpc.uv.uv import Uv, start_uv_embed_nvim_sync_log, cons_uv_embed
+from ribosome.rpc.comm import Comm, RpcComm, StateGuard
 from ribosome.config.config import Config
 from ribosome.rpc.strict import StrictRpc
-from ribosome.rpc.start import start_comm
+from ribosome.rpc.start import start_comm, stop_comm, plugin_execute_receive_request
 from ribosome.rpc.handle import comm_request_handler
 from ribosome.rpc.api import RiboNvimApi
+from ribosome.compute.api import prog
+from ribosome.nvim.io.state import NS
+from ribosome.request.handler.handler import rpc
+from ribosome.rpc.state import cons_state
+from ribosome.components.internal.update import init_rpc
 
 log = module_log()
+A = TypeVar('A')
 
 
 def stop(p: Uv) -> None:
@@ -50,7 +52,7 @@ def run2() -> Do:
     channel = yield channel_id()
     yield variable_set('foo', value)
     v = yield variable_raw('foo')
-    yield N.recover_failure(nvim_call_function('rpcrequest', channel, 'meth', sync=True), lambda a: N.pure('failed'))
+    yield N.recover_failure(nvim_call_function('rpcrequest', channel, 'ping', sync=False), lambda a: N.pure('failed'))
     return v
 
 
@@ -61,20 +63,36 @@ def run1() -> Do:
     return v
 
 
+responses: Map[str, Any] = Map(
+    nvim_get_api_info=(1, {}),
+)
+
+
+@prog
+@do(NS[None, None])
+def ping() -> Do:
+    yield NS.unit
+
+
+config: Config = Config.cons('uv', request_handlers=List(rpc.write(ping)()))
+
+
 def embed_nvim(log: Path) -> Uv:
     embed_nvim_cmdline = List('nvim', f'-V{log}', '-n', '-u', 'NONE', '--embed')
     return cons_uv_embed(embed_nvim_cmdline)
 
 
-# @do(NvimIO[Callable[[str, List[Any], bool], NvimIO[Any]]])
-# def cons_request_handler(config: Config) -> Do:
-#     holder = yield prepare_plugin(config)
-#     return handler
-
-
-responses: Map[str, Any] = Map(
-    nvim_get_api_info=(1, {}),
-)
+@do(IO[A])
+def run_nvim(comm: Comm, config: Config, io: Callable[[], NvimIO[A]]) -> Do:
+    state = cons_state(config)
+    guard = StateGuard.cons(state)
+    execute_request = plugin_execute_receive_request(guard)
+    yield start_comm(comm, execute_request)
+    api = RiboNvimApi(config.basic.name, comm)
+    guard.exclusive_state(lambda s: init_rpc().run_s(s).run_a(api).value)
+    s, r = io().run(api)
+    yield stop_comm(comm)
+    return r
 
 
 # TODO incoming rpc methods must have format '{read,write}:{sync,async}:<name>'
@@ -82,36 +100,30 @@ responses: Map[str, Any] = Map(
 # sync requests produce responses to vim
 # is sync necessary? can also just correspond to the rpc type
 # also, read/write should probably just be attrs of the handler
-class SessionSpec(SpecBase):
+class RpcSpec(SpecBase):
     '''
-    test $test
+    uv session $uv
     strict $strict
+    external $external
     '''
 
-    def test(self) -> Expectation:
+    def uv(self) -> Expectation:
         log = temp_file('log', 'uv')
         uv, rpc_comm = embed_nvim(log)
         comm = Comm.cons(comm_request_handler, rpc_comm)
-        start_comm(comm, Config.cons('uv')).attempt.get_or_raise()
-        main = Thread(target=main_loop, args=(uv,))
-        main.start()
-        api = RiboNvimApi('uv', comm)
-        s, r = run1().run(api)
-        stop(uv)
-        main.join()
-        return k(r).must(contain(be_right(value)))
+        return kio(run_nvim, comm, config, run1).must(contain(be_right(value)))
 
+    @pending
     def strict(self) -> Expectation:
         strict_rpc = StrictRpc.cons(responses)
-        rpc_comm = RpcComm(strict_rpc.start_processing, strict_rpc.send, strict_rpc.stop)
+        rpc_comm = RpcComm(strict_rpc.start_processing, strict_rpc.stop, strict_rpc.send, strict_rpc.stop)
         comm = Comm.cons(comm_request_handler, rpc_comm)
-        start_comm(comm, Config.cons('uv')).attempt.get_or_raise()
-        api = RiboNvimApi('uv', comm)
-        s, r = run1().run(api)
-        if not isinstance(r, NSuccess):
-            print(r)
-        strict_rpc.stop()
+        return kio(run_nvim, comm, config, run1).must(contain(be_right(value)))
+
+    def external(self) -> Expectation:
+        log = temp_file('log', 'uv')
+        start_uv_embed_nvim_sync_log('uv', log)
         return k(1) == 1
 
 
-__all__ = ('SessionSpec',)
+__all__ = ('RpcSpec',)

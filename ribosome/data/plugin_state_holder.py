@@ -13,29 +13,27 @@ from ribosome.logging import Logging
 from ribosome.nvim.io.api import N
 from ribosome.nvim.io.data import NResult
 from ribosome.data.plugin_state import PluginState
-from ribosome.config.settings import Settings
 
 A = TypeVar('A')
 CC = TypeVar('CC')
 D = TypeVar('D')
-S = TypeVar('S', bound=Settings)
 
 
 class PluginStateHolder(Generic[D], Dat['PluginStateHolder[D]'], Logging):
 
     @staticmethod
-    def concurrent(state: PluginState[S, D, CC], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
+    def concurrent(state: PluginState[D, CC], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
         return ConcurrentPluginStateHolder(state, Maybe.check(log_handler), Lock(), False)
 
     @staticmethod
-    def strict(state: PluginState[S, D, CC], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
+    def strict(state: PluginState[D, CC], log_handler: logging.Handler=None) -> 'PluginStateHolder[D]':
         return StrictPluginStateHolder(state, log_handler)
 
-    def __init__(self, state: PluginState[S, D, CC], log_handler: Maybe[logging.Handler]=Nothing) -> None:
+    def __init__(self, state: PluginState[D, CC], log_handler: Maybe[logging.Handler]=Nothing) -> None:
         self.state = state
         self.log_handler = log_handler
 
-    def update(self, state: PluginState[S, D, CC]) -> None:
+    def update(self, state: PluginState[D, CC]) -> None:
         self.state = state
 
     @abc.abstractmethod
@@ -55,7 +53,7 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
 
     def __init__(
             self,
-            state: PluginState[S, D, CC],
+            state: PluginState[D, CC],
             log_handler: Maybe[logging.Handler],
             lock: Lock,
             running: Boolean,
@@ -113,7 +111,6 @@ class ConcurrentPluginStateHolder(Generic[D], PluginStateHolder[D]):
 
 
 class StrictPluginStateHolder(Generic[D], PluginStateHolder[D]):
-    pass
 
     def acquire(self) -> NvimIO[None]:
         return N.pure(None)

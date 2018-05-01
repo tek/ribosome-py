@@ -7,7 +7,7 @@ from amino import do, Do
 from ribosome.test.integration.default import ExternalSpec
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.integration.run import RequestHelper
-from ribosome.test.klk import kn
+from ribosome.test.klk.expectable import kn
 
 from integration._support.settings import config
 

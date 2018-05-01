@@ -1,7 +1,12 @@
-from typing import TypeVar, Generic, Callable, Any
+from typing import TypeVar, Generic, Callable, Any, Type
 
-from amino import ADT, Dat, List, Lists, Nil
+from amino import ADT, Dat, List, Lists, Nil, Either
 from amino.case import Case
+from amino.json.encoder import Encoder
+from amino.json.data import JsonError, Json
+from amino.json.encoders import encode_instance
+from amino.json.decoder import Decoder
+from amino.json.decoders import decode_instance
 
 from ribosome.compute.wrap_data import ProgWrappers
 from ribosome.compute.output import ProgOutput, ProgOutputResult
@@ -89,6 +94,18 @@ def bind_nullary_program(program: Program[A]) -> Prog[B]:
 
 def bind_programs(programs: List[Program[A]], args: List[Any]) -> Prog[B]:
     return programs.traverse(lambda a: bind_program(a, args), Prog)
+
+
+class ProgramEncoder(Encoder[Program], tpe=Program):
+
+    def encode(self, prog: Program) -> Either[JsonError, Json]:
+        return encode_instance(prog, Program, prog.code.code.__module__, prog.code.code.__name__)
+
+
+class ProgramDecoder(Decoder[Program], tpe=Program):
+
+    def decode(self, tpe: Type[Program], data: Json) -> Either[JsonError, Program]:
+        return decode_instance(data, 'Program')
 
 
 __all__ = ('Program', 'bind_program', 'bind_nullary_program', 'bind_programs')

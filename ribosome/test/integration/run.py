@@ -7,11 +7,9 @@ from amino.dat import Dat
 from amino.lenses.lens import lens
 from amino.logging import module_log
 
-from ribosome.host import init_state
 from ribosome.request.execute import request_job, traverse_programs, run_request_handler
 from ribosome.nvim.io.state import NS
 from ribosome.config.config import Config
-from ribosome.config.settings import Settings
 from ribosome.config.component import ComponentData
 from ribosome.nvim.api.data import NvimApi, StrictNvimApi
 from ribosome.nvim.io.compute import NvimIO
@@ -24,15 +22,15 @@ from ribosome.config.resources import Resources
 from ribosome.data.plugin_state_holder import PluginStateHolder
 from ribosome.compute.output import ProgOutput
 from ribosome.compute.prog import Prog
-from ribosome.test.klk import kn
-from ribosome.nvim.io.data import NSuccess, NResult
+from ribosome.test.klk.expectable import kn
+from ribosome.nvim.io.data import NResult
+from ribosome.rpc.state import init_state
 
 log = module_log()
 A = TypeVar('A')
 B = TypeVar('B')
 C = TypeVar('C')
 D = TypeVar('D')
-S = TypeVar('S', bound=Settings)
 CC = TypeVar('CC')
 DIO = TypeVar('DIO')
 R = TypeVar('R')
@@ -56,7 +54,7 @@ def default_request_handler(vim: NvimApi, name: str, args: List[Any]) -> Do:
 
 @do(Either[str, Tuple[NvimApi, Any]])
 def pop_first(vim: NvimApi, name: str, args: List[Any]) -> Do:
-    name1, args1 = yield args.detach_head.to_either(f'invalid command: {name}({args})')
+    name1, args1 = yield args.uncons.to_either(f'invalid command: {name}({args})')
     yield default_request_handler(vim, name1, args1)
 
 
@@ -72,7 +70,7 @@ default_request_handlers = Map({
 
 @do(Either[str, Tuple[NvimApi, Any]])
 def specific_handler(desc: str, handler: Handler, vim: StrictNvimApi, name: str, args: List[Any]) -> Do:
-    name1, args1 = yield args.detach_head.to_either(f'empty {desc} args: {name}')
+    name1, args1 = yield args.uncons.to_either(f'empty {desc} args: {name}')
     yield handler(vim, name1, args1)
 
 
@@ -112,11 +110,11 @@ def no_handler(vim: NvimApi, name: str, args: List[Any]) -> Either[str, Tuple[Nv
     return Left(f'no handler for {name}')
 
 
-class RequestHelperBuilder(Generic[S, D, CC], Dat['RequestHelperBuilder[S, D, CC]']):
+class RequestHelperBuilder(Generic[D, CC], Dat['RequestHelperBuilder[D, CC]']):
 
     def __init__(
             self,
-            config: Config[S, D, CC],
+            config: Config[D, CC],
             comps: List[str],
             vars: Map[str, Any]=Map(),
             io_interpreter: ProgInt=None,
@@ -128,13 +126,13 @@ class RequestHelperBuilder(Generic[S, D, CC], Dat['RequestHelperBuilder[S, D, CC
         self.io_interpreter = io_interpreter
         self.logger = logger
 
-    def create(self, cons_vim: Callable[[dict], NvimApi]) -> 'RequestHelper[S, D, CC]':
+    def create(self, cons_vim: Callable[[dict], NvimApi]) -> 'RequestHelper[D, CC]':
         comps_var = Map({f'{self.config.basic.name}_components': self.comps})
         vim = cons_vim(self.vars ** comps_var)
         vim1, state = init_state(self.config, io_interpreter=self.io_interpreter, logger=self.logger).unsafe_run(vim)
         return RequestHelper(vim, self.config, state)
 
-    def nvim(self, vim: NvimApi) -> 'RequestHelper[S, D, CC]':
+    def nvim(self, vim: NvimApi) -> 'RequestHelper[D, CC]':
         def cons_vim(vars: dict) -> NvimApi:
             for k, v in vars.items():
                 variable_set(k, v).unsafe(vim)
@@ -146,17 +144,17 @@ class RequestHelperBuilder(Generic[S, D, CC], Dat['RequestHelperBuilder[S, D, CC
             request_handler: Handler=no_handler,
             function_handler: Handler=no_handler,
             command_handler: Handler=no_handler,
-    ) -> 'RequestHelper[S, D, CC]':
+    ) -> 'RequestHelper[D, CC]':
         def cons_vim(vars: Map[str, Any]) -> StrictNvimApi:
             handler = StrictRequestHandler(request_handler, function_handler, command_handler)
             return StrictNvimApi(self.config.basic.name, vars, handler, Nil)
         return self.create(cons_vim)
 
 
-class RequestHelper(Generic[S, D, CC], Dat['RequestHelper[S, D, CC]']):
+class RequestHelper(Generic[D, CC], Dat['RequestHelper[D, CC]']):
 
     @staticmethod
-    def nvim(config: Config[S, D, CC], vim: NvimApi, *comps: str, **kw: Any) -> 'RequestHelper[S, D, CC]':
+    def nvim(config: Config[D, CC], vim: NvimApi, *comps: str, **kw: Any) -> 'RequestHelper[D, CC]':
         return RequestHelper.cons(config, *comps, **kw).nvim(vim)
 
     @staticmethod
@@ -169,10 +167,10 @@ class RequestHelper(Generic[S, D, CC], Dat['RequestHelper[S, D, CC]']):
         return RequestHelper.cons(config, *comps, **kw).strict(request_handler)
 
     @staticmethod
-    def cons(config: Config[S, D, CC], *comps: str, **kw: Any) -> RequestHelperBuilder[S, D, CC]:
+    def cons(config: Config[D, CC], *comps: str, **kw: Any) -> RequestHelperBuilder[D, CC]:
         return RequestHelperBuilder(config, Lists.wrap(comps), **kw)
 
-    def __init__(self, vim: NvimApi, config: Config, state: PluginState[S, D, CC]) -> None:
+    def __init__(self, vim: NvimApi, config: Config, state: PluginState[D, CC]) -> None:
         self.vim = vim
         self.config = config
         self.state = state
@@ -181,15 +179,11 @@ class RequestHelper(Generic[S, D, CC], Dat['RequestHelper[S, D, CC]']):
     def holder(self) -> PluginStateHolder[D]:
         return PluginStateHolder.strict(self.state)
 
-    @property
-    def settings(self) -> S:
-        return self.state.basic.settings
-
     def request_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[RequestJob, List[Program]]:
         job = request_job(self.holder, name, (args,), sync)
         return job, job.state.state.programs.lift(job.name).get_or_fail(f'no matching program for `{job.name}`')
 
-    def traverse_programs(self, name: str, args: tuple=(), sync: bool=True) -> NS[PluginState[S, D, CC], Any]:
+    def traverse_programs(self, name: str, args: tuple=(), sync: bool=True) -> NS[PluginState[D, CC], Any]:
         job, program = self.request_job(name, args, sync)
         return traverse_programs(program, Lists.wrap(args))
 
@@ -218,16 +212,16 @@ class RequestHelper(Generic[S, D, CC], Dat['RequestHelper[S, D, CC]']):
     def unsafe_run_a(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> Any:
         return self.run_a(name, args=args, sync=sync).unsafe(self.vim)
 
-    def update_data(self, **kw: Any) -> 'RequestHelper[S, D, CC]':
+    def update_data(self, **kw: Any) -> 'RequestHelper[D, CC]':
         return lens.state.data.modify(__.copy(**kw))(self)
 
-    def update_component(self, name: str, **kw: Any) -> 'RequestHelper[S, D, CC]':
+    def update_component(self, name: str, **kw: Any) -> 'RequestHelper[D, CC]':
         return self.mod.state(__.modify_component_data(name, __.copy(**kw)))
 
-    def component_res(self, data: C) -> Resources[S, C, CC]:
+    def component_res(self, data: C) -> Resources[C, CC]:
         return self.state.resources_with(ComponentData(self.state.data, data))
 
-    def component_res_for(self, name: str) -> Resources[S, C, CC]:
+    def component_res_for(self, name: str) -> Resources[C, CC]:
         data = self.state.data_by_name(name).get_or_raise()
         return self.state.resources_with(ComponentData(self.state.data, data))
 
@@ -239,11 +233,11 @@ class RequestHelper(Generic[S, D, CC], Dat['RequestHelper[S, D, CC]']):
 
 
 def request_helper(
-        config: Config[S, D, CC],
+        config: Config[D, CC],
         *comps: str,
         vars: Map[str, Any]=Map(),
         io_interpreter: ProgInt=None,
-) -> NvimIO[RequestHelper[S, D, CC]]:
+) -> NvimIO[RequestHelper[D, CC]]:
     return N.delay(lambda v: RequestHelper.nvim(config, v, *comps, vars=vars, io_interpreter=io_interpreter))
 
 
