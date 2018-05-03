@@ -13,7 +13,7 @@ from ribosome.test.integration.run import RequestHelper
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.config import default_config_name
 from ribosome.test.integration.default import ExternalSpec
-from ribosome.request.handler.handler import RequestHandler
+from ribosome.request.handler.handler import rpc
 from ribosome.data.plugin_state import PluginState
 from ribosome.config.component import Component, ComponentData
 from ribosome.config.config import Config, NoData
@@ -51,9 +51,9 @@ def setup_map() -> Do:
 component: Component = Component.cons(
     'main',
     state_type=CData,
-    request_handlers=List(
-        RequestHandler.trans_function(setup_map)(),
-        RequestHandler.trans_function(handle_map)(json=true)
+    rpc=List(
+        rpc.write(setup_map),
+        rpc.write(handle_map).conf(json=true)
     ),
     mappings=Mappings.cons(
         Map({gs_mapping: handle_map}),
@@ -75,8 +75,8 @@ class MappingSpec(ExternalSpec):
         helper = RequestHelper.nvim(config, self.vim, 'main')
         @do(NvimIO[None])
         def run() -> Do:
-            s = yield helper.run_s('function:setup_map', args=())
-            s1 = yield helper.set.state(s).run_s('function:map', args=(str(gs_mapping.uuid), 'gs'))
+            s = yield helper.run_s('setup_map', args=())
+            s1 = yield helper.set.state(s).run_s('map', args=(str(gs_mapping.uuid), 'gs'))
             maps = yield nvim_command_output('map <buffer>')
             return s1.component_data.lift(CData), maps
         data, maps = run().unsafe(self.vim)

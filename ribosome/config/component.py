@@ -3,7 +3,7 @@ from typing import TypeVar, Callable, Generic, Any, Type, Union
 from amino import List, Either, _, Nil, Maybe, Boolean, __, Map
 from amino.dat import Dat
 
-from ribosome.request.handler.handler import RpcProgram, RequestHandlers
+from ribosome.request.handler.handler import RpcProgram
 from ribosome.nvim.io.state import NS
 from ribosome.data.mapping import Mappings
 

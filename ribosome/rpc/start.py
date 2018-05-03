@@ -7,7 +7,7 @@ from amino.logging import module_log
 from ribosome.rpc.comm import Comm, Rpc, RpcComm, StateGuard
 from ribosome.config.config import Config
 from ribosome.rpc.handle_receive import rpc_receive
-from ribosome.rpc.handle import rpc_error, comm_request_handler
+from ribosome.rpc.handle import rpc_error, rpc_handler
 from ribosome.components.internal.update import init_rpc_plugin
 from ribosome.rpc.api import RiboNvimApi
 from ribosome.rpc.state import cons_state
@@ -42,7 +42,7 @@ def init_plugin() -> Do:
 
 @do(IO[None])
 def init_comm(rpc_comm: RpcComm, execute_request: Callable[[Comm, Rpc], IO[None]]) -> Do:
-    comm = Comm.cons(comm_request_handler, rpc_comm)
+    comm = Comm.cons(rpc_handler, rpc_comm)
     yield start_comm(comm, execute_request)
     return comm
 

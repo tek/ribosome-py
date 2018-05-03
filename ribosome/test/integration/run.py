@@ -7,7 +7,7 @@ from amino.dat import Dat
 from amino.lenses.lens import lens
 from amino.logging import module_log
 
-from ribosome.request.execute import request_job, traverse_programs, run_request_handler
+from ribosome.request.execute import request_job, traverse_programs, run_rpc_pgrogram
 from ribosome.nvim.io.state import NS
 from ribosome.config.config import Config
 from ribosome.config.component import ComponentData
@@ -24,7 +24,8 @@ from ribosome.compute.output import ProgOutput
 from ribosome.compute.prog import Prog
 from ribosome.test.klk.expectable import kn
 from ribosome.nvim.io.data import NResult
-from ribosome.rpc.state import init_state
+from ribosome.rpc.state import cons_state
+from ribosome.components.internal.update import update_components
 
 log = module_log()
 A = TypeVar('A')
@@ -129,7 +130,8 @@ class RequestHelperBuilder(Generic[D, CC], Dat['RequestHelperBuilder[D, CC]']):
     def create(self, cons_vim: Callable[[dict], NvimApi]) -> 'RequestHelper[D, CC]':
         comps_var = Map({f'{self.config.basic.name}_components': self.comps})
         vim = cons_vim(self.vars ** comps_var)
-        vim1, state = init_state(self.config, io_interpreter=self.io_interpreter, logger=self.logger).unsafe_run(vim)
+        state0 = cons_state(self.config, self.io_interpreter, self.logger)
+        state = update_components(Right(self.comps)).run_s(state0).get_or_raise()
         return RequestHelper(vim, self.config, state)
 
     def nvim(self, vim: NvimApi) -> 'RequestHelper[D, CC]':
@@ -181,20 +183,19 @@ class RequestHelper(Generic[D, CC], Dat['RequestHelper[D, CC]']):
 
     def request_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[RequestJob, List[Program]]:
         job = request_job(self.holder, name, (args,), sync)
-        return job, job.state.state.programs.lift(job.name).get_or_fail(f'no matching program for `{job.name}`')
+        return job, job.state.state.program_by_name(job.name).get_or_raise()
 
     def traverse_programs(self, name: str, args: tuple=(), sync: bool=True) -> NS[PluginState[D, CC], Any]:
         job, program = self.request_job(name, args, sync)
         return traverse_programs(program, Lists.wrap(args))
 
     def run(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> NvimIO[Tuple[PluginState, Any]]:
-        job, programs = self.request_job(name, args, sync)
-        program = programs.head.get_or_fail('multiple programs')
+        job, program = self.request_job(name, args, sync)
         def check_error(result: NResult) -> NvimIO[None]:
             if warn_error:
                 log.error(f'NvimIO failed: {result}')
             return N.unit
-        io = run_request_handler(program, Lists.wrap(args)).run(self.state)
+        io = run_rpc_pgrogram(program, Lists.wrap(args)).run(self.state)
         return N.ensure_failure(io, check_error)
 
     def run_s(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> NvimIO[PluginState]:

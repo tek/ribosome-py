@@ -8,7 +8,7 @@ from amino.lenses.lens import lens
 
 from ribosome.test.integration.run import RequestHelper
 from ribosome.config.config import Config, NoData
-from ribosome.request.handler.handler import RequestHandler
+from ribosome.request.handler.handler import rpc
 from ribosome.compute.api import prog
 from ribosome.config.component import Component, ComponentData
 from ribosome.nvim.io.state import NS
@@ -64,9 +64,9 @@ def switch() -> Do:
 
 core = Component.cons(
     'core',
-    request_handlers=List(
-        RequestHandler.trans_function(core_fun)(),
-        RequestHandler.trans_function(switch)(),
+    rpc=List(
+        rpc.write(core_fun),
+        rpc.write(switch),
     ),
     config=CompoComponent(13),
     state_type=CoreData,
@@ -74,8 +74,8 @@ core = Component.cons(
 
 extra = Component.cons(
     'extra',
-    request_handlers=List(
-        RequestHandler.trans_function(extra_fun)(),
+    rpc=List(
+        rpc.write(extra_fun),
     ),
     state_type=ExtraData,
 )
@@ -85,8 +85,6 @@ config = Config.cons(
     'compo',
     components=Map(core=core, extra=extra),
     core_components=List('core'),
-    request_handlers=List(
-    )
 )
 
 
@@ -98,12 +96,12 @@ class ComponentSpec(SpecBase):
 
     def enable_component(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        s = helper.unsafe_run_s('command:enable_components', args=('extra',))
+        s = helper.unsafe_run_s('enable_components', args=('extra',))
         return k(s.components.all / _.name).must(contain('extra'))
 
     def switch(self) -> Expectation:
         helper = RequestHelper.strict(config, 'extra')
-        s, r = helper.unsafe_run('function:switch', args=())
+        s, r = helper.unsafe_run('switch', args=())
         return (
             (k(r) == 17) &
             (k(s.data_by_name('core')).must(be_right(CoreData(-10)))) &

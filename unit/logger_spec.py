@@ -6,13 +6,12 @@ from amino import Dat, List, Nil, __
 from amino.test.spec import SpecBase
 
 from ribosome.config.config import Config
-from ribosome.request.handler.handler import RequestHandler
+from ribosome.request.handler.handler import rpc
 from ribosome.compute.output import Echo
 from ribosome.nvim.io.state import NS
 from ribosome.compute.api import prog
 from ribosome.test.integration.run import RequestHelper
 from ribosome.data.plugin_state import PluginState
-from ribosome.config.settings import Settings
 from ribosome.config.component import NoComponentData
 
 
@@ -38,8 +37,8 @@ def logger(msg: Echo) -> NS[LSData, None]:
 config: Config = Config.cons(
     'logger',
     state_ctor=LSData,
-    request_handlers=List(
-        RequestHandler.trans_function(log_something)(),
+    rpc=List(
+        rpc.write(log_something),
     ),
 )
 helper = RequestHelper.cons(config, logger=logger).strict()
@@ -53,7 +52,7 @@ class LoggerSpec(SpecBase):
     def logger(self) -> Expectation:
         def check(state: PluginState[LSData, NoComponentData]) -> Expectation:
             return k(state.data.log).must(contain(test_echo))
-        return helper.k(helper.run_s, 'function:log_something').must(contain(match_with(check)))
+        return helper.k(helper.run_s, 'log_something').must(contain(match_with(check)))
 
 
 __all__ = ('LoggerSpec',)

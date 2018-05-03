@@ -1,13 +1,12 @@
 from typing import GenericMeta, TypeVar, Callable, Type
 
 from amino.lenses.lens import lens
-from amino import do, Do, _
+from amino import do, Do, _, Either
 
 from ribosome.nvim.io.state import NS
 from ribosome.compute.ribosome import Ribosome
 from ribosome.config.setting import Setting
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.compute.api import prog
 from ribosome.compute.prog import Prog, ProgExec
 from ribosome.compute.output import ProgOutputResult
 from ribosome.compute.tpe_data import StateProg, trivial_state_prog, ribo_state_prog
@@ -31,7 +30,11 @@ class Ribo(metaclass=RMeta):
 
     @classmethod
     def setting(self, setting: Setting) -> NS[Ribosome[D, CC, C], A]:
-        return Ribo.lift_nvimio(setting.value_or_default)
+        return NS.lift(setting.value_or_default)
+
+    @classmethod
+    def setting_raw(self, setting: Setting) -> NS[Ribosome[D, CC, C], Either[str, A]]:
+        return NS.lift(setting.value)
 
     @classmethod
     def comp(self) -> NS[Ribosome[D, CC, C], C]:

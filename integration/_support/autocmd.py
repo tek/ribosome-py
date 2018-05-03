@@ -3,7 +3,7 @@ from amino import Map, List
 from ribosome.compute.api import prog
 from ribosome.config.component import Component
 from ribosome.request.handler.prefix import Plain
-from ribosome.request.handler.handler import RequestHandler
+from ribosome.request.handler.handler import rpc
 from ribosome.config.config import Config, NoData
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.io.state import NS
@@ -22,9 +22,10 @@ core: Component = Component.cons('core')
 autocmd_spec_config: Config = Config.cons(
     name='plug',
     components=Map(core=core),
-    request_handlers=List(
-        RequestHandler.trans_autocmd(trans1)('vim_resized', prefix=Plain()),
+    rpc=List(
+        rpc.autocmd(trans1).conf(name=Just('vim_resized'), prefix=Plain()),
     ),
+    internal_component=False,
 )
 
 __all__ = ('autocmd_spec_config',)

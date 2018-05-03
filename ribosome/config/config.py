@@ -1,13 +1,9 @@
-from typing import Callable, TypeVar, Generic, Optional, Type, Any
+from typing import Callable, TypeVar, Generic, Optional, Any
 
-from amino import List, Nil, Map, Either, Right, do, Do, Maybe, __
+from amino import List, Nil, Map, __, Maybe
 from amino.dat import Dat
-from amino.json.encoder import Encoder, json_object_with_type
-from amino.json.data import JsonError, Json, JsonScalar
-from amino.json.decoder import Decoder, decode
 
-from ribosome.request.handler.handler import RequestHandler, RequestHandlers, RpcProgram
-from ribosome.request.rpc import RpcHandlerSpec
+from ribosome.request.handler.handler import RpcProgram
 from ribosome.config.component import Component
 from ribosome.compute.program import Program
 from ribosome.config.basic_config import NoData, BasicConfig
@@ -63,13 +59,6 @@ class Config(Generic[D, CC], Dat['Config[D, CC]']):
         self.components = components
         self.rpc = rpc
         self.init = init
-
-    def vim_cmd_name(self, handler: RequestHandler) -> str:
-        return handler.vim_cmd_name(self.name, self.prefix)
-
-    @property
-    def rpc_specs(self) -> List[RpcHandlerSpec]:
-        return self.rpc / __.spec(self.name, self.prefix)
 
 
 __all__ = ('Config', 'NoData')

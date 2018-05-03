@@ -5,7 +5,7 @@ from kallikrein.matchers import contain
 from kallikrein.matchers.either import be_right
 from kallikrein.expectable import kio
 
-from amino import List, do, Do, Map, IO, Path
+from amino import List, do, Do, Map, IO, Path, Left
 from amino.test import temp_file
 from amino.test.spec import SpecBase
 from amino.logging import module_log
@@ -17,11 +17,11 @@ from ribosome.nvim.api.rpc import channel_id
 from ribosome.nvim.api.function import nvim_call_function
 from ribosome.nvim.io.api import N
 from ribosome.rpc.uv.uv import Uv, start_uv_embed_nvim_sync_log, cons_uv_embed
-from ribosome.rpc.comm import Comm, RpcComm, StateGuard
+from ribosome.rpc.comm import Comm, RpcComm, StateGuard, exclusive_ns
 from ribosome.config.config import Config
 from ribosome.rpc.strict import StrictRpc
 from ribosome.rpc.start import start_comm, stop_comm, plugin_execute_receive_request
-from ribosome.rpc.handle import comm_request_handler
+from ribosome.rpc.handle import rpc_handler
 from ribosome.rpc.api import RiboNvimApi
 from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
@@ -74,7 +74,7 @@ def ping() -> Do:
     yield NS.unit
 
 
-config: Config = Config.cons('uv', request_handlers=List(rpc.write(ping)()))
+config: Config = Config.cons('uv', rpc=List(rpc.write(ping)))
 
 
 def embed_nvim(log: Path) -> Uv:
@@ -89,7 +89,7 @@ def run_nvim(comm: Comm, config: Config, io: Callable[[], NvimIO[A]]) -> Do:
     execute_request = plugin_execute_receive_request(guard)
     yield start_comm(comm, execute_request)
     api = RiboNvimApi(config.basic.name, comm)
-    guard.exclusive_state(lambda s: init_rpc().run_s(s).run_a(api).value)
+    yield N.to_io(exclusive_ns(guard, 'init_rpc', init_rpc, Left('')), api)
     s, r = io().run(api)
     yield stop_comm(comm)
     return r
@@ -110,14 +110,14 @@ class RpcSpec(SpecBase):
     def uv(self) -> Expectation:
         log = temp_file('log', 'uv')
         uv, rpc_comm = embed_nvim(log)
-        comm = Comm.cons(comm_request_handler, rpc_comm)
+        comm = Comm.cons(rpc_handler, rpc_comm)
         return kio(run_nvim, comm, config, run1).must(contain(be_right(value)))
 
     @pending
     def strict(self) -> Expectation:
         strict_rpc = StrictRpc.cons(responses)
         rpc_comm = RpcComm(strict_rpc.start_processing, strict_rpc.stop, strict_rpc.send, strict_rpc.stop)
-        comm = Comm.cons(comm_request_handler, rpc_comm)
+        comm = Comm.cons(rpc_handler, rpc_comm)
         return kio(run_nvim, comm, config, run1).must(contain(be_right(value)))
 
     def external(self) -> Expectation:

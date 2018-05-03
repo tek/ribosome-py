@@ -3,16 +3,18 @@ from typing import Callable
 from amino import List, do, Do, Dat, Nil
 from amino.case import Case
 from amino.util.string import camelcase
+from amino.logging import module_log
 
 from ribosome.request.handler.handler import RpcProgram, RpcOptions
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.rpc import channel_id
-from ribosome import ribo_log
 from ribosome.nvim.io.api import N
 from ribosome.request.handler.method import RpcMethod, CommandMethod, FunctionMethod, AutocmdMethod
 from ribosome.nvim.api.command import nvim_command
 from ribosome.request.nargs import Nargs
 from ribosome.request.handler.prefix import PrefixStyle, Plain, Full, Short
+
+log = module_log()
 
 
 # @property
@@ -82,7 +84,7 @@ function_tokens = DefinitionTokens('rpcrequest', List('a:000'), 'function!', Nil
 
 
 def autocmd_tokens(pattern: str) -> None:
-    return DefinitionTokens('rpcnotify', Nil, 'autocmd', Nil, Nil, '')
+    return DefinitionTokens('rpcnotify', Nil, 'autocmd', Nil, List('*'), '')
 
 
 class rpc_prefix(Case[PrefixStyle, str], alg=PrefixStyle):
@@ -159,7 +161,7 @@ class define_method_rpc(Case[RpcMethod, NvimIO[DefinedHandler]], alg=RpcMethod):
     @do(NvimIO[DefinedHandler])
     def autocmd(self, method: AutocmdMethod) -> Do:
         tokens = autocmd_tokens(method.pattern)
-        yield nvim_command(f'augroup {self.rpc_config.name}')
+        yield nvim_command(f'augroup {self.rpc_def.config.name}')
         result = yield define_trigger(command_rhs, self.rpc_def, tokens)
         yield nvim_command(f'augroup end')
         return result
@@ -169,7 +171,7 @@ def define_prog_rpc(rpc_config: RpcConfig) -> Callable[[RpcProgram], NvimIO[List
     def traverse(prog: RpcProgram) -> NvimIO[List[DefinedHandler]]:
         @do(NvimIO[DefinedHandler])
         def define(method: RpcMethod) -> Do:
-            ribo_log.debug1(lambda: f'defining {prog} for {method} on channel {rpc_config.channel}')
+            log.debug1(lambda: f'defining {prog} for {method} on channel {rpc_config.channel}')
             rpc_def = RpcDef(rpc_config, prog.options, prog.program.name, prog.rpc_name)
             yield define_method_rpc(prog, rpc_def)(method)
             return DefinedHandler(prog, method, rpc_config.channel)

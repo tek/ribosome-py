@@ -1,37 +1,40 @@
-from kallikrein import Expectation
-from kallikrein.matchers import contain
+from kallikrein import Expectation, k
 
 from ribosome.nvim.api.variable import variable_set, variable_num
 
-from amino import do, Do
-from ribosome.test.integration.default import ExternalSpec
+from amino import do, Do, Nil
+from amino.test.spec import SpecBase
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.test.integration.run import RequestHelper
-from ribosome.test.klk.expectable import kn
+from ribosome.test.integration.external import request, external_test
+from ribosome.test.integration.embed import TestConfig
+from ribosome.nvim.io.state import NS
 
 from integration._support.settings import config
 
 
-class SettingsSpec(ExternalSpec):
+@do(NS[None, None])
+def update_setting_spec() -> Do:
+    yield request('check', args=Nil)
+    n = yield NS.lift(variable_num('counter'))
+    return k(n) == 21
+
+
+@do(NvimIO[None])
+def pre() -> Do:
+    yield variable_set('counter', 7)
+    yield variable_set('inc', 14)
+
+
+test_config = TestConfig.cons(config, pre=pre)
+
+
+class SettingsSpec(SpecBase):
     '''
     update a setting $update
     '''
 
-    def plugin_name(self) -> str:
-        return 'plug'
-
-    def _pre_start(self) -> None:
-        super()._pre_start()
-        variable_set('counter', 7).unsafe(self.vim)
-        variable_set('inc', 14).unsafe(self.vim)
-
     def update(self) -> Expectation:
-        helper = RequestHelper.nvim(config, self.vim)
-        @do(NvimIO[None])
-        def run() -> Do:
-            s = yield helper.run_s('command:check', args=())
-            yield variable_num('counter')
-        return kn(helper.vim, run).must(contain(21))
+        return external_test(test_config, update_setting_spec)
 
 
 __all__ = ('SettingsSpec',)

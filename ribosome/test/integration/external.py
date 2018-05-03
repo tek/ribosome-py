@@ -17,14 +17,14 @@ from ribosome.data.plugin_state import PS
 from ribosome.nvim.io.state import NS
 from ribosome.logging import nvim_logging
 from ribosome.components.internal.update import init_rpc
-from ribosome.request.handler.handler import RpcProgram
+from ribosome.request.handler.handler import RpcProgram, RpcArgs
 from ribosome.rpc.handle import run_program
 from ribosome.rpc.comm import Comm
 
 
 def program_runner(args: List[Any]) -> Callable[[RpcProgram], NS[PS, Any]]:
     def runner(program: RpcProgram) -> NS[PS, Any]:
-        return run_program(program, args)
+        return run_program(program, RpcArgs.cons(args))
     return runner
 
 
@@ -65,6 +65,7 @@ def run_test(
         config: TestConfig,
         io: Callable[[], NS[PS, Expectation]],
 ) -> Do:
+    yield config.pre()
     engine = yield setup_engine(config)
     yield io().run_a(engine)
 

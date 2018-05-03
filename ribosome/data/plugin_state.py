@@ -135,6 +135,9 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
     def camelcase_name(self) -> str:
         return camelcase(self.basic.name)
 
+    def program_by_name(self, name: str) -> Either[str, RpcProgram]:
+        return self.programs.find(_.rpc_name == name).to_either(f'no program named `{name}`')
+
 
 PS = PluginState[D, CC]
 

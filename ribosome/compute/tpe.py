@@ -60,7 +60,7 @@ def resources_trans(resources_type: type) -> Do:
 
 @do(Either[str, RibosomeStateProgType])
 def ribosome_trans(ribosome_type: type) -> Do:
-    tpe = yield type_arg(ribosome_type, 1)
+    tpe = yield type_arg(ribosome_type, 2)
     return RibosomeStateProgType(tpe)
 
 

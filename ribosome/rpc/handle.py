@@ -98,7 +98,7 @@ def decode_args(args: List[Any]) -> RpcArgs:
 
 
 # FIXME `request_result` is not called with `run_program`
-def comm_request_handler(guard: StateGuard[A]) -> Callable[[str, List[Any], bool], NvimIO[Any]]:
+def rpc_handler(guard: StateGuard[A]) -> Callable[[str, List[Any], bool], NvimIO[Any]]:
     @do(NvimIO[Any])
     def handler(method: str, raw_args: List[Any], sync: bool) -> Do:
         args = decode_args(raw_args)
@@ -112,4 +112,4 @@ def comm_request_handler(guard: StateGuard[A]) -> Callable[[str, List[Any], bool
     return handler
 
 
-__all__ = ()
+__all__ = ('send_request', 'send_notification', 'rpc_handler',)

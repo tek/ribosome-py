@@ -3,13 +3,14 @@ from typing import Any
 from kallikrein import Expectation, k, pending
 
 from amino.test.spec import SpecBase
-from amino import Lists, List, _, IO, __, do, Do
+from amino import Lists, List, _, IO, __, do, Do, Just
 from amino.boolean import true
 from amino.dat import Dat, ADT
+from amino.json.decoder import decode_json_type
 
 from ribosome.compute.api import prog
 from ribosome.data.plugin_state import PluginState
-from ribosome.request.handler.handler import RequestHandler
+from ribosome.request.handler.handler import rpc
 from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import RequestHelper
 from ribosome.config.config import Config
@@ -26,19 +27,19 @@ class HsData(Dat['HsData']):
         self.counter = counter
 
 
-@prog.result
+@prog
 def trans_free(a: int, b: str='b') -> NS[None, int]:
     return NS.pure(8)
 
 
-@prog.result
+@prog
 @do(NS[HsData, IO[int]])
 def trans_io() -> Do:
     return NS.pure(IO.pure(5))
 
 
 # TODO allow args here
-@prog.result
+@prog
 def trans_internal() -> NS[PluginState, str]:
     return NS.inspect(_.basic.name)
 
@@ -48,7 +49,7 @@ def trans_data() -> NS[HsData, None]:
     return NS.modify(__.set.counter(23))
 
 
-class JData(ADT['JData']):
+class JData(Dat['JData']):
 
     def __init__(self, number: int, name: str, items: List[str]) -> None:
         self.number = number
@@ -56,7 +57,7 @@ class JData(ADT['JData']):
         self.items = items
 
 
-@prog.result
+@prog
 def trans_json(a: int, b: str, data: JData) -> NS[HsData, int]:
     return NS.pure(data.number + a)
 
@@ -67,21 +68,21 @@ def vim_enter() -> Do:
     yield NS.modify(__.copy(counter=19))
 
 
-@prog.result
+@prog
 def trans_error() -> NS[HsData, int]:
     return NS.lift(N.error('error'))
 
 
 config: Config[HsData, Any] = Config.cons(
     'hs',
-    request_handlers=List(
-        RequestHandler.trans_cmd(trans_free)('trfree'),
-        RequestHandler.trans_cmd(trans_io)('trio'),
-        RequestHandler.trans_function(trans_internal)('int'),
-        RequestHandler.trans_function(trans_data)('dat'),
-        RequestHandler.trans_cmd(trans_json)('json', json=true),
-        RequestHandler.trans_autocmd(vim_enter)(prefix=Plain()),
-        RequestHandler.trans_cmd(trans_error)('error'),
+    rpc=List(
+        rpc.write(trans_free),
+        rpc.write(trans_io),
+        rpc.write(trans_internal),
+        rpc.write(trans_data),
+        rpc.write(trans_json).conf(json=true),
+        rpc.autocmd(vim_enter).conf(prefix=Plain()),
+        rpc.write(trans_error),
     ),
     state_ctor=HsData,
 )
@@ -101,29 +102,29 @@ class DispatchSpec(SpecBase):
 
     def trans_free(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        result = helper.unsafe_run_a('command:trfree', args=('x',))
+        result = helper.unsafe_run_a('trans_free', args=('x',))
         return k(result) == 8
 
     @pending
     def io(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        result = helper.unsafe_run_a('command:trio')
+        result = helper.unsafe_run_a('trans_io')
         return k(result) == 5
 
     def internal(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        state, result = helper.unsafe_run('function:int')
+        state, result = helper.unsafe_run('trans_internal')
         return k(result) == state.basic.name
 
     def data(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        state = helper.unsafe_run_s('dat')
+        state = helper.unsafe_run_s('trans_data')
         return k(state.data.counter) == 23
 
     def json(self) -> Expectation:
         helper = RequestHelper.strict(config)
         js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
-        result = helper.unsafe_run_a('command:json', args=(7, 'one', *Lists.split(js, ' ')))
+        result = helper.unsafe_run_a('trans_json', args=(7, 'one', *Lists.split(js, ' ')))
         return k(result) == 9
 
     def autocmd(self) -> Expectation:
@@ -133,7 +134,7 @@ class DispatchSpec(SpecBase):
 
     def error(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        result = execute_request(helper.vim, helper.holder, 'command:error', (), True)
+        result = execute_request(helper.vim, helper.holder, 'error', (), True)
         return k(result) == 1
 
 

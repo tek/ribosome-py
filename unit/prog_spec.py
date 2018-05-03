@@ -17,7 +17,6 @@ from ribosome.config.component import Component, ComponentData
 from ribosome.test.integration.run import RequestHelper
 from ribosome.nvim.io.state import NS
 from ribosome.compute.api import prog
-from ribosome.request.handler.handler import RequestHandler
 from ribosome.compute.run import run_prog
 from ribosome.test.klk.expectable import kn
 from ribosome.compute.prog import Prog
@@ -29,6 +28,7 @@ from ribosome.compute.interpret import GatherIOs, GatherSubprocesses
 from ribosome.process import Subprocess, SubprocessResult
 from ribosome.compute.output import Echo
 from ribosome.test.klk.matchers.nresult import nsuccess, nerror
+from ribosome.request.handler.handler import rpc
 
 A = TypeVar('A')
 
@@ -63,14 +63,14 @@ class CompoComponent(Dat['CompoComponent']):
         self.baseline = baseline
 
 
-@prog.result
+@prog
 @do(State[ComponentData[CoreData, ExtraData], int])
 def t1(a: int) -> Do:
     yield State.modify(lens.comp.y.modify(_ + 5))
     return a + 2
 
 
-@prog.result
+@prog
 @do(State[ComponentData[CoreData, ExtraData], int])
 def t2_b(a: int) -> Do:
     yield State.inspect(_.comp.y + a + 39)
@@ -81,7 +81,7 @@ def t2(a: int) -> Do:
     yield t2_b(a)
 
 
-@prog.result
+@prog
 @do(State[CoreData, int])
 def t3(a: int) -> Do:
     yield State.modify(lens.x.modify(_ + a))
@@ -97,8 +97,8 @@ def tm() -> Do:
 
 c1: Component = Component.cons(
     'c1',
-    request_handlers=List(
-        RequestHandler.trans_function(t1)(),
+    rpc=List(
+        rpc.write(t1),
     ),
     config=CompoComponent(13),
     state_ctor=ExtraData.cons,
@@ -107,9 +107,9 @@ c1: Component = Component.cons(
 
 c2: Component = Component.cons(
     'c2',
-    request_handlers=List(
-        RequestHandler.trans_function(t2)(),
-        RequestHandler.trans_function(t2_b)(),
+    rpc=List(
+        rpc.write(t2),
+        rpc.write(t2_b),
     ),
     state_ctor=ExtraData.cons,
     state_type=ExtraData,
@@ -121,9 +121,9 @@ config: Config = Config.cons(
     components=Map(c1=c1, c2=c2),
     core_components=List('c1', 'c2'),
     state_ctor=CoreData.cons,
-    request_handlers=List(
-        RequestHandler.trans_function(tm)(),
-        RequestHandler.trans_function(t3)(),
+    rpc=List(
+        rpc.write(tm),
+        rpc.write(t3),
     ),
 )
 helper = RequestHelper.strict(config)
@@ -146,7 +146,7 @@ def n1() -> Do:
     return b + 7
 
 
-@prog.result
+@prog
 @do(NS[Resources[ComponentData[CoreData, ExtraData], Compon], str])
 def comp_res() -> Do:
     s = yield NS.inspect(_.components)
@@ -155,28 +155,20 @@ def comp_res() -> Do:
     return comp.name
 
 
-@prog.result
+@prog
 @do(NS[CoreData, None])
 def root() -> Do:
     yield NS.pure(13)
 
 
-def run_a(t: Program) -> Expectable:
-    return kn(helper.vim, lambda: run_prog(t, Nil).run_a(helper.state))
-
-
-def run(t: Program) -> Expectable:
-    return kn(helper.vim, lambda: run_prog(t, Nil).run(helper.state))
-
-
-@prog.result
+@prog
 @do(NS[Ribosome[CoreData, Compon, ExtraData], int])
 def mod_main() -> Do:
     yield Ribo.modify_main(__.set.x(437))
     yield Ribo.main()
 
 
-@prog.result
+@prog
 @do(NS[Ribosome[CoreData, Compon, ExtraData], int])
 def mod_comp() -> Do:
     yield Ribo.modify_comp(__.set.y(954))
@@ -213,6 +205,14 @@ def gather_subprocs() -> Do:
 @do(NS[CoreData, Echo])
 def log_message() -> Do:
     yield NS.pure(Echo.info('hello'))
+
+
+def run_a(t: Program) -> Expectable:
+    return kn(helper.vim, lambda: run_prog(t, Nil).run_a(helper.state))
+
+
+def run(t: Program) -> Expectable:
+    return kn(helper.vim, lambda: run_prog(t, Nil).run(helper.state))
 
 
 class ProgSpec(SpecBase):

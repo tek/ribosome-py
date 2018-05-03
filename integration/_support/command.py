@@ -23,7 +23,7 @@ command_spec_config: Config = Config.cons(
     name='plug',
     components=Map(core=core),
     rpc=List(
-        rpc.write(trans1).conf(name='trans_cmd'),
+        rpc.write(trans1).conf(name=Just('trans_cmd')),
     ),
     internal_component=False,
 )

@@ -22,11 +22,11 @@ from ribosome import NvimApi
 from ribosome.nvim.io.data import NResult, NSuccess, NError, NFatal
 from ribosome.nvim.io.api import N
 from ribosome.request.job import RequestJob
-from ribosome.request.handler.handler import RequestHandler, RpcProgram
 from ribosome.request.args import ParamsSpec
 from ribosome.request.handler.arg_parser import ArgParser, JsonArgParser, TokenArgParser
 from ribosome.compute.run import run_prog
 from ribosome.data.plugin_state_holder import PluginStateHolder
+from ribosome.request.handler.handler import RpcProgram
 
 Loop = TypeVar('Loop', bound=BaseEventLoop)
 D = TypeVar('D')
@@ -80,14 +80,14 @@ def parse_args(rpc_program: RpcProgram, args: List[Any]) -> NS[D, List[Any]]:
 
 
 @do(NS)
-def run_request_handler(handler: RequestHandler, args: List[Any]) -> Do:
-    parsed_args = yield NS.from_either(parse_args(handler, args))
-    yield run_prog(handler.program, parsed_args)
+def run_rpc_pgrogram(program: RpcProgram, args: List[Any]) -> Do:
+    parsed_args = yield NS.from_either(parse_args(program, args))
+    yield run_prog(program.program, parsed_args)
 
 
 @do(NS)
 def traverse_programs(programs: List[Program], args: List[Any]) -> Do:
-    yield programs.traverse(lambda a: run_request_handler(a, args), NS)
+    yield programs.traverse(lambda a: run_rpc_pgrogram(a, args), NS)
 
 
 @do(NvimIO[A])
@@ -106,14 +106,14 @@ def exclusive(holder: PluginStateHolder, f: Callable[[], NvimIO[Tuple[PluginStat
 def exclusive_program(holder: PluginStateHolder, program: Program, args: List[Any]) -> NvimIO[R]:
     return exclusive(
         holder,
-        lambda: run_request_handler(program, args).run(holder.state),
+        lambda: run_rpc_pgrogram(program, args).run(holder.state),
         program.name
     )
 
 
 @do(EitherState[RequestJob, List[Program]])
 def regular_programs(name: str) -> Do:
-    yield EitherState.inspect_f(lambda job: job.programs.lift(name).to_either(f'no program for {name}'))
+    yield EitherState.inspect_f(__.state.state.program_by_name(name))
 
 
 def special_programs_sync(parts: List[str]) -> EitherState[RequestJob, List[Program]]:

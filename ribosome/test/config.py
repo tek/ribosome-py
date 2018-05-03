@@ -3,7 +3,7 @@ from typing import Any
 from ribosome.config.component import Component
 
 from amino import Map, Lists
-from ribosome.request.handler.handler import RpcProgram, rpc, RpcOptions
+from ribosome.request.handler.handler import RpcProgram, rpc
 from ribosome.config.config import Config
 from ribosome.compute.program import Program
 
@@ -25,7 +25,7 @@ def spec_config(*rpc: RpcProgram) -> Config:
 
 
 def single_trans_config(trans: Program, **kw: Any) -> Config:
-    return spec_config(rpc.write(trans).conf(RpcOptions.cons(**kw)))
+    return spec_config(rpc.write(trans).conf(**kw))
 
 
 __all__ = ('single_trans_config', 'spec_config')

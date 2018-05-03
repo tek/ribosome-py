@@ -19,7 +19,6 @@ def pre() -> Do:
 
 @do(NvimIO[Expectation])
 def command_spec() -> Do:
-    c = yield nvim_command_output('command')
     yield nvim_command('PlugTransCmd')
     yield var_must_become('command_success', val)
 
