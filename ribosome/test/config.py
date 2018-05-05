@@ -10,6 +10,7 @@ from ribosome.rpc.api import RpcProgram, rpc
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.compute.interpret import ProgIOInterpreter
 from ribosome.nvim.io.api import N
+from ribosome.test.request import Handler, no_handler
 
 
 default_config_name = 'spec'
@@ -27,7 +28,10 @@ class TestConfig(Dat['TestConfig']):
             components: List[str]=Nil,
             io_interpreter: ProgIOInterpreter=None,
             logger: Program[None]=None,
-            vars: Map[str, Any]=Map()
+            vars: Map[str, Any]=Map(),
+            request_handler: Handler=no_handler,
+            function_handler: Handler=no_handler,
+            command_handler: Handler=no_handler,
     ) -> 'TestConfig':
         ld = log_dir or temp_dir('log')
         lf = log_file or ld / config.basic.name
@@ -40,6 +44,9 @@ class TestConfig(Dat['TestConfig']):
             io_interpreter,
             logger,
             vars,
+            request_handler,
+            function_handler,
+            command_handler,
         )
 
     def __init__(
@@ -52,6 +59,9 @@ class TestConfig(Dat['TestConfig']):
             io_interpreter: Optional[ProgIOInterpreter],
             logger: Optional[Program[None]],
             vars: Map[str, Any],
+            request_handler: Handler,
+            function_handler: Handler,
+            command_handler: Handler,
     ) -> None:
         self.config = config
         self.pre = pre
@@ -61,6 +71,9 @@ class TestConfig(Dat['TestConfig']):
         self.io_interpreter = io_interpreter
         self.logger = logger
         self.vars = vars
+        self.request_handler = request_handler
+        self.function_handler = function_handler
+        self.command_handler = command_handler
 
 
 def spec_config(*rpc: RpcProgram) -> Config:

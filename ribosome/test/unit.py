@@ -2,7 +2,7 @@ from typing import Callable
 
 from kallikrein import Expectation
 
-from amino import IO, Do, do
+from amino import Do, do
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.config import TestConfig
@@ -10,10 +10,12 @@ from ribosome.nvim.api.data import StrictNvimApi
 from ribosome.test.run import run_test_io
 from ribosome.nvim.io.api import N
 from ribosome.test.prog import init_test_state
+from ribosome.test.integration.run import StrictRequestHandler
 
 
 def setup_strict_test_nvim(config: TestConfig) -> StrictNvimApi:
-    return StrictNvimApi.cons('unit', vars=config.vars)
+    handler = StrictRequestHandler(config.request_handler, config.function_handler, config.command_handler)
+    return StrictNvimApi.cons('unit', vars=config.vars, request_handler=handler)
 
 
 def unit_test(config: TestConfig, io: Callable[[], NvimIO[Expectation]]) -> Expectation:
