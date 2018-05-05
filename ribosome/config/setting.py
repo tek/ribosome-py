@@ -1,6 +1,5 @@
 import abc
 from typing import Callable, Type, TypeVar, Generic, Any
-from mypy_extensions import DefaultArg
 
 from amino import List, Either, __, Left, Eval, ADT, Right, Try, Path, Map, Boolean, Lists
 from amino.do import do, Do
@@ -114,7 +113,7 @@ SettingCtor = Callable[[str, str, str, bool, Either[str, B]], Setting[B]]
 no_default: Either[str, Any] = Left('no default specified')
 
 
-def setting_ctor(tpe: Type[A], ctor: Callable[[A], DefaultArg(Either[str, B])]) -> SettingCtor:
+def setting_ctor(tpe: Type[A], ctor: Callable[[A], Either[str, B]]) -> SettingCtor:
     def setting(name: str, desc: str, help: str, prefix: bool, default: Either[str, B]=no_default) -> Setting[B]:
         return StrictSetting(name, desc, help, prefix, tpe, ctor, default)
     return setting
