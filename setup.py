@@ -13,7 +13,7 @@ setup(
     url='https://github.com/tek/ribosome',
     packages=find_packages(exclude=['unit', 'unit.*']),
     install_requires=[
-        'amino==13.0.0a23',
+        'amino==13.0.0a24',
         'pyuv~=1.4.0',
         'mypy_extensions==0.3.0',
     ],
