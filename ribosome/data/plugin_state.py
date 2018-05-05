@@ -2,20 +2,20 @@ import logging
 from typing import TypeVar, Generic, Callable, Any, Type
 from uuid import UUID
 
-from amino import Map, List, Nil, Either, _, Maybe, __, L
+from amino import Map, List, Nil, Either, _, Maybe, __
 from amino.dat import Dat
 from amino.util.string import camelcase
 
 from ribosome.config.component import Component, Components, NoComponentData, ComponentConfig
 from ribosome.nvim.io.state import NS
 from ribosome.compute.program import Program
-from ribosome.request.rpc import RpcHandlerSpec, DefinedHandler
 from ribosome.config.resources import Resources
-from ribosome.request.handler.handler import RpcProgram
 from ribosome.config.basic_config import BasicConfig
 from ribosome.compute.output import ProgIO
 from ribosome.compute.prog import Prog
 from ribosome.compute.interpret import interpret_io, no_interpreter
+from ribosome.rpc.define import DefinedHandler
+from ribosome.rpc.api import RpcProgram
 
 A = TypeVar('A')
 C = TypeVar('C')
@@ -135,8 +135,11 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
     def camelcase_name(self) -> str:
         return camelcase(self.basic.name)
 
+    def programs_by_name(self, name: str) -> List[RpcProgram]:
+        return self.programs.filter(_.rpc_name == name)
+
     def program_by_name(self, name: str) -> Either[str, RpcProgram]:
-        return self.programs.find(_.rpc_name == name).to_either(f'no program named `{name}`')
+        return self.programs_by_name(name).head.to_either(f'no program named `{name}`')
 
 
 PS = PluginState[D, CC]

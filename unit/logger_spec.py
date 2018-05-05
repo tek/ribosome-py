@@ -6,13 +6,13 @@ from amino import Dat, List, Nil, __
 from amino.test.spec import SpecBase
 
 from ribosome.config.config import Config
-from ribosome.request.handler.handler import rpc
 from ribosome.compute.output import Echo
 from ribosome.nvim.io.state import NS
 from ribosome.compute.api import prog
 from ribosome.test.integration.run import RequestHelper
 from ribosome.data.plugin_state import PluginState
 from ribosome.config.component import NoComponentData
+from ribosome.rpc.api import rpc
 
 
 class LSData(Dat['LSData']):

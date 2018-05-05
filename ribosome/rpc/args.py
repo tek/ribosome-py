@@ -6,7 +6,7 @@ from amino.dat import Dat
 from amino.state import StateT
 from amino.util.tpe import first_type_arg, type_arg
 
-from ribosome.request.nargs import Nargs
+from ribosome.rpc.data.nargs import Nargs
 
 
 def analyse_state_type(tpe: type) -> Tuple[Either[str, type], Either[str, type]]:

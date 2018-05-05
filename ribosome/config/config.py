@@ -3,11 +3,11 @@ from typing import Callable, TypeVar, Generic, Optional, Any
 from amino import List, Nil, Map, __, Maybe
 from amino.dat import Dat
 
-from ribosome.request.handler.handler import RpcProgram
 from ribosome.config.component import Component
 from ribosome.compute.program import Program
 from ribosome.config.basic_config import NoData, BasicConfig
 from ribosome.components.internal.config import internal
+from ribosome.rpc.api import RpcProgram
 
 A = TypeVar('A')
 D = TypeVar('D')

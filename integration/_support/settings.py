@@ -1,7 +1,8 @@
-from amino import List, do, Do, _, __
+from amino import List, do, Do
+from amino.logging import module_log
 
 from ribosome.compute.api import prog
-from ribosome.request.handler.handler import rpc
+from ribosome.rpc.api import rpc
 from ribosome.config.config import Config, NoData
 from ribosome.nvim.io.state import NS
 from ribosome.config.component import NoComponentData
@@ -9,6 +10,7 @@ from ribosome.compute.ribosome import Ribosome
 from ribosome.compute.ribosome_api import Ribo
 from ribosome.config.setting import int_setting
 
+log = module_log()
 counter = int_setting('counter', 'counter', '', False)
 inc = int_setting('inc', 'inc', '', False)
 
@@ -21,7 +23,7 @@ def check() -> Do:
     yield NS.lift(counter.update(ctr + i))
 
 
-config: Config = Config.cons(
+settings_spec_config: Config = Config.cons(
     name='plug',
     rpc=List(
         rpc.write(check),
@@ -29,4 +31,4 @@ config: Config = Config.cons(
     internal_component=False,
 )
 
-__all__ = ('config',)
+__all__ = ('settings_spec_config',)

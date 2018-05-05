@@ -8,12 +8,11 @@ from amino.lenses.lens import lens
 
 from ribosome.test.integration.run import RequestHelper
 from ribosome.config.config import Config, NoData
-from ribosome.request.handler.handler import rpc
 from ribosome.compute.api import prog
 from ribosome.config.component import Component, ComponentData
 from ribosome.nvim.io.state import NS
 from ribosome.config.resources import Resources
-from ribosome.compute.prog import Prog
+from ribosome.rpc.api import rpc
 
 
 class CoreData(Dat['CoreData']):

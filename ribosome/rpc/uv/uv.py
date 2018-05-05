@@ -13,10 +13,9 @@ from amino.case import Case
 
 from ribosome.rpc.comm import RpcComm, OnMessage, OnError
 from ribosome.rpc.error import RpcReadErrorUnknown, RpcProcessExit
-from ribosome.rpc.start import start_plugin_sync, init_comm, cannnot_execute_request
+from ribosome.rpc.start import start_plugin_sync, init_comm, cannot_execute_request
 from ribosome.config.config import Config
-from ribosome.rpc.api import RiboNvimApi
-from ribosome import ribo_log
+from ribosome.rpc.nvim_api import RiboNvimApi
 
 log = module_log()
 
@@ -295,7 +294,7 @@ embed_nvim_cmdline = List('nvim', '-n', '-u', 'NONE', '--embed')
 @do(IO[RiboNvimApi])
 def start_uv_embed_nvim_sync(name: str, extra: List[str]) -> Do:
     uv, rpc_comm = cons_uv(lambda loop: uv_embed(loop, embed_nvim_cmdline + extra))
-    comm = yield init_comm(rpc_comm, cannnot_execute_request)
+    comm = yield init_comm(rpc_comm, cannot_execute_request)
     return RiboNvimApi(name, comm)
 
 

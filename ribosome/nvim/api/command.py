@@ -10,6 +10,7 @@ A = TypeVar('A')
 
 
 def nvim_command(cmd: str, *args: Any, verbose: bool=False, sync: bool=False) -> NvimIO[None]:
+    verbose = True
     arg_string = ' '.join(map(str, args))
     arg_suffix = '' if len(args) == 0 else f' {arg_string}'
     silent = '' if verbose else 'silent! '

@@ -5,18 +5,18 @@ from amino.case import Case
 from amino.util.string import camelcase
 from amino.logging import module_log
 
-from ribosome.request.handler.handler import RpcProgram, RpcOptions
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.rpc import channel_id
-from ribosome.nvim.io.api import N
-from ribosome.request.handler.method import RpcMethod, CommandMethod, FunctionMethod, AutocmdMethod
 from ribosome.nvim.api.command import nvim_command
-from ribosome.request.nargs import Nargs
-from ribosome.request.handler.prefix import PrefixStyle, Plain, Full, Short
+from ribosome.rpc.api import RpcOptions, RpcProgram
+from ribosome.rpc.data.rpc_method import RpcMethod, CommandMethod, FunctionMethod, AutocmdMethod
+from ribosome.rpc.data.prefix_style import PrefixStyle, Plain, Full, Short
+from ribosome.rpc.data.nargs import Nargs
 
 log = module_log()
 
 
+# FIXME do multiple handlers work?
 # @property
 # def distinct_specs(self) -> List[RpcProgram]:
 #     return self.specs.distinct_by(_.rpc_method)
@@ -114,7 +114,7 @@ def define_trigger_tokens(
         rpc_def: RpcDef,
         tokens: DefinitionTokens,
 ) -> List[str]:
-    method = f'{tokens.method_prefix}{rpc_def.prog_name}'
+    method = f'{tokens.method_prefix}{rpc_def.rpc_name}'
     args = tokens.rpc_args.cons(quote(method)).join_comma
     rpc_call = f'{tokens.rpc_function}({rpc_def.config.channel}, {args})'
     rhs = rhs_f(rpc_call)

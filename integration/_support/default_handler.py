@@ -2,23 +2,24 @@ from amino import Either, List, do, Do
 
 from ribosome.config.config import Config, NoData
 from ribosome.compute.api import prog
-from ribosome.request.handler.handler import RequestHandler
-from ribosome.request.handler.prefix import Plain
+from ribosome.rpc.api import rpc
 from ribosome.nvim.io.state import NS
+from ribosome.rpc.data.prefix_style import Plain
 
 class_name = 'ZeeKlass'
 
 
-@prog.result
-def test_path() -> NS[NoData, str]:
-    return NS.pure(Either.import_name('pkg', class_name).map(lambda a: a.__name__).value_or('failed'))
+@prog
+@do(NS[NoData, str])
+def test_path() -> Do:
+    yield NS.pure(Either.import_name('pkg', class_name).map(lambda a: a.__name__).value_or('failed'))
 
 
-config: Config = Config.cons(
+default_handler_spec_config: Config = Config.cons(
     'plug',
-    request_handlers=List(
-        RequestHandler.trans_function(test_path)(prefix=Plain(), sync=True),
+    rpc=List(
+        rpc.write(test_path).conf(prefix=Plain(), sync=True),
     )
 )
 
-__all__ = ('config',)
+__all__ = ('default_handler_spec_config',)

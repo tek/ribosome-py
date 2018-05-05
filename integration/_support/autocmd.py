@@ -1,12 +1,12 @@
-from amino import Map, List
+from amino import Map, List, Just
 
 from ribosome.compute.api import prog
 from ribosome.config.component import Component
-from ribosome.request.handler.prefix import Plain
-from ribosome.request.handler.handler import rpc
+from ribosome.rpc.api import rpc
 from ribosome.config.config import Config, NoData
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.io.state import NS
+from ribosome.rpc.data.prefix_style import Plain
 
 val = 71
 

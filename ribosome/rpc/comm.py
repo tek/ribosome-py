@@ -1,68 +1,20 @@
-from concurrent.futures import Future
 from typing import Any, Callable, TypeVar, Generic, Optional
 from threading import Lock
 
-from amino import Dat, Map, List, Either, IO, ADT, do, Do, Try
+from amino import Dat, List, Either, IO, do, Do, Try
 from amino.logging import module_log
 
-from ribosome.rpc.error import RpcReadError
 from ribosome.nvim.io.api import N
 from ribosome.nvim.io.state import NS
 from ribosome.nvim.io.compute import NvimIO, lift_n_result
 from ribosome.nvim.io.data import NResult
+from ribosome.rpc.concurrency import RpcConcurrency, OnMessage, OnError
+from ribosome.rpc.data.rpc import Rpc
 
 A = TypeVar('A')
 B = TypeVar('B')
 log = module_log()
-
-
-class RpcType(ADT['RpcType']):
-    pass
-
-
-class BlockingRpc(RpcType):
-
-    def __init__(self, id: int) -> None:
-        self.id = id
-
-
-class NonblockingRpc(RpcType):
-    pass
-
-
-class Rpc(Dat['Rpc']):
-
-    @staticmethod
-    def nonblocking(method: str, args: List[Any]) -> 'Rpc':
-        return Rpc(method, args, NonblockingRpc())
-
-    def __init__(self, method: str, args: List[Any], tpe: RpcType) -> None:
-        self.method = method
-        self.args = args
-        self.tpe = tpe
-
-    @property
-    def sync(self) -> bool:
-        return isinstance(self.tpe, BlockingRpc)
-
-
 Exec = Callable[[Rpc], Either[str, Any]]
-
-
-class Requests(Dat['Requests']):
-
-    @staticmethod
-    def cons(current_id: int=0, to_vim: Map[int, Future]=Map(), from_vim: Map[int, Future]=Map()) -> 'Requests':
-        return Requests(current_id, to_vim, from_vim)
-
-    def __init__(self, current_id: int, to_vim: Map[int, Future], from_vim: Map[int, Future]) -> None:
-        self.current_id = current_id
-        self.to_vim = to_vim
-        self.from_vim = from_vim
-
-
-OnMessage = Callable[[bytes], IO[None]]
-OnError = Callable[[RpcReadError], IO[None]]
 
 
 # FIXME send/exit should be IO
@@ -81,29 +33,6 @@ class RpcComm(Dat['RpcComm']):
         self.join = join
         self.send = send
         self.exit = exit
-
-
-class RpcConcurrency(Dat['RpcConcurrency']):
-
-    @staticmethod
-    def cons(
-            requests: Requests=None,
-            lock: Lock=None,
-    ) -> 'RpcConcurrency':
-        return RpcConcurrency(
-            requests or Requests.cons(),
-            lock or Lock(),
-        )
-
-    def exclusive(self, f: Callable[..., IO[A]], *a: Any, **kw: Any) -> IO[A]:
-        def wrap() -> IO[A]:
-            with self.lock:
-                return IO.from_either(f(*a, **kw).attempt)
-        return IO.suspend(wrap)
-
-    def __init__(self, requests: Requests, lock: Lock) -> None:
-        self.requests = requests
-        self.lock = lock
 
 
 class Comm(Dat['Comm']):
@@ -181,4 +110,4 @@ def exclusive_ns(guard: StateGuard[A], desc: str, thunk: Callable[..., NS[A, B]]
     yield N.pure(response)
 
 
-__all__ = ('Comm', 'Rpc', 'Requests', 'OnMessage', 'OnError', 'RpcComm', 'RpcConcurrency', 'StateGuard')
+__all__ = ('Comm', 'OnError', 'RpcComm', 'StateGuard')

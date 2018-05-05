@@ -50,9 +50,9 @@ class ReceiveUnknown(Receive):
 
 
 @do(Either[str, Receive])
-def receive_error(id: int, el3: Any) -> Do:
-    yield Right(el3) if isinstance(el3, list) else Left(f'error payload not a list: {el3}')
-    error = yield Lists.wrap(el3).lift(1).to_either_f(lambda: f'too few elements for error payload: {el3}')
+def receive_error(id: int, payload: Any) -> Do:
+    data = yield Right(payload) if isinstance(payload, list) else Left(f'error payload not a list: {payload}')
+    error = yield Lists.wrap(data).lift(1).to_either_f(lambda: f'too few elements for error payload: {data}')
     return ReceiveError(id, error)
 
 

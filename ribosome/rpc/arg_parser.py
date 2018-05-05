@@ -4,8 +4,7 @@ from typing import Any, Tuple
 from amino import List, Either, Right, Map
 from amino.json.decoder import decode_json_type
 
-from ribosome.request.args import ParamsSpec
-from ribosome import ribo_log
+from ribosome.rpc.args import ParamsSpec
 
 
 def starts_with_brace(data: Any) -> bool:

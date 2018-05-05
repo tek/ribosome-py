@@ -1,7 +1,7 @@
 from typing import TypeVar, Type, Callable, Any
 from types import ModuleType
 
-from amino import Either, _, L, amino_log, Logger, __, Path, Nil, Just, IO, List, do, Do
+from amino import Either, _, L, amino_log, __, Path, Nil, Just, IO, List, do, Do
 
 from amino.either import ImportFailure
 from amino.logging import amino_root_file_logging
@@ -10,8 +10,6 @@ from amino.json import decode_json
 from amino.util.exception import format_exception
 
 from ribosome.config.config import Config
-from ribosome.rpc.neovim import connect_nvim, run_session
-from ribosome import ribo_log
 from ribosome.rpc.uv.uv import start_uv_plugin_sync
 
 D = TypeVar('D')
@@ -19,12 +17,6 @@ DIO = TypeVar('DIO')
 B = TypeVar('B')
 CC = TypeVar('CC')
 R = TypeVar('R')
-
-
-def run_loop_session(config: Config) -> int:
-    amino_log.debug(f'starting plugin from {config.basic}')
-    vim = connect_nvim(config.basic.name)
-    return run_session(vim.session, config).unsafe(vim)
 
 
 def report_runtime_error(result: Any) -> int:
@@ -67,7 +59,6 @@ def exception(e: Exception, desc: str) -> int:
 
 
 def start_module_config(mod: ModuleType) -> int:
-    # return config_from_module(mod).cata(error, run_loop_session)
     return config_from_module(mod).cata(error, run_loop_uv)
 
 

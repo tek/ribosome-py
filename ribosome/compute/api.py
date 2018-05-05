@@ -1,14 +1,13 @@
-from typing import Callable, TypeVar, Tuple
+from typing import Callable, TypeVar, Tuple, Any
 
 from amino import Either, do, Do, _, IO, List
 
-from ribosome.compute.tpe import analyse_prog_tpe, prog_type
+from ribosome.compute.tpe import prog_type
 from ribosome.compute.wrap import prog_wrappers
 from ribosome.compute.output import (ProgOutput, ProgOutputUnit, ProgOutputResult, ProgOutputIO,
                                      ProgScalarIO, ProgGatherIOs, ProgScalarSubprocess, ProgGatherSubprocesses, Echo,
                                      ProgIOEcho)
 from ribosome.nvim.io.state import NS
-from ribosome.request.args import ParamsSpec
 from ribosome.compute.wrap_data import ProgWrappers
 from ribosome.config.basic_config import NoData
 from ribosome.compute.ribosome import Ribosome
@@ -16,6 +15,9 @@ from ribosome.compute.tpe_data import ribo_state_prog
 from ribosome.compute.prog import Prog
 from ribosome.compute.program import Program, ProgramBlock, ProgramCompose
 from ribosome.process import Subprocess
+from ribosome.rpc.args import ParamsSpec
+from ribosome.rpc.api import RpcProgram
+from ribosome.rpc.arg_parser import ArgParser, JsonArgParser, TokenArgParser
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -26,6 +28,15 @@ R = TypeVar('R')
 CC = TypeVar('CC')
 C = TypeVar('C')
 PIO = TypeVar('PIO')
+
+
+def arg_parser(rpc_program: RpcProgram, params_spec: ParamsSpec) -> ArgParser:
+    tpe = JsonArgParser if rpc_program.options.json else TokenArgParser
+    return tpe(params_spec)
+
+
+def parse_args(rpc_program: RpcProgram, args: List[Any]) -> NS[D, List[Any]]:
+    return arg_parser(rpc_program, rpc_program.program.params_spec).parse(args)
 
 
 def prog_type_error(func: Callable[[P], NS[R, A]], error: str) -> None:

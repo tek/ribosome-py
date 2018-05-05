@@ -28,7 +28,7 @@ from ribosome.compute.interpret import GatherIOs, GatherSubprocesses
 from ribosome.process import Subprocess, SubprocessResult
 from ribosome.compute.output import Echo
 from ribosome.test.klk.matchers.nresult import nsuccess, nerror
-from ribosome.request.handler.handler import rpc
+from ribosome.rpc.api import rpc
 
 A = TypeVar('A')
 

@@ -3,9 +3,9 @@ from typing import Any
 from ribosome.config.component import Component
 
 from amino import Map, Lists
-from ribosome.request.handler.handler import RpcProgram, rpc
 from ribosome.config.config import Config
 from ribosome.compute.program import Program
+from ribosome.rpc.api import RpcProgram, rpc
 
 
 default_config_name = 'spec'

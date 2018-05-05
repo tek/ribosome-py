@@ -4,8 +4,8 @@ from kallikrein import k, Expectation
 from kallikrein.matchers import equal
 from kallikrein.matchers.maybe import be_just
 
-from ribosome.request.args import ArgValidator, ParamsSpec
-from ribosome.request.nargs import NargsZero, NargsOne, NargsPlus
+from ribosome.rpc.args import ParamsSpec, ArgValidator
+from ribosome.rpc.data.nargs import NargsZero, NargsOne, NargsPlus
 
 
 def check_args(fun: Callable, name: str=None) -> None:

@@ -1,13 +1,8 @@
-import abc
-
-from amino.dat import ADT
+from amino import ADT
 
 
 class RpcMethod(ADT['RpcMethod']):
-
-    @abc.abstractproperty
-    def method(self) -> str:
-        ...
+    pass
 
 
 class CommandMethod(RpcMethod):
@@ -18,10 +13,6 @@ class CommandMethod(RpcMethod):
 
     def __init__(self, bang: bool) -> None:
         self.bang = bang
-
-    @property
-    def method(self) -> str:
-        return 'command'
 
 
 class FunctionMethod(RpcMethod):
@@ -39,10 +30,6 @@ class AutocmdMethod(RpcMethod):
 
     def __init__(self, pattern: str) -> None:
         self.pattern = pattern
-
-    @property
-    def method(self) -> str:
-        return 'autocmd'
 
 
 __all__ = ('RpcMethod', 'CommandMethod', 'FunctionMethod', 'AutocmdMethod',)

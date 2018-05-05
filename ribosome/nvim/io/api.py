@@ -1,3 +1,4 @@
+import time
 from typing import TypeVar, Callable, Any, Type
 
 from msgpack import ExtType
@@ -105,6 +106,9 @@ class NMeta(type):
     def to_io(self, fa: NvimIO[A], api: NvimApi) -> Do:
         result = yield IO.delay(fa.run_a, api)
         yield IO.from_either(result.to_either)
+
+    def sleep(self, duration: float) -> NvimIO[None]:
+        return N.delay(lambda v: time.sleep(duration))
 
 
 class N(metaclass=NMeta):

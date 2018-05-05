@@ -7,18 +7,18 @@ from amino.logging import module_log
 from ribosome.rpc.comm import Comm, Rpc, RpcComm, StateGuard
 from ribosome.config.config import Config
 from ribosome.rpc.handle_receive import rpc_receive
-from ribosome.rpc.handle import rpc_error, rpc_handler
 from ribosome.components.internal.update import init_rpc_plugin
-from ribosome.rpc.api import RiboNvimApi
 from ribosome.rpc.state import cons_state
 from ribosome.nvim.io.compute import NvimIO, NvimIOSuspend
 from ribosome.nvim.io.api import N
 from ribosome.nvim.api.variable import variable_set_prefixed
 from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PS
-from ribosome.rpc.execute import execute_rpc
-from ribosome import ribo_log
 from ribosome.logging import nvim_logging
+from ribosome.rpc.to_vim import rpc_error
+from ribosome.rpc.to_plugin import rpc_handler
+from ribosome.rpc.from_vim import execute_rpc_from_vim
+from ribosome.rpc.nvim_api import RiboNvimApi
 
 A = TypeVar('A')
 log = module_log()
@@ -49,7 +49,8 @@ def init_comm(rpc_comm: RpcComm, execute_request: Callable[[Comm, Rpc], IO[None]
 
 def plugin_execute_receive_request(guard: StateGuard[A]) -> Callable[[Comm, Rpc], IO[None]]:
     def execute(comm: Comm, rpc: Rpc) -> IO[None]:
-        return execute_rpc(rpc, comm, comm.request_handler(guard))(rpc.tpe)
+        return IO.fork_io(execute_rpc_from_vim(rpc, comm, comm.request_handler(guard)), rpc.tpe)
+        # return execute_rpc_from_vim(rpc, comm, comm.request_handler(guard))(rpc.tpe)
     return execute
 
 
@@ -80,18 +81,15 @@ def start_plugin_sync(config: Config, rpc_comm: RpcComm) -> Do:
     yield comm.rpc.join()
 
 
-def start_embed() -> None:
-    pass
-
-
-def cannnot_execute_request(comm: Comm, rpc: Rpc, sync: bool) -> IO[None]:
-    return IO.failed(f'cannot execute request in external nvim')
+def cannot_execute_request(comm: Comm, rpc: Rpc) -> IO[None]:
+    return IO.failed(f'cannot execute request in external nvim: {rpc}')
 
 
 @do(IO[RiboNvimApi])
 def start_external(name: str, rpc_comm: RpcComm) -> Do:
-    comm = yield init_comm(rpc_comm, cannnot_execute_request)
+    comm = yield init_comm(rpc_comm, cannot_execute_request)
     return RiboNvimApi(name, comm)
 
 
-__all__ = ('start_comm', 'stop_comm')
+__all__ = ('start_comm', 'stop_comm', 'init_plugin', 'init_comm', 'plugin_execute_receive_request', 'setup_comm',
+           'start_plugin', 'start_plugin_sync', 'cannot_execute_request', 'start_external',)

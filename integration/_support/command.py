@@ -1,19 +1,19 @@
-from amino import Map, List
+from amino import Map, List, Just, do, Do
 
 from ribosome.compute.api import prog
 from ribosome.config.component import Component
-from ribosome.request.handler.handler import rpc
+from ribosome.rpc.api import rpc
 from ribosome.config.config import Config, NoData
-from ribosome.nvim.api.variable import variable_set
+from ribosome.nvim.api.variable import variable_set, variable_raw
 from ribosome.nvim.io.state import NS
-from ribosome import ribo_log
 
 val = 71
 
 
 @prog.unit
-def trans1() -> NS[NoData, None]:
-    return NS.lift(variable_set('command_success', val))
+@do(NS[NoData, None])
+def trans1() -> Do:
+    yield NS.lift(variable_set('command_success', val))
 
 
 core: Component = Component.cons('core')

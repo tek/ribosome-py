@@ -18,7 +18,7 @@ from ribosome.nvim.api.ui import buffer_content, buffers, windows, current_buffe
 from ribosome.nvim.api.data import Window, Buffer
 from ribosome.config.config import NoData
 from ribosome.test.integration.embed import TestConfig
-from ribosome.test.integration.external import external_test, request
+from ribosome.test.integration.external import request, external_state_test
 from ribosome.data.plugin_state import PS
 
 
@@ -56,7 +56,7 @@ class ScratchSpec(SpecBase):
     '''
 
     def launch(self) -> Expectation:
-        return external_test(test_config, launch_spec)
+        return external_state_test(test_config, launch_spec)
 
 
 __all__ = ('ScratchSpec',)

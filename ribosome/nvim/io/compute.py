@@ -7,11 +7,13 @@ from amino.func import tailrec
 from amino.do import do
 from amino.dat import ADT, ADTMeta
 from amino.case import Case, CaseRec, Term, RecStep
+from amino.logging import module_log
 
 from ribosome.nvim.api.data import NvimApi
 from ribosome.nvim.io.trace import NvimIOException
 from ribosome.nvim.io.data import NFatal, NResult, NSuccess, NError, Thunk, eval_thunk
 
+log = module_log()
 A = TypeVar('A')
 B = TypeVar('B')
 C = TypeVar('C')

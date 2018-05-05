@@ -1,31 +1,38 @@
 from kallikrein import Expectation
 
-from ribosome.test.integration.klk import AutoPluginIntegrationKlkSpec
-from ribosome.config.config import NoData
+from amino import do, Do
+from amino.test.spec import SpecBase
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.api.exists import command_once_defined
+from ribosome.test.klk.matchers.variable import var_must_become
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.test.integration.embed import TestConfig, plugin_test
+
+from integration._support.settings import settings_spec_config
 
 
-class SettingsSpec(AutoPluginIntegrationKlkSpec[NoData]):
+@do(NvimIO[Expectation])
+def settings_spec() -> Do:
+    yield command_once_defined('PlugCheck')
+    yield var_must_become('counter', 21)
+
+
+@do(NvimIO[None])
+def pre() -> Do:
+    yield variable_set('counter', 7)
+    yield variable_set('inc', 14)
+
+
+test_config = TestConfig.cons(settings_spec_config, pre=pre)
+
+
+class SettingsSpec(SpecBase):
     '''
     update a setting $update
     '''
 
-    def plugin_name(self) -> str:
-        return 'plug'
-
-    def module(self) -> str:
-        return 'integration._support.settings'
-
-    def _pre_start(self) -> None:
-        super()._pre_start()
-        variable_set('counter', 7).unsafe(self.vim)
-        variable_set('inc', 14).unsafe(self.vim)
-
     def update(self) -> Expectation:
-        command_once_defined('PlugCheck').unsafe(self.vim)
-        self._wait(.5)
-        return self.var_becomes('counter', 21)
+        return plugin_test(test_config, settings_spec)
 
 
 __all__ = ('SettingsSpec',)

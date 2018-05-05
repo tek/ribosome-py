@@ -1,7 +1,5 @@
 from typing import Callable, Any, Union, List as TList
 
-import neovim
-
 from amino import List, Map, L, __, _
 from amino.util.string import snake_case
 

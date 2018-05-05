@@ -3,20 +3,18 @@ from typing import Any
 from kallikrein import Expectation, k, pending
 
 from amino.test.spec import SpecBase
-from amino import Lists, List, _, IO, __, do, Do, Just
+from amino import Lists, List, _, IO, __, do, Do
 from amino.boolean import true
-from amino.dat import Dat, ADT
-from amino.json.decoder import decode_json_type
+from amino.dat import Dat
 
 from ribosome.compute.api import prog
 from ribosome.data.plugin_state import PluginState
-from ribosome.request.handler.handler import rpc
 from ribosome.nvim.io.state import NS
 from ribosome.test.integration.run import RequestHelper
 from ribosome.config.config import Config
-from ribosome.request.execute import execute_request
 from ribosome.nvim.io.api import N
-from ribosome.request.handler.prefix import Plain
+from ribosome.rpc.api import rpc
+from ribosome.rpc.data.prefix_style import Plain
 
 specimen = Lists.random_string()
 
@@ -97,7 +95,6 @@ class DispatchSpec(SpecBase):
     modify the state data $data
     json command args $json
     run an autocmd $autocmd
-    error $error
     '''
 
     def trans_free(self) -> Expectation:
@@ -131,11 +128,6 @@ class DispatchSpec(SpecBase):
         helper = RequestHelper.strict(config)
         state = helper.unsafe_run_s('vim_enter')
         return k(state.data.counter) == 19
-
-    def error(self) -> Expectation:
-        helper = RequestHelper.strict(config)
-        result = execute_request(helper.vim, helper.holder, 'error', (), True)
-        return k(result) == 1
 
 
 __all__ = ('DispatchSpec',)

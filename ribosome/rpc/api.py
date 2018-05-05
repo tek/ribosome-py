@@ -1,33 +1,79 @@
-from typing import Any, Tuple
+from typing import Any, TypeVar, Callable, Generic
 
-from amino import List, do, Either, Do, Left
-from amino.logging import module_log
+from amino import List, Dat, Maybe
 
-from ribosome import NvimApi
-from ribosome.rpc.comm import Comm, Rpc
-from ribosome.rpc.handle import send_request, send_notification
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.compute.program import Program
+from ribosome.rpc.data.prefix_style import PrefixStyle, Short
+from ribosome.rpc.data.rpc_method import RpcMethod, CommandMethod, FunctionMethod, AutocmdMethod
 
-log = module_log()
-request_timeout = 10.
+A = TypeVar('A')
+default_methods = List(FunctionMethod(), CommandMethod.cons())
 
 
-# FIXME remove request_timeout
-class RiboNvimApi(NvimApi):
+class RpcOptions(Dat['RpcOptions']):
 
-    def __init__(self, name: str, comm: Comm) -> None:
+    @staticmethod
+    def cons(
+            name: str=None,
+            methods: List[RpcMethod]=default_methods,
+            prefix: PrefixStyle=Short(),
+            json: bool=False,
+            write: bool=True,
+    ) -> 'RpcOptions':
+        return RpcOptions(Maybe.optional(name), methods, prefix, json, write)
+
+
+    def __init__(
+            self,
+            name: Maybe[str],
+            methods: List[RpcMethod],
+            prefix: PrefixStyle,
+            json: bool,
+            write: bool,
+    ) -> None:
         self.name = name
-        self.comm = comm
-
-    @do(Either[str, Tuple[NvimApi, Any]])
-    def request(self, method: str, args: List[Any], sync: bool) -> Do:
-        sender = send_request if sync else send_notification
-        rpc_desc = 'request' if sync else 'notification'
-        try:
-            log.debug(f'api: {rpc_desc} `{method}({args.join_tokens})`')
-            comm, result = yield sender(Rpc.nonblocking(method, args), request_timeout).run(self.comm)
-            return self.copy(comm=comm), result
-        except Exception as e:
-            yield Left(f'request error: {e}')
+        self.methods = methods
+        self.prefix = prefix
+        self.json = json
+        self.write = write
 
 
-__all__ = ('RiboNvimApi',)
+class RpcProgram(Generic[A], Dat['RpcProgram[A]']):
+
+    @staticmethod
+    def cons(program: Program[A], options: RpcOptions=None) -> 'RpcProgram':
+        return RpcProgram(program, options or RpcOptions.cons())
+
+    def __init__(self, program: Program[A], options: RpcOptions) -> None:
+        self.program = program
+        self.options = options
+
+    def conf(self, **kw: Any) -> 'RpcProgram':
+        return self.set.options(self.options.copy(**kw))
+
+    @property
+    def program_name(self) -> str:
+        return self.program.name
+
+    @property
+    def rpc_name(self) -> str:
+        return self.options.name | self.program_name
+
+
+class RpcApi:
+
+    def simple(self, f: Callable[..., NvimIO[A]]) -> RpcProgram[A]:
+        ...
+
+    def write(self, program: Program[A]) -> RpcProgram[A]:
+        return RpcProgram.cons(program)
+
+    def autocmd(self, program: Program[A]) -> RpcProgram[A]:
+        return RpcProgram.cons(program, RpcOptions.cons(methods=List(AutocmdMethod.cons())))
+
+
+rpc = RpcApi()
+
+
+__all__ = ('RpcOptions', 'RpcProgram', 'rpc',)

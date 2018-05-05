@@ -5,11 +5,12 @@ from uuid import UUID
 from lenses import UnboundLens
 
 from amino.state import EitherState
-from amino import do, Do, __, Either, _, Map, Maybe, Lists, Just, Regex, L, IO, Try
+from amino import do, Do, __, _, Map, Maybe, Lists, Just, Regex, L, IO, Try
 from amino.json import dump_json
 from amino.dat import Dat
 from amino.lenses.lens import lens
 from amino.regex import Match
+from amino.logging import module_log
 
 from ribosome.compute.api import prog
 from ribosome.data.plugin_state import PluginState
@@ -21,11 +22,12 @@ from ribosome.components.internal.update import undef_handlers, def_handlers
 from ribosome.compute.program import Program, bind_nullary_program
 from ribosome.config.settings import run_internal_init
 
+log = module_log()
 D = TypeVar('D')
 CC = TypeVar('CC')
 
 
-@prog.result
+@prog
 @do(NS[ComponentData[PluginState[D, CC], NoData], str])
 def program_log() -> Do:
     yield NS.inspect_either(lambda s: dump_json(s.main.program_log))
@@ -37,13 +39,13 @@ def set_log_level(level: str) -> NS[PluginState[D, CC], None]:
     handler.setLevel(level)
 
 
-@prog.result
+@prog
 @do(EitherState[ComponentData[PluginState[D, CC], NoData], str])
 def state_data() -> Do:
     yield EitherState.inspect_f(lambda s: dump_json(s.main.data))
 
 
-@prog.result
+@prog
 def rpc_handlers() -> NS[PluginState[D, CC], str]:
     return NS.inspect_either(lambda s: dump_json(s.distinct_specs))
 
@@ -114,7 +116,7 @@ def append_python_path(path: str) -> NS[D, None]:
     return NS.from_io(IO.delay(sys.path.append, path))
 
 
-@prog.result
+@prog
 def show_python_path() -> NS[D, Iterable[str]]:
     return NS.pure(sys.path)
 
@@ -147,7 +149,7 @@ class MapOptions(Dat['MapOptions']):
         self.buffer = buffer
 
 
-@prog.result
+@prog
 @do(NS[PluginState[D, CC], Program])
 def mapping_handler(uuid: UUID, keys: str) -> Do:
     yield NS.inspect_either(lambda a: a.active_mappings.lift(uuid).to_either(f'no handler for mapping `{keys}`'))
@@ -160,7 +162,7 @@ def mapping(uuid_s: str, keys: str) -> Do:
     yield handler()
 
 
-@prog.result
+@prog
 @do(NS[PluginState[D, CC], Maybe[Program]])
 def internal_init_trans() -> Do:
     yield NS.inspect(_.init)

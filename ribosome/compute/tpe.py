@@ -5,7 +5,6 @@ from amino.util.tpe import first_type_arg, type_arg
 
 from ribosome.config.resources import Resources
 from ribosome.config.component import ComponentData
-from ribosome.request.args import ParamsSpec
 from ribosome.data.plugin_state import PluginState
 from ribosome.compute.tpe_data import (MainDataProgType, InternalMainDataProgType, PlainMainDataProgType,
                                        ComponentProgType, AffiliationProgType, PlainStateProgType,
@@ -15,6 +14,7 @@ from ribosome.compute.ribosome import Ribosome
 from ribosome.compute.wrap import prog_wrappers
 from ribosome.compute.wrap_data import ProgWrappers
 from ribosome.nvim.io.state import NS
+from ribosome.rpc.args import ParamsSpec
 
 A = TypeVar('A')
 P = TypeVar('P')

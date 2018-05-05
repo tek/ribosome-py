@@ -1,13 +1,15 @@
-from kallikrein import Expectation, k
+from kallikrein import Expectation
 
 from amino import do, Do
 from amino.test.spec import SpecBase
 
-from ribosome.nvim.api.command import nvim_command, nvim_command_output
+from ribosome.nvim.api.command import nvim_command, defined_commands_str, nvim_command_output
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.integration.embed import plugin_test, TestConfig
-from ribosome.nvim.api.variable import variable_set_prefixed
+from ribosome.nvim.api.variable import variable_set_prefixed, variable_set
 from ribosome.test.klk.matchers.variable import var_must_become
+from ribosome.nvim.io.api import N
+from ribosome.nvim.api.function import nvim_call_function
 
 from integration._support.command import command_spec_config, val
 
@@ -19,7 +21,7 @@ def pre() -> Do:
 
 @do(NvimIO[Expectation])
 def command_spec() -> Do:
-    yield nvim_command('PlugTransCmd')
+    yield nvim_call_function('PlugTransCmd')
     yield var_must_become('command_success', val)
 
 

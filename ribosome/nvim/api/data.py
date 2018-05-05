@@ -1,11 +1,9 @@
 import abc
 from typing import Any, Callable, Tuple
 
-from neovim.msgpack_rpc import Session
-
 from msgpack import ExtType
 
-from amino import List, Either, Map, Left, Try, Dat, Nil, do, Do
+from amino import List, Either, Map, Left, Dat, Nil, do, Do
 from amino.logging import module_log
 
 log = module_log()
@@ -19,19 +17,6 @@ class NvimApi(Dat['NvimApi']):
     @abc.abstractmethod
     def request(self, method: str, args: List[Any], sync: bool) -> Either[str, Tuple['NvimApi', Any]]:
         ...
-
-
-class NativeNvimApi(NvimApi):
-
-    def __init__(self, name: str, session: Session) -> None:
-        self.name = name
-        self.session = session
-
-    @do(Either[str, Tuple['NvimApi', Any]])
-    def request(self, method: str, args: List[Any], sync: bool) -> Do:
-        log.debug1(lambda: f'executing nvim request {method}({args.join_comma})')
-        result = yield Try(self.session.request, method, *args, async=not sync)
-        return self, result
 
 
 StrictNvimHandler = Callable[['StrictNvimApi', str, List[Any], bool], Either[List[str], Tuple[NvimApi, Any]]]
@@ -118,4 +103,4 @@ class Buffer(Dat['Buffer']):
         self.data = data
 
 
-__all__ = ('NvimApi', 'NativeNvimApi', 'StrictNvimApi', 'Tabpage', 'Window', 'StrictNvimHandler')
+__all__ = ('NvimApi', 'StrictNvimApi', 'Tabpage', 'Window', 'StrictNvimHandler')

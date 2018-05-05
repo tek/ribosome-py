@@ -7,19 +7,16 @@ from amino.state import EitherState
 from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PluginState
 from ribosome.config.resolve import ComponentResolver
-from ribosome.request.handler.handler import RpcProgram
 from ribosome.config.component import Components
-from ribosome.request.rpc import define_handlers, DefinedHandler
-from ribosome.request.handler.method import RpcMethod
 from ribosome.nvim.api.command import nvim_command
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.config import settings
-from ribosome.rpc.define import define_rpc
-from ribosome import ribo_log
+from ribosome.rpc.define import define_rpc, DefinedHandler
+from ribosome.rpc.api import RpcProgram
+from ribosome.rpc.data.rpc_method import RpcMethod
 
 CC = TypeVar('CC')
 D = TypeVar('D')
-Meth = TypeVar('Meth', bound=RpcMethod)
 P = TypeVar('P')
 
 

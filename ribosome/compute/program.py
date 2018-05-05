@@ -11,8 +11,8 @@ from amino.json.decoders import decode_instance
 from ribosome.compute.wrap_data import ProgWrappers
 from ribosome.compute.output import ProgOutput, ProgOutputResult
 from ribosome.nvim.io.state import NS
-from ribosome.request.args import ParamsSpec
 from ribosome.compute.prog import Prog, ProgBind, ProgExec
+from ribosome.rpc.args import ParamsSpec
 
 A = TypeVar('A')
 B = TypeVar('B')

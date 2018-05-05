@@ -1,5 +1,4 @@
-from amino.dat import ADT
-from amino import Boolean
+from amino import ADT, Boolean
 
 
 class PrefixStyle(ADT['PrefixStyle']):
@@ -26,4 +25,5 @@ class Full(PrefixStyle): pass
 class Plain(PrefixStyle): pass
 
 
-__all__ = ('PrefixStyle', 'Short', 'Full', 'Plain')
+
+__all__ = ('PrefixStyle', 'Short', 'Full', 'Plain',)

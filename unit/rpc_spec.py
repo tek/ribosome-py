@@ -21,13 +21,13 @@ from ribosome.rpc.comm import Comm, RpcComm, StateGuard, exclusive_ns
 from ribosome.config.config import Config
 from ribosome.rpc.strict import StrictRpc
 from ribosome.rpc.start import start_comm, stop_comm, plugin_execute_receive_request
-from ribosome.rpc.handle import rpc_handler
-from ribosome.rpc.api import RiboNvimApi
 from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
-from ribosome.request.handler.handler import rpc
+from ribosome.rpc.api import rpc
 from ribosome.rpc.state import cons_state
 from ribosome.components.internal.update import init_rpc
+from ribosome.rpc.to_plugin import rpc_handler
+from ribosome.rpc.nvim_api import RiboNvimApi
 
 log = module_log()
 A = TypeVar('A')

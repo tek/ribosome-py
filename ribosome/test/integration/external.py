@@ -17,9 +17,10 @@ from ribosome.data.plugin_state import PS
 from ribosome.nvim.io.state import NS
 from ribosome.logging import nvim_logging
 from ribosome.components.internal.update import init_rpc
-from ribosome.request.handler.handler import RpcProgram, RpcArgs
-from ribosome.rpc.handle import run_program
+from ribosome.rpc.api import RpcProgram
 from ribosome.rpc.comm import Comm
+from ribosome.rpc.to_plugin import run_program
+from ribosome.rpc.data.rpc import RpcArgs
 
 
 def program_runner(args: List[Any]) -> Callable[[RpcProgram], NS[PS, Any]]:
@@ -36,10 +37,7 @@ def request(method: str, args: List[Any]) -> Do:
 
 
 @do(NvimIO[PS])
-def init_state(
-        config: TestConfig,
-        components: List[str]=Nil,
-) -> Do:
+def init_state(config: TestConfig, components: List[str]=Nil) -> Do:
     log_handler = yield N.delay(nvim_logging)
     state = cons_state(config.config, config.io_interpreter, config.logger, log_handler=log_handler)
     yield init_rpc(Just(config.components)).run_s(state)
@@ -70,15 +68,16 @@ def run_test(
     yield io().run_a(engine)
 
 
-def external_test(
-        config: TestConfig,
-        io: Callable[[PS], NvimIO[Expectation]],
-) -> Expectation:
+def external_state_test(config: TestConfig, io: Callable[[], NS[PS, Expectation]]) -> Expectation:
     @do(IO[Expectation])
     def run() -> Do:
         nvim = yield setup_test_nvim(config)
         return N.ensure(run_test(config, io), cleanup(nvim.comm)).run_a(nvim.api)
     return k(run().attempt).must(be_right(nsuccess(match_with(lambda a: a))))
+
+
+def external_test(config: TestConfig, io: Callable[[], NvimIO[Expectation]]) -> Expectation:
+    return external_state_test(config, lambda: NS.lift(io()))
 
 
 __all__ = ('external_test',)

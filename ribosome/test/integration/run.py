@@ -7,7 +7,6 @@ from amino.dat import Dat
 from amino.lenses.lens import lens
 from amino.logging import module_log
 
-from ribosome.request.execute import request_job, traverse_programs, run_rpc_pgrogram
 from ribosome.nvim.io.state import NS
 from ribosome.config.config import Config
 from ribosome.config.component import ComponentData
@@ -16,16 +15,17 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.data.plugin_state import PluginState
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.io.api import N
-from ribosome.request.job import RequestJob
 from ribosome.compute.program import Program
 from ribosome.config.resources import Resources
-from ribosome.data.plugin_state_holder import PluginStateHolder
 from ribosome.compute.output import ProgOutput
 from ribosome.compute.prog import Prog
 from ribosome.test.klk.expectable import kn
 from ribosome.nvim.io.data import NResult
 from ribosome.rpc.state import cons_state
 from ribosome.components.internal.update import update_components
+from ribosome.rpc.comm import StateGuard
+from ribosome.rpc.to_plugin import run_programs, run_program
+from ribosome.rpc.data.rpc import RpcArgs
 
 log = module_log()
 A = TypeVar('A')
@@ -178,40 +178,39 @@ class RequestHelper(Generic[D, CC], Dat['RequestHelper[D, CC]']):
         self.state = state
 
     @property
-    def holder(self) -> PluginStateHolder[D]:
-        return PluginStateHolder.strict(self.state)
+    def guard(self) -> StateGuard[D]:
+        return StateGuard.cons(self.state)
 
-    def request_job(self, name: str, args: tuple, sync: bool=True) -> Tuple[RequestJob, List[Program]]:
-        job = request_job(self.holder, name, (args,), sync)
-        return job, job.state.state.program_by_name(job.name).get_or_raise()
+    def resolve_program(self, name: str) -> List[Program]:
+        return self.guard.state.program_by_name(name)
 
-    def traverse_programs(self, name: str, args: tuple=(), sync: bool=True) -> NS[PluginState[D, CC], Any]:
-        job, program = self.request_job(name, args, sync)
-        return traverse_programs(program, Lists.wrap(args))
+    def run_programs(self, name: str, args: tuple=()) -> NS[PluginState[D, CC], Any]:
+        programs = self.guard.state.programs_by_name(name)
+        return run_programs(programs, RpcArgs.cons(Lists.wrap(args)))
 
-    def run(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> NvimIO[Tuple[PluginState, Any]]:
-        job, program = self.request_job(name, args, sync)
+    def run(self, name: str, args=(), warn_error: bool=True) -> NvimIO[Tuple[PluginState, Any]]:
+        program = self.resolve_program(name).get_or_raise()
         def check_error(result: NResult) -> NvimIO[None]:
             if warn_error:
                 log.error(f'NvimIO failed: {result}')
             return N.unit
-        io = run_rpc_pgrogram(program, Lists.wrap(args)).run(self.state)
+        io = run_program(program, RpcArgs.cons(Lists.wrap(args))).run(self.state)
         return N.ensure_failure(io, check_error)
 
-    def run_s(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> NvimIO[PluginState]:
-        return self.run(name, args, sync).map2(lambda s, a: s)
+    def run_s(self, name: str, args=(), warn_error: bool=True) -> NvimIO[PluginState]:
+        return self.run(name, args).map2(lambda s, a: s)
 
-    def run_a(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> NvimIO[Any]:
-        return self.run(name, args, sync).map2(lambda s, a: a)
+    def run_a(self, name: str, args=(), warn_error: bool=True) -> NvimIO[Any]:
+        return self.run(name, args).map2(lambda s, a: a)
 
-    def unsafe_run(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> Tuple[PluginState, Any]:
-        return self.run(name, args=args, sync=sync).unsafe(self.vim)
+    def unsafe_run(self, name: str, args=(), warn_error: bool=True) -> Tuple[PluginState, Any]:
+        return self.run(name, args=args).unsafe(self.vim)
 
-    def unsafe_run_s(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> PluginState:
-        return self.run_s(name, args=args, sync=sync).unsafe(self.vim)
+    def unsafe_run_s(self, name: str, args=(), warn_error: bool=True) -> PluginState:
+        return self.run_s(name, args=args).unsafe(self.vim)
 
-    def unsafe_run_a(self, name: str, args=(), sync: bool=True, warn_error: bool=True) -> Any:
-        return self.run_a(name, args=args, sync=sync).unsafe(self.vim)
+    def unsafe_run_a(self, name: str, args=(), warn_error: bool=True) -> Any:
+        return self.run_a(name, args=args).unsafe(self.vim)
 
     def update_data(self, **kw: Any) -> 'RequestHelper[D, CC]':
         return lens.state.data.modify(__.copy(**kw))(self)
