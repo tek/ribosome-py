@@ -1,36 +1,35 @@
-# import time
-# from datetime import datetime
-# from typing import Callable, Any, Union, TypeVar, Generic
+import time
+from datetime import datetime
+from typing import Callable, Any, Union, TypeVar, Generic
 
-# from amino.test.spec import default_timeout
-# from amino import List
+from amino.test.spec import default_timeout
+from amino import List
 
-# from kallikrein import Expectation, kf
-# from kallikrein.matcher import BoundMatcher
-# from kallikrein.matchers.length import have_length
-# from kallikrein.matchers.comparison import greater
-# from kallikrein.matchers import contain, equal
-# from kallikrein.matchers.lines import have_lines
-# from kallikrein.matchers.maybe import be_just
-# from kallikrein.matchers.either import be_right
+from kallikrein import Expectation, kf
+from kallikrein.matcher import BoundMatcher
+from kallikrein.matchers.length import have_length
+from kallikrein.matchers.comparison import greater
+from kallikrein.matchers import contain, equal
+from kallikrein.matchers.lines import have_lines
+from kallikrein.matchers.maybe import be_just
+from kallikrein.matchers.either import be_right
 
-# from ribosome.test.integration.spec import VimIntegrationSpecI, VimIntegrationSpec, AutoPluginIntegrationSpec
-# from ribosome.test.klk.expectable import kn
-# from ribosome.nvim.api.variable import variable_prefixed_raw, variable_raw
-# from ribosome.nvim.api.exists import command_exists
-
-
-# def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> Expectation:
-#     to = default_timeout if timeout is None else timeout
-#     start = datetime.now()
-#     while (not exp().unsafe_eval and (datetime.now() - start).total_seconds() < to):
-#         time.sleep(intval)
-#     exp().fatal_eval()
-#     return exp()
+from ribosome.test.klk.expectable import kn
+from ribosome.nvim.api.variable import variable_prefixed_raw, variable_raw
+from ribosome.nvim.api.exists import command_exists
 
 
-# def later(exp: Expectation, timeout: float=None, intval: float=0.1) -> Expectation:
-#     return later_f(lambda: exp, timeout, intval)
+def later_f(exp: Callable[[], Expectation], timeout: float=None, intval: float=0.1) -> Expectation:
+    to = default_timeout if timeout is None else timeout
+    start = datetime.now()
+    while (not exp().unsafe_eval and (datetime.now() - start).total_seconds() < to):
+        time.sleep(intval)
+    exp().fatal_eval()
+    return exp()
+
+
+def later(exp: Expectation, timeout: float=None, intval: float=0.1) -> Expectation:
+    return later_f(lambda: exp, timeout, intval)
 
 
 # class VimIntegrationKlkHelpers(VimIntegrationSpecI):
@@ -112,17 +111,3 @@
 
 #     def command_exists_not(self, name: str, **kw: Any) -> Expectation:
 #         return later(kn(self.vim, command_exists, name).must(contain(False)), **kw)
-
-
-# class VimIntegrationKlkSpec(VimIntegrationSpec, VimIntegrationKlkHelpers):
-#     pass
-
-
-# D = TypeVar('D')
-
-
-# class AutoPluginIntegrationKlkSpec(Generic[D], AutoPluginIntegrationSpec[D], VimIntegrationKlkHelpers):
-#     pass
-
-
-# __all__ = ('VimIntegrationKlkHelpers', 'VimIntegrationKlkSpec', 'AutoPluginIntegrationKlkSpec')
