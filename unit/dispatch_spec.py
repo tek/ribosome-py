@@ -15,6 +15,8 @@ from ribosome.config.config import Config
 from ribosome.nvim.io.api import N
 from ribosome.rpc.api import rpc
 from ribosome.rpc.data.prefix_style import Plain
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.test.integration.external import request
 
 specimen = Lists.random_string()
 
@@ -86,6 +88,12 @@ config: Config[HsData, Any] = Config.cons(
 )
 
 
+def json_spec() -> NvimIO[Expectation]:
+    js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
+    result = request('trans_json', List(7, 'one', *Lists.split(js, ' ')))
+    k(result) == 9
+
+
 # TODO test free trans function with invalid arg count
 class DispatchSpec(SpecBase):
     '''
@@ -119,10 +127,7 @@ class DispatchSpec(SpecBase):
         return k(state.data.counter) == 23
 
     def json(self) -> Expectation:
-        helper = RequestHelper.strict(config)
-        js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
-        result = helper.unsafe_run_a('trans_json', args=(7, 'one', *Lists.split(js, ' ')))
-        return k(result) == 9
+        return unit_test(json_spec)
 
     def autocmd(self) -> Expectation:
         helper = RequestHelper.strict(config)
