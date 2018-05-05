@@ -21,6 +21,7 @@ from ribosome.config.basic_config import NoData
 from ribosome.components.internal.update import undef_handlers, def_handlers
 from ribosome.compute.program import Program, bind_nullary_program
 from ribosome.config.settings import run_internal_init
+from ribosome.compute.ribosome_api import Ribo
 
 log = module_log()
 D = TypeVar('D')
@@ -168,14 +169,14 @@ def internal_init_trans() -> Do:
     yield NS.inspect(_.init)
 
 
-# FIXME need special helper to lift setting to prog (or NvimIO)
 @prog.do
 def internal_init() -> Do:
-    # enabled = yield prog(NS.lift(run_internal_init.value_or_default))
+    enabled = yield Ribo.setting_prog(run_internal_init)
     if enabled:
         handler = yield internal_init_trans()
         yield handler / bind_nullary_program | Prog.unit
 
 
 __all__ = ('internal_init', 'mapping', 'MapOptions', 'enable_components', 'show_python_path', 'append_python_path',
-           'poll', 'program_log', 'set_log_level', 'state_data', 'rpc_handlers', 'update_state', 'update_component_state')
+           'poll', 'program_log', 'set_log_level', 'state_data', 'rpc_handlers', 'update_state',
+           'update_component_state')

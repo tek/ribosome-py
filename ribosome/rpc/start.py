@@ -1,6 +1,6 @@
 from typing import Callable, TypeVar, Tuple
 
-from amino import IO, do, Do
+from amino import IO, do, Do, Nil
 from amino.state import State
 from amino.logging import module_log
 
@@ -19,6 +19,8 @@ from ribosome.rpc.to_vim import rpc_error
 from ribosome.rpc.to_plugin import rpc_handler
 from ribosome.rpc.from_vim import execute_rpc_from_vim
 from ribosome.rpc.nvim_api import RiboNvimApi
+from ribosome.components.internal.prog import internal_init
+from ribosome.compute.run import run_prog
 
 A = TypeVar('A')
 log = module_log()
@@ -36,7 +38,7 @@ def stop_comm(comm: Comm) -> IO[None]:
 def init_plugin() -> Do:
     yield NS.delay(nvim_logging)
     yield init_rpc_plugin()
-    # yield N.from_io(IO.delay(session._enqueue_notification, 'function:internal_init', ()))
+    yield run_prog(internal_init, Nil)
     yield NS.lift(variable_set_prefixed('started', True))
 
 
