@@ -1,8 +1,6 @@
-from typing import Callable
+from typing import Callable, Any
 
-from kallikrein import Expectation, k
-from kallikrein.matchers.match_with import match_with
-from kallikrein.matchers.either import be_right
+from kallikrein import Expectation
 
 from amino import do, Do, IO, List, Lists
 from amino.json import dump_json
@@ -15,14 +13,11 @@ from ribosome.nvim.api.function import define_function, nvim_call_function
 from ribosome.nvim.api.rpc import nvim_quit
 from ribosome.nvim.api.variable import pvar_becomes
 from ribosome.nvim.io.data import NResult
-from ribosome.test.klk.matchers.nresult import nsuccess
 from ribosome.test.config import TestConfig
 from ribosome.test.integration.rpc import setup_test_nvim
-
+from ribosome.test.run import run_test_io
 
 log = module_log()
-
-
 stderr_handler_name = 'RibosomeSpecStderr'
 stderr_handler_body = '''
 let err = substitute(join(a:data, '\\r'), '"', '\\"', 'g')
@@ -55,21 +50,18 @@ def cleanup(config: TestConfig) -> Callable[[NResult], NvimIO[None]]:
     return cleanup
 
 
-def plugin_test(
-        config: TestConfig,
-        io: Callable[..., NvimIO[Expectation]],
-) -> Expectation:
+def plugin_test(config: TestConfig, io: Callable[..., NvimIO[Expectation]], *a: Any, **kw: Any) -> Expectation:
     @do(NvimIO[None])
     def run_nvim_io() -> Do:
         yield config.pre()
         yield start_plugin(config)
         yield pvar_becomes('started', True)
-        yield io()
+        yield io(*a, **kw)
     @do(IO[Expectation])
     def run() -> Do:
         nvim = yield setup_test_nvim(config)
         return N.ensure(run_nvim_io(), cleanup(config)).run_a(nvim.api)
-    return k(run().attempt).must(be_right(nsuccess(match_with(lambda a: a))))
+    return run_test_io(run)
 
 
-__all__ = ('TestConfig', 'TestNvim')
+__all__ = ('plugin_test',)

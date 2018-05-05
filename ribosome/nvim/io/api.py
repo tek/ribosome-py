@@ -1,5 +1,5 @@
 import time
-from typing import TypeVar, Callable, Any, Type
+from typing import TypeVar, Callable, Any, Type, Tuple
 
 from msgpack import ExtType
 
@@ -102,10 +102,21 @@ class NMeta(type):
     def ensure_failure(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]]) -> NvimIO[A]:
         return nvimio_ensure(fa, f, Boolean.is_a((NError, NFatal)))
 
-    @do(IO[A])
+    @do(IO[Tuple[NvimApi, A]])
     def to_io(self, fa: NvimIO[A], api: NvimApi) -> Do:
-        result = yield IO.delay(fa.run_a, api)
-        yield IO.from_either(result.to_either)
+        api1, result = yield IO.delay(fa.run, api)
+        result_strict = yield IO.from_either(result.to_either)
+        return api1, result_strict
+
+    @do(IO[NvimApi])
+    def to_io_s(self, fa: NvimIO[A], api: NvimApi) -> Do:
+        api1, result = yield N.to_io(fa, api)
+        return api1
+
+    @do(IO[A])
+    def to_io_a(self, fa: NvimIO[A], api: NvimApi) -> Do:
+        api1, result = yield N.to_io(fa, api)
+        return result
 
     def sleep(self, duration: float) -> NvimIO[None]:
         return N.delay(lambda v: time.sleep(duration))

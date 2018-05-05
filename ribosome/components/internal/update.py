@@ -1,6 +1,6 @@
 from typing import TypeVar
 
-from amino import do, Do, _, __, List, Either, Map, Maybe
+from amino import do, Do, _, __, List, Either, Maybe
 from amino.lenses.lens import lens
 from amino.state import EitherState
 
@@ -13,7 +13,6 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.config import settings
 from ribosome.rpc.define import define_rpc, DefinedHandler
 from ribosome.rpc.api import RpcProgram
-from ribosome.rpc.data.rpc_method import RpcMethod
 
 CC = TypeVar('CC')
 D = TypeVar('D')

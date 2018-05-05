@@ -89,7 +89,7 @@ def run_nvim(comm: Comm, config: Config, io: Callable[[], NvimIO[A]]) -> Do:
     execute_request = plugin_execute_receive_request(guard)
     yield start_comm(comm, execute_request)
     api = RiboNvimApi(config.basic.name, comm)
-    yield N.to_io(exclusive_ns(guard, 'init_rpc', init_rpc, Left('')), api)
+    yield N.to_io_a(exclusive_ns(guard, 'init_rpc', init_rpc, Left('')), api)
     s, r = io().run(api)
     yield stop_comm(comm)
     return r

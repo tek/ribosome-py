@@ -27,6 +27,7 @@ class TestConfig(Dat['TestConfig']):
             components: List[str]=Nil,
             io_interpreter: ProgIOInterpreter=None,
             logger: Program[None]=None,
+            vars: Map[str, Any]=Map()
     ) -> 'TestConfig':
         ld = log_dir or temp_dir('log')
         lf = log_file or ld / config.basic.name
@@ -38,6 +39,7 @@ class TestConfig(Dat['TestConfig']):
             components,
             io_interpreter,
             logger,
+            vars,
         )
 
     def __init__(
@@ -49,6 +51,7 @@ class TestConfig(Dat['TestConfig']):
             components: List[str],
             io_interpreter: Optional[ProgIOInterpreter],
             logger: Optional[Program[None]],
+            vars: Map[str, Any],
     ) -> None:
         self.config = config
         self.pre = pre
@@ -57,6 +60,7 @@ class TestConfig(Dat['TestConfig']):
         self.components = components
         self.io_interpreter = io_interpreter
         self.logger = logger
+        self.vars = vars
 
 
 def spec_config(*rpc: RpcProgram) -> Config:
