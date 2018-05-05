@@ -36,7 +36,7 @@ def cons_params_spec(fun: Callable[..., Any]) -> None:
     nargs = Nargs.cons(min, max)
     types = params.traverse(annotations.lift, Maybe) | Nil
     main_rettype, state_type, return_type = analyse_return_type(fun, annotations)
-    return ParamsSpec(nargs, min, max, method, types, main_rettype, state_type, return_type | main_rettype)
+    return ParamsSpec(nargs, min, max, method, types, main_rettype, state_type, return_type | (lambda: main_rettype))
 
 
 class ParamsSpec(Dat['ParamsSpec']):
