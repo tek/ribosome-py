@@ -1,7 +1,7 @@
 import abc
 from typing import Callable, Type, TypeVar, Generic, Any
 
-from amino import List, Either, __, Left, Eval, ADT, Right, Try, Path, Map, Boolean, Lists
+from amino import List, Either, __, Left, Eval, ADT, Right, Try, Path, Map, Lists
 from amino.do import do, Do
 from amino.boolean import false, true
 

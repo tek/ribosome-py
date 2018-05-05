@@ -37,7 +37,7 @@ The entries of this setting can either be names of the builtin components or arb
 custom components.
 '''
 components = list_setting('components', 'names or paths of active components', components_help, True, Right(Nil))
-state_dir = path_setting('ribosome_state_dir', 'state persistence directory', state_dir_help, False),
+state_dir = path_setting('ribosome_state_dir', 'state persistence directory', state_dir_help, False)
 proteome_main_name = str_setting('proteome_main_name', 'project name from protoeome', proteome_name_help, False)
 ribosome_session_name = str_setting('ribosome_session_name', 'project name from user var', session_name_help, False)
 project_state_dir = EvalSetting('project_state_dir', Eval.always(state_dir_with_name))
