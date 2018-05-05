@@ -89,27 +89,23 @@ class prog_subproc:
         return prog_state(func, ProgOutputIO(ProgGatherSubprocesses()))
 
 
-class prog:
+class ProgApi:
 
-    def __new__(self, func: Callable[[P], NS[D, A]]) -> Program[A]:
+    def __call__(self, func: Callable[[P], NS[D, A]]) -> Program[A]:
         return prog_state(func, ProgOutputResult())
 
-    @staticmethod
-    def unit(func: Callable[[P], NS[D, None]]) -> Program[None]:
+    def unit(self, func: Callable[[P], NS[D, None]]) -> Program[None]:
         return prog_state(func, ProgOutputUnit())
 
-    @staticmethod
-    def result(func: Callable[[P], NS[D, A]]) -> Program[A]:
+    def result(self, func: Callable[[P], NS[D, A]]) -> Program[A]:
         return prog_state(func, ProgOutputResult())
 
-    @staticmethod
-    def strict(func: Callable[[P], A]) -> Program[A]:
+    def strict(self, func: Callable[[P], A]) -> Program[A]:
         def wrap(*p: P) -> NS[NoData, A]:
             return NS.pure(func(*p))
         return prog_state(wrap, ProgOutputResult())
 
-    @staticmethod
-    def do(func: Callable[[P], Do]) -> Program:
+    def do(self, func: Callable[[P], Do]) -> Program:
         f = do(Prog[A])(func)
         params_spec = ParamsSpec.from_function(f)
         return Program(func.__name__, ProgramCompose(f), params_spec)
@@ -117,8 +113,7 @@ class prog:
     io = prog_io
     subproc = prog_subproc
 
-    @staticmethod
-    def comp(f: Callable[[P], NS[C, A]]) -> Program[A]:
+    def comp(self, f: Callable[[P], NS[C, A]]) -> Program[A]:
         params_spec, wrappers = func_state_data(f)
         @do(NS[Ribosome[D, CC, C], A])
         def zoomed(*p: P) -> Do:
@@ -126,9 +121,11 @@ class prog:
             yield f(*p).zoom(comp_lens)
         return program_from_data(zoomed, params_spec, wrappers, ProgOutputResult())
 
-    @staticmethod
-    def echo(f: Callable[[P], NS[D, Echo]]) -> Program[None]:
+    def echo(self, f: Callable[[P], NS[D, Echo]]) -> Program[None]:
         return prog_state(f, ProgOutputIO(ProgIOEcho()))
+
+
+prog = ProgApi()
 
 
 __all__ = ('prog',)
