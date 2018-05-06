@@ -34,7 +34,7 @@ def external_state_test(config: TestConfig, io: Callable[..., NS[PS, Expectation
     @do(IO[Expectation])
     def run() -> Do:
         nvim = yield setup_test_nvim(config)
-        return N.ensure(run_test(config, io, *a, **kw), cleanup).run_a(nvim.api)
+        yield N.to_io_a(N.ensure(run_test(config, io, *a, **kw), cleanup), nvim.api)
     return run_test_io(run)
 
 
