@@ -1,6 +1,6 @@
 from typing import Any, Callable
 
-from amino import List, do, Do, Just
+from amino import List, do, Do, Just, Lists
 
 from ribosome.rpc.api import RpcProgram
 from ribosome.nvim.io.state import NS
@@ -22,10 +22,10 @@ def program_runner(args: List[Any]) -> Callable[[RpcProgram], NS[PS, Any]]:
 
 
 @do(NS[PS, Any])
-def request(method: str, args: List[Any]) -> Do:
+def request(method: str, *args: Any) -> Do:
     progs = yield NS.inspect(lambda a: a.programs)
     matches = progs.filter(lambda a: a.program.name == method)
-    yield matches.traverse(program_runner(args), NS)
+    yield matches.traverse(program_runner(Lists.wrap(args)), NS)
 
 
 @do(NvimIO[PS])

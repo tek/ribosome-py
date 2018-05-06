@@ -95,7 +95,7 @@ test_config = TestConfig.cons(config)
 @do(NS[PS, Expectation])
 def json_spec() -> Do:
     js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
-    result = yield request('trans_json', List(7, 'one', *Lists.split(js, ' ')))
+    result = yield request('trans_json', 7, 'one', *Lists.split(js, ' '))
     return k(result) == List(9)
 
 

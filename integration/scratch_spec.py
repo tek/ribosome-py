@@ -45,7 +45,7 @@ def ui_data() -> Do:
 
 @do(NS[PS, Expectation])
 def launch_spec() -> Do:
-    yield request('create_scratch', args=List(lines, '{}'))
+    yield request('create_scratch', lines, '{}')
     data = yield NS.lift(ui_data())
     return k(data).must(tupled(3)((have_length(2), have_length(2), have_lines(lines))))
 

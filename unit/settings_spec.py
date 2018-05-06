@@ -14,7 +14,7 @@ from integration._support.settings import settings_spec_config
 
 @do(NS[None, None])
 def update_setting_spec() -> Do:
-    yield request('check', args=Nil)
+    yield request('check')
     n = yield NS.lift(variable_num('counter'))
     return k(n) == 21
 
