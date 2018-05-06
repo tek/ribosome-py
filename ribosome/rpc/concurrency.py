@@ -59,7 +59,7 @@ def exclusive_unregister_rpc(rc: RpcConcurrency, requests: PendingRpc, rpc: Acti
 
 
 def unregister_rpc(rc: RpcConcurrency, requests: PendingRpc, rpc: ActiveRpc) -> IO[Future]:
-    log.debug(f'unregistering {rpc}')
+    log.debug1(f'unregistering {rpc}')
     return (
         IO.failed(f'invalid request id from vim after execution: {rpc}. active requests: {requests}')
         if rpc.id not in requests else
@@ -76,7 +76,7 @@ def exclusive_register_rpc(rc: RpcConcurrency, requests: PendingRpc, rpc: Active
 
 @do(IO[Future])
 def register_rpc(rc: RpcConcurrency, requests: PendingRpc, rpc: ActiveRpc) -> Do:
-    log.debug(f'registering {rpc}')
+    log.debug1(f'registering {rpc}')
     yield (
         IO.failed(f'duplicate id in request from vim: {rpc}')
         if rpc.id in requests else

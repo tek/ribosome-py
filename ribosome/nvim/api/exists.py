@@ -26,7 +26,7 @@ def wait_until_valid(
         check: Callable[[str], NvimIO[bool]],
         timeout: int=30,
         interval: float=.01,
-        desc='satify condition',
+        desc: str='satify condition',
 ) -> NvimIO[None]:
     return nvimio_repeat_timeout(
         lambda: check(name),

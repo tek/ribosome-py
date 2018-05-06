@@ -51,7 +51,7 @@ def send_rpc(metadata: list, payload: list) -> Do:
 
 
 def initiate_rpc(metadata: list, rpc: Rpc) -> IOState[RpcComm, Any]:
-    log.debug(f'initiate_rpc: {rpc}')
+    log.debug1(f'initiate_rpc: {rpc}')
     return send_rpc(metadata, [rpc.method.encode(), rpc.args])
 
 

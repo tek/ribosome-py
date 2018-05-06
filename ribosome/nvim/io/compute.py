@@ -1,9 +1,8 @@
-from typing import TypeVar, Callable, Generic, Union, Tuple, cast
+from typing import TypeVar, Callable, Generic, Tuple, cast
 
 from amino.tc.base import F, ImplicitsMeta, Implicits
 from amino import Either, List, options, Do, Boolean
 from amino.state import State
-from amino.func import tailrec
 from amino.do import do
 from amino.dat import ADT, ADTMeta
 from amino.case import Case, CaseRec, Term, RecStep
