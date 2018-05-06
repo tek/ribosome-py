@@ -6,7 +6,7 @@ from lenses import UnboundLens  # type: ignore
 from amino import Left, Right
 from amino.lenses.lens import lens
 
-from ribosome.data.plugin_state import PluginState, PS
+from ribosome.data.plugin_state import PluginState
 from ribosome.config.component import ComponentData
 from ribosome.compute.tpe_data import (ProgType, UnknownProgType, StateProgType, AffiliationProgType, RootProgType,
                                        ComponentProgType, MainDataProgType, PlainMainDataProgType,
@@ -22,6 +22,7 @@ M = TypeVar('M')
 R = TypeVar('R')
 CC = TypeVar('CC')
 C = TypeVar('C')
+PS = PluginState[D, CC]  # type: ignore
 
 
 class zoom_main_data(
