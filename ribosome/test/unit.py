@@ -11,14 +11,16 @@ from ribosome.test.run import run_test_io
 from ribosome.nvim.io.api import N
 from ribosome.test.prog import init_test_state
 from ribosome.test.integration.run import StrictRequestHandler
+from ribosome.nvim.io.state import NS
+from ribosome.data.plugin_state import PS
 
 
 def setup_strict_test_nvim(config: TestConfig) -> StrictNvimApi:
     handler = StrictRequestHandler(config.request_handler, config.function_handler, config.command_handler)
-    return StrictNvimApi.cons('unit', vars=config.vars, request_handler=handler)
+    return StrictNvimApi.cons(config.config.basic.name, vars=config.vars, request_handler=handler)
 
 
-def unit_test(config: TestConfig, io: Callable[[], NvimIO[Expectation]]) -> Expectation:
+def unit_test(config: TestConfig, io: Callable[[], NS[PS, Expectation]]) -> Expectation:
     initial_nvim = setup_strict_test_nvim(config)
     @do(NvimIO[Expectation])
     def run() -> Do:
