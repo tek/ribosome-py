@@ -33,13 +33,15 @@ class Setting(Generic[B], ADT['Setting[B]']):
         current = yield self.value
         yield current.cata(lambda e: self.update(fallback), lambda a: N.unit)
 
-    @property
-    def value_or_default(self) -> NvimIO[B]:
-        @do(NvimIO[B])
-        def run() -> Do:
-            value = yield self.value
-            yield N.from_either(value.o(self.default_e))
-        return run()
+    @do(NvimIO[Either[str, B]])
+    def value_or_default(self) -> Do:
+        value = yield self.value
+        return value.o(self.default_e)
+
+    @do(NvimIO[B])
+    def value_or_default_fatal(self) -> Do:
+        value = yield self.value_or_default()
+        yield N.from_either(value)
 
 
 class StrictSetting(Generic[A, B], Setting[B]):
@@ -110,12 +112,15 @@ class EvalSetting(Generic[B], Setting[B]):
 
 
 SettingCtor = Callable[[str, str, str, bool, Either[str, B]], Setting[B]]
-no_default: Either[str, Any] = Left('no default specified')
+
+
+def no_default(name: str) -> Either[str, A]:
+    return Left(f'no default specified for setting `{name}`')
 
 
 def setting_ctor(tpe: Type[A], ctor: Callable[[A], Either[str, B]]) -> SettingCtor:
-    def setting(name: str, desc: str, help: str, prefix: bool, default: Either[str, B]=no_default) -> Setting[B]:
-        return StrictSetting(name, desc, help, prefix, tpe, ctor, default)
+    def setting(name: str, desc: str, help: str, prefix: bool, default: Either[str, B]=None) -> Setting[B]:
+        return StrictSetting(name, desc, help, prefix, tpe, ctor, default or no_default(name))
     return setting
 
 

@@ -29,8 +29,12 @@ class RMeta(GenericMeta):
 class Ribo(metaclass=RMeta):
 
     @classmethod
-    def setting(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], A]:
-        return NS.lift(setting.value_or_default)
+    def setting(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], Either[str, A]]:
+        return NS.lift(setting.value_or_default())
+
+    @classmethod
+    def setting_fatal(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], A]:
+        return NS.lift(setting.value_or_default_fatal())
 
     @classmethod
     def setting_raw(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], Either[str, A]]:

@@ -19,7 +19,7 @@ def project_name_from_path() -> Do:
 @do(NvimIO[Either[str, Path]])
 def state_dir_with_name() -> Do:
     plugin = yield plugin_name()
-    base = yield state_dir.value_or_default
+    base = yield state_dir.value_or_default_fatal()
     pro_name = yield proteome_main_name.value
     sess_name = yield ribosome_session_name.value
     path = pro_name.o(sess_name).o(project_name_from_path) / (lambda a: base / plugin / a)
@@ -36,8 +36,10 @@ They can define nvim request handlers with the decorator `@prog`.
 The entries of this setting can either be names of the builtin components or arbitrary python module paths that define
 custom components.
 '''
+
 components = list_setting('components', 'names or paths of active components', components_help, True, Right(Nil))
-state_dir = path_setting('ribosome_state_dir', 'state persistence directory', state_dir_help, False)
+state_dir = path_setting('ribosome_state_dir', 'state persistence directory', state_dir_help, False,
+                         Right(state_dir_base_default))
 proteome_main_name = str_setting('proteome_main_name', 'project name from protoeome', proteome_name_help, False)
 ribosome_session_name = str_setting('ribosome_session_name', 'project name from user var', session_name_help, False)
 project_state_dir = EvalSetting('project_state_dir', Eval.always(state_dir_with_name))
