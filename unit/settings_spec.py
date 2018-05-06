@@ -2,14 +2,15 @@ from kallikrein import Expectation, k
 
 from ribosome.nvim.api.variable import variable_set, variable_num
 
-from amino import do, Do, Nil
+from amino import do, Do
 from amino.test.spec import SpecBase
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.test.integration.external import request, external_state_test
+from ribosome.test.integration.external import external_state_test
 from ribosome.test.integration.embed import TestConfig
 from ribosome.nvim.io.state import NS
+from ribosome.test.prog import request
 
-from integration._support.settings import settings_spec_config
+from test.settings import settings_spec_config
 
 
 @do(NS[None, None])

@@ -2,13 +2,14 @@ from kallikrein import Expectation
 
 from amino import do, Do
 from amino.test.spec import SpecBase
+
 from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.api.exists import command_once_defined
 from ribosome.test.klk.matchers.variable import var_must_become
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.integration.embed import TestConfig, plugin_test
 
-from integration._support.settings import settings_spec_config
+from test.settings import settings_spec_config
 
 
 @do(NvimIO[Expectation])

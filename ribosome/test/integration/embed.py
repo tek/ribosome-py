@@ -60,7 +60,7 @@ def plugin_test(config: TestConfig, io: Callable[..., NvimIO[Expectation]], *a: 
     @do(IO[Expectation])
     def run() -> Do:
         nvim = yield setup_test_nvim(config)
-        return N.ensure(run_nvim_io(), cleanup(config)).run_a(nvim.api)
+        yield N.to_io_a(N.ensure(run_nvim_io(), cleanup(config)), nvim.api)
     return run_test_io(run)
 
 

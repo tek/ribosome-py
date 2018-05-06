@@ -26,9 +26,7 @@ from ribosome.components.internal.update import update_components
 from ribosome.rpc.comm import StateGuard
 from ribosome.rpc.to_plugin import run_programs, run_program
 from ribosome.rpc.data.rpc import RpcArgs
-from ribosome.test.request import Handler, StrictRequestHandler
-
-from myo.config.component import no_handler
+from ribosome.test.request import Handler, StrictRequestHandler, no_handler
 
 log = module_log()
 A = TypeVar('A')

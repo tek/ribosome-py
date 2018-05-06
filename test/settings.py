@@ -18,8 +18,8 @@ inc = int_setting('inc', 'inc', '', False)
 @prog.unit
 @do(NS[Ribosome[NoData, NoComponentData, NoData], None])
 def check() -> Do:
-    ctr = yield Ribo.setting(counter)
-    i = yield Ribo.setting(inc)
+    ctr = yield Ribo.setting_fatal(counter)
+    i = yield Ribo.setting_fatal(inc)
     yield NS.lift(counter.update(ctr + i))
 
 

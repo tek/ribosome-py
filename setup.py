@@ -11,7 +11,7 @@ setup(
     author_email='torstenschmits@gmail.com',
     license='MIT',
     url='https://github.com/tek/ribosome',
-    packages=find_packages(exclude=['unit', 'unit.*']),
+    packages=find_packages(exclude=['unit', 'unit.*', 'integration', 'integration.*', 'test', 'test.*']),
     install_requires=[
         'amino==13.0.0a24',
         'pyuv~=1.4.0',
@@ -19,7 +19,7 @@ setup(
     ],
     tests_require=[
         'chiasma~=0.1.0.a13',
-        'kallikrein~=0.22.0a',
+        'kallikrein~=0.22.0a15',
     ],
     entry_points={
         'console_scripts': [
