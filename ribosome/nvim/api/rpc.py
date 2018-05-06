@@ -1,11 +1,13 @@
 from typing import Tuple, Any
 
 from amino import _, Either, Map, Left, Right, do, Do
+from amino.state import State
 
-from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.compute import NvimIO, NvimIOSuspend, NvimIOPure
 from ribosome.nvim.io.api import N
 from ribosome.nvim.api.function import nvim_call_function
 from ribosome.nvim.api.command import nvim_command
+from ribosome import NvimApi
 
 
 def plugin_name() -> NvimIO[str]:
@@ -48,4 +50,8 @@ def nvim_quit() -> NvimIO[None]:
     return nvim_command('quit!')
 
 
-__all__ = ('plugin_name', 'api_info', 'channel_id', 'rpcrequest', 'rpcrequest_current', 'nvim_quit')
+def nvim_api() -> NvimIO[NvimApi]:
+    return NvimIOSuspend.cons(State.get().map(NvimIOPure))
+
+
+__all__ = ('plugin_name', 'api_info', 'channel_id', 'rpcrequest', 'rpcrequest_current', 'nvim_quit', 'nvim_api',)
