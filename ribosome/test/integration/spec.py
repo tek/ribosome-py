@@ -54,15 +54,6 @@
 #         ...
 
 
-# def format_json_cmd(args: List[str], data: dict) -> str:
-#     j = json.dumps(data)
-#     return f'{args.join_tokens} {j}'
-
-
-# def json_cmd(cmd: str, *args: str, **data: str) -> NvimIO[str]:
-#     return nvim_command(cmd, format_json_cmd(Lists.wrap(args), data), verbose=True)
-
-
 # class VimIntegrationSpec(VimIntegrationSpecI, IntegrationSpecBase, Logging):
 
 #     def __init__(self) -> None:
