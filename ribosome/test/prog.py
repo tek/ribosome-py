@@ -21,11 +21,19 @@ def program_runner(args: List[Any]) -> Callable[[RpcProgram], NS[PS, Any]]:
     return runner
 
 
+def no_matching_program(method: str) -> NS[PS, Any]:
+    return NS.lift(N.error(f'no matching program for {method}'))
+
+
 @do(NS[PS, Any])
 def request(method: str, *args: Any) -> Do:
     progs = yield NS.inspect(lambda a: a.programs)
-    matches = progs.filter(lambda a: a.program.name == method)
-    yield matches.traverse(program_runner(Lists.wrap(args)), NS)
+    matches = progs.filter(lambda a: a.rpc_name == method)
+    yield (
+        no_matching_program(method)
+        if matches.empty else
+        matches.traverse(program_runner(Lists.wrap(args)), NS)
+    )
 
 
 @do(NvimIO[PS])
