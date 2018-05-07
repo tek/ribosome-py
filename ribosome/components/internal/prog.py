@@ -150,22 +150,27 @@ class MapOptions(Dat['MapOptions']):
         self.buffer = buffer
 
 
+def mapping_data(uuid: UUID, keys: str) -> NS[PluginState[D, CC], Program]:
+    return NS.inspect_either(lambda a: a.active_mappings.lift(uuid).to_either(f'no program for mapping `{keys}`'))
+
+
 @prog
 @do(NS[PluginState[D, CC], Program])
-def mapping_handler(uuid: UUID, keys: str) -> Do:
-    yield NS.inspect_either(lambda a: a.active_mappings.lift(uuid).to_either(f'no handler for mapping `{keys}`'))
+def mapping_program(uuid: UUID, keys: str) -> Do:
+    mapping, program = yield mapping_data(uuid, keys)
+    return program
 
 
 @prog.do
 def mapping(uuid_s: str, keys: str) -> Do:
     uuid = yield Prog.from_either(Try(UUID, hex=uuid_s))
-    handler = yield mapping_handler(uuid, keys)
-    yield handler()
+    program = yield mapping_program(uuid, keys)
+    yield program()
 
 
 @prog
 @do(NS[PluginState[D, CC], Maybe[Program]])
-def internal_init_trans() -> Do:
+def internal_init_program() -> Do:
     yield NS.inspect(_.init)
 
 
@@ -173,8 +178,8 @@ def internal_init_trans() -> Do:
 def internal_init() -> Do:
     enabled = yield Ribo.setting_prog(run_internal_init)
     if enabled:
-        handler = yield internal_init_trans()
-        yield handler / bind_nullary_program | Prog.unit
+        program = yield internal_init_program()
+        yield program / bind_nullary_program | Prog.unit
 
 
 __all__ = ('internal_init', 'mapping', 'MapOptions', 'enable_components', 'show_python_path', 'append_python_path',

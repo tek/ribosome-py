@@ -1,7 +1,8 @@
 import abc
 from uuid import uuid4, UUID
+from typing import Tuple
 
-from amino import Dat, Map, Boolean, ADT, List, Maybe
+from amino import Dat, Map, Boolean, ADT, List, Maybe, Lists
 from amino.boolean import false
 
 from ribosome.compute.program import Program
@@ -88,14 +89,14 @@ class Mapping(Dat['Mapping']):
 class Mappings(Dat['Mappings']):
 
     @staticmethod
-    def cons(mappings: Map[Mapping, Program]=Map()) -> 'Mappings':
-        return Mappings(mappings)
+    def cons(*mappings: List[Tuple[Mapping, Program]]) -> 'Mappings':
+        return Mappings(Map(Lists.wrap(mappings).map2(lambda m, p: (str(m.uuid), (m, p)))))
 
-    def __init__(self, mappings: Map[Mapping, Program]) -> None:
+    def __init__(self, mappings: Map[str, Tuple[Mapping, Program]]) -> None:
         self.mappings = mappings
 
     def lift(self, mapping: Mapping) -> Maybe[Program]:
-        return self.mappings.lift(mapping)
+        return self.mappings.lift(str(mapping.uuid))
 
 
 __all__ = ('Mapping', 'Mappings')
