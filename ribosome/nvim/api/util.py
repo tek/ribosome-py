@@ -96,7 +96,7 @@ def nvimio_repeat_timeout(
     start = yield N.simple(time.time)
     @do(NvimIO[None])
     def wait_and_recurse() -> Do:
-        yield N.delay(lambda a: time.sleep(interval))
+        yield N.sleep(interval)
         yield recurse()
     @do(NvimIO[None])
     def recurse() -> Do:
