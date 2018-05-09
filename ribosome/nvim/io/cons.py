@@ -24,7 +24,7 @@ def nvimio_recover_error(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) ->
     return NvimIORecover(fa, f, Boolean.is_a(NError))
 
 
-def nvimio_intercept(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
+def nvimio_intercept(fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[B]]) -> NvimIO[B]:
     return NvimIORecover(fa, f, lambda r: true)
 
 

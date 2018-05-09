@@ -102,4 +102,4 @@ def start_json_config(data: str) -> int:
             error(e)
 
 
-__all__ = ('start_host', 'start_module', 'start_file', 'start_json_config')
+__all__ = ('start_module', 'start_file', 'start_json_config')

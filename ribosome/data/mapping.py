@@ -89,7 +89,7 @@ class Mapping(Dat['Mapping']):
 class Mappings(Dat['Mappings']):
 
     @staticmethod
-    def cons(*mappings: List[Tuple[Mapping, Program]]) -> 'Mappings':
+    def cons(*mappings: Tuple[Mapping, Program]) -> 'Mappings':
         return Mappings(Map(Lists.wrap(mappings).map2(lambda m, p: (str(m.uuid), (m, p)))))
 
     def __init__(self, mappings: Map[str, Tuple[Mapping, Program]]) -> None:
