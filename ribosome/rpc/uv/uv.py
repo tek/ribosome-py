@@ -1,11 +1,12 @@
 import sys
 import abc
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Any
 from threading import Thread
+from concurrent.futures import Future
 
 import pyuv
 from pyuv import (Pipe, Loop, Process, StdIO, UV_CREATE_PIPE, UV_READABLE_PIPE, UV_WRITABLE_PIPE,  # type: ignore
-                  UV_PROCESS_WINDOWS_HIDE)
+                  UV_PROCESS_WINDOWS_HIDE, TCP)
 
 from amino import Dat, Try, Either, ADT, IO, List, do, Do, Maybe, Just, Nothing, Path
 from amino.logging import module_log
@@ -91,6 +92,54 @@ class UvEmbedResources(UvResources):
         return Just(self.write)
 
 
+class UvTcpResources(UvResources):
+
+    def __init__(
+            self,
+            tcp: TCP,
+            address: str,
+            port: int,
+    ) -> None:
+        self.tcp = tcp
+        self.address = address
+        self.port = port
+
+    @property
+    def write_sink(self) -> Pipe:
+        return self.tcp
+
+    @property
+    def read_source(self) -> Pipe:
+        return self.tcp
+
+    @property
+    def error_source(self) -> Maybe[Pipe]:
+        return Nothing
+
+
+class UvSocketResources(UvResources):
+
+    def __init__(
+            self,
+            pipe: Pipe,
+            socket: Path,
+    ) -> None:
+        self.pipe = pipe
+        self.socket = socket
+
+    @property
+    def write_sink(self) -> Pipe:
+        return self.pipe
+
+    @property
+    def read_source(self) -> Pipe:
+        return self.pipe
+
+    @property
+    def error_source(self) -> Maybe[Pipe]:
+        return Nothing
+
+
 class UvLoopThread(Dat['UvLoopThread']):
 
     def __init__(self, thread: Maybe[Thread]) -> None:
@@ -156,6 +205,14 @@ def uv_embed(loop: Loop, proc: List[str]) -> UvResources:
     stdout = StdIO(read, flags=UV_CREATE_PIPE + UV_WRITABLE_PIPE)
     stderr = StdIO(error, flags=UV_CREATE_PIPE + UV_WRITABLE_PIPE)
     return UvEmbedResources(write, read, error, stdin, stdout, stderr, proc)
+
+
+def uv_tcp(loop: Loop, address: str, port: int) -> UvResources:
+    return UvTcpResources(TCP(loop), address)
+
+
+def uv_socket(loop: Loop, socket: Path) -> UvResources:
+    return UvSocketResources(Pipe(loop), socket)
 
 
 def on_exit(handle: Pipe, exit_status: int, term_signal: int) -> None:
@@ -241,6 +298,14 @@ def cons_uv_stdio() -> Tuple[Uv, RpcComm]:
     return cons_uv(lambda loop: uv_stdio(loop))
 
 
+def cons_uv_tcp(address: str) -> Tuple[Uv, RpcComm]:
+    return cons_uv(lambda loop: uv_tcp(loop, address))
+
+
+def cons_uv_socket(socket: Path) -> Tuple[Uv, RpcComm]:
+    return cons_uv(lambda loop: uv_socket(loop, socket))
+
+
 class UvConnection(ADT['UvConnection']):
     pass
 
@@ -249,6 +314,11 @@ class UvEmbedConnection(UvConnection):
 
     def __init__(self, proc: Process) -> None:
         self.proc = proc
+
+
+def nvim_connected(handle: Pipe, error: Any) -> None:
+    if error:
+        log.error(f'connecting to nvim: {error}')
 
 
 class connect_uv(Case[UvResources, IO[UvConnection]], alg=UvResources):
@@ -274,6 +344,16 @@ class connect_uv(Case[UvResources, IO[UvConnection]], alg=UvResources):
         )
         yield IO.delay(resources.error.start_read, self.on_read)
         return UvEmbedConnection(proc)
+
+    @do(IO[UvConnection])
+    def tcp(self, resources: UvTcpResources) -> Do:
+        yield IO.delay(resources.tcp.connect, (resources.address, resources.port), nvim_connected)
+        yield IO.delay(resources.tcp.start_read, self.on_read)
+
+    @do(IO[UvConnection])
+    def socket(self, resources: UvSocketResources) -> Do:
+        yield IO.delay(resources.pipe.connect, str(resources.socket), nvim_connected)
+        yield IO.delay(resources.pipe.start_read, self.on_read)
 
 
 class ConnectedUv(Dat['ConnectedUv']):

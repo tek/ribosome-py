@@ -30,8 +30,8 @@ class RpcComm(Dat['RpcComm']):
     ) -> None:
         self.start_processing = start_processing
         self.stop_processing = stop_processing
-        self.join = join
         self.send = send
+        self.join = join
         self.exit = exit
 
 
