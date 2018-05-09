@@ -14,7 +14,7 @@ from ribosome.rpc.data.rpc import Rpc
 A = TypeVar('A')
 B = TypeVar('B')
 log = module_log()
-Exec = Callable[[Rpc], Either[str, Any]]
+Exec = Callable[[str, List[Any]], NvimIO[List[Any]]]
 
 
 # FIXME send/exit should be IO

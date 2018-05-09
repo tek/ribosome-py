@@ -1,9 +1,9 @@
 from concurrent.futures import Future, TimeoutError
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, Union, Tuple
 
 import msgpack
 
-from amino import do, Do, Try, IO, Either, Left, List
+from amino import do, Do, IO, Either, List, ADT
 from amino.state import IOState
 from amino.lenses.lens import lens
 from amino.logging import module_log
@@ -14,9 +14,11 @@ from ribosome.rpc.comm import Comm, RpcComm, RpcConcurrency, Rpc
 from ribosome.nvim.io.data import NResult, NSuccess, NError, NFatal
 from ribosome.rpc.concurrency import register_rpc
 from ribosome.rpc.data.rpc import ActiveRpc
+from ribosome.rpc.response import RpcResponse, RpcSyncError, RpcSyncSuccess
 
 log = module_log()
 A = TypeVar('A')
+ResponseTuple = Union[Tuple[None, str], Tuple[Any, None]]
 
 
 # FIXME loop is not part of comm, but uv
@@ -67,44 +69,6 @@ def wait_for_result(result: Future, timeout: float, rpc: Rpc) -> IO[Any]:
         return IO.from_either(r.lmap(lambda a: f'{rpc} failed: {a}'))
 
 
-def success_result(result: Any) -> List[Any]:
-    return [None, result]
-
-
-def error_result(message: str) -> List[Any]:
-    return [message, None]
-
-
-def ensure_single_result(rpc: Rpc) -> List[Any]:
-    def ensure_single_result(head: Any, tail: List[Any]) -> List[Any]:
-        return (
-            success_result(head)
-            if tail.empty else
-            error_result(f'multiple results for {rpc}')
-        )
-    return ensure_single_result
-
-
-def no_result(rpc: Rpc) -> List[Any]:
-    return error_result(f'no result for {rpc}')
-
-
-class response_payload_to_vim(Case[NResult, List[Any]], alg=NResult):
-
-    def __init__(self, rpc: Rpc) -> None:
-        self.rpc = rpc
-
-    def success(self, result: NSuccess[List[Any]]) -> List[Any]:
-        return result.value.uncons.map2(ensure_single_result(self.rpc)).get_or(no_result, self.rpc)
-
-    def error(self, result: NError[List[Any]]) -> List[Any]:
-        return error_result(result.error)
-
-    def fatal(self, result: NFatal[List[Any]]) -> List[Any]:
-        log.caught_exception_error(f'executing {self.rpc} from vim', result.exception)
-        return error_result('fatal error in {rpc}')
-
-
 @do(IOState[Comm, Either[str, Any]])
 def send_request(rpc: Rpc, timeout: float) -> Do:
     id = yield increment().zoom(lens.concurrency)
@@ -119,10 +83,20 @@ def send_notification(rpc: Rpc, timeout: float) -> Do:
     yield initiate_rpc([2], rpc).zoom(lens.rpc)
 
 
-@do(IOState[Comm, None])
-def send_response(rpc: Rpc, id: int, result: NResult[List[Any]]) -> Do:
-    payload = response_payload_to_vim(rpc)(result)
-    yield send_rpc([1, id], payload).zoom(lens.rpc)
+class handle_response(Case[RpcResponse, IOState[Comm, None]], alg=RpcResponse):
+
+    @do(IOState[Comm, None])
+    def error(self, response: RpcSyncError) -> Do:
+        payload = [response.error, None]
+        yield send_rpc([1, response.request_id], payload).zoom(lens.rpc)
+
+    @do(IOState[Comm, None])
+    def success(self, response: RpcSyncSuccess) -> Do:
+        payload = [None, response.result]
+        yield send_rpc([1, response.request_id], payload).zoom(lens.rpc)
+
+    def case_default(self, response: RpcResponse) -> IOState[Comm, None]:
+        return IOState.unit
 
 
-__all__ = ('send_request', 'send_notification',)
+__all__ = ('send_request', 'send_notification', 'handle_response',)

@@ -48,10 +48,9 @@ def decode_args(args: List[Any]) -> RpcArgs:
     return RpcArgs(fun_args, bang)
 
 
-# FIXME `request_result` is not called with `run_program`
-def rpc_handler(guard: StateGuard[A]) -> Callable[[str, List[Any], bool], NvimIO[List[Any]]]:
+def rpc_handler(guard: StateGuard[A]) -> Callable[[str, List[Any]], NvimIO[List[Any]]]:
     @do(NvimIO[List[Any]])
-    def handler(method: str, raw_args: List[Any], sync: bool) -> Do:
+    def handler(method: str, raw_args: List[Any]) -> Do:
         args = decode_args(raw_args)
         log.debug(f'handling request: {method}({args.args.join_tokens})')
         programs = guard.state.programs_by_name(method)
