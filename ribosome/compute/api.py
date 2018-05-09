@@ -48,14 +48,33 @@ def program_from_data(
         params_spec: ParamsSpec,
         wrappers: ProgWrappers,
         interpreter: ProgOutput[A, B],
+        original_module: str=None,
+        original_name: str=None,
 ) -> Program[A]:
-    return Program(func.__name__, ProgramBlock(func.__name__, func, wrappers, interpreter), params_spec)
+    return Program.cons(
+        func.__name__,
+        ProgramBlock(func.__name__, func, wrappers, interpreter),
+        params_spec,
+        original_module,
+        original_name,
+    )
 
 
-def prog_state(func: Callable[[P], NS[R, A]], interpreter: ProgOutput[A, B]) -> Program:
+def prog_state(
+        func: Callable[[P], NS[R, A]],
+        interpreter: ProgOutput[A, B],
+        original_module: str=None,
+        original_name: str=None,
+) -> Program:
     params_spec = ParamsSpec.from_function(func)
     wrappers = prog_type(func, params_spec).value_or(lambda err: prog_type_error(func, err))
-    return Program(func.__name__, ProgramBlock(func.__name__, func, wrappers, interpreter), params_spec)
+    return Program.cons(
+        func.__name__,
+        ProgramBlock(func.__name__, func, wrappers, interpreter),
+        params_spec,
+        original_module,
+        original_name,
+    )
 
 
 def func_state_data(f: Callable[..., NS[R, A]]) -> Tuple[ParamsSpec, ProgWrappers]:
@@ -103,12 +122,12 @@ class ProgApi:
     def strict(self, func: Callable[[P], A]) -> Program[A]:
         def wrap(*p: P) -> NS[NoData, A]:
             return NS.pure(func(*p))
-        return prog_state(wrap, ProgOutputResult())
+        return prog_state(wrap, ProgOutputResult(), func.__module__, func.__name__)
 
     def do(self, func: Callable[[P], Do]) -> Program:
         f = do(Prog[A])(func)
         params_spec = ParamsSpec.from_function(f)
-        return Program(func.__name__, ProgramCompose(f), params_spec)
+        return Program.cons(func.__name__, ProgramCompose(f), params_spec)
 
     io = prog_io
     subproc = prog_subproc
@@ -119,7 +138,7 @@ class ProgApi:
         def zoomed(*p: P) -> Do:
             comp_lens = yield NS.inspect(_.comp_lens)
             yield f(*p).zoom(comp_lens)
-        return program_from_data(zoomed, params_spec, wrappers, ProgOutputResult())
+        return program_from_data(zoomed, params_spec, wrappers, ProgOutputResult(), f.__module__, f.__name__)
 
     def echo(self, f: Callable[[P], NS[D, Echo]]) -> Program[None]:
         return prog_state(f, ProgOutputIO(ProgIOEcho()))

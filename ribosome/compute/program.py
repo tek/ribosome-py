@@ -1,6 +1,6 @@
 from typing import TypeVar, Generic, Callable, Any, Type
 
-from amino import ADT, Dat, List, Lists, Nil, Either
+from amino import ADT, Dat, List, Lists, Nil, Either, Maybe
 from amino.case import Case
 from amino.json.encoder import Encoder
 from amino.json.data import JsonError, Json
@@ -48,28 +48,68 @@ class ProgramCompose(Generic[A], ProgramCode[A]):
         self.code = code
 
 
-class Program(Generic[A], Dat['Program[A]']):
+class ProgramMetadata(Dat['ProgramMetadata']):
 
     @staticmethod
-    def lift(f: Callable[..., NS[D, A]]) -> 'Program[A]':
-        return Program(
-            f.__name__,
-            ProgramBlock(f.__name__, f, ProgWrappers.id(), ProgOutputResult()),
-            ParamsSpec.from_function(f)
-        )
+    def cons(
+            name: str,
+            params_spec: ParamsSpec,
+            original_module: str=None,
+            original_name: str=None,
+    ) -> 'ProgramMetadata':
+        return ProgramMetadata(name, params_spec, Maybe.optional(original_module), Maybe.optional(original_name))
 
     def __init__(
             self,
             name: str,
-            code: ProgramCode[A],
             params_spec: ParamsSpec,
+            original_module: Maybe[str],
+            original_name: Maybe[str],
     ) -> None:
         self.name = name
-        self.code = code
         self.params_spec = params_spec
+        self.original_module = original_module
+        self.original_name = original_name
+
+
+class Program(Generic[A], Dat['Program[A]']):
+
+    @staticmethod
+    def lift(f: Callable[..., NS[D, A]]) -> 'Program[A]':
+        return Program.cons(
+            f.__name__,
+            ProgramBlock(f.__name__, f, ProgWrappers.id(), ProgOutputResult()),
+            ParamsSpec.from_function(f),
+        )
+
+    @staticmethod
+    def cons(
+            name: str,
+            code: ProgramCode[A],
+            params_spec: ParamsSpec,
+            original_module: str=None,
+            original_name: str=None,
+    ) -> 'Program[A]':
+        return Program(code, ProgramMetadata.cons(name, params_spec, original_module, original_name))
+
+    def __init__(
+            self,
+            code: ProgramCode[A],
+            metadata: ProgramMetadata,
+    ) -> None:
+        self.code = code
+        self.metadata = metadata
 
     def __call__(self, *args: Any) -> Prog[A]:
         return bind_program(self, Lists.wrap(args))
+
+    @property
+    def name(self) -> str:
+        return self.metadata.name
+
+    @property
+    def params_spec(self) -> ParamsSpec:
+        return self.metadata.params_spec
 
 
 class bind_program_code(Generic[A, B, R], Case[ProgramCode[A], Prog[B]], alg=ProgramCode):
@@ -96,10 +136,18 @@ def bind_programs(programs: List[Program[A]], args: List[Any]) -> Prog[B]:
     return programs.traverse(lambda a: bind_program(a, args), Prog)
 
 
+def program_module(prog: Program) -> str:
+    return prog.metadata.original_module | prog.code.code.__module__
+
+
+def program_name(prog: Program) -> str:
+    return prog.metadata.original_name | prog.metadata.name
+
+
 class ProgramEncoder(Encoder[Program], tpe=Program):
 
     def encode(self, prog: Program) -> Either[JsonError, Json]:
-        return encode_instance(prog, Program, prog.code.code.__module__, prog.code.code.__name__)
+        return encode_instance(prog, Program, program_module(prog), [program_name(prog)])
 
 
 class ProgramDecoder(Decoder[Program], tpe=Program):
