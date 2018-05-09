@@ -7,8 +7,9 @@ from amino import Either, Left, Right, List, Lists, Try, do, Maybe, Do, Just, No
 from amino.json import decode_json
 from amino.json.decoder import decode_json_type
 
-from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.compute import NvimIO, lift_n_result
 from ribosome.nvim.io.api import N
+from ribosome.nvim.io.data import NResult, NSuccess
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -112,6 +113,35 @@ def nvimio_repeat_timeout(
     yield recurse()
 
 
+def nvimio_result(thunk: Callable[..., NvimIO[A]], *a: Any, **kw: Any) -> NvimIO[NResult[A]]:
+    return N.intercept(thunk(*a, **kw), N.pure)
+
+
+@do(NvimIO[A])
+def nvimio_await_success(
+        thunk: Callable[..., NvimIO[A]],
+        timeout: float,
+        *a: Any,
+        interval: float=.01,
+        **kw: Any,
+) -> Do:
+    start = yield N.simple(time.time)
+    @do(NvimIO[None])
+    def wait_and_recurse() -> Do:
+        yield N.sleep(interval)
+        yield recurse()
+    @do(NvimIO[None])
+    def recurse() -> Do:
+        result = yield nvimio_result(thunk, *a, **kw)
+        yield (
+            lift_n_result.match(result)
+            if isinstance(result, NSuccess) or time.time() - start > timeout else
+            wait_and_recurse()
+        )
+    yield recurse()
+
+
 __all__ = ('cons_checked_e', 'cons_checked', 'cons_ext', 'cons_checked_list', 'cons_ext_list', 'check_str_list',
            'cons_decode_str', 'cons_decode_str_list', 'extract_int_pair', 'split_option', 'cons_decode_str_list_option',
-           'cons_split_lines', 'cons_decode_bool', 'nvimio_repeat_timeout', 'cons_json', 'cons_json_tpe')
+           'cons_split_lines', 'cons_decode_bool', 'nvimio_repeat_timeout', 'cons_json', 'cons_json_tpe',
+           'nvimio_await_success',)

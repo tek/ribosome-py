@@ -78,7 +78,7 @@ class NMeta(type):
     def write(self, cmd: str, *args: Any, sync: bool=False) -> NvimIO[A]:
         return nvim_request(cmd, *args, sync=sync).replace(None)
 
-    def intercept(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
+    def intercept(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[B]]) -> NvimIO[B]:
         return nvimio_intercept(fa, f)
 
     def recover_error(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
@@ -89,6 +89,9 @@ class NMeta(type):
 
     def recover_failure(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
         return nvimio_recover_failure(fa, f)
+
+    def ignore_failure(self, fa: NvimIO[A]) -> NvimIO[None]:
+        return nvimio_recover_failure(fa, lambda a: N.unit)
 
     def ensure(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[None]]) -> NvimIO[A]:
         return nvimio_ensure(fa, f, lambda a: True)

@@ -11,7 +11,7 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
 from ribosome.nvim.api.function import define_function, nvim_call_function
 from ribosome.nvim.api.rpc import nvim_quit
-from ribosome.nvim.api.variable import pvar_becomes
+from ribosome.nvim.api.variable import pvar_becomes, variable_set_prefixed
 from ribosome.nvim.io.data import NResult
 from ribosome.test.config import TestConfig
 from ribosome.test.integration.rpc import setup_test_nvim
@@ -29,7 +29,7 @@ execute 'python3 amino.amino_log.error(f"""error starting rpc job on channel ' .
 
 
 @do(NvimIO[None])
-def start_plugin(config: TestConfig) -> Do:
+def start_plugin_embed(config: TestConfig) -> Do:
     yield define_function(stderr_handler_name, List('id', 'data', 'event'), stderr_handler_body)
     json = yield N.from_either(dump_json(config.config))
     cmd = f'from ribosome.host import start_json_config; start_json_config({json!r})'
@@ -42,6 +42,7 @@ def cleanup(config: TestConfig) -> Callable[[NResult], NvimIO[None]]:
     @do(NvimIO[None])
     def cleanup(result: NResult) -> Do:
         yield nvim_quit()
+        yield nvim_quit()
         runtime_log = yield N.from_io(IO.delay(config.log_file.read_text))
         if runtime_log:
             log.info(green('plugin output:'))
@@ -53,8 +54,9 @@ def cleanup(config: TestConfig) -> Callable[[NResult], NvimIO[None]]:
 def plugin_test(config: TestConfig, io: Callable[..., NvimIO[Expectation]], *a: Any, **kw: Any) -> Expectation:
     @do(NvimIO[None])
     def run_nvim_io() -> Do:
+        yield variable_set_prefixed('components', config.components)
         yield config.pre()
-        yield start_plugin(config)
+        yield start_plugin_embed(config)
         yield pvar_becomes('started', True)
         yield io(*a, **kw)
     @do(IO[Expectation])

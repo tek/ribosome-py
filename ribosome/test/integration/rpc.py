@@ -1,4 +1,6 @@
-from amino import do, Do, IO, List, Dat
+from typing import Any
+
+from amino import do, Do, IO, List, Dat, Map
 from amino.test import temp_dir
 from amino.test.path import pkg_dir
 from amino.env_vars import set_env
@@ -8,6 +10,8 @@ from ribosome.rpc.uv.uv import cons_uv_embed
 from ribosome.rpc.start import start_external
 from ribosome.rpc.comm import Comm
 from ribosome.test.config import TestConfig
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.api.variable import variable_set
 
 nvim_cmdline = List('nvim', '-n', '-u', 'NONE')
 env_vars = List(
@@ -51,4 +55,8 @@ def setup_test_nvim(config: TestConfig) -> Do:
     return TestNvim(api.comm, api)
 
 
-__all__ = ('TestNvim',)
+def set_nvim_vars(vars: Map[str, Any]) -> NvimIO[None]:
+    return vars.to_list.traverse2(variable_set, NvimIO)
+
+
+__all__ = ('TestNvim', 'setup_test_nvim', 'set_nvim_vars',)

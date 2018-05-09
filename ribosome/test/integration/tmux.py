@@ -1,108 +1,104 @@
+from typing import Callable, Any, Tuple
+import subprocess
+
+from kallikrein import Expectation
+
+from chiasma.tmux import Tmux
+from chiasma.test.tmux_spec import tmux_spec_socket
+from chiasma.io.compute import TmuxIO
+from chiasma.commands.server import kill_server
+from chiasma.test.terminal import start_tmux
+from chiasma.commands.pane import send_keys
+
+from amino import do, Do, IO, Lists, List
+from amino.logging import module_log
+from amino.string.hues import green
+
+from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.api import N
+from ribosome.nvim.api.rpc import nvim_quit
+from ribosome.nvim.api.variable import pvar_becomes, variable_set_prefixed
+from ribosome.nvim.io.data import NResult
+from ribosome.test.config import TestConfig
+from ribosome.test.integration.rpc import setup_test_nvim, nvim_cmdline, env_vars, set_nvim_vars
+from ribosome.test.run import run_test_io
+from ribosome.test.integration.embed import start_plugin_embed
+
+from myo.tmux.io import tmux_to_nvim
+
+log = module_log()
+
+# if 'VIRTUAL_ENV' in env:
+#     send_keys(0, List(f'source $VIRTUAL_ENV/bin/activate')).unsafe(self.tmux)
+# send_keys(0, List(cmd.join_tokens)).unsafe(self.tmux)
+# wait_for(Path(self.nvim_socket).is_socket)
+# self.neovim = neovim.attach('socket', path=self.nvim_socket)
+# self.neovim.command('python3 sys.path.insert(0, \'{}\')'.format(self.python_path))
+# self.vim = self.create_nvim_api(self.neovim)
 
 
-@lazy
-def nvim_socket(self) -> str:
-    return str(temp_dir('nvim_sockets') / List.random_string())
+@do(IO[Tuple[subprocess.Popen, Tmux, Any]])
+def setup_tmux(width: int, height: int) -> Do:
+    proc = yield IO.delay(start_tmux, tmux_spec_socket, width, height, True)
+    tmux = Tmux.cons(tmux_spec_socket)
+    yield IO.sleep(.5)
+    clients_tio = TmuxIO.read('list-clients -F "#{client_name}"')
+    cmd = yield IO.delay(clients_tio.unsafe, tmux)
+    client = yield IO.from_maybe(cmd.head, 'no clients')
+    return proc, tmux, client
 
-@property
-def project_path(self) -> str:
-    return str(base_dir().parent)
 
-def connect_tmux(self, external: bool) -> Any:
-    try:
-        from chiasma.test.tmux_spec import tmux_spec_socket
-        from chiasma.tmux import Tmux
-    except ImportError:
-        raise Exception('install chiasma to run nvim in a tmux pane')
-    else:
-        return Tmux.cons(socket=tmux_spec_socket if external else None)
+@do(IO[None])
+def cleanup_tmux(proc: subprocess.Popen, tmux: Tmux) -> Do:
+    yield IO.delay(proc.kill)
+    yield IO.delay(proc.wait)
+    yield IO.delay(kill_server().result, tmux)
 
-@property
-def tmux_window_external(self) -> Any:
-    self.ribo_tmux = self.connect_tmux(True)
-    from chiasma.io.compute import TmuxIO
-    from chiasma.commands.window import windows
-    @do(TmuxIO)
+
+def tmux_pre(pre: Callable[[], NvimIO[None]], tmux_width: int, tmux_height: int) -> Callable[[], NvimIO[None]]:
+    @do(NvimIO[None])
+    def tmux_pre() -> Do:
+        yield N.from_io(setup_tmux)
+        yield pre()
+    return tmux_pre
+
+
+@do(NvimIO[None])
+def start_plugin(config: TestConfig) -> Do:
+    env_args = env_vars.map2(lambda k, v: f'{k}=\'{v}\'').cons('env')
+    cmd = env_args + nvim_cmdline
+    yield tmux_to_nvim(send_keys(0, List(cmd.join_tokens)))
+    yield start_plugin_embed(config)
+
+
+def cleanup(config: TestConfig, proc: subprocess.Popen, tmux: Tmux) -> Callable[[NResult], NvimIO[None]]:
+    @do(NvimIO[None])
+    def cleanup(result: NResult) -> Do:
+        yield N.ignore_failure(nvim_quit())
+        yield N.ignore_failure(nvim_quit())
+        yield N.ignore_failure(N.from_io(cleanup_tmux(proc, tmux)))
+        runtime_log = yield N.from_io(IO.delay(config.log_file.read_text))
+        if runtime_log:
+            log.info(green('plugin output:'))
+            Lists.lines(runtime_log) % log.info
+            log.info('')
+    return cleanup
+
+
+def tmux_plugin_test(config: TestConfig, io: Callable[..., NvimIO[Expectation]], *a: Any, **kw: Any) -> Expectation:
+    @do(NvimIO[None])
+    def run_nvim_io() -> Do:
+        yield set_nvim_vars(config.vars + ('components', config.components))
+        yield config.pre()
+        yield start_plugin(config)
+        yield pvar_becomes('started', True)
+        yield io(*a, **kw)
+    @do(IO[Expectation])
     def run() -> Do:
-        ws = yield windows()
-        yield TmuxIO.from_maybe(ws.head, 'tmux contains no windows')
-    return run().unsafe(self.ribo_tmux)
-
-@property
-def tmux_window_local(self) -> Any:
-    session = next(s for s in server.sessions if int(s['session_attached']) >= 1)
-    return session.attached_window
-
-@lazy
-def tmux_window(self) -> Any:
-    return self.tmux_window_external if self.tmux_nvim_external else self.tmux_window_local
-
-def start_neovim_tmux_bg(self) -> None:
-    conf = fixture_path('conf', 'tmux.conf')
-    args = ['tmux', '-L', self.tmux_socket, '-f', str(conf)]
-    master, slave = pty.openpty()
-    self.subproc = subprocess.Popen(args, stdout=slave, stdin=slave, stderr=slave)
-    env_args = self.vim_proc_env.map2(lambda k, v: f'{k}={v}').cons('env')
-    cmd = env_args + self.nvim_cmdline
-    from chiasma.commands.pane import send_keys
-    send_keys(0, List(cmd.join_tokens)).unsafe(self.ribo_tmux)
-    wait_for(Path(self.nvim_socket).is_socket)
-
-def start_neovim_tmux_pane(self) -> None:
-    self.ribo_tmux = self.connect_tmux(False)
-    env_args = self.vim_proc_env.map2(lambda k, v: f'{k}={v}').cons('env')
-    cmd = env_args + self.nvim_cmdline
-    pid = os.getpid()
-    from chiasma.io.compute import TmuxIO
-    from chiasma.command import simple_tmux_cmd_attrs
-    from psutil import Process
-    @do(TmuxIO)
-    def run() -> Do:
-        ps = yield simple_tmux_cmd_attrs('list-panes', Nil, List('pane_pid', 'window_id'))
-        def match(pane: Map[str, str]) -> bool:
-            return Lists.wrap(Process(int(pane['pane_pid'])).children(recursive=True)).map(_.pid).contains(pid)
-        current_pane = yield TmuxIO.from_maybe(ps.find(match), 'vim pane not found')
-        window_id = current_pane['window_id']
-        pane = yield simple_tmux_cmd_attrs('split-window', List('-t', window_id, '-d', '-P') + cmd, List('pane_id'))
-        return pane[0]['pane_id'][1:]
-    self.tmux_pane_id = run().unsafe(self.ribo_tmux)
-    wait_for(Path(self.nvim_socket).is_socket)
-    self.neovim = neovim.attach('socket', path=self.nvim_socket)
-    self.neovim.command('python3 sys.path.insert(0, \'{}\')'.format(self.python_path))
-
-def _cleanup_tmux(self) -> None:
-    if self.tmux_pane_id is not None and not self.keep_tmux_pane:
-        from chiasma.commands.pane import close_pane_id
-        close_pane_id(self.tmux_pane_id).unsafe(self.ribo_tmux)
-
-# def create_nvim_api(self, vim: Nvim) -> NvimApi:
-#     return RiboNvimApi(self.plugin_name(), vim._session)
-
-@abc.abstractmethod
-def plugin_name(self) -> str:
-    ...
-
-def plugin_short_name(self) -> str:
-    return self.plugin_name()
-
-def full_cmd_prefix(self) -> str:
-    return camelcase(self.plugin_name())
-
-def short_cmd_prefix(self) -> str:
-    return camelcase(self.plugin_short_name())
-
-def teardown(self) -> None:
-    IntegrationSpecBase.teardown(self)
-    nvim_command('q!').unsafe(self.vim)
-    if self._debug:
-        self._log_out.foreach(self.log.info)
-    if self.tmux_nvim:
-        self._cleanup_tmux()
-    if self.subproc is not None:
-        self.subproc.kill()
-    if self.tmux_nvim_external:
-        from chiasma.io.compute import TmuxIO
-        TmuxIO.write('kill-server').unsafe(self.ribo_tmux)
+        proc, tmux, client = yield setup_tmux(300, 120)
+        nvim = yield setup_test_nvim(config)
+        yield N.to_io_a(N.ensure(run_nvim_io(), cleanup(config, proc, tmux)), nvim.api)
+    return run_test_io(run)
 
 
-__all__ = ()
+__all__ = ('tmux_plugin_test',)
