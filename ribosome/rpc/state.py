@@ -8,12 +8,10 @@ from ribosome.logging import nvim_logging
 from ribosome.data.plugin_state import PluginState
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
-from ribosome.data.plugin_state_holder import PluginStateHolder
 from ribosome.config.component import ComponentConfig
 from ribosome.components.internal.update import init_rpc_plugin
 from ribosome.compute.interpret import ProgIOInterpreter
 from ribosome.compute.program import Program
-from ribosome import ribo_log
 
 D = TypeVar('D')
 CC = TypeVar('CC')
@@ -46,10 +44,4 @@ def init_state_plugin(config: Config, io_interpreter: ProgIOInterpreter=None, lo
     yield init_rpc_plugin().run_s(state)
 
 
-@do(NvimIO[PluginStateHolder])
-def prepare_plugin(config: Config) -> Do:
-    state = yield init_state_plugin(config)
-    return PluginStateHolder.concurrent(state)
-
-
-__all__ = ('cons_state', 'init_state', 'prepare_plugin')
+__all__ = ('cons_state', 'init_state',)
