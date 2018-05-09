@@ -45,6 +45,10 @@ class Ribo(metaclass=RMeta):
         return Ribo.lift(Ribo.setting(setting), None)
 
     @classmethod
+    def setting_prog_fatal(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], A]:
+        return Ribo.lift(Ribo.setting_fatal(setting), None)
+
+    @classmethod
     def comp(self) -> NS[Ribosome[D, CC, C], C]:
         return NS.inspect(lambda a: a.comp_lens.get()(a))
 
