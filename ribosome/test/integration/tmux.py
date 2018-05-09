@@ -10,31 +10,25 @@ from chiasma.commands.server import kill_server
 from chiasma.test.terminal import start_tmux
 from chiasma.commands.pane import send_keys
 
-from amino import do, Do, IO, Lists, List
+from amino import do, Do, IO, Lists, List, Path, env
 from amino.logging import module_log
 from amino.string.hues import green
+from amino.test import temp_dir
+from amino.test.path import base_dir, pkg_dir
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
 from ribosome.nvim.api.rpc import nvim_quit
-from ribosome.nvim.api.variable import pvar_becomes, variable_set_prefixed
+from ribosome.nvim.api.variable import pvar_becomes
 from ribosome.nvim.io.data import NResult
 from ribosome.test.config import TestConfig
-from ribosome.test.integration.rpc import setup_test_nvim, nvim_cmdline, env_vars, set_nvim_vars
+from ribosome.test.integration.rpc import nvim_cmdline, set_nvim_vars, setup_test_nvim_socket, test_env_vars
 from ribosome.test.run import run_test_io
 from ribosome.test.integration.embed import start_plugin_embed
-
-from myo.tmux.io import tmux_to_nvim
+from ribosome.nvim.api.exists import wait_until_valid
+from ribosome import NvimApi
 
 log = module_log()
-
-# if 'VIRTUAL_ENV' in env:
-#     send_keys(0, List(f'source $VIRTUAL_ENV/bin/activate')).unsafe(self.tmux)
-# send_keys(0, List(cmd.join_tokens)).unsafe(self.tmux)
-# wait_for(Path(self.nvim_socket).is_socket)
-# self.neovim = neovim.attach('socket', path=self.nvim_socket)
-# self.neovim.command('python3 sys.path.insert(0, \'{}\')'.format(self.python_path))
-# self.vim = self.create_nvim_api(self.neovim)
 
 
 @do(IO[Tuple[subprocess.Popen, Tmux, Any]])
@@ -55,20 +49,29 @@ def cleanup_tmux(proc: subprocess.Popen, tmux: Tmux) -> Do:
     yield IO.delay(kill_server().result, tmux)
 
 
-def tmux_pre(pre: Callable[[], NvimIO[None]], tmux_width: int, tmux_height: int) -> Callable[[], NvimIO[None]]:
-    @do(NvimIO[None])
-    def tmux_pre() -> Do:
-        yield N.from_io(setup_tmux)
-        yield pre()
-    return tmux_pre
+@do(TmuxIO[None])
+def send_tmux_cmdline(cmdline: str) -> Do:
+    if 'VIRTUAL_ENV' in env:
+        yield send_keys(0, List(f'source $VIRTUAL_ENV/bin/activate'))
+    yield send_keys(0, List(cmdline))
 
 
-@do(NvimIO[None])
-def start_plugin(config: TestConfig) -> Do:
-    env_args = env_vars.map2(lambda k, v: f'{k}=\'{v}\'').cons('env')
+def tmux_env_vars(socket: Path) -> List[Tuple[str, str]]:
+    global_path = env['PYTHONPATH'] | ''
+    project_path = pkg_dir()
+    python_path = f'{project_path}:{global_path}'
+    return List(
+        ('NVIM_LISTEN_ADDRESS', str(socket)),
+        ('PYTHONPATH', python_path),
+    )
+
+@do(IO[NvimApi])
+def setup_test_nvim_tmux(config: TestConfig, socket: Path, tmux: Tmux) -> Do:
+    env_args = (test_env_vars(config) + tmux_env_vars(socket)).map2(lambda k, v: f'{k}=\'{v}\'').cons('env')
     cmd = env_args + nvim_cmdline
-    yield tmux_to_nvim(send_keys(0, List(cmd.join_tokens)))
-    yield start_plugin_embed(config)
+    yield IO.delay(send_tmux_cmdline(cmd.join_tokens).run, tmux)
+    yield N.to_io_a(wait_until_valid('nvim_socket', lambda n: N.pure(socket.is_socket()), 3.), None)
+    yield setup_test_nvim_socket(config, socket)
 
 
 def cleanup(config: TestConfig, proc: subprocess.Popen, tmux: Tmux) -> Callable[[NResult], NvimIO[None]]:
@@ -90,13 +93,15 @@ def tmux_plugin_test(config: TestConfig, io: Callable[..., NvimIO[Expectation]],
     def run_nvim_io() -> Do:
         yield set_nvim_vars(config.vars + ('components', config.components))
         yield config.pre()
-        yield start_plugin(config)
+        yield start_plugin_embed(config)
         yield pvar_becomes('started', True)
         yield io(*a, **kw)
     @do(IO[Expectation])
     def run() -> Do:
+        socket_dir = yield IO.delay(temp_dir, 'sockets', 'nvim')
+        socket = socket_dir / Lists.random_alpha()
         proc, tmux, client = yield setup_tmux(300, 120)
-        nvim = yield setup_test_nvim(config)
+        nvim = yield setup_test_nvim_tmux(config, socket, tmux)
         yield N.to_io_a(N.ensure(run_nvim_io(), cleanup(config, proc, tmux)), nvim.api)
     return run_test_io(run)
 

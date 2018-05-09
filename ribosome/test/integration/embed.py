@@ -14,7 +14,7 @@ from ribosome.nvim.api.rpc import nvim_quit
 from ribosome.nvim.api.variable import pvar_becomes, variable_set_prefixed
 from ribosome.nvim.io.data import NResult
 from ribosome.test.config import TestConfig
-from ribosome.test.integration.rpc import setup_test_nvim
+from ribosome.test.integration.rpc import setup_test_nvim_embed
 from ribosome.test.run import run_test_io
 
 log = module_log()
@@ -61,7 +61,7 @@ def plugin_test(config: TestConfig, io: Callable[..., NvimIO[Expectation]], *a: 
         yield io(*a, **kw)
     @do(IO[Expectation])
     def run() -> Do:
-        nvim = yield setup_test_nvim(config)
+        nvim = yield setup_test_nvim_embed(config)
         yield N.to_io_a(N.ensure(run_nvim_io(), cleanup(config)), nvim.api)
     return run_test_io(run)
 

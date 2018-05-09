@@ -18,7 +18,7 @@ setup(
         'mypy_extensions==0.3.0',
     ],
     tests_require=[
-        'chiasma~=0.1.0.a13',
+        'chiasma~=0.1.0.a20',
         'kallikrein~=0.22.0a15',
     ],
     entry_points={

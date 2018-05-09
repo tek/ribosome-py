@@ -5,7 +5,7 @@ from kallikrein import Expectation
 from amino import do, IO, Do
 
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.test.integration.embed import setup_test_nvim, TestConfig
+from ribosome.test.integration.embed import setup_test_nvim_embed, TestConfig
 from ribosome.nvim.api.rpc import nvim_quit
 from ribosome.nvim.io.api import N
 from ribosome.nvim.io.data import NResult
@@ -33,7 +33,7 @@ def run_test(config: TestConfig, io: Callable[..., NS[PS, Expectation]], *a: Any
 def external_state_test(config: TestConfig, io: Callable[..., NS[PS, Expectation]], *a: Any, **kw: Any) -> Expectation:
     @do(IO[Expectation])
     def run() -> Do:
-        nvim = yield setup_test_nvim(config)
+        nvim = yield setup_test_nvim_embed(config)
         yield N.to_io_a(N.ensure(run_test(config, io, *a, **kw), cleanup), nvim.api)
     return run_test_io(run)
 
