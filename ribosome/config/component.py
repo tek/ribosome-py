@@ -1,6 +1,6 @@
 from typing import TypeVar, Callable, Generic, Any, Type, Union
 
-from amino import List, Either, _, Nil, Maybe, Boolean, __, Map
+from amino import List, Either, _, Nil, Maybe, Boolean, __, Map, do, Do
 from amino.dat import Dat
 
 from ribosome.nvim.io.state import NS
@@ -29,14 +29,14 @@ def comp_data() -> NS[ComponentData[D, CD], CD]:
     return NS.inspect(_.comp)
 
 
-def infer_state_ctor(state_type: Union[None, Type[CD]]) -> Union[None, Callable[[], CD]]:
-    return (
-        None
-        if state_type is None else
-        getattr(state_type, 'cons', state_type)
-    )
+@do(Maybe[Callable[[], CD]])
+def infer_state_ctor(state_type: Union[None, Type[CD]]) -> Do:
+    tpe = yield Maybe.optional(state_type)
+    return getattr(tpe, 'cons', state_type)
 
 
+# FIXME `D` is unnecessary
+# maybe the others as well
 class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
 
     @staticmethod
@@ -52,8 +52,8 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
             name,
             rpc,
             state_type or NoComponentData,
-            state_ctor or infer_state_ctor(state_type) or NoComponentData,
-            Maybe.check(config),
+            Maybe.optional(state_ctor).o(infer_state_ctor(state_type)),
+            Maybe.optional(config),
             mappings or Mappings.cons(),
         )
 
@@ -62,7 +62,7 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
             name: str,
             rpc: List[RpcProgram],
             state_type: Type[CD],
-            state_ctor: Maybe[Callable[[D], CD]],
+            state_ctor: Maybe[Callable[[], CD]],
             config: Maybe[CC],
             mappings: Mappings,
     ) -> None:

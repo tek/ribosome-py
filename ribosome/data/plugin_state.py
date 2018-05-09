@@ -5,6 +5,7 @@ from uuid import UUID
 from amino import Map, List, Nil, Either, _, Maybe, __
 from amino.dat import Dat
 from amino.util.string import camelcase
+from amino.logging import module_log
 
 from ribosome.config.component import Component, Components, NoComponentData, ComponentConfig
 from ribosome.nvim.io.state import NS
@@ -20,8 +21,18 @@ from ribosome.rpc.api import RpcProgram
 A = TypeVar('A')
 C = TypeVar('C')
 CC = TypeVar('CC')
+CD = TypeVar('CD')
 D = TypeVar('D')
 DIO = TypeVar('DIO')
+log = module_log()
+
+
+def component_ctor(comp: Component[D, CD, CC]) -> Callable[[], CD]:
+    return comp.state_ctor.get_or_strict(NoComponentData)
+
+
+def component_ctor_m(comp: Maybe[Component[D, CD, CC]]) -> Callable[[], CD]:
+    return (comp // _.state_ctor).get_or_strict(NoComponentData)
 
 
 # FIXME in order to allow transparent updating of components, the data and config part must be separated
@@ -106,13 +117,13 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
         return self.components.by_name(name)
 
     def ctor_by_type(self, tpe: Type[C]) -> Callable[[], C]:
-        return self.components.by_type(tpe) / _.state_ctor | (lambda: NoComponentData)
+        return component_ctor_m(self.components.by_type(tpe))
 
     def data_by_type(self, tpe: Type[C]) -> C:
         return self.component_data.lift(tpe) | (lambda: self.ctor_by_type(tpe)())
 
     def data_for(self, component: Component) -> Any:
-        return self.component_data.lift(component.state_type) | component.state_ctor
+        return self.component_data.lift(component.state_type).get_or(component_ctor(component))
 
     def data_by_name(self, name: str) -> Either[str, Any]:
         return self.component(name) / self.data_for
