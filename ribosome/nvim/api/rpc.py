@@ -5,7 +5,7 @@ from amino.state import State
 
 from ribosome.nvim.io.compute import NvimIO, NvimIOSuspend, NvimIOPure
 from ribosome.nvim.io.api import N
-from ribosome.nvim.api.function import nvim_call_function
+from ribosome.nvim.api.function import nvim_call_function, nvim_call_tpe
 from ribosome.nvim.api.command import nvim_command
 from ribosome import NvimApi
 
@@ -54,4 +54,9 @@ def nvim_api() -> NvimIO[NvimApi]:
     return NvimIOSuspend.cons(State.get().map(NvimIOPure))
 
 
-__all__ = ('plugin_name', 'api_info', 'channel_id', 'rpcrequest', 'rpcrequest_current', 'nvim_quit', 'nvim_api',)
+def nvim_pid() -> NvimIO[int]:
+    return nvim_call_tpe(int, 'getpid')
+
+
+__all__ = ('plugin_name', 'api_info', 'channel_id', 'rpcrequest', 'rpcrequest_current', 'nvim_quit', 'nvim_api',
+           'nvim_pid',)
