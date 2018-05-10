@@ -7,7 +7,7 @@ from amino.logging import module_log
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.rpc import channel_id
-from ribosome.nvim.api.command import nvim_command
+from ribosome.nvim.api.command import nvim_command, nvim_sync_command
 from ribosome.rpc.api import RpcOptions, RpcProgram
 from ribosome.rpc.data.rpc_method import RpcMethod, CommandMethod, FunctionMethod, AutocmdMethod
 from ribosome.rpc.data.prefix_style import PrefixStyle, Plain, Full, Short
@@ -89,9 +89,9 @@ def autocmd_tokens(pattern: str) -> None:
 
 class rpc_prefix(Case[PrefixStyle, str], alg=PrefixStyle):
 
-    def __init__(self, prefix: str, name: str, method: str) -> None:
-        self.prefix = prefix
+    def __init__(self, name: str, prefix: str, method: str) -> None:
         self.name = name
+        self.prefix = prefix
         self.method = method
 
     def plain(self, style: Plain) -> str:
