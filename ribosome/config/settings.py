@@ -19,7 +19,7 @@ def project_name_from_path() -> Do:
 @do(NvimIO[Either[str, Path]])
 def state_dir_with_name() -> Do:
     plugin = yield plugin_name()
-    base = yield state_dir.value_or_default_fatal()
+    base = yield state_dir.value_or_default()
     pro_name = yield proteome_main_name.value
     sess_name = yield ribosome_session_name.value
     path = pro_name.o(sess_name).o(project_name_from_path) / (lambda a: base / plugin / a)

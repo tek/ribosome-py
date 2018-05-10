@@ -29,24 +29,24 @@ class RMeta(GenericMeta):
 class Ribo(metaclass=RMeta):
 
     @classmethod
-    def setting(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], Either[str, A]]:
-        return NS.lift(setting.value_or_default())
+    def setting_e(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], Either[str, A]]:
+        return NS.lift(setting.value_or_default_e())
 
     @classmethod
-    def setting_fatal(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], A]:
-        return NS.lift(setting.value_or_default_fatal())
+    def setting(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], A]:
+        return NS.lift(setting.value_or_default())
 
     @classmethod
     def setting_raw(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], Either[str, A]]:
         return NS.lift(setting.value)
 
     @classmethod
-    def setting_prog(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], A]:
-        return Ribo.lift(Ribo.setting(setting), None)
+    def setting_prog_e(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], Either[str, A]]:
+        return Ribo.lift(Ribo.setting_e(setting), None)
 
     @classmethod
-    def setting_prog_fatal(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], A]:
-        return Ribo.lift(Ribo.setting_fatal(setting), None)
+    def setting_prog(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], A]:
+        return Ribo.lift(Ribo.setting(setting), None)
 
     @classmethod
     def comp(self) -> NS[Ribosome[D, CC, C], C]:
@@ -69,8 +69,17 @@ class Ribo(metaclass=RMeta):
         return NS.inspect(lambda a: main_lens.get()(a))
 
     @classmethod
+    def inspect_main(self, f: Callable[[D], A]) -> NS[Ribosome[D, CC, C], A]:
+        return NS.inspect(lambda a: f(main_lens.get()(a)))
+
+    @classmethod
     def modify_main(self, f: Callable[[D], D]) -> NS[Ribosome[D, CC, C], None]:
         return NS.modify(lambda a: main_lens.modify(f)(a))
+
+    @classmethod
+    @do(NS[Ribosome[D, CC, C], A])
+    def zoom_main(self, fa: NS[D, A]) -> Do:
+        yield fa.zoom(main_lens)
 
     @classmethod
     @do(NS[Ribosome[D, CC, C], A])

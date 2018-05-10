@@ -34,13 +34,13 @@ class Setting(Generic[B], ADT['Setting[B]']):
         yield current.cata(lambda e: self.update(fallback), lambda a: N.unit)
 
     @do(NvimIO[Either[str, B]])
-    def value_or_default(self) -> Do:
+    def value_or_default_e(self) -> Do:
         value = yield self.value
         return value.o(self.default_e)
 
     @do(NvimIO[B])
-    def value_or_default_fatal(self) -> Do:
-        value = yield self.value_or_default()
+    def value_or_default(self) -> Do:
+        value = yield self.value_or_default_e()
         yield N.from_either(value)
 
 

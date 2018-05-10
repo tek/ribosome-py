@@ -20,7 +20,7 @@ def mkdir(dir: Path) -> IO[None]:
 
 @do(NvimIO[Path])
 def state_file(name: str) -> Do:
-    dir = yield project_state_dir.value_or_default_fatal()
+    dir = yield project_state_dir.value_or_default()
     yield N.from_io(mkdir(dir))
     yield N.pure(dir / f'{name}.json')
 
