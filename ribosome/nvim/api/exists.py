@@ -60,18 +60,18 @@ def wait_for_function_undef(name: str, timeout: int=30) -> NvimIO[None]:
 
 
 def wait_for_command(name: str, timeout: int=30) -> NvimIO[None]:
-    return wait_until_valid(name, command_exists, timeout, 'appear')
+    return wait_until_valid(name, command_exists, timeout=timeout, desc='appear')
 
 
 @do(NvimIO[A])
 def command_once_defined(name: str, *args: str, timeout: int=30, verbose: bool=False) -> Do:
-    yield wait_for_command(name, timeout)
+    yield wait_for_command(name, timeout=timeout)
     yield nvim_command(name, *args, verbose=verbose)
 
 
 @do(NvimIO[A])
 def call_once_defined(name: str, *args: str, timeout: int=10) -> Do:
-    yield wait_for_function(name, timeout)
+    yield wait_for_function(name, timeout=timeout)
     yield nvim_call_function(name, *args)
 
 

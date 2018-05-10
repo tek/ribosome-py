@@ -22,8 +22,8 @@ def nvim_sync_command(cmd: str, *args: Any, verbose: bool=False) -> NvimIO[None]
 
 
 def nvim_command_output(cmd: str, *args: Any) -> NvimIO[None]:
-    arg_string = ' '.join(map(str, args))
-    return N.read_cons('nvim_command_output', cons_split_lines, f'{cmd} {arg_string}')
+    cmdline = ' '.join(map(str, (cmd,) + args))
+    return N.read_cons('nvim_command_output', cons_split_lines, cmdline)
 
 
 def doautocmd(name: str, pattern: str='', verbose: bool=False, sync: bool=False) -> NvimIO[None]:

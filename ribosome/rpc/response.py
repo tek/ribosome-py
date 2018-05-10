@@ -91,7 +91,7 @@ class validate_rpc_result(Case[NResult[List[Any]], RpcResponse], alg=NResult):
 
     def fatal(self, result: NFatal[List[Any]]) -> RpcResponse:
         log.caught_exception_error(f'executing {self.rpc} from vim', result.exception)
-        return error_response('fatal error in {rpc}')(self.rpc.tpe)
+        return error_response(f'fatal error in {self.rpc}')(self.rpc.tpe)
 
 
 class report_error(Case[RpcResponse, IO[None]], alg=RpcResponse):
