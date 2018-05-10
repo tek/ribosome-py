@@ -1,18 +1,17 @@
 from kallikrein import Expectation, k
-from kallikrein.matchers.match_with import match_with
 from kallikrein.matchers import contain
 
-from amino import Dat, List, Nil, __
+from amino import Dat, List, Nil, __, do, Do
 from amino.test.spec import SpecBase
 
 from ribosome.config.config import Config
 from ribosome.compute.output import Echo
 from ribosome.nvim.io.state import NS
 from ribosome.compute.api import prog
-from ribosome.test.integration.run import RequestHelper
-from ribosome.data.plugin_state import PluginState
-from ribosome.config.component import NoComponentData
 from ribosome.rpc.api import rpc
+from ribosome.test.config import TestConfig
+from ribosome.test.prog import request
+from ribosome.test.unit import unit_test
 
 
 class LSData(Dat['LSData']):
@@ -41,7 +40,14 @@ config: Config = Config.cons(
         rpc.write(log_something),
     ),
 )
-helper = RequestHelper.cons(config, logger=logger).strict()
+test_config = TestConfig.cons(config, logger=logger)
+
+
+@do(NS[LSData, Expectation])
+def logger_spec() -> Do:
+    yield request('log_something')
+    log = yield NS.inspect(lambda s: s.data.log)
+    return k(log).must(contain(test_echo))
 
 
 class LoggerSpec(SpecBase):
@@ -50,9 +56,7 @@ class LoggerSpec(SpecBase):
     '''
 
     def logger(self) -> Expectation:
-        def check(state: PluginState[LSData, NoComponentData]) -> Expectation:
-            return k(state.data.log).must(contain(test_echo))
-        return helper.k(helper.run_s, 'log_something').must(contain(match_with(check)))
+        return unit_test(test_config, logger_spec)
 
 
 __all__ = ('LoggerSpec',)

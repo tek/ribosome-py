@@ -10,9 +10,9 @@ from ribosome.nvim.api.data import StrictNvimApi
 from ribosome.test.run import run_test_io
 from ribosome.nvim.io.api import N
 from ribosome.test.prog import init_test_state
-from ribosome.test.integration.run import StrictRequestHandler
 from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PS
+from ribosome.test.request import StrictRequestHandler
 
 
 def setup_strict_test_nvim(config: TestConfig) -> StrictNvimApi:

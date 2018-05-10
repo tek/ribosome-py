@@ -6,13 +6,16 @@ from amino.test.spec import SpecBase
 from amino import List, Map, do, Do, Dat, _
 from amino.lenses.lens import lens
 
-from ribosome.test.integration.run import RequestHelper
 from ribosome.config.config import Config, NoData
 from ribosome.compute.api import prog
 from ribosome.config.component import Component, ComponentData
 from ribosome.nvim.io.state import NS
 from ribosome.config.resources import Resources
 from ribosome.rpc.api import rpc
+from ribosome.test.config import TestConfig
+from ribosome.test.prog import request
+from ribosome.test.integration.embed import plugin_test
+from ribosome.test.unit import unit_test
 
 
 class CoreData(Dat['CoreData']):
@@ -85,6 +88,26 @@ config = Config.cons(
     components=Map(core=core, extra=extra),
     core_components=List('core'),
 )
+test_config = TestConfig.cons(config)
+
+
+@do(NS[CoreData, Expectation])
+def enable_component_spec() -> Do:
+    yield request('enable_components', 'extra')
+    names = yield NS.inspect(lambda s: s.components.all / _.name)
+    return k(names).must(contain('extra'))
+
+
+@do(NS[CoreData, Expectation])
+def switch_spec() -> Do:
+    r = yield request('switch')
+    core_data = yield NS.inspect(lambda s: s.data_by_name('core'))
+    extra_data = yield NS.inspect(lambda s: s.data_by_name('extra'))
+    return (
+        (k(r) == List(17)) &
+        (k(core_data).must(be_right(CoreData(-10)))) &
+        (k(extra_data).must(be_right(ExtraData(20))))
+    )
 
 
 class ComponentSpec(SpecBase):
@@ -94,18 +117,10 @@ class ComponentSpec(SpecBase):
     '''
 
     def enable_component(self) -> Expectation:
-        helper = RequestHelper.strict(config)
-        s = helper.unsafe_run_s('enable_components', args=('extra',))
-        return k(s.components.all / _.name).must(contain('extra'))
+        return unit_test(test_config, enable_component_spec)
 
     def switch(self) -> Expectation:
-        helper = RequestHelper.strict(config, 'extra')
-        s, r = helper.unsafe_run('switch', args=())
-        return (
-            (k(r) == 17) &
-            (k(s.data_by_name('core')).must(be_right(CoreData(-10)))) &
-            (k(s.data_by_name('extra')).must(be_right(ExtraData(20))))
-        )
+        return unit_test(TestConfig.cons(config, components=List('extra')), switch_spec)
 
 
 __all__ = ('ComponentSpec',)

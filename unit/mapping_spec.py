@@ -10,7 +10,6 @@ from amino.test.spec import SpecBase
 
 from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
-from ribosome.test.integration.run import RequestHelper
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.config import default_config_name, TestConfig
 from ribosome.rpc.api import rpc
@@ -25,7 +24,7 @@ from ribosome.test.unit import unit_test
 from ribosome.test.integration.external import external_state_test
 
 keys = 'gs'
-gs_mapping = Mapping.cons('gs', true, List(mapmode.Normal(), mapmode.Visual()))
+gs_mapping = Mapping.cons('test-mapping', 'gs', true, List(mapmode.Normal(), mapmode.Visual()))
 
 
 class CData(Dat['CData']):
@@ -73,7 +72,7 @@ test_config = TestConfig.cons(config, components=List('main'))
 @do(NS[PS, Expectation])
 def buffer_spec() -> Do:
     yield request('setup_map')
-    yield request('map', str(gs_mapping.uuid), 'gs')
+    yield request('map', gs_mapping.ident, 'gs')
     maps = yield NS.lift(nvim_command_output('map <buffer>'))
     data = yield NS.inspect(lambda s: s.data_by_type(CData))
     return (

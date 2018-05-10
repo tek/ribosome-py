@@ -10,7 +10,6 @@ from amino.dat import Dat
 from ribosome.compute.api import prog
 from ribosome.data.plugin_state import PluginState, PS
 from ribosome.nvim.io.state import NS
-from ribosome.test.integration.run import RequestHelper
 from ribosome.config.config import Config
 from ribosome.nvim.io.api import N
 from ribosome.rpc.api import rpc
@@ -110,6 +109,7 @@ class DispatchSpec(SpecBase):
     run an autocmd $autocmd
     '''
 
+    @pending
     def trans_free(self) -> Expectation:
         helper = RequestHelper.strict(config)
         result = helper.unsafe_run_a('trans_free', args=('x',))
@@ -121,19 +121,23 @@ class DispatchSpec(SpecBase):
         result = helper.unsafe_run_a('trans_io')
         return k(result) == 5
 
+    @pending
     def internal(self) -> Expectation:
         helper = RequestHelper.strict(config)
         state, result = helper.unsafe_run('trans_internal')
         return k(result) == state.basic.name
 
+    @pending
     def data(self) -> Expectation:
         helper = RequestHelper.strict(config)
         state = helper.unsafe_run_s('trans_data')
         return k(state.data.counter) == 23
 
+    @pending
     def json(self) -> Expectation:
         return unit_test(test_config, json_spec)
 
+    @pending
     def autocmd(self) -> Expectation:
         helper = RequestHelper.strict(config)
         state = helper.unsafe_run_s('vim_enter')

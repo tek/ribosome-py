@@ -86,7 +86,7 @@ def embed_nvim(log: Path) -> Uv:
 def run_nvim(comm: Comm, config: Config, io: Callable[[], NvimIO[A]]) -> Do:
     state = cons_state(config)
     guard = StateGuard.cons(state)
-    execute_request = plugin_execute_receive_request(guard)
+    execute_request = plugin_execute_receive_request(guard, 'spec')
     yield start_comm(comm, execute_request)
     api = RiboNvimApi(config.basic.name, comm)
     yield N.to_io_a(exclusive_ns(guard, 'init_rpc', init_rpc, Left('')), api)

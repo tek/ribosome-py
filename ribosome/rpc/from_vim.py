@@ -14,6 +14,7 @@ from ribosome.rpc.response import validate_rpc_result, report_error
 log = module_log()
 
 
+# TODO fetch nvim api ctor from `Comm`
 @do(IO[NResult[List[Any]]])
 def execute_rpc(comm: Comm, rpc: Rpc, execute: Exec, plugin_name: str) -> Do:
     thunk = yield IO.delay(execute, rpc.method, rpc.args)
