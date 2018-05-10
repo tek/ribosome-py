@@ -1,11 +1,10 @@
 import sys
 from typing import TypeVar, Any, Iterable
-from uuid import UUID
 
 from lenses import UnboundLens
 
 from amino.state import EitherState
-from amino import do, Do, __, _, Map, Maybe, Lists, Just, Regex, L, IO, Try
+from amino import do, Do, __, _, Map, Maybe, Lists, Just, Regex, L, IO
 from amino.json import dump_json
 from amino.dat import Dat
 from amino.lenses.lens import lens
@@ -150,21 +149,20 @@ class MapOptions(Dat['MapOptions']):
         self.buffer = buffer
 
 
-def mapping_data(uuid: UUID, keys: str) -> NS[PluginState[D, CC], Program]:
-    return NS.inspect_either(lambda a: a.active_mappings.lift(uuid).to_either(f'no program for mapping `{keys}`'))
+def mapping_data(ident: str, keys: str) -> NS[PluginState[D, CC], Program]:
+    return NS.inspect_either(lambda a: a.active_mappings.lift(ident).to_either(f'no program for mapping `{keys}`'))
 
 
 @prog
 @do(NS[PluginState[D, CC], Program])
-def mapping_program(uuid: UUID, keys: str) -> Do:
-    mapping, program = yield mapping_data(uuid, keys)
+def mapping_program(ident: str, keys: str) -> Do:
+    mapping, program = yield mapping_data(ident, keys)
     return program
 
 
 @prog.do
-def mapping(uuid_s: str, keys: str) -> Do:
-    uuid = yield Prog.from_either(Try(UUID, hex=uuid_s))
-    program = yield mapping_program(uuid, keys)
+def mapping(ident: str, keys: str) -> Do:
+    program = yield mapping_program(ident, keys)
     yield program()
 
 

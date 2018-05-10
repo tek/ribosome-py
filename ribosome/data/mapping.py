@@ -1,5 +1,4 @@
 import abc
-from uuid import uuid4, UUID
 from typing import Tuple
 
 from amino import Dat, Map, Boolean, ADT, List, Maybe, Lists
@@ -75,28 +74,28 @@ class mapmode:
 class Mapping(Dat['Mapping']):
 
     @staticmethod
-    def cons(keys: str, buffer: Boolean=false, modes: List[MapMode]=None, uuid: UUID=None) -> 'Mapping':
+    def cons(ident: str, keys: str, buffer: Boolean=false, modes: List[MapMode]=None) -> 'Mapping':
         modes1 = List(mapmode.Normal()) if modes is None else modes
-        return Mapping(keys, Boolean(buffer), modes1, uuid or uuid4())
+        return Mapping(ident, keys, Boolean(buffer), modes1)
 
-    def __init__(self, keys: str, buffer: Boolean, modes: List[MapMode], uuid: UUID) -> None:
+    def __init__(self, ident: str, keys: str, buffer: Boolean, modes: List[MapMode]) -> None:
+        self.ident = ident
         self.keys = keys
         self.buffer = buffer
         self.modes = modes
-        self.uuid = uuid
 
 
 class Mappings(Dat['Mappings']):
 
     @staticmethod
     def cons(*mappings: Tuple[Mapping, Program]) -> 'Mappings':
-        return Mappings(Map(Lists.wrap(mappings).map2(lambda m, p: (str(m.uuid), (m, p)))))
+        return Mappings(Map(Lists.wrap(mappings).map2(lambda m, p: (m.ident, (m, p)))))
 
     def __init__(self, mappings: Map[str, Tuple[Mapping, Program]]) -> None:
         self.mappings = mappings
 
     def lift(self, mapping: Mapping) -> Maybe[Program]:
-        return self.mappings.lift(str(mapping.uuid))
+        return self.mappings.lift(mapping.ident)
 
 
 __all__ = ('Mapping', 'Mappings')

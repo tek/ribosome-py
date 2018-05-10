@@ -1,6 +1,5 @@
 import logging
 from typing import TypeVar, Generic, Callable, Any, Type
-from uuid import UUID
 
 from amino import Map, List, Nil, Either, _, Maybe, __
 from amino.dat import Dat
@@ -51,7 +50,7 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
             logger: Program[None]=None,
             log_handler: logging.Handler=None,
             component_data: Map[type, Any]=Map(),
-            active_mappings: Map[UUID, Program]=Map(),
+            active_mappings: Map[str, Program]=Map(),
             io_executor: Callable[[DIO], NS['PluginState[D, CC]', Any]]=None,
             rpc_handlers: List[DefinedHandler]=Nil,
             programs: List[Program]=Nil,
@@ -86,7 +85,7 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
             program_log: List[str],
             log_handler: Maybe[logging.Handler],
             component_data: Map[type, Any],
-            active_mappings: Map[UUID, Program],
+            active_mappings: Map[str, Program],
             io_executor: Maybe[Callable[[DIO], NS['PluginState[D, CC]', Any]]],
             rpc_handlers: List[DefinedHandler],
             programs: List[Program],
