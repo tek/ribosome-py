@@ -49,9 +49,9 @@ def init_comm(rpc_comm: RpcComm, execute_request: Callable[[Comm, Rpc], IO[None]
     return comm
 
 
-def plugin_execute_receive_request(guard: StateGuard[A]) -> Callable[[Comm, Rpc], IO[None]]:
+def plugin_execute_receive_request(guard: StateGuard[A], plugin_name: str) -> Callable[[Comm, Rpc], IO[None]]:
     def execute(comm: Comm, rpc: Rpc) -> IO[None]:
-        return IO.fork_io(execute_rpc_from_vim, rpc, comm, comm.request_handler(guard))
+        return IO.fork_io(execute_rpc_from_vim, rpc, comm, comm.request_handler(guard), plugin_name)
         # return execute_rpc_from_vim(rpc, comm, comm.request_handler(guard))(rpc.tpe)
     return execute
 
@@ -60,7 +60,7 @@ def plugin_execute_receive_request(guard: StateGuard[A]) -> Callable[[Comm, Rpc]
 def setup_comm(config: Config, rpc_comm: RpcComm) -> Do:
     state = cons_state(config)
     guard = StateGuard.cons(state)
-    execute_request = plugin_execute_receive_request(guard)
+    execute_request = plugin_execute_receive_request(guard, config.basic.name)
     comm = yield N.from_io(init_comm(rpc_comm, execute_request))
     api = RiboNvimApi(config.basic.name, comm)
     yield NvimIOSuspend.cons(State.set(api).replace(N.pure(None)))
