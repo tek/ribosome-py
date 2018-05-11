@@ -79,6 +79,9 @@ class TestConfig(Dat['TestConfig']):
         self.command_handler = command_handler
         self.autostart = autostart
 
+    def with_vars(self, **kw: Any) -> 'TestConfig':
+        return self.copy(vars=self.vars ** Map(kw))
+
 
 def spec_config(*rpc: RpcProgram) -> Config:
     component: Component = Component.cons(
