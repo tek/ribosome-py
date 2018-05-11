@@ -223,8 +223,12 @@ def on_exit(handle: Pipe, exit_status: int, term_signal: int) -> None:
 OnRead = Callable[[Pipe, Optional[bytes], Optional[int]], None]
 
 
-def processing_error(error: Exception) -> None:
-    log.error(f'error processing message from nvim: {error}')
+def processing_error(data: Optional[bytes]) -> Callable[[Exception], None]:
+    def processing_error(error: Exception) -> None:
+        if data:
+            log.debug(f'{error}: {data}')
+        log.error(f'error processing message from nvim: {error}')
+    return processing_error
 
 
 def read_pipe(on_data: OnMessage, on_error: OnError) -> OnRead:
@@ -232,11 +236,11 @@ def read_pipe(on_data: OnMessage, on_error: OnError) -> OnRead:
         '''error -4095 is EOF, regular message when quitting
         '''
         if data is not None:
-            on_data(data).attempt.leffect(processing_error)
+            on_data(data).attempt.leffect(processing_error(data))
         if error is not None:
             message = pyuv.errno.strerror(error)
             info = RpcProcessExit() if error == -4095 else RpcReadErrorUnknown(message)
-            on_error(info).attempt.leffect(processing_error)
+            on_error(info).attempt.leffect(processing_error(None))
     return read
 
 
