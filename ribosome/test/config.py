@@ -32,6 +32,7 @@ class TestConfig(Dat['TestConfig']):
             request_handler: Handler=no_handler,
             function_handler: Handler=no_handler,
             command_handler: Handler=no_handler,
+            autostart: bool=True,
     ) -> 'TestConfig':
         ld = log_dir or temp_dir('log')
         lf = log_file or ld / config.basic.name
@@ -47,6 +48,7 @@ class TestConfig(Dat['TestConfig']):
             request_handler,
             function_handler,
             command_handler,
+            autostart,
         )
 
     def __init__(
@@ -62,6 +64,7 @@ class TestConfig(Dat['TestConfig']):
             request_handler: Handler,
             function_handler: Handler,
             command_handler: Handler,
+            autostart: bool,
     ) -> None:
         self.config = config
         self.pre = pre
@@ -74,6 +77,7 @@ class TestConfig(Dat['TestConfig']):
         self.request_handler = request_handler
         self.function_handler = function_handler
         self.command_handler = command_handler
+        self.autostart = autostart
 
 
 def spec_config(*rpc: RpcProgram) -> Config:

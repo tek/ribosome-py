@@ -56,8 +56,9 @@ def plugin_test(config: TestConfig, io: Callable[..., NvimIO[Expectation]], *a: 
     def run_nvim_io() -> Do:
         yield set_nvim_vars(config.vars + ('components', config.components))
         yield config.pre()
-        yield start_plugin_embed(config)
-        yield pvar_becomes('started', True)
+        if config.autostart:
+            yield start_plugin_embed(config)
+            yield pvar_becomes('started', True)
         yield io(*a, **kw)
     @do(IO[Expectation])
     def run() -> Do:
