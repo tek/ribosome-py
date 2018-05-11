@@ -1,13 +1,13 @@
 from typing import Callable
 
-from amino import List, do, Do, Dat, Nil
+from amino import List, do, Do, Dat, Nil, Just, Nothing, Maybe
 from amino.case import Case
 from amino.util.string import camelcase
 from amino.logging import module_log
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.rpc import channel_id
-from ribosome.nvim.api.command import nvim_command, nvim_sync_command
+from ribosome.nvim.api.command import nvim_atomic_commands
 from ribosome.rpc.api import RpcOptions, RpcProgram
 from ribosome.rpc.data.rpc_method import RpcMethod, CommandMethod, FunctionMethod, AutocmdMethod
 from ribosome.rpc.data.prefix_style import PrefixStyle, Plain, Full, Short
@@ -32,23 +32,45 @@ class RpcConfig(Dat['RpcConfig']):
 
 class RpcDef(Dat['RpcDef']):
 
-    def __init__(self, config: RpcConfig, options: RpcOptions, prog_name: str, rpc_name: str) -> None:
+    def __init__(
+            self,
+            config: RpcConfig,
+            options: RpcOptions,
+            prog_name: str,
+            rpc_name: str,
+            trigger_name: str,
+    ) -> None:
         self.config = config
         self.options = options
         self.prog_name = prog_name
         self.rpc_name = rpc_name
+        self.trigger_name = trigger_name
 
 
-class DefinedHandler(Dat['DefinedHandler']):
+class ActiveRpcTrigger(Dat['ActiveRpcTrigger']):
 
-    def __init__(self, prog: RpcProgram, method: RpcMethod, channel: int) -> None:
+    def __init__(self, name: str, prog: RpcProgram, method: RpcMethod, channel: int, definition: List[str]) -> None:
+        self.name = name
         self.prog = prog
         self.method = method
         self.channel = channel
+        self.definition = definition
 
 
 def quote(a: str) -> str:
     return f'\'{a}\''
+
+
+class undef_command(Case[RpcMethod, Maybe[str]], alg=RpcMethod):
+
+    def function(self, method: FunctionMethod) -> Maybe[str]:
+        return Just('delfunction')
+
+    def command(self, method: CommandMethod) -> Maybe[str]:
+        return Just('delcommand')
+
+    def autocmd(self, method: AutocmdMethod) -> Maybe[str]:
+        return Nothing
 
 
 class DefinitionTokens(Dat['DefinitionTokens']):
@@ -83,7 +105,7 @@ def command_tokens(bang: bool, nargs: Nargs) -> DefinitionTokens:
 function_tokens = DefinitionTokens('rpcrequest', List('a:000'), 'function!', Nil, Nil, '')
 
 
-def autocmd_tokens(pattern: str) -> None:
+def autocmd_tokens(pattern: str) -> DefinitionTokens:
     return DefinitionTokens('rpcnotify', Nil, 'autocmd', Nil, List('*'), '')
 
 
@@ -104,8 +126,8 @@ class rpc_prefix(Case[PrefixStyle, str], alg=PrefixStyle):
         return f'{self.prefix}_{self.method}'
 
 
-def rpc_name(rpc_def: RpcDef) -> str:
-    prefixed = rpc_prefix(rpc_def.config.name, rpc_def.config.prefix, rpc_def.rpc_name)(rpc_def.options.prefix)
+def rpc_trigger_name(config: RpcConfig, options: RpcOptions, rpc_name: str) -> str:
+    prefixed = rpc_prefix(config.name, config.prefix, rpc_name)(options.prefix)
     return camelcase(prefixed)
 
 
@@ -121,20 +143,18 @@ def define_trigger_tokens(
     return (
         List(tokens.def_cmd) +
         tokens.rpc_opts_pre +
-        List(rpc_name(rpc_def)) +
+        List(rpc_def.trigger_name) +
         tokens.rpc_opts_post +
         List(rhs)
     )
 
 
-@do(NvimIO[None])
-def define_trigger(
+def trigger_definition(
         rhs: Callable[[str], str],
         rpc_def: RpcDef,
         tokens: DefinitionTokens,
-) -> Do:
-    trigger = define_trigger_tokens(rhs, rpc_def, tokens)
-    yield nvim_command(trigger.join_tokens)
+) -> str:
+    return define_trigger_tokens(rhs, rpc_def, tokens).join_tokens
 
 
 def command_rhs(a: str) -> str:
@@ -145,43 +165,50 @@ def function_rhs(a: str) -> str:
     return f'(...)\nreturn {a}\nendfunction'
 
 
-class define_method_rpc(Case[RpcMethod, NvimIO[DefinedHandler]], alg=RpcMethod):
+class method_definition(Case[RpcMethod, List[str]], alg=RpcMethod):
 
     def __init__(self, prog: RpcProgram, rpc_def: RpcDef) -> None:
         self.prog = prog
         self.rpc_def = rpc_def
 
-    def command(self, method: CommandMethod) -> NvimIO[DefinedHandler]:
+    def command(self, method: CommandMethod) -> List[str]:
         tokens = command_tokens(method.bang, self.prog.program.params_spec.nargs)
-        return define_trigger(command_rhs, self.rpc_def, tokens)
+        return List(trigger_definition(command_rhs, self.rpc_def, tokens))
 
-    def function(self, method: FunctionMethod) -> NvimIO[DefinedHandler]:
-        return define_trigger(function_rhs, self.rpc_def, function_tokens)
+    def function(self, method: FunctionMethod) -> List[str]:
+        return List(trigger_definition(function_rhs, self.rpc_def, function_tokens))
 
-    @do(NvimIO[DefinedHandler])
-    def autocmd(self, method: AutocmdMethod) -> Do:
+    def autocmd(self, method: AutocmdMethod) -> List[str]:
         tokens = autocmd_tokens(method.pattern)
-        yield nvim_command(f'augroup {self.rpc_def.config.name}')
-        result = yield define_trigger(command_rhs, self.rpc_def, tokens)
-        yield nvim_command(f'augroup end')
-        return result
+        return List(
+            f'augroup {self.rpc_def.config.name}',
+            trigger_definition(command_rhs, self.rpc_def, tokens),
+            f'augroup end'
+        )
 
 
-def define_prog_rpc(rpc_config: RpcConfig) -> Callable[[RpcProgram], NvimIO[List[DefinedHandler]]]:
-    def traverse(prog: RpcProgram) -> NvimIO[List[DefinedHandler]]:
-        @do(NvimIO[DefinedHandler])
-        def define(method: RpcMethod) -> Do:
+def prog_triggers(rpc_config: RpcConfig) -> Callable[[RpcProgram], ActiveRpcTrigger]:
+    def traverse(prog: RpcProgram) -> ActiveRpcTrigger:
+        def define(method: RpcMethod) -> List[str]:
             log.debug1(lambda: f'defining {prog} for {method} on channel {rpc_config.channel}')
-            rpc_def = RpcDef(rpc_config, prog.options, prog.program.name, prog.rpc_name)
-            yield define_method_rpc(prog, rpc_def)(method)
-            return DefinedHandler(prog, method, rpc_config.channel)
-        return prog.options.methods.traverse(define, NvimIO)
+            trigger_name = rpc_trigger_name(rpc_config, prog.options, prog.rpc_name)
+            rpc_def = RpcDef(rpc_config, prog.options, prog.program.name, prog.rpc_name, trigger_name)
+            return ActiveRpcTrigger(trigger_name, prog, method, rpc_config.channel,
+                                    method_definition(prog, rpc_def)(method))
+        return prog.options.methods.map(define)
     return traverse
 
 
-@do(NvimIO[List[DefinedHandler]])
+def rpc_triggers(progs: List[RpcProgram], name: str, prefix: str, channel: int) -> List[ActiveRpcTrigger]:
+    return progs.flat_map(prog_triggers(RpcConfig(channel, name, prefix)))
+
+
+@do(NvimIO[List[ActiveRpcTrigger]])
 def define_rpc(progs: List[RpcProgram], name: str, prefix: str) -> Do:
     channel = yield channel_id()
-    yield progs.flat_traverse(define_prog_rpc(RpcConfig(channel, name, prefix)), NvimIO)
+    triggers = rpc_triggers(progs, name, prefix, channel)
+    definitions = triggers.flat_map(lambda a: a.definition)
+    yield nvim_atomic_commands(definitions)
+    return triggers
 
 __all__ = ('define_rpc',)

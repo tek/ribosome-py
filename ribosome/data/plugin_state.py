@@ -14,7 +14,7 @@ from ribosome.config.basic_config import BasicConfig
 from ribosome.compute.output import ProgIO
 from ribosome.compute.prog import Prog
 from ribosome.compute.interpret import interpret_io, no_interpreter
-from ribosome.rpc.define import DefinedHandler
+from ribosome.rpc.define import ActiveRpcTrigger
 from ribosome.rpc.api import RpcProgram
 
 A = TypeVar('A')
@@ -30,8 +30,8 @@ def component_ctor(comp: Component[D, CD, CC]) -> Callable[[], CD]:
     return comp.state_ctor.get_or_strict(NoComponentData)
 
 
-def component_ctor_m(comp: Maybe[Component[D, CD, CC]]) -> Callable[[], CD]:
-    return (comp // _.state_ctor).get_or_strict(NoComponentData)
+def component_ctor_m(comp: Either[str, Component[D, CD, CC]]) -> Callable[[], CD]:
+    return (comp.to_maybe // _.state_ctor).get_or_strict(NoComponentData)
 
 
 # FIXME in order to allow transparent updating of components, the data and config part must be separated
@@ -52,7 +52,7 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
             component_data: Map[type, Any]=Map(),
             active_mappings: Map[str, Program]=Map(),
             io_executor: Callable[[DIO], NS['PluginState[D, CC]', Any]]=None,
-            rpc_handlers: List[DefinedHandler]=Nil,
+            rpc_triggers: List[ActiveRpcTrigger]=Nil,
             programs: List[Program]=Nil,
             io_interpreter: Callable[[ProgIO], Prog]=None,
             custom_io: Callable[[Any], Prog[A]]=None,
@@ -68,7 +68,7 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
             Maybe.optional(log_handler),
             component_data,
             active_mappings,
-            rpc_handlers,
+            rpc_triggers,
             Maybe.optional(io_executor),
             programs,
             io_interpreter or interpret_io(custom_io or no_interpreter, Maybe.optional(logger)),
@@ -87,7 +87,7 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
             component_data: Map[type, Any],
             active_mappings: Map[str, Program],
             io_executor: Maybe[Callable[[DIO], NS['PluginState[D, CC]', Any]]],
-            rpc_handlers: List[DefinedHandler],
+            rpc_triggers: List[ActiveRpcTrigger],
             programs: List[Program],
             io_interpreter: Callable[[ProgIO], Prog],
     ) -> None:
@@ -101,7 +101,7 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
         self.component_data = component_data
         self.active_mappings = active_mappings
         self.io_executor = io_executor
-        self.rpc_handlers = rpc_handlers
+        self.rpc_triggers = rpc_triggers
         self.programs = programs
         self.rpc = rpc
         self.io_interpreter = io_interpreter

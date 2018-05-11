@@ -29,14 +29,18 @@ def cons_ext(cons: Callable[[ExtType], A]) -> Callable[[Any], Either[str, A]]:
     return cons_checked(ExtType, cons)
 
 
-def cons_checked_list(tpe: Type[A], cons: Callable[[A], B]) -> Callable[[Any], Either[str, List[B]]]:
-    def cons_data(data: Any) -> Either[str, A]:
+def cons_checked_list_e(tpe: Type[A], cons: Callable[[A], Either[str, B]]) -> Callable[[Any], Either[str, List[B]]]:
+    def cons_data(data: Any) -> Either[str, List[B]]:
         return (
-            Lists.wrap(data).traverse(cons_checked(tpe, cons), Either)
+            Lists.wrap(data).traverse(cons_checked_e(tpe, cons), Either)
             if isinstance(data, TList) else
             Left(f'invalid nvim data for `List[{tpe}]`: {data}')
         )
     return cons_data
+
+
+def cons_checked_list(tpe: Type[A], cons: Callable[[A], B]) -> Callable[[Any], Either[str, List[B]]]:
+    return cons_checked_list_e(tpe, lambda a: Right(cons(a)))
 
 
 def cons_ext_list(cons: Callable[[ExtType], A]) -> Callable[[Any], Either[str, List[A]]]:
@@ -144,4 +148,4 @@ def nvimio_await_success(
 __all__ = ('cons_checked_e', 'cons_checked', 'cons_ext', 'cons_checked_list', 'cons_ext_list', 'check_str_list',
            'cons_decode_str', 'cons_decode_str_list', 'extract_int_pair', 'split_option', 'cons_decode_str_list_option',
            'cons_split_lines', 'cons_decode_bool', 'nvimio_repeat_timeout', 'cons_json', 'cons_json_tpe',
-           'nvimio_await_success',)
+           'nvimio_await_success', 'cons_checked_list_e',)

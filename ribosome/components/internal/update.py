@@ -11,7 +11,7 @@ from ribosome.config.component import Components
 from ribosome.nvim.api.command import nvim_command
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.config import settings
-from ribosome.rpc.define import define_rpc, DefinedHandler
+from ribosome.rpc.define import define_rpc, ActiveRpcTrigger, undef_command
 from ribosome.rpc.api import RpcProgram
 
 CC = TypeVar('CC')
@@ -39,29 +39,29 @@ def update_components(requested: Either[str, List[str]]) -> Do:
 
 
 @do(NvimIO[None])
-def undef_handler(dh: DefinedHandler) -> Do:
-    yield nvim_command(dh.spec.undef_cmdline)
+def undef_trigger(trigger: ActiveRpcTrigger) -> Do:
+    yield nvim_command(undef_command(trigger.method), trigger.prog.rpc_name)
 
 
 @do(NS[PluginState[D, CC], None])
-def undef_handlers() -> Do:
-    handlers = yield NS.inspect(_.rpc_handlers)
-    yield NS.lift(handlers.traverse(undef_handler, NvimIO))
+def undef_triggers() -> Do:
+    handlers = yield NS.inspect(_.rpc_triggers)
+    yield NS.lift(handlers.traverse(undef_trigger, NvimIO))
 
 
 @do(NS[PluginState[D, CC], None])
-def def_handlers() -> Do:
+def def_triggers() -> Do:
     name = yield NS.inspect(_.basic.name)
     prefix = yield NS.inspect(_.basic.prefix)
     programs = yield NS.inspect(_.programs)
     handlers = yield NS.lift(define_rpc(programs, name, prefix))
-    yield NS.modify(lens.rpc_handlers.set(handlers))
+    yield NS.modify(lens.rpc_triggers.set(handlers))
 
 
 @do(NS[PluginState[D, CC], None])
 def init_rpc(requested_components: Maybe[List[str]]) -> Do:
     yield update_components(requested_components).nvim
-    yield def_handlers()
+    yield def_triggers()
 
 
 @do(NS[PluginState[D, CC], None])
@@ -70,4 +70,4 @@ def init_rpc_plugin() -> Do:
     yield init_rpc(requested_components)
 
 
-__all__ = ('init_rpc', 'undef_handlers', 'def_handlers', 'programs', 'init_rpc_plugin',)
+__all__ = ('init_rpc', 'undef_triggers', 'def_triggers', 'programs', 'init_rpc_plugin',)

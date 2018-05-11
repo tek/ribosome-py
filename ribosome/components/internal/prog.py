@@ -4,7 +4,7 @@ from typing import TypeVar, Any, Iterable
 from lenses import UnboundLens
 
 from amino.state import EitherState
-from amino import do, Do, __, _, Map, Maybe, Lists, Just, Regex, L, IO
+from amino import do, Do, __, _, Map, Maybe, Lists, Just, Regex, L, IO, List
 from amino.json import dump_json
 from amino.dat import Dat
 from amino.lenses.lens import lens
@@ -17,10 +17,12 @@ from ribosome.nvim.io.state import NS
 from ribosome.config.component import ComponentData
 from ribosome.compute.prog import Prog
 from ribosome.config.basic_config import NoData
-from ribosome.components.internal.update import undef_handlers, def_handlers
+from ribosome.components.internal.update import undef_triggers, def_triggers
 from ribosome.compute.program import Program, bind_nullary_program
 from ribosome.config.settings import run_internal_init
 from ribosome.compute.ribosome_api import Ribo
+from ribosome.rpc.data.rpc_method import RpcMethod
+from ribosome.rpc.define import ActiveRpcTrigger
 
 log = module_log()
 D = TypeVar('D')
@@ -45,9 +47,20 @@ def state_data() -> Do:
     yield EitherState.inspect_f(lambda s: dump_json(s.main.data))
 
 
+class RpcTrigger(Dat['RpcTrigger']):
+
+    @staticmethod
+    def from_active(trigger: ActiveRpcTrigger) -> 'RpcTrigger':
+        return RpcTrigger(trigger.name, trigger.method)
+
+    def __init__(self, name: str, method: RpcMethod) -> None:
+        self.name = name
+        self.method = method
+
+
 @prog
-def rpc_handlers() -> NS[PluginState[D, CC], str]:
-    return NS.inspect_either(lambda s: dump_json(s.distinct_specs))
+def rpc_triggers() -> NS[PluginState[D, CC], List[RpcTrigger]]:
+    return NS.inspect_either(lambda s: dump_json(s.rpc_triggers.map(RpcTrigger.from_active)))
 
 
 class PatchQuery(Dat['PatchQuery']):
@@ -129,9 +142,9 @@ def enable_components(*names: str) -> Do:
         yield NS.inspect_either(
             __.comp.available.lift_all(*names).to_either(f'couldn\'t find some components: {names}'))
     )
-    yield undef_handlers()
+    yield undef_triggers()
     yield NS.modify(lens.components.all.modify(__.add(comps)))
-    yield def_handlers()
+    yield def_triggers()
     print
 
 
@@ -181,5 +194,5 @@ def internal_init() -> Do:
 
 
 __all__ = ('internal_init', 'mapping', 'MapOptions', 'enable_components', 'show_python_path', 'append_python_path',
-           'poll', 'program_log', 'set_log_level', 'state_data', 'rpc_handlers', 'update_state',
+           'poll', 'program_log', 'set_log_level', 'state_data', 'rpc_triggers', 'update_state',
            'update_component_state')
