@@ -13,7 +13,7 @@ from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.scratch import CreateScratchBufferOptions, show_in_scratch_buffer
-from ribosome.test.config import single_trans_config
+from ribosome.test.config import single_prog_config
 from ribosome.nvim.api.ui import buffer_content, buffers, windows, current_buffer
 from ribosome.nvim.api.data import Window, Buffer
 from ribosome.config.config import NoData
@@ -30,7 +30,7 @@ def create_scratch(lines: List[str], options: CreateScratchBufferOptions) -> Do:
     yield NS.unit
 
 
-config = single_trans_config(create_scratch, json=true)
+config = single_prog_config(create_scratch, json=true)
 test_config = TestConfig.cons(config, components=List('main'))
 lines = List('1', '2', '3')
 

@@ -1,6 +1,5 @@
 import abc
 
-from ribosome.trans.message_base import Message, pmessage
 from ribosome import NvimApi
 from ribosome.logging import Logging
 from ribosome.nvim.components import Syntax

@@ -12,7 +12,7 @@ val = 71
 
 @prog.unit
 @do(NS[NoData, None])
-def trans1() -> Do:
+def prog1() -> Do:
     yield NS.lift(variable_set('command_success', val))
 
 
@@ -23,7 +23,7 @@ command_spec_config: Config = Config.cons(
     name='plug',
     components=Map(core=core),
     rpc=List(
-        rpc.write(trans1).conf(name=Just('trans_cmd')),
+        rpc.write(prog1).conf(name=Just('prog_cmd')),
     ),
     internal_component=False,
 )

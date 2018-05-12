@@ -12,7 +12,7 @@ val = 71
 
 
 @prog.unit
-def trans1() -> NS[NoData, None]:
+def prog1() -> NS[NoData, None]:
     return NS.lift(variable_set('autocmd_success', val))
 
 
@@ -23,7 +23,7 @@ autocmd_spec_config: Config = Config.cons(
     name='plug',
     components=Map(core=core),
     rpc=List(
-        rpc.autocmd(trans1).conf(name=Just('vim_resized'), prefix=Plain()),
+        rpc.autocmd(prog1).conf(name=Just('vim_resized'), prefix=Plain()),
     ),
     internal_component=False,
 )

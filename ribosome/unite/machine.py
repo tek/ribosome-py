@@ -10,7 +10,7 @@ from ribosome.config.component import Component
 
 class Unite(Component):
 
-    @trans.msg.one(UniteSyntax, trans.m, trans.io)
+    @prog.msg.one(UniteSyntax, prog.m, prog.io)
     def syntax(self):
         return self.machine.syntax(self.msg.source)
 

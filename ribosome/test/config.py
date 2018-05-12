@@ -96,8 +96,8 @@ def spec_config(*rpc: RpcProgram) -> Config:
     )
 
 
-def single_trans_config(trans: Program, **kw: Any) -> Config:
-    return spec_config(rpc.write(trans).conf(**kw))
+def single_prog_config(prog: Program, **kw: Any) -> Config:
+    return spec_config(rpc.write(prog).conf(**kw))
 
 
-__all__ = ('single_trans_config', 'spec_config')
+__all__ = ('single_prog_config', 'spec_config')

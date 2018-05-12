@@ -6,10 +6,9 @@ from amino.dat import Dat
 from ribosome.nvim.io.state import NS
 from ribosome.data.mapping import Mappings
 from ribosome.rpc.api import RpcProgram
+from ribosome.compute.program import Program
 
-# FIXME typevar P is temporary
 D = TypeVar('D')
-P = TypeVar('P')
 CC = TypeVar('CC')
 CD = TypeVar('CD')
 
@@ -73,11 +72,11 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
         self.config = config
         self.mappings = mappings
 
-    def handler_by_name(self, name: str) -> Either[str, P]:
-        return self.handlers.find(_.name == name).to_either(f'component `{self.name}` has no handler `name`')
+    def handler_by_name(self, name: str) -> Either[str, Program]:
+        return self.handlers.find(_.name == name).to_either(f'component `{self.name}` has no program `{name}`')
 
-    def contains(self, handler: P) -> Boolean:
-        return self.rpc.trans_handlers.exists(_.fun == handler.fun)
+    def contains(self, prog: Program) -> Boolean:
+        return self.rpc.contains(lambda a: a.program == prog)
 
 
 class Components(Generic[D, CC], Dat['Components']):
@@ -101,8 +100,8 @@ class Components(Generic[D, CC], Dat['Components']):
     def config(self) -> List[CC]:
         return self.all.collect(_.config)
 
-    def for_handler(self, handler: P) -> Maybe[Component]:
-        return self.all.find(__.contains(handler))
+    def for_program(self, prog: Program) -> Maybe[Component]:
+        return self.all.find(__.contains(prog))
 
 
 class ComponentConfig(Dat['ComponentConfig']):

@@ -109,8 +109,8 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
     def update(self, data: D) -> 'PluginState[D, CC]':
         return self.copy(data=data)
 
-    def log_prog(self, trans: str) -> 'PluginState[D, CC]':
-        return self.append1.program_log(trans)
+    def log_prog(self, prog: str) -> 'PluginState[D, CC]':
+        return self.append1.program_log(prog)
 
     def component(self, name: str) -> Either[str, Component]:
         return self.components.by_name(name)

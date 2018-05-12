@@ -215,7 +215,7 @@ def run(t: Program) -> Expectable:
 
 class ProgSpec(SpecBase):
     '''
-    nest several trans $nest
+    nest several prog $nest
     fail on error $error
     component with resources $comp_res
     root without extras $root

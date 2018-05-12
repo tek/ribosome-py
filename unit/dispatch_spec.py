@@ -29,24 +29,24 @@ class HsData(Dat['HsData']):
 
 
 @prog
-def trans_free(a: int, b: str='b') -> NS[None, int]:
+def prog_free(a: int, b: str='b') -> NS[None, int]:
     return NS.pure(8)
 
 
 @prog
 @do(NS[HsData, IO[int]])
-def trans_io() -> Do:
+def prog_io() -> Do:
     return NS.pure(IO.pure(5))
 
 
 # TODO allow args here
 @prog
-def trans_internal() -> NS[PluginState, str]:
+def prog_internal() -> NS[PluginState, str]:
     return NS.inspect(_.basic.name)
 
 
 @prog.unit
-def trans_data() -> NS[HsData, None]:
+def prog_data() -> NS[HsData, None]:
     return NS.modify(__.set.counter(23))
 
 
@@ -59,7 +59,7 @@ class JData(Dat['JData']):
 
 
 @prog
-def trans_json(a: int, b: str, data: JData) -> NS[HsData, int]:
+def prog_json(a: int, b: str, data: JData) -> NS[HsData, int]:
     return NS.pure(data.number + a)
 
 
@@ -70,20 +70,20 @@ def vim_enter() -> Do:
 
 
 @prog
-def trans_error() -> NS[HsData, int]:
+def prog_error() -> NS[HsData, int]:
     return NS.lift(N.error('error'))
 
 
 config: Config[HsData, Any] = Config.cons(
     'hs',
     rpc=List(
-        rpc.write(trans_free),
-        rpc.write(trans_io),
-        rpc.write(trans_internal),
-        rpc.write(trans_data),
-        rpc.write(trans_json).conf(json=true),
+        rpc.write(prog_free),
+        rpc.write(prog_io),
+        rpc.write(prog_internal),
+        rpc.write(prog_data),
+        rpc.write(prog_json).conf(json=true),
         rpc.autocmd(vim_enter).conf(prefix=Plain()),
-        rpc.write(trans_error),
+        rpc.write(prog_error),
     ),
     state_ctor=HsData,
     internal_component=False,
@@ -94,43 +94,43 @@ test_config = TestConfig.cons(config)
 @do(NS[PS, Expectation])
 def json_spec() -> Do:
     js = '{ "number": 2, "name": "two", "items": ["1", "2", "3"] }'
-    result = yield request('trans_json', 7, 'one', *Lists.split(js, ' '))
+    result = yield request('prog_json', 7, 'one', *Lists.split(js, ' '))
     return k(result) == List(9)
 
 
-# TODO test free trans function with invalid arg count
+# TODO test free prog function with invalid arg count
 class DispatchSpec(SpecBase):
     '''
-    run a free trans function $trans_free
-    run an IO result from a free trans $io
-    work on PluginState in internal trans $internal
+    run a free prog function $prog_free
+    run an IO result from a free prog $io
+    work on PluginState in internal prog $internal
     modify the state data $data
     json command args $json
     run an autocmd $autocmd
     '''
 
     @pending
-    def trans_free(self) -> Expectation:
+    def prog_free(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        result = helper.unsafe_run_a('trans_free', args=('x',))
+        result = helper.unsafe_run_a('prog_free', args=('x',))
         return k(result) == 8
 
     @pending
     def io(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        result = helper.unsafe_run_a('trans_io')
+        result = helper.unsafe_run_a('prog_io')
         return k(result) == 5
 
     @pending
     def internal(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        state, result = helper.unsafe_run('trans_internal')
+        state, result = helper.unsafe_run('prog_internal')
         return k(result) == state.basic.name
 
     @pending
     def data(self) -> Expectation:
         helper = RequestHelper.strict(config)
-        state = helper.unsafe_run_s('trans_data')
+        state = helper.unsafe_run_s('prog_data')
         return k(state.data.counter) == 23
 
     @pending

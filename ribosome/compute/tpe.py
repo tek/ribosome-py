@@ -21,7 +21,7 @@ P = TypeVar('P')
 R = TypeVar('R')
 
 
-def main_data_trans(data_type: type) -> MainDataProgType:
+def main_data_prog(data_type: type) -> MainDataProgType:
     return (
         InternalMainDataProgType()
         if issubclass(data_type, PluginState) else
@@ -30,56 +30,56 @@ def main_data_trans(data_type: type) -> MainDataProgType:
 
 
 @do(Either[str, MainDataProgType])
-def component_trans(affiliation_type: type) -> Do:
+def component_prog(affiliation_type: type) -> Do:
     tpe = yield first_type_arg(affiliation_type)
     component_data = yield type_arg(affiliation_type, 1)
-    return ComponentProgType(main_data_trans(tpe), component_data)
+    return ComponentProgType(main_data_prog(tpe), component_data)
 
 
 @do(Either[str, AffiliationProgType])
-def affiliation_trans(affiliation_type: type) -> Do:
+def affiliation_prog(affiliation_type: type) -> Do:
     yield (
-        component_trans(affiliation_type)
+        component_prog(affiliation_type)
         if issubclass(affiliation_type, ComponentData) else
-        Right(RootProgType(main_data_trans(affiliation_type)))
+        Right(RootProgType(main_data_prog(affiliation_type)))
     )
 
 
 @do(Either[str, PlainStateProgType])
-def plain_trans(plain_type: type) -> Do:
-    affiliation = yield affiliation_trans(plain_type)
+def plain_prog(plain_type: type) -> Do:
+    affiliation = yield affiliation_prog(plain_type)
     return PlainStateProgType(affiliation)
 
 
 @do(Either[str, ResourcesStateProgType])
-def resources_trans(resources_type: type) -> Do:
+def resources_prog(resources_type: type) -> Do:
     tpe = yield first_type_arg(resources_type)
-    affiliation = yield affiliation_trans(tpe)
+    affiliation = yield affiliation_prog(tpe)
     return ResourcesStateProgType(affiliation)
 
 
 @do(Either[str, RibosomeStateProgType])
-def ribosome_trans(ribosome_type: type) -> Do:
+def ribosome_prog(ribosome_type: type) -> Do:
     tpe = yield type_arg(ribosome_type, 2)
     return RibosomeStateProgType(tpe)
 
 
 @do(Either[str, StateProg])
-def state_trans(state_type: type, return_type: type) -> Do:
-    state_trans_type = yield (
-        resources_trans(state_type)
+def state_prog(state_type: type, return_type: type) -> Do:
+    state_prog_type = yield (
+        resources_prog(state_type)
         if issubclass(state_type, Resources) else
-        ribosome_trans(state_type)
+        ribosome_prog(state_type)
         if issubclass(state_type, Ribosome) else
-        plain_trans(state_type)
+        plain_prog(state_type)
     )
-    return StateProg(state_trans_type, return_type)
+    return StateProg(state_prog_type, return_type)
 
 
 def analyse_prog_tpe(params: ParamsSpec) -> Either[str, ProgType]:
     return params.state_type.cata(
         lambda a: Right(UnknownProgType()),
-        lambda a: state_trans(a, params.return_type),
+        lambda a: state_prog(a, params.return_type),
     )
 
 
