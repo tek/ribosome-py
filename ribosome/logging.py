@@ -7,32 +7,22 @@ import amino
 from amino.lazy import lazy
 import amino.logging
 from amino.logging import (amino_logger, init_loglevel, amino_root_file_logging, DDEBUG, print_log_info, VERBOSE,
-                           LazyRecord, TEST, log_stamp)
+                           LazyRecord, TEST, log_stamp, module_log)
 from amino import Path, Logger, Nothing, Maybe, List, Lists
 
 import ribosome  # noqa
 from ribosome import options
 from ribosome.nvim.api.ui import echo
+from ribosome.util.string import escape_dquote
 
+alog = module_log()
 A = TypeVar('A')
-
-
-def squote(text: str) -> str:
-    return text.replace("'", "''")
-
-
-def dquote(text: str) -> str:
-    return text.replace('"', '\\"')
-
-
-def quote(text: str) -> str:
-    return dquote(squote(text))
 
 
 def fmt_echo(text: Union[str, List[str]], cmd: str='echom', prefix: Maybe[str]=Nothing) -> List[str]:
     lines = text if isinstance(text, List) else Lists.lines(str(text))
     pre = prefix.map(_ + ': ') | ''
-    return lines.map(lambda a: '{} "{}{}"'.format(cmd, pre, dquote(a)))
+    return lines.map(lambda a: '{} "{}{}"'.format(cmd, pre, escape_dquote(a)))
 
 
 def fmt_echohl(text: Union[str, List[str]], hl: str, prefix: Maybe[str]=Nothing) -> List[str]:
