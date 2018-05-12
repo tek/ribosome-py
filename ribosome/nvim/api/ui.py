@@ -3,12 +3,15 @@ from typing import Tuple
 from msgpack import unpackb
 
 from amino import List, I, do, Do, Path
+from amino.logging import module_log
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.data import Tabpage, Window, Buffer
 from ribosome.nvim.api.util import cons_ext, cons_ext_list, cons_checked_list, cons_checked_e, extract_int_pair
 from ribosome.nvim.api.command import nvim_command
 from ribosome.nvim.io.api import N
+
+log = module_log()
 
 
 def current_tabpage() -> NvimIO[Tabpage]:
@@ -161,8 +164,9 @@ def edit_file(file: Path) -> NvimIO[None]:
     return nvim_command('edit', str(file))
 
 
-def echo(text: str) -> NvimIO[None]:
-    return N.write('nvim_out_write', text)
+@do(NvimIO[None])
+def echo(text: str) -> Do:
+    yield N.write('nvim_out_write', f"{text}\n")
 
 
 __all__ = ('current_tabpage', 'current_window', 'current_buffer', 'tabpages', 'windows', 'buffers', 'window_buffer',
