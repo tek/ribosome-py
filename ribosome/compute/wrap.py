@@ -22,32 +22,32 @@ M = TypeVar('M')
 R = TypeVar('R')
 CC = TypeVar('CC')
 C = TypeVar('C')
-PS = PluginState[D, CC]  # type: ignore
+PlS = PluginState[D, CC]  # type: ignore
 
 
 class zoom_main_data(
         Generic[D, CC, M],
-        Case[MainDataProgType, Callable[[PS], M]],
+        Case[MainDataProgType, Callable[[PlS], M]],
         alg=MainDataProgType,
 ):
 
-    def plain_main_data_prog_type(self, tpe: PlainMainDataProgType[M]) -> Callable[[PS], D]:
+    def plain_main_data_prog_type(self, tpe: PlainMainDataProgType[M]) -> Callable[[PlS], D]:
         return lambda a: a.data
 
-    def internal_main_data_prog_type(self, tpe: InternalMainDataProgType[D, CC]) -> Callable[[PS], PS]:
+    def internal_main_data_prog_type(self, tpe: InternalMainDataProgType[D, CC]) -> Callable[[PlS], PlS]:
         return lambda a: a
 
 
 class pick_main_data(
         Generic[D, CC, M],
-        Case[MainDataProgType[M], Callable[[PS, M], PS]],
+        Case[MainDataProgType[M], Callable[[PlS, M], PlS]],
         alg=MainDataProgType,
 ):
 
-    def plain_main_data_prog_type(self, tpe: PlainMainDataProgType[M]) -> Callable[[PS, D], PS]:
+    def plain_main_data_prog_type(self, tpe: PlainMainDataProgType[M]) -> Callable[[PlS, D], PlS]:
         return lambda ps, data: ps.set.data(data)
 
-    def internal_main_data_prog_type(self, tpe: InternalMainDataProgType[D, CC]) -> Callable[[PS, PS], PS]:
+    def internal_main_data_prog_type(self, tpe: InternalMainDataProgType[D, CC]) -> Callable[[PlS, PlS], PlS]:
         return lambda ps, data: data
 
 
@@ -65,7 +65,7 @@ class wrap_affiliation(
     def root_prog_type(self, tpe: RootProgType[M]) -> Callable[[PluginState[D, CC]], M]:
         return zoom_main_data.match(tpe.main)
 
-    def component_prog_type(self, tpe: ComponentProgType[C, D]) -> Callable[[PS], ComponentData[M, Any]]:
+    def component_prog_type(self, tpe: ComponentProgType[C, D]) -> Callable[[PlS], ComponentData[M, Any]]:
         inner: Callable[[PluginState[D, CC]], M] = zoom_main_data.match(tpe.main)
         def wrap(ps: PluginState[D, CC]) -> ComponentData[M, Any]:
             return ComponentData(inner(ps), data_for_type(ps, tpe.comp))
@@ -74,16 +74,16 @@ class wrap_affiliation(
 
 class unwrap_affiliation(
         Generic[C, D, CC, M],
-        Case[AffiliationProgType[M, C], Callable[[PS, C], PS]],
+        Case[AffiliationProgType[M, C], Callable[[PlS, C], PlS]],
         alg=AffiliationProgType,
 ):
 
-    def root_prog_type(self, tpe: RootProgType[M]) -> Callable[[PS, M], PS]:
+    def root_prog_type(self, tpe: RootProgType[M]) -> Callable[[PlS, M], PlS]:
         return pick_main_data.match(tpe.main)
 
-    def component_prog_type(self, tpe: ComponentProgType[M, C]) -> Callable[[PS, ComponentData[M, Any]], PS]:
-        inner: Callable[[PS, M], PS] = pick_main_data.match(tpe.main)
-        def unwrap(ps: PS, data: ComponentData[M, Any]) -> PS:
+    def component_prog_type(self, tpe: ComponentProgType[M, C]) -> Callable[[PlS, ComponentData[M, Any]], PlS]:
+        inner: Callable[[PlS, M], PlS] = pick_main_data.match(tpe.main)
+        def unwrap(ps: PlS, data: ComponentData[M, Any]) -> PlS:
             return inner(ps, data.main).update_component_data(data.comp)
         return unwrap
 
@@ -106,16 +106,16 @@ class wrap_resources(
         alg=StateProgType,
 ):
 
-    def resources_state_prog_type(self, tpe: ResourcesStateProgType[M, C, D, CC]) -> Callable[[PS], Resources[D, CC]]:
+    def resources_state_prog_type(self, tpe: ResourcesStateProgType[M, C, D, CC]) -> Callable[[PlS], Resources[D, CC]]:
         inner: Callable[[PluginState[D, CC]], C] = wrap_affiliation.match(tpe.affiliation)
         return lambda ps: ps.resources_with(inner(ps))
 
-    def plain_state_prog_type(self, tpe: PlainStateProgType[M, C]) -> Callable[[PS], C]:
+    def plain_state_prog_type(self, tpe: PlainStateProgType[M, C]) -> Callable[[PlS], C]:
         return wrap_affiliation.match(tpe.affiliation)
 
-    def wrap_ribosome(self, tpe: RibosomeStateProgType[D, CC, C]) -> Callable[[PS], Ribosome[D, CC, C]]:
+    def wrap_ribosome(self, tpe: RibosomeStateProgType[D, CC, C]) -> Callable[[PlS], Ribosome[D, CC, C]]:
         comp_lens = ribosome_comp_lens(tpe.comp)
-        def wrap(ps: PS) -> Ribosome[D, CC, C]:
+        def wrap(ps: PlS) -> Ribosome[D, CC, C]:
             return Ribosome(ps, tpe.comp, comp_lens)
         return wrap
 
@@ -127,31 +127,31 @@ class unwrap_resources(
 ):
 
     def resources_state_prog_type(self, tpe: ResourcesStateProgType[M, C, D, CC]
-                                  ) -> Callable[[PS, Resources[D, CC]], PS]:
-        inner: Callable[[PS, C], PS] = unwrap_affiliation.match(tpe.affiliation)
-        def unwrap(ps: PS, res_wrapped: Resources[C, CC]) -> PS:
+                                  ) -> Callable[[PlS, Resources[D, CC]], PlS]:
+        inner: Callable[[PlS, C], PlS] = unwrap_affiliation.match(tpe.affiliation)
+        def unwrap(ps: PlS, res_wrapped: Resources[C, CC]) -> PlS:
             return inner(ps, res_wrapped.data)
         return unwrap
 
-    def plain_state_prog_type(self, tpe: PlainStateProgType[M, C]) -> Callable[[PS, R], PS]:
+    def plain_state_prog_type(self, tpe: PlainStateProgType[M, C]) -> Callable[[PlS, R], PlS]:
         return unwrap_affiliation.match(tpe.affiliation)
 
-    def unwrap_ribosome(self, tpe: RibosomeStateProgType[D, CC, C]) -> Callable[[PS, Ribosome[D, CC, C]], PS]:
-        def wrap(ps: PS, ribo: Ribosome[D, CC, C]) -> PS:
+    def unwrap_ribosome(self, tpe: RibosomeStateProgType[D, CC, C]) -> Callable[[PlS, Ribosome[D, CC, C]], PlS]:
+        def wrap(ps: PlS, ribo: Ribosome[D, CC, C]) -> PlS:
             return ribo.state
         return wrap
 
 
 class prog_wrappers(
         Generic[M, C, R, D, CC],
-        Case[ProgType[M, C, R], ProgWrappers[PS, R]],
+        Case[ProgType[M, C, R], ProgWrappers[PlS, R]],
         alg=ProgType,
 ):
 
-    def unknown_prog_type(self, tpe: UnknownProgType[M, C]) -> ProgWrappers[PS, R]:
+    def unknown_prog_type(self, tpe: UnknownProgType[M, C]) -> ProgWrappers[PlS, R]:
         return Left('not an `NvimIOState`')
 
-    def state_prog(self, tpe: StateProg[M, C, R, A]) -> ProgWrappers[PS, R]:
+    def state_prog(self, tpe: StateProg[M, C, R, A]) -> ProgWrappers[PlS, R]:
         return Right(ProgWrappers(wrap_resources.match(tpe.tpe), unwrap_resources.match(tpe.tpe)))
 
 
