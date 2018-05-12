@@ -26,11 +26,11 @@ DIO = TypeVar('DIO')
 log = module_log()
 
 
-def component_ctor(comp: Component[D, CD, CC]) -> Callable[[], CD]:
+def component_ctor(comp: Component[CD, CC]) -> Callable[[], CD]:
     return comp.state_ctor.get_or_strict(NoComponentData)
 
 
-def component_ctor_m(comp: Either[str, Component[D, CD, CC]]) -> Callable[[], CD]:
+def component_ctor_m(comp: Either[str, Component[CD, CC]]) -> Callable[[], CD]:
     return (comp.to_maybe // _.state_ctor).get_or_strict(NoComponentData)
 
 

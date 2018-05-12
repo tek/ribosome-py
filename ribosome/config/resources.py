@@ -12,7 +12,7 @@ G = TypeVar('G')
 
 class Resources(Generic[D, CC], Dat['Resources[D, CC]']):
 
-    def __init__(self, data: D, components: Components[D, CC]) -> None:
+    def __init__(self, data: D, components: Components[CC]) -> None:
         self.data = data
         self.components = components
 

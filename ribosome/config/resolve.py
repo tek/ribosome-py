@@ -15,7 +15,7 @@ class ComponentResolver(Logging):
     def __init__(
             self,
             name: str,
-            available_components: Map[str, Component[D, Any, CC]],
+            available_components: Map[str, Component[Any, CC]],
             core: List[str],
             default: List[str],
             requested: Maybe[List[str]],

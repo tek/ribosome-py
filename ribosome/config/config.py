@@ -26,7 +26,7 @@ class Config(Generic[D, CC], Dat['Config[D, CC]']):
             name: str,
             prefix: Optional[str]=None,
             state_ctor: Callable[[], D]=None,
-            components: Map[str, Component[D, Any, CC]]=Map(),
+            components: Map[str, Component[Any, CC]]=Map(),
             rpc: List[RpcProgram]=Nil,
             core_components: List[str]=Nil,
             default_components: List[str]=Nil,
@@ -51,7 +51,7 @@ class Config(Generic[D, CC], Dat['Config[D, CC]']):
     def __init__(
             self,
             basic: BasicConfig[D],
-            components: Map[str, Component[D, Any, CC]],
+            components: Map[str, Component[Any, CC]],
             rpc: List[RpcProgram],
             init: Maybe[Program],
     ) -> None:

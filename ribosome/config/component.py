@@ -34,9 +34,7 @@ def infer_state_ctor(state_type: Union[None, Type[CD]]) -> Do:
     return getattr(tpe, 'cons', state_type)
 
 
-# FIXME `D` is unnecessary
-# maybe the others as well
-class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
+class Component(Generic[CD, CC], Dat['Component[CD, CC]']):
 
     @staticmethod
     def cons(
@@ -46,7 +44,7 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
             state_ctor: Callable[[], CD]=None,
             config: CC=None,
             mappings: Mappings=None,
-    ) -> 'Component[D, CD, CC]':
+    ) -> 'Component[CD, CC]':
         return Component(
             name,
             rpc,
@@ -79,21 +77,21 @@ class Component(Generic[D, CD, CC], Dat['Component[D, CD, CC]']):
         return self.rpc.contains(lambda a: a.program == prog)
 
 
-class Components(Generic[D, CC], Dat['Components']):
+class Components(Generic[CC], Dat['Components']):
 
     @staticmethod
     def cons(
-            all: List[Component[D, Any, CC]]=Nil,
-    ) -> 'Components[D, CC]':
+            all: List[Component[Any, CC]]=Nil,
+    ) -> 'Components[CC]':
         return Components(all)
 
-    def __init__(self, all: List[Component[D, Any, CC]]) -> None:
+    def __init__(self, all: List[Component[Any, CC]]) -> None:
         self.all = all
 
-    def by_name(self, name: str) -> Either[str, Component[D, CD, CC]]:
+    def by_name(self, name: str) -> Either[str, Component[CD, CC]]:
         return self.all.find(_.name == name).to_either(f'no component named {name}')
 
-    def by_type(self, tpe: type) -> Either[str, Component[D, CD, CC]]:
+    def by_type(self, tpe: type) -> Either[str, Component[CD, CC]]:
         return self.all.find(_.state_type == tpe).to_either(f'no component with state type {tpe}')
 
     @property
@@ -108,13 +106,13 @@ class ComponentConfig(Dat['ComponentConfig']):
 
     @staticmethod
     def cons(
-            available: Map[str, Component[D, Any, CC]],
+            available: Map[str, Component[Any, CC]],
     ) -> 'ComponentConfig':
         return ComponentConfig(
             available,
         )
 
-    def __init__(self, available: Map[str, Component[D, Any, CC]]) -> None:
+    def __init__(self, available: Map[str, Component[Any, CC]]) -> None:
         self.available = available
 
 
