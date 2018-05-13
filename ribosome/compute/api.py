@@ -1,6 +1,7 @@
 from typing import Callable, TypeVar, Tuple, Any
 
 from amino import Either, do, Do, _, IO, List
+from amino.logging import module_log
 
 from ribosome.compute.tpe import prog_type
 from ribosome.compute.wrap import prog_wrappers
@@ -19,15 +20,14 @@ from ribosome.rpc.args import ParamsSpec
 from ribosome.rpc.api import RpcProgram
 from ribosome.rpc.arg_parser import ArgParser, JsonArgParser, TokenArgParser
 
+log = module_log()
 A = TypeVar('A')
 B = TypeVar('B')
 D = TypeVar('D')
-M = TypeVar('M')
 P = TypeVar('P')
 R = TypeVar('R')
 CC = TypeVar('CC')
 C = TypeVar('C')
-PIO = TypeVar('PIO')
 
 
 def arg_parser(rpc_program: RpcProgram, params_spec: ParamsSpec) -> ArgParser:

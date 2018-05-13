@@ -1,6 +1,9 @@
 from typing import Any
 
 from amino import List, Try, do, Do, Either, ADT, Left, Right, Lists
+from amino.logging import module_log
+
+log = module_log()
 
 
 class Receive(ADT['Receive']):

@@ -50,7 +50,6 @@ def quit_file() -> Do:
 
 @do(NvimIO[Expectation])
 def leave_spec() -> Do:
-    yield N.sleep(2)
     yield nvim_quit()
     yield await_k(quit_file)
 
