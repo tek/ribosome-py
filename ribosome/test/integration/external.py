@@ -20,7 +20,6 @@ def cleanup(result: NResult) -> Do:
     '''for some reason, the loop gets stuck if `quit` is called only once.
         '''
     yield nvim_quit()
-    yield nvim_quit()
 
 
 @do(NvimIO[Expectation])

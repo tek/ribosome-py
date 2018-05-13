@@ -4,7 +4,7 @@ from ribosome.compute.api import prog
 from ribosome.config.component import Component
 from ribosome.rpc.api import rpc
 from ribosome.config.config import Config, NoData
-from ribosome.nvim.api.variable import variable_set, variable_raw
+from ribosome.nvim.api.variable import variable_set
 from ribosome.nvim.io.state import NS
 
 val = 71

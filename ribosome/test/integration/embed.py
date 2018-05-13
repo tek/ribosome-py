@@ -42,7 +42,6 @@ def cleanup(config: TestConfig) -> Callable[[NResult], NvimIO[None]]:
     @do(NvimIO[None])
     def cleanup(result: NResult) -> Do:
         yield nvim_quit()
-        yield nvim_quit()
         runtime_log = yield N.from_io(IO.delay(config.log_file.read_text))
         if runtime_log:
             log.info(green('plugin output:'))

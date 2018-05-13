@@ -1,30 +1,23 @@
 from kallikrein import Expectation
 
-from amino import do, Do
+from amino import do, Do, List
 from amino.test.spec import SpecBase
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.integration.embed import plugin_test, TestConfig
-from ribosome.nvim.api.variable import variable_set_prefixed
 from ribosome.test.klk.matchers.variable import var_must_become
-from ribosome.nvim.io.api import N
 from ribosome.nvim.api.function import nvim_call_function
 
 from integration._support.command import command_spec_config, val
 
 
-@do(NvimIO[None])
-def pre() -> Do:
-    yield variable_set_prefixed('components', ['core'])
-
-
 @do(NvimIO[Expectation])
 def command_spec() -> Do:
-    yield nvim_call_function('PlugTransCmd')
+    yield nvim_call_function('PlugProgCmd')
     yield var_must_become('command_success', val)
 
 
-test_config = TestConfig.cons(command_spec_config, pre)
+test_config = TestConfig.cons(command_spec_config, components=List('core'))
 
 
 class CommandSpec(SpecBase):

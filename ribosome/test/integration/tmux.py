@@ -78,7 +78,6 @@ def cleanup(config: TestConfig, proc: subprocess.Popen, tmux: Tmux) -> Callable[
     @do(NvimIO[None])
     def cleanup(result: NResult) -> Do:
         yield N.ignore_failure(nvim_quit())
-        yield N.ignore_failure(nvim_quit())
         yield N.ignore_failure(N.from_io(cleanup_tmux(proc, tmux)))
         runtime_log = yield N.from_io(IO.delay(config.log_file.read_text))
         if runtime_log:

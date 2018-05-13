@@ -47,7 +47,7 @@ def rpcrequest_current(method: str, *args: str) -> Do:
 
 
 def nvim_quit() -> NvimIO[None]:
-    return nvim_command('quit!')
+    return nvim_command('qall!')
 
 
 def nvim_api() -> NvimIO[NvimApi]:
