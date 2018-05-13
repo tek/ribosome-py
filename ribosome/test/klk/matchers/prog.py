@@ -1,3 +1,5 @@
+from typing import Any
+
 from ribosome.nvim.api.util import nvimio_repeat_timeout
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.rpc import plugin_name
@@ -23,4 +25,16 @@ def seen_program(name: str, timeout: float=1., interval=.25) -> NvimIO[None]:
     )
 
 
-__all__ = ('program_log', 'seen_program',)
+@do(NvimIO[Any])
+def plugin_state() -> Do:
+    name = yield plugin_name()
+    yield nvim_call_json(f'{camelcase(name)}State')
+
+
+@do(NvimIO[Any])
+def component_state(component_name: str) -> Do:
+    name = yield plugin_name()
+    yield nvim_call_json(f'{camelcase(name)}ComponentState', component_name)
+
+
+__all__ = ('program_log', 'seen_program', 'plugin_state', 'component_state',)

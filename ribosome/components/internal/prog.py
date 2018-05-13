@@ -42,9 +42,16 @@ def set_log_level(level: str) -> NS[PluginState[D, CC], None]:
 
 
 @prog
-@do(EitherState[ComponentData[PluginState[D, CC], NoData], str])
+@do(NS[ComponentData[PluginState[D, CC], NoData], str])
 def state_data() -> Do:
-    yield EitherState.inspect_f(lambda s: dump_json(s.main.data))
+    yield NS.inspect_either(lambda s: dump_json(s.main.data))
+
+
+@prog
+@do(NS[PluginState[D, CC], str])
+def component_state_data(name: str) -> Do:
+    data = yield NS.inspect_either(lambda s: s.data_by_name(name))
+    yield NS.e(dump_json(data))
 
 
 class RpcTrigger(Dat['RpcTrigger']):
@@ -195,4 +202,4 @@ def internal_init() -> Do:
 
 __all__ = ('internal_init', 'mapping', 'MapOptions', 'enable_components', 'show_python_path', 'append_python_path',
            'poll', 'program_log', 'set_log_level', 'state_data', 'rpc_triggers', 'update_state',
-           'update_component_state')
+           'update_component_state', 'component_state_data',)
