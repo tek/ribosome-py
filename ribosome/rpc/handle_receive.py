@@ -36,7 +36,7 @@ def publish_error_from_vim(requests: Requests, err: ReceiveError) -> Do:
 
 class handle_receive(Generic[A], Case[Receive, IO[None]], alg=Receive):
 
-    def __init__(self, comm: Comm, execute_plugin_rpc: Callable[[Comm, Rpc], None]) -> None:
+    def __init__(self, comm: Comm, execute_plugin_rpc: Callable[[Comm, Rpc], IO[None]]) -> None:
         self.comm = comm
         self.execute_plugin_rpc = execute_plugin_rpc
 

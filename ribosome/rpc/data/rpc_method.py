@@ -25,11 +25,12 @@ class FunctionMethod(RpcMethod):
 class AutocmdMethod(RpcMethod):
 
     @staticmethod
-    def cons(pattern: str='*') -> 'AutocmdMethod':
-        return AutocmdMethod(pattern)
+    def cons(pattern: str=None, sync: bool=False) -> 'AutocmdMethod':
+        return AutocmdMethod(pattern or '*', sync)
 
-    def __init__(self, pattern: str) -> None:
+    def __init__(self, pattern: str, sync: bool) -> None:
         self.pattern = pattern
+        self.sync = sync
 
 
 __all__ = ('RpcMethod', 'CommandMethod', 'FunctionMethod', 'AutocmdMethod',)

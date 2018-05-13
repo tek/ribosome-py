@@ -105,8 +105,9 @@ def command_tokens(bang: bool, nargs: Nargs) -> DefinitionTokens:
 function_tokens = DefinitionTokens('rpcrequest', List('a:000'), 'function!', Nil, Nil, '')
 
 
-def autocmd_tokens(pattern: str) -> DefinitionTokens:
-    return DefinitionTokens('rpcnotify', Nil, 'autocmd', Nil, List('*'), '')
+def autocmd_tokens(pattern: str, sync: bool) -> DefinitionTokens:
+    func = 'rpcrequest' if sync else 'rpcnotify'
+    return DefinitionTokens(func, Nil, 'autocmd', Nil, List('*'), '')
 
 
 class rpc_prefix(Case[PrefixStyle, str], alg=PrefixStyle):
@@ -179,7 +180,7 @@ class method_definition(Case[RpcMethod, List[str]], alg=RpcMethod):
         return List(trigger_definition(function_rhs, self.rpc_def, function_tokens))
 
     def autocmd(self, method: AutocmdMethod) -> List[str]:
-        tokens = autocmd_tokens(method.pattern)
+        tokens = autocmd_tokens(method.pattern, method.sync)
         return List(
             f'augroup {self.rpc_def.config.name}',
             trigger_definition(command_rhs, self.rpc_def, tokens),

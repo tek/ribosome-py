@@ -4,7 +4,7 @@ from amino import List, Dat, Maybe
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.compute.program import Program
-from ribosome.rpc.data.prefix_style import PrefixStyle, Short
+from ribosome.rpc.data.prefix_style import PrefixStyle, Short, Plain
 from ribosome.rpc.data.rpc_method import RpcMethod, CommandMethod, FunctionMethod, AutocmdMethod
 
 A = TypeVar('A')
@@ -69,8 +69,9 @@ class RpcApi:
     def write(self, program: Program[A]) -> RpcProgram[A]:
         return RpcProgram.cons(program)
 
-    def autocmd(self, program: Program[A]) -> RpcProgram[A]:
-        return RpcProgram.cons(program, RpcOptions.cons(methods=List(AutocmdMethod.cons())))
+    def autocmd(self, program: Program[A], pattern: str=None, sync: bool=False) -> RpcProgram[A]:
+        method = AutocmdMethod.cons(pattern, sync)
+        return RpcProgram.cons(program, RpcOptions.cons(methods=List(method))).conf(prefix=Plain())
 
 
 rpc = RpcApi()

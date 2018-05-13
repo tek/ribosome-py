@@ -2,8 +2,6 @@ from typing import Any
 
 from amino import List, Try, do, Do, Either, ADT, Left, Right, Lists
 
-from ribosome import ribo_log
-
 
 class Receive(ADT['Receive']):
     pass
@@ -11,7 +9,7 @@ class Receive(ADT['Receive']):
 
 class ReceiveRequest(Receive):
 
-    def __init__(self, id: int, method: str, args: list) -> None:
+    def __init__(self, id: int, method: str, args: List[Any]) -> None:
         self.id = id
         self.method = method
         self.args = args

@@ -95,11 +95,6 @@ def run_nvim(comm: Comm, config: Config, io: Callable[[], NvimIO[A]]) -> Do:
     return r
 
 
-# TODO incoming rpc methods must have format '{read,write}:{sync,async}:<name>'
-# write requests are exclusive and their results update the state.
-# sync requests produce responses to vim
-# is sync necessary? can also just correspond to the rpc type
-# also, read/write should probably just be attrs of the handler
 class RpcSpec(SpecBase):
     '''
     uv session $uv
