@@ -11,7 +11,7 @@ from ribosome.nvim.api.command import nvim_atomic_commands
 from ribosome.rpc.api import RpcOptions, RpcProgram
 from ribosome.rpc.data.rpc_method import RpcMethod, CommandMethod, FunctionMethod, AutocmdMethod
 from ribosome.rpc.data.prefix_style import PrefixStyle, Plain, Full, Short
-from ribosome.rpc.data.nargs import Nargs
+from ribosome.rpc.data.nargs import Nargs, NargsStar
 
 log = module_log()
 
@@ -173,7 +173,12 @@ class method_definition(Case[RpcMethod, List[str]], alg=RpcMethod):
         self.rpc_def = rpc_def
 
     def command(self, method: CommandMethod) -> List[str]:
-        tokens = command_tokens(method.bang, self.prog.program.params_spec.nargs)
+        nargs = (
+            NargsStar()
+            if self.prog.options.json else
+            self.prog.program.params_spec.nargs
+        )
+        tokens = command_tokens(method.bang, nargs)
         return List(trigger_definition(command_rhs, self.rpc_def, tokens))
 
     def function(self, method: FunctionMethod) -> List[str]:
