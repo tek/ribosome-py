@@ -1,9 +1,9 @@
 from concurrent.futures import Future
-from typing import Callable, Tuple, Generic, TypeVar
+from typing import Callable, Tuple, Generic, TypeVar, Any
 
 import msgpack
 
-from amino import do, Do, IO, Right, Left
+from amino import do, Do, IO, Right, Left, List, Lists
 from amino.case import Case
 from amino.logging import module_log
 
@@ -68,12 +68,23 @@ class handle_receive(Generic[A], Case[Receive, IO[None]], alg=Receive):
         return IO.delay(log.error, f'received unknown rpc: {receive}')
 
 
+@do(IO[List[Any]])
+def unpack(data: bytes) -> Do:
+    unpacker = msgpack.Unpacker()
+    yield IO.delay(unpacker.feed, data)
+    raw = yield IO.delay(list, unpacker)
+    return Lists.wrap(raw)
+
+
 def rpc_receive(comm: Comm, execute_plugin_rpc: Callable[[Comm, Rpc], None]) -> Callable[[bytes], IO[None]]:
+    def handle(data: Any) -> IO[None]:
+        receive = cons_receive(data)
+        return handle_receive(comm, execute_plugin_rpc)(receive)
     @do(IO[None])
     def on_read(blob: bytes) -> Do:
-        data = yield IO.delay(msgpack.unpackb, blob).recover_with(lambda e: IO.failed(f'failed to unpack: {e}'))
-        receive = cons_receive(data)
-        yield handle_receive(comm, execute_plugin_rpc)(receive)
+        data = yield IO.delay(unpack, blob).recover_with(lambda e: IO.failed(f'failed to unpack: {e}'))
+        yield data.traverse(handle, IO)
+        yield IO.pure(None)
     return on_read
 
 

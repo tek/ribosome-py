@@ -1,6 +1,6 @@
 from typing import Tuple
 
-from msgpack import unpackb
+import msgpack
 
 from amino import List, I, do, Do, Path
 from amino.logging import module_log
@@ -83,7 +83,7 @@ def current_buffer_content() -> Do:
 
 
 def buffer_number(buffer: Buffer) -> NvimIO[int]:
-    return N.delay(lambda v: unpackb(buffer.data.data))
+    return N.delay(lambda v: msgpack.unpackb(buffer.data.data))
 
 
 @do(NvimIO[None])
