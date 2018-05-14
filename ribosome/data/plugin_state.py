@@ -122,7 +122,7 @@ class PluginState(Generic[D, CC], Dat['PluginState[D, CC]']):
         return self.component_data.lift(tpe) | (lambda: self.ctor_by_type(tpe)())
 
     def data_for(self, component: Component) -> Any:
-        return self.component_data.lift(component.state_type).get_or(component_ctor, component)
+        return self.component_data.lift(component.state_type).get_or(component_ctor(component))
 
     def data_by_name(self, name: str) -> Either[str, Any]:
         return self.component(name) / self.data_for
