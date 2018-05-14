@@ -45,10 +45,17 @@ def increment() -> IOState[RpcConcurrency, int]:
     return IOState.inspect(exclusive_increment)
 
 
+def pack_error(metadata: list, payload: list) -> Callable[[Exception], IO[bytes]]:
+    def pack_error(error: Exception) -> IO[bytes]:
+        return IO.delay(msgpack.packb, metadata + [f'could not serialize response `{payload}`', None])
+    return pack_error
+
+
 @do(IOState[RpcComm, Any])
 def send_rpc(metadata: list, payload: list) -> Do:
     send = yield IOState.inspect(lambda a: a.send)
-    payload = yield IOState.delay(msgpack.packb, metadata + payload)
+    pack = IO.delay(msgpack.packb, metadata + payload).recover_with(pack_error(metadata, payload))
+    payload = yield IOState.lift(pack)
     yield IOState.delay(send, payload)
 
 
