@@ -76,6 +76,10 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
     def simple(f: Callable[..., A], *a: Any, **kw: Any) -> 'NvimIOState[S, A]':
         return NS.lift(N.simple(f, *a, **kw))
 
+    @staticmethod
+    def sleep(duration: float) -> 'NvimIOState[S, A]':
+        return NS.lift(N.sleep(duration))
+
 
 tcs(NvimIO, NvimIOState)
 
