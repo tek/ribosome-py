@@ -7,6 +7,7 @@ from amino.logging import module_log
 from ribosome.rpc.data.rpc_type import RpcType, BlockingRpc, NonblockingRpc
 from ribosome.rpc.data.rpc import Rpc
 from ribosome.nvim.io.data import NFatal, NResult, NSuccess, NError
+from ribosome import ribo_log
 
 log = module_log()
 
@@ -100,7 +101,7 @@ class report_error(Case[RpcResponse, IO[None]], alg=RpcResponse):
         return IO.delay(log.debug, response.error)
 
     def async_error(self, response: RpcAsyncError) -> IO[None]:
-        return IO.delay(log.error, response.error)
+        return IO.delay(ribo_log.error, response.error)
 
     def case_default(self, response: RpcResponse) -> IO[None]:
         return IO.pure(None)
