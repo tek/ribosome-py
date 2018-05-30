@@ -180,7 +180,7 @@ def mapping_program(ident: str, keys: str) -> Do:
     return program
 
 
-@prog.do
+@prog.do(None)
 def mapping(ident: str, keys: str) -> Do:
     program = yield mapping_program(ident, keys)
     yield program()
@@ -192,7 +192,7 @@ def internal_init_program() -> Do:
     yield NS.inspect(_.init)
 
 
-@prog.do
+@prog.do(None)
 def internal_init() -> Do:
     enabled = yield Ribo.setting_prog(run_internal_init)
     if enabled:

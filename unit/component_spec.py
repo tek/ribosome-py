@@ -58,7 +58,7 @@ def extra_fun(a: int) -> Do:
     yield NS.pure(a + 9)
 
 
-@prog.do
+@prog.do(None)
 def switch() -> Do:
     a = yield core_fun(3)
     yield extra_fun(a)

@@ -7,7 +7,7 @@ from kallikrein.matchers.match_with import match_with
 from amino import IO
 
 
-def run_test_io(io: Callable[..., IO[Expectation]], *a: Any, **kw: Any) -> None:
+def run_test_io(io: Callable[..., IO[Expectation]], *a: Any, **kw: Any) -> Expectation:
     return k(io(*a, **kw).attempt).must(be_right(match_with(lambda a: a)))
 
 

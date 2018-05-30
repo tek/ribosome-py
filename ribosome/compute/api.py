@@ -1,4 +1,4 @@
-from typing import Callable, TypeVar, Tuple, Any
+from typing import Callable, TypeVar, Tuple, Any, Type
 
 from amino import Either, do, Do, _, IO, List
 from amino.logging import module_log
@@ -124,10 +124,12 @@ class ProgApi:
             return NS.pure(func(*p))
         return prog_state(wrap, ProgOutputResult(), func.__module__, func.__name__)
 
-    def do(self, func: Callable[[P], Do]) -> Program:
-        f = do(Prog[A])(func)
-        params_spec = ParamsSpec.from_function(f)
-        return Program.cons(func.__name__, ProgramCompose(f), params_spec)
+    def do(self, rettype: Type[A]) -> Program[A]:
+        def do_wrap(func: Callable[[P], Do]) -> Program[A]:
+            f = do(Prog[A])(func)
+            params_spec = ParamsSpec.from_function(f)
+            return Program.cons(func.__name__, ProgramCompose(f), params_spec)
+        return do_wrap
 
     io = prog_io
     subproc = prog_subproc
