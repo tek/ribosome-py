@@ -13,6 +13,7 @@ from ribosome.data.plugin_state import PS
 from ribosome.nvim.io.state import NS
 from ribosome.test.prog import init_test_state
 from ribosome.test.run import run_test_io
+from ribosome.test.integration.rpc import set_nvim_vars
 
 
 @do(NvimIO[None])
@@ -24,6 +25,7 @@ def cleanup(result: NResult) -> Do:
 
 @do(NvimIO[Expectation])
 def run_test(config: TestConfig, io: Callable[..., NS[PS, Expectation]], *a: Any, **kw: Any) -> Do:
+    yield set_nvim_vars(config.vars + ('components', config.components))
     yield config.pre()
     state = yield init_test_state(config)
     yield io(*a, **kw).run_a(state)
