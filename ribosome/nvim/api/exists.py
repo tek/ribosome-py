@@ -6,6 +6,7 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.function import nvim_call_cons, nvim_call_function
 from ribosome.nvim.api.util import nvimio_repeat_timeout, cons_checked_e
 from ribosome.nvim.api.command import nvim_command
+from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
 
@@ -81,6 +82,22 @@ def call_once_defined(name: str, *args: str, timeout: int=10) -> Do:
     yield nvim_call_function(name, *args)
 
 
+def wait_until_function_produces(
+        target: Any,
+        name: str,
+        *args: str,
+        timeout: int=10,
+        interval: float=None,
+) -> NvimIO[A]:
+    return nvimio_repeat_timeout(
+        lambda: N.recover_failure(nvim_call_function(name, *args), N.pure),
+        lambda a: a == target,
+        f'{name} did not product `{target}` within {timeout} seconds',
+        timeout,
+        interval,
+    )
+
+
 __all__ = ('nvim_exists', 'wait_until_valid', 'function_exists', 'command_exists', 'wait_for_function',
            'wait_for_command', 'command_once_defined', 'call_once_defined', 'function_exists_not',
-           'wait_for_function_undef', 'command_exists_not',)
+           'wait_for_function_undef', 'command_exists_not', 'wait_until_function_produces',)

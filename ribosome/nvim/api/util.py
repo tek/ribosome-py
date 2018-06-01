@@ -96,12 +96,13 @@ def nvimio_repeat_timeout(
         check: Callable[[A], bool],
         error: str,
         timeout: float,
-        interval: float=.01,
+        interval: float=None,
 ) -> Do:
+    effective_interval = .01 if interval is None else interval
     start = yield N.simple(time.time)
     @do(NvimIO[None])
     def wait_and_recurse() -> Do:
-        yield N.sleep(interval)
+        yield N.sleep(effective_interval)
         yield recurse()
     @do(NvimIO[None])
     def recurse() -> Do:
