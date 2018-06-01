@@ -30,7 +30,11 @@ def run_programs(programs: List[Program], args: RpcArgs) -> NvimIO[List[Any]]:
 
 
 def run_program_exclusive(guard: StateGuard[A], program: RpcProgram, args: RpcArgs) -> NvimIO[Any]:
-    return exclusive_ns(guard, program.program.name, run_program, program, args)
+    return (
+        exclusive_ns(guard, program.program.name, run_program, program, args)
+        if program.options.write else
+        run_program(program, args).run_a(guard.state)
+    )
 
 
 def run_programs_exclusive(guard: StateGuard[A], programs: List[Program], args: RpcArgs) -> NvimIO[List[Any]]:

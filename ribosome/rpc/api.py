@@ -69,6 +69,9 @@ class RpcApi:
     def write(self, program: Program[A]) -> RpcProgram[A]:
         return RpcProgram.cons(program)
 
+    def read(self, program: Program[A]) -> RpcProgram[A]:
+        return RpcProgram.cons(program, RpcOptions.cons(write=False))
+
     def autocmd(self, program: Program[A], pattern: str=None, sync: bool=False) -> RpcProgram[A]:
         method = AutocmdMethod.cons(pattern, sync)
         return RpcProgram.cons(program, RpcOptions.cons(methods=List(method))).conf(prefix=Plain())
