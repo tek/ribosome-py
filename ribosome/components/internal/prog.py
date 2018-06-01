@@ -126,9 +126,9 @@ def update_component_state(comp: str, query: UpdateQuery) -> Do:
     yield query.patch / L(patch_update_component)(comp, _) | NS.pure(None)
 
 
-@prog.unit
-def poll() -> NS[D, None]:
-    return NS.unit
+@prog
+def poll() -> NS[D, bool]:
+    return NS.pure(True)
 
 
 @prog.unit
