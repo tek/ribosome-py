@@ -33,6 +33,10 @@ class Prog(Generic[A], ADT['Prog[A]'], Implicits, implicits=True, auto=True, met
         return fa / Prog.pure | (lambda: Prog.error(error))
 
     @staticmethod
+    def m(fa: Maybe[A], error: CallByName) -> 'Prog[A]':
+        return Prog.from_maybe(fa, error)
+
+    @staticmethod
     def from_either(fa: Either[str, A]) -> 'Prog[A]':
         return fa.cata(Prog.error, Prog.pure)
 
