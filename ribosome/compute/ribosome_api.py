@@ -11,7 +11,7 @@ from ribosome.compute.prog import Prog, ProgExec
 from ribosome.compute.output import ProgOutputResult
 from ribosome.compute.tpe_data import StateProg, trivial_state_prog, ribo_state_prog
 from ribosome.compute.wrap import prog_wrappers
-from ribosome.data.plugin_state import PluginState
+from ribosome.data.plugin_state import PS
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -96,7 +96,7 @@ class Ribo(metaclass=RMeta):
     @classmethod
     @do(Prog[A])
     def lift(self, fa: NS[Ribosome[D, CC, C], A], comp: Type[C]) -> Do:
-        state_type: StateProg[PluginState[D, CC], C, Ribosome[D, CC, C]] = ribo_state_prog(comp)
+        state_type: StateProg[PS[D, CC], C, Ribosome[D, CC, C]] = ribo_state_prog(comp)
         yield Ribo.lift_state_prog(fa, state_type)
 
     @classmethod

@@ -1,5 +1,5 @@
-amino~=13.0.0a24
+amino~=13.0.0a32
 pyuv~=1.4.0
 msgpack-python~=0.5.6
-chiasma~=0.1.0.a20
+chiasma~=0.1.0.a25
 kallikrein~=0.22.0a15
