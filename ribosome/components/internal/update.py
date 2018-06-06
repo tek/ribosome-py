@@ -3,6 +3,7 @@ from typing import TypeVar
 from amino import do, Do, _, __, List, Either, Maybe
 from amino.lenses.lens import lens
 from amino.state import EitherState
+from amino.logging import module_log
 
 from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PluginState
@@ -14,6 +15,7 @@ from ribosome.config import settings
 from ribosome.rpc.define import define_rpc, ActiveRpcTrigger, undef_command
 from ribosome.rpc.api import RpcProgram
 
+log = module_log()
 CC = TypeVar('CC')
 D = TypeVar('D')
 P = TypeVar('P')

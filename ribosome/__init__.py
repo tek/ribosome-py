@@ -1,4 +1,7 @@
-in_vim = True
+import os
+import sys
+
+sys.path[:0] = os.environ.get('RIBOSOME_PYTHONPATH', '').split(':')
 
 from ribosome.nvim.api.data import NvimApi
 from ribosome.logging import ribo_log
