@@ -128,10 +128,15 @@ def path_list(data: list) -> Either[str, List[Path]]:
     return Lists.wrap(data).traverse(lambda a: Try(Path, a) / __.expanduser(), Either)
 
 
+def str_list(data: list) -> Either[str, List[str]]:
+    return Lists.wrap(data).traverse(lambda a: Right(a) if isinstance(a, str) else Left(f'not a string: {a}'), Either)
+
+
 str_setting = setting_ctor(str, Right)
 int_setting = setting_ctor(int, Right)
 float_setting = setting_ctor(float, Right)
 list_setting = setting_ctor(list, Right)
+str_list_setting = setting_ctor(list, str_list)
 path_setting = setting_ctor(str, (lambda a: Try(Path, a)))
 path_list_setting = setting_ctor(list, path_list)
 map_setting = setting_ctor(dict, lambda a: Right(Map(a)))
@@ -140,4 +145,5 @@ bool_setting = setting_ctor(int, lambda a: Right(false if a == 0 else true))
 
 
 __all__ = ('Setting', 'StrictSetting', 'EvalSetting', 'setting_ctor', 'str_setting', 'int_setting', 'float_setting',
-           'list_setting', 'path_setting', 'path_list_setting', 'map_setting', 'path_map_setting', 'bool_setting')
+           'list_setting', 'path_setting', 'path_list_setting', 'map_setting', 'path_map_setting', 'bool_setting',
+           'str_list_setting',)
