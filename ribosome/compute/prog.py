@@ -41,6 +41,10 @@ class Prog(Generic[A], ADT['Prog[A]'], Implicits, implicits=True, auto=True, met
         return fa.cata(Prog.error, Prog.pure)
 
     @staticmethod
+    def e(fa: Either[str, A]) -> 'Prog[A]':
+        return Prog.from_either(fa)
+
+    @staticmethod
     def pure(a: A) -> 'Prog[A]':
         return ProgPure(a)
 
