@@ -25,7 +25,7 @@ def no_matching_program(method: str) -> NS[PS, Any]:
     return NS.lift(N.error(f'no matching program for {method}'))
 
 
-@do(NS[PS, Any])
+@do(NS[PS, List[Any]])
 def request(method: str, *args: Any) -> Do:
     progs = yield NS.inspect(lambda a: a.programs)
     matches = progs.filter(lambda a: a.rpc_name == method)
@@ -36,6 +36,12 @@ def request(method: str, *args: Any) -> Do:
     )
 
 
+@do(NS[PS, Any])
+def request_one(method: str, *args: Any) -> Do:
+    results = yield request(method, *args)
+    yield NS.m(results.head, lambda: f'empty result list for request `{method}`')
+
+
 @do(NvimIO[PS])
 def init_test_state(config: TestConfig) -> Do:
     log_handler = yield N.delay(nvim_logging)
@@ -43,4 +49,4 @@ def init_test_state(config: TestConfig) -> Do:
     yield update_components(Just(config.components)).nvim.run_s(state)
 
 
-__all__ = ('program_runner', 'request', 'init_test_state',)
+__all__ = ('program_runner', 'request', 'init_test_state', 'request_one',)
