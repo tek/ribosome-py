@@ -4,14 +4,16 @@ from types import ModuleType
 from amino import Either, _, L, amino_log, __, Path, Nil, Just, IO, List, do, Do
 
 from amino.either import ImportFailure
-from amino.logging import amino_root_file_logging
+from amino.logging import amino_root_file_logging, module_log
 from amino.mod import instance_from_module
 from amino.json import decode_json
 from amino.util.exception import format_exception
+from amino.test.time import timed
 
 from ribosome.config.config import Config
 from ribosome.rpc.uv.uv import start_uv_plugin_sync
 
+log = module_log()
 D = TypeVar('D')
 DIO = TypeVar('DIO')
 B = TypeVar('B')
@@ -79,6 +81,15 @@ def start_module(mod: str) -> int:
     return start_from(mod, Either.import_module, 'module')
 
 
+def start_path(path: str) -> int:
+    try:
+        setup_log()
+        amino_log.debug(f'start_path: {path}')
+        return Either.import_path(path).cata(L(import_error)(_, path), run_loop_uv)
+    except Exception as e:
+        return exception(e, path)
+
+
 def start_file(path: str) -> int:
     p = Path(path)
     file = p / '__init__.py' if p.is_dir() else p
@@ -102,4 +113,4 @@ def start_json_config(data: str) -> int:
             error(e)
 
 
-__all__ = ('start_module', 'start_file', 'start_json_config')
+__all__ = ('start_module', 'start_file', 'start_json_config', 'start_path',)
