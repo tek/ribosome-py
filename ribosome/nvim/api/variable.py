@@ -59,13 +59,16 @@ def variable_prefixed_num(name: str) -> NvimIO[Either[str, Number]]:
 
 
 def variable_set(name: str, value: Any) -> NvimIO[None]:
+    log.debug(f'setting variable `{name}` to `{value}`')
     return N.write('nvim_set_var', name, value)
 
 
 @do(NvimIO[None])
 def variable_set_prefixed(name: str, value: Any) -> Do:
     plug = yield plugin_name()
-    yield N.write('nvim_set_var', f'{plug}_{name}', value)
+    ident = f'{plug}_{name}'
+    log.debug(f'setting variable `{ident}` to `{value}`')
+    yield N.write('nvim_set_var', ident, value)
 
 
 def buffer_var_raw(buffer: Buffer, name: str) -> NvimIO[Any]:
