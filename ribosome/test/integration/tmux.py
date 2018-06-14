@@ -14,19 +14,18 @@ from amino import do, Do, IO, Lists, List, Path, env
 from amino.logging import module_log
 from amino.string.hues import green
 from amino.test import temp_dir
-from amino.test.path import base_dir, pkg_dir
+from amino.test.path import pkg_dir
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
 from ribosome.nvim.api.rpc import nvim_quit
-from ribosome.nvim.api.variable import pvar_becomes
 from ribosome.nvim.io.data import NResult
 from ribosome.test.config import TestConfig
 from ribosome.test.integration.rpc import nvim_cmdline, set_nvim_vars, setup_test_nvim_socket, test_env_vars
-from ribosome.test.run import run_test_io
-from ribosome.test.integration.embed import start_plugin_embed
+from ribosome.test.run import run_test_io, plugin_started
 from ribosome.nvim.api.exists import wait_until_valid
 from ribosome import NvimApi
+from ribosome.test.integration.start import start_plugin_embed
 
 log = module_log()
 
@@ -93,7 +92,7 @@ def tmux_plugin_test(config: TestConfig, io: Callable[..., NvimIO[Expectation]],
         yield set_nvim_vars(config.vars + ('components', config.components))
         yield config.pre()
         yield start_plugin_embed(config)
-        yield pvar_becomes('started', True)
+        yield plugin_started()
         yield io(*a, **kw)
     @do(IO[Expectation])
     def run() -> Do:

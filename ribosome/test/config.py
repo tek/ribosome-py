@@ -2,7 +2,7 @@ from typing import Any, Callable, Optional
 
 from ribosome.config.component import Component
 
-from amino import Map, Lists, Dat, Path, List, Nil
+from amino import Map, Lists, Dat, Path, List, Nil, Maybe
 from amino.test import temp_dir
 from ribosome.config.config import Config
 from ribosome.compute.program import Program
@@ -33,6 +33,7 @@ class TestConfig(Dat['TestConfig']):
             function_handler: Handler=no_handler,
             command_handler: Handler=no_handler,
             autostart: bool=True,
+            config_path: str=None,
     ) -> 'TestConfig':
         ld = log_dir or temp_dir('log')
         lf = log_file or ld / config.basic.name
@@ -49,6 +50,7 @@ class TestConfig(Dat['TestConfig']):
             function_handler,
             command_handler,
             autostart,
+            Maybe.optional(config_path),
         )
 
     def __init__(
@@ -65,6 +67,7 @@ class TestConfig(Dat['TestConfig']):
             function_handler: Handler,
             command_handler: Handler,
             autostart: bool,
+            config_path: Maybe[str],
     ) -> None:
         self.config = config
         self.pre = pre
@@ -78,6 +81,7 @@ class TestConfig(Dat['TestConfig']):
         self.function_handler = function_handler
         self.command_handler = command_handler
         self.autostart = autostart
+        self.config_path = config_path
 
     def with_vars(self, **kw: Any) -> 'TestConfig':
         return self.copy(vars=self.vars ** Map(kw))
