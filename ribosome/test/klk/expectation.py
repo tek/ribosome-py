@@ -1,6 +1,6 @@
 from typing import Callable, Any, TypeVar
 
-from kallikrein.expectation import LiftExpectationResult, ExpectationResult
+from kallikrein.expectation import LiftExpectationResult, ExpectationResult, FatalSpecResult
 from kallikrein import Expectation, k
 from kallikrein.matcher import Matcher
 
@@ -9,7 +9,7 @@ from amino import do, Do
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.util import nvimio_repeat_timeout
 from ribosome.nvim.io.api import N
-from ribosome.nvim.io.data import NError
+from ribosome.nvim.io.data import NError, NResult
 
 A = TypeVar('A')
 
@@ -20,10 +20,14 @@ def failure_result(expectation: Callable[..., NvimIO[Expectation]], *a: Any, **k
     return failure_result
 
 
-@do(NvimIO[Expectation])
+@do(NvimIO[ExpectationResult])
 def eval_expectation(expectation: Callable[..., NvimIO[Expectation]], *a: Any, **kw: Any) -> Do:
-    io = yield expectation(*a, **kw)
-    yield N.from_io(io.evaluate)
+    exp = yield expectation(*a, **kw)
+    yield N.from_io(exp.evaluate)
+
+
+def failed_expectation(result: NResult[A]) -> NvimIO[ExpectationResult]:
+    return N.pure(FatalSpecResult('await_k', Exception(str(result))))
 
 
 @do(NvimIO[Expectation])
@@ -36,7 +40,7 @@ def await_k(
 ) -> Do:
     yield N.recover_error(
         nvimio_repeat_timeout(
-            lambda: eval_expectation(expectation, *a, **kw),
+            lambda: N.recover_failure(eval_expectation(expectation, *a, **kw), failed_expectation),
             lambda a: a.success,
             f'expectation not satisfied within {timeout} seconds',
             timeout,

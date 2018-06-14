@@ -4,12 +4,14 @@ from lenses import UnboundLens
 
 from amino import IO, Path, Left, do, Do
 from amino.json import decode_json, dump_json
+from amino.logging import module_log
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.state import NS
 from ribosome.nvim.io.api import N
 from ribosome.config.settings import project_state_dir
 
+log = module_log()
 A = TypeVar('A')
 D = TypeVar('D')
 
