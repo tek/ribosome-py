@@ -45,7 +45,8 @@ def defined_commands_str() -> Do:
     return lines.join_lines
 
 
-def atomic_error(cmdlines: List[str], error_raw: Any) -> Either[str, None]:
+@do(Either[str, None])
+def atomic_error(cmdlines: List[str], error_raw: Any) -> Do:
     error = yield (
         Right(error_raw)
         if isinstance(error_raw, list) else
