@@ -146,7 +146,17 @@ def nvimio_await_success(
     yield recurse()
 
 
+def format_bufdo(cmd: str, start: int, end: Maybe[int]) -> str:
+    range = end.map(lambda a: f'{start},{a}').get_or(str, start)
+    return f'{range}bufdo {cmd}'
+
+
+def format_windo(cmd: str, start: int, end: Maybe[int]) -> str:
+    range = end.map(lambda a: f'{start},{a}').get_or(str, start)
+    return f'{range}windo {cmd}'
+
+
 __all__ = ('cons_checked_e', 'cons_checked', 'cons_ext', 'cons_checked_list', 'cons_ext_list', 'check_str_list',
            'cons_decode_str', 'cons_decode_str_list', 'extract_int_pair', 'split_option', 'cons_decode_str_list_option',
            'cons_split_lines', 'cons_decode_bool', 'nvimio_repeat_timeout', 'cons_json', 'cons_json_tpe',
-           'nvimio_await_success', 'cons_checked_list_e',)
+           'nvimio_await_success', 'cons_checked_list_e', 'format_bufdo', 'format_windo',)
