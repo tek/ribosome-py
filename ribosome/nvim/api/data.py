@@ -99,6 +99,7 @@ class Window(Dat['Window']):
 
 
 class Buffer(Dat['Buffer']):
+
     def __init__(self, data: ExtType) -> None:
         self.data = data
 

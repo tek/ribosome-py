@@ -2,7 +2,7 @@ from typing import TypeVar, Type, Generic, Callable, Any
 
 from amino.case import Case
 
-from lenses import UnboundLens  # type: ignore
+from lenses import UnboundLens
 from amino import Left, Right
 from amino.lenses.lens import lens
 
