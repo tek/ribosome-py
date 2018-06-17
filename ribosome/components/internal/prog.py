@@ -184,6 +184,7 @@ def mapping_program(ident: str, keys: str) -> Do:
 def mapping(ident: str, keys: str) -> Do:
     program = yield mapping_program(ident, keys)
     yield program()
+    yield Prog.unit
 
 
 @prog
