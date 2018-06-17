@@ -28,6 +28,7 @@ def mapping_cmd(plugin: str, mapping: Mapping, mode: MapMode) -> NvimIO[None]:
     return nvim_command(
         f'{mode.mnemonic}map',
         buf,
+        '<silent>',
         mapping.keys,
         rhs,
     )
