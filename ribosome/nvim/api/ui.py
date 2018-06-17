@@ -83,7 +83,7 @@ def current_buffer_content() -> Do:
 
 
 def buffer_number(buffer: Buffer) -> NvimIO[int]:
-    return N.delay(lambda v: msgpack.unpackb(buffer.data.data))
+    return N.read_tpe('nvim_buf_get_number', int, buffer.data)
 
 
 @do(NvimIO[None])
@@ -156,6 +156,10 @@ def current_window_number() -> Do:
     yield N.read_tpe('nvim_win_get_number', int, window.data)
 
 
+def window_number(window: Window) -> NvimIO[int]:
+    return N.read_tpe('nvim_win_get_number', int, window.data)
+
+
 def send_input(data: str) -> NvimIO[None]:
     return N.write('nvim_input', data)
 
@@ -173,4 +177,4 @@ __all__ = ('current_tabpage', 'current_window', 'current_buffer', 'tabpages', 'w
            'set_buffer_lines', 'set_buffer_content', 'buffer_lines', 'buffer_content', 'current_buffer_content',
            'buffer_number', 'close_buffer', 'close_current_buffer', 'cursor', 'current_cursor', 'window_line',
            'focus_window', 'buffer_name', 'window_buffer_name', 'current_buffer_name', 'set_cursor', 'set_line',
-           'set_local_cursor', 'current_window_number', 'send_input', 'edit_file', 'echo')
+           'set_local_cursor', 'current_window_number', 'send_input', 'edit_file', 'echo', 'window_number',)
