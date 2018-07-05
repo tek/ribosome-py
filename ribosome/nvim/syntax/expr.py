@@ -62,17 +62,17 @@ class SyntaxMatch(SyntaxItem):
         self.params = params
 
 
-class SyntaxRegion(Dat['SyntaxRegion']):
+class SyntaxRegion(SyntaxItem):
 
     @staticmethod
     def cons(
             group: str,
             start: str,
             end: str,
+            *options: str,
             skip: str=None,
             starts: List[str]=Nil,
             stops: List[str]=Nil,
-            *options: str,
             **params: str,
     ) -> 'SyntaxRegion':
         return SyntaxRegion(

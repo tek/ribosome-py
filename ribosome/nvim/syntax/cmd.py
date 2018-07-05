@@ -27,6 +27,8 @@ class syntax_item_cmd(Case[SyntaxItem, str], alg=SyntaxItem):
 
     def region(self, data: SyntaxRegion) -> str:
         skip = data.skip.map(lambda a: f' skip=/{a}/').get_or_strict('')
+        options = data.options.join_tokens
+        params = join_equals(data.params)
         return f'syntax region {data.group} start=/{data.start}/{skip} end=/{data.end}/ {options} {params}'
 
     def literal(self, data: SyntaxLiteral) -> str:
