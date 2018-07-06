@@ -1,12 +1,15 @@
-from amino import do, Do, List, Boolean, Maybe, Dat, Just, Nothing
-from amino.boolean import false, true
+from amino import do, Do, List, Maybe, Dat, Just, Nothing
+from amino.logging import module_log
 
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.nvim.api.ui import current_tabpage, current_window, window_buffer, set_buffer_content
+from ribosome.nvim.api.ui import (current_tabpage, current_window, window_buffer, set_buffer_content,
+                                  current_window_height)
 from ribosome.nvim.api.data import Window, Buffer, Tabpage
 from ribosome.nvim.api.option import option_buffer_set
 from ribosome.nvim.api.command import nvim_command
 from ribosome.nvim.io.api import N
+
+log = module_log()
 
 
 class ScratchUi(Dat['ScratchUi']):
@@ -31,16 +34,18 @@ def create_scratch_tab() -> Do:
 
 
 @do(NvimIO[Window])
-def create_scratch_window(vertical: Boolean) -> Do:
-    yield nvim_command('vnew' if vertical else 'new')
+def create_scratch_window(vertical: bool, size: Maybe[int]) -> Do:
+    cmd = 'vnew' if vertical else 'new'
+    size_prefix = size.cata(str, '')
+    yield nvim_command(f'{size_prefix}{cmd}')
     yield current_window()
 
 
 @do(NvimIO[ScratchUi])
-def create_scratch_ui(use_tab: Boolean, vertical: Boolean) -> Do:
+def create_scratch_ui(use_tab: bool, vertical: bool, size: Maybe[int]) -> Do:
     current = yield current_window()
     tab = yield create_scratch_tab() / Just if use_tab else N.pure(Nothing)
-    window = yield current_window() if use_tab else create_scratch_window(vertical)
+    window = yield current_window() if use_tab else create_scratch_window(vertical, size)
     return ScratchUi(window, tab, current)
 
 
@@ -60,7 +65,7 @@ def setup_scratch_buffer(ui: ScratchUi) -> Do:
     return buffer
 
 
-class CreateScratchBufferOptions(Dat['CreateScratchOptions']):
+class CreateScratchBufferOptions(Dat['CreateScratchBufferOptions']):
 
     @staticmethod
     def cons(
@@ -68,7 +73,7 @@ class CreateScratchBufferOptions(Dat['CreateScratchOptions']):
             vertical: bool=None,
             size: int=None,
             wrap: bool=None,
-    ) -> None:
+    ) -> 'CreateScratchBufferOptions':
         return CreateScratchBufferOptions(
             Maybe.optional(tab),
             Maybe.optional(vertical),
@@ -76,7 +81,13 @@ class CreateScratchBufferOptions(Dat['CreateScratchOptions']):
             Maybe.optional(wrap),
         )
 
-    def __init__(self, tab: Maybe[Boolean], vertical: Maybe[Boolean], size: Maybe[int], wrap: Maybe[Boolean],) -> None:
+    def __init__(
+            self,
+            tab: Maybe[bool],
+            vertical: Maybe[bool],
+            size: Maybe[int],
+            wrap: Maybe[bool],
+    ) -> None:
         self.tab = tab
         self.vertical = vertical
         self.size = size
@@ -85,7 +96,7 @@ class CreateScratchBufferOptions(Dat['CreateScratchOptions']):
 
 @do(NvimIO[ScratchBuffer])
 def create_scratch_buffer(options: CreateScratchBufferOptions) -> Do:
-    ui = yield create_scratch_ui(options.tab | false, options.vertical | false)
+    ui = yield create_scratch_ui(options.tab.get_or_strict(False), options.vertical.get_or_strict(False), options.size)
     buffer = yield setup_scratch_buffer(ui)
     return ScratchBuffer(buffer, ui)
 
@@ -104,9 +115,16 @@ def show_in_scratch_buffer(lines: List[str], options: CreateScratchBufferOptions
     return scratch
 
 
+@do(NvimIO[int])
+def scratch_buffer_height(line_count: int, max_height: float) -> Do:
+    current_height = yield current_window_height()
+    return min(line_count, int(max_height * current_height))
+
+
 @do(NvimIO[ScratchBuffer])
-def show_in_scratch_buffer_default(lines: List[str]) -> Do:
-    yield show_in_scratch_buffer(lines, CreateScratchBufferOptions.cons())
+def show_in_scratch_buffer_default(lines: List[str], max_height: Maybe[float]) -> Do:
+    size = yield max_height.map(lambda a: scratch_buffer_height(len(lines), a)).get_or_strict(None)
+    yield show_in_scratch_buffer(lines, CreateScratchBufferOptions.cons(size=size))
 
 
 __all__ = ('setup_scratch_buffer', 'CreateScratchBufferOptions', 'create_scratch_buffer', 'show_in_scratch_buffer',
