@@ -4,7 +4,7 @@ from typing import Callable, Any, Tuple
 from amino import Maybe, _, Just, Boolean, Lists, Nothing, Either, L, List, Nil, Map, Left
 from amino.dat import Dat
 from amino.state import StateT
-from amino.util.tpe import first_type_arg, type_arg
+from amino.util.tpe import first_type_arg, type_arg, is_subclass
 
 from ribosome.rpc.data.nargs import Nargs
 
@@ -12,7 +12,7 @@ from ribosome.rpc.data.nargs import Nargs
 def analyse_state_type(tpe: type) -> Tuple[Either[str, type], Either[str, type]]:
     return (
         (first_type_arg(tpe), type_arg(tpe, 1))
-        if tpe is not None and issubclass(tpe, StateT)
+        if tpe is not None and is_subclass(tpe, StateT)
         else (Left('not a StateT'), Left('not a StateT'))
     )
 

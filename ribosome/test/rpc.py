@@ -1,3 +1,4 @@
+from typing import Any
 import json
 
 from amino import List, Lists
@@ -11,7 +12,7 @@ def format_json_cmd(args: List[str], data: dict) -> str:
     return f'{args.join_tokens} {j}'
 
 
-def json_cmd(cmd: str, *args: str, **data: str) -> NvimIO[str]:
+def json_cmd(cmd: str, *args: str, **data: Any) -> NvimIO[str]:
     return nvim_command(cmd, format_json_cmd(Lists.wrap(args), data), verbose=True)
 
 

@@ -13,7 +13,7 @@ setup(
     url='https://github.com/tek/ribosome',
     packages=find_packages(exclude=['unit', 'unit.*', 'integration', 'integration.*', 'test', 'test.*']),
     install_requires=[
-        'amino~=13.0.0a34',
+        'amino~=13.0.1a1',
         'pyuv~=1.4.0',
         'msgpack-python~=0.5.6'
     ],

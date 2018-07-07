@@ -1,4 +1,5 @@
-from typing import GenericMeta, TypeVar, Callable, Type
+import abc
+from typing import TypeVar, Callable, Type
 
 from amino.lenses.lens import lens
 from amino import do, Do, _, Either
@@ -22,7 +23,7 @@ R = TypeVar('R')
 main_lens = lens.state.data
 
 
-class RMeta(GenericMeta):
+class RMeta(abc.ABCMeta):
     pass
 
 

@@ -1,7 +1,8 @@
 from typing import Callable, TypeVar
 
 from amino import Either, do, Do, Right
-from amino.util.tpe import first_type_arg, type_arg
+from amino.util.tpe import first_type_arg, type_arg, normalize_generic_type, is_subclass, is_subclass
+from amino.tc.base import normalize_type
 
 from ribosome.config.resources import Resources
 from ribosome.config.component import ComponentData
@@ -24,7 +25,7 @@ R = TypeVar('R')
 def main_data_prog(data_type: type) -> MainDataProgType:
     return (
         InternalMainDataProgType()
-        if issubclass(data_type, PluginState) else
+        if is_subclass(data_type, PluginState) else
         PlainMainDataProgType()
     )
 
@@ -40,7 +41,7 @@ def component_prog(affiliation_type: type) -> Do:
 def affiliation_prog(affiliation_type: type) -> Do:
     yield (
         component_prog(affiliation_type)
-        if issubclass(affiliation_type, ComponentData) else
+        if is_subclass(affiliation_type, ComponentData) else
         Right(RootProgType(main_data_prog(affiliation_type)))
     )
 
@@ -68,9 +69,9 @@ def ribosome_prog(ribosome_type: type) -> Do:
 def state_prog(state_type: type, return_type: type) -> Do:
     state_prog_type = yield (
         resources_prog(state_type)
-        if issubclass(state_type, Resources) else
+        if is_subclass(state_type, Resources) else
         ribosome_prog(state_type)
-        if issubclass(state_type, Ribosome) else
+        if is_subclass(state_type, Ribosome) else
         plain_prog(state_type)
     )
     return StateProg(state_prog_type, return_type)

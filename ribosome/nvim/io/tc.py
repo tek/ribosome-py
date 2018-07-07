@@ -18,7 +18,7 @@ class NvimIOInstances(ImplicitInstances):
         return Map({Monad: NvimIOMonad()})
 
 
-class NvimIOMonad(Monad[NvimIO]):
+class NvimIOMonad(Monad):
 
     def pure(self, a: A) -> NvimIO[A]:
         return NvimIOPure(a)

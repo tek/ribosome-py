@@ -1,3 +1,5 @@
+from typing import Union
+
 from amino import List
 
 from ribosome.nvim.io.compute import NvimIO
@@ -14,7 +16,7 @@ def current_buffer_matches(matcher: Matcher[List[str]]) -> NvimIO[Expectation]:
     return await_k_with(matcher, current_buffer_content)
 
 
-def current_buffer_contains(lines: List[str]) -> NvimIO[Expectation]:
+def current_buffer_contains(lines: Union[str, List[str]]) -> NvimIO[Expectation]:
     return current_buffer_matches(have_lines(lines))
 
 
