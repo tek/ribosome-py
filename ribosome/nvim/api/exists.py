@@ -92,7 +92,7 @@ def wait_until_function_produces(
     return nvimio_repeat_timeout(
         lambda: N.recover_failure(nvim_call_function(name, *args), N.pure),
         lambda a: a == target,
-        f'{name} did not product `{target}` within {timeout} seconds',
+        f'{name} did not produce `{target}` within {timeout} seconds',
         timeout,
         interval,
     )
