@@ -63,11 +63,12 @@ class Comm(Dat['Comm']):
 class StateGuard(Generic[A], Dat['StateGuard']):
 
     @staticmethod
-    def cons(state: A) -> 'StateGuard[A]':
-        return StateGuard(state, Lock())
+    def cons(state: A, initialized: bool=False) -> 'StateGuard[A]':
+        return StateGuard(state, initialized, Lock())
 
-    def __init__(self, state: A, lock: Lock) -> None:
+    def __init__(self, state: A, initialized: bool, lock: Lock) -> None:
         self.state = state
+        self.initialized = initialized
         self.lock = lock
 
     def exclusive(self, f: Callable[..., A], *a: Any, **kw: Any) -> Any:
@@ -80,6 +81,10 @@ class StateGuard(Generic[A], Dat['StateGuard']):
 
     def update(self, state: A) -> None:
         self.exclusive(setattr, self, 'state', state)
+
+    def init(self, state: A) -> None:
+        self.update(state)
+        self.exclusive(setattr, self, 'initialized', True)
 
     @do(NvimIO[None])
     def acquire(self) -> Do:
