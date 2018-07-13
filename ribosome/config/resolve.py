@@ -2,15 +2,16 @@ from typing import Any, TypeVar
 
 from amino import Either, List, Left, do, Right, curried, Do, Map, Maybe
 from amino.mod import instance_from_module
+from amino.logging import module_log
 
-from ribosome.logging import Logging
 from ribosome.config.component import Component
 
+log = module_log()
 D = TypeVar('D')
 CC = TypeVar('CC')
 
 
-class ComponentResolver(Logging):
+class ComponentResolver:
 
     def __init__(
             self,
@@ -33,13 +34,13 @@ class ComponentResolver(Logging):
     def components(self) -> List[str]:
         additional = self.requested | self.default
         components = self.core + additional
-        self.log.debug(f'starting {self.name} with components {components}')
+        log.debug(f'starting {self.name} with components {components}')
         return components
 
     def create_components(self, name: str) -> Either[str, List[Component]]:
         def report(errs: List[str]):
             msg = 'invalid {} component module "{}": {}'
-            self.log.error(msg.format(self.name, name, errs))
+            log.error(msg.format(self.name, name, errs))
         return self.resolve_name(name).leffect(report)
 
     def resolve_name(self, name: str) -> Either[List[str], Component]:
