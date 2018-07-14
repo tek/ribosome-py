@@ -14,10 +14,13 @@ from amino.either import Right, Left
 from amino.util.string import ToStr
 from amino.dat import Dat
 from amino.do import Do
+from amino.logging import module_log
 
 import ribosome
 from ribosome.logging import Logging
 from ribosome.nvim.api.data import NvimApi
+
+log = module_log()
 
 
 class Result(ToStr):
@@ -252,6 +255,7 @@ class Subprocess(Generic[A], Dat['Subprocess']):
     @do(IO[Tuple[int, List[str], List[str]]])
     def popen(*args: str, timeout: float=None, stdin: int=PIPE, stdout: int=PIPE, stderr: int=PIPE, env: dict=dict(),
               universal_newlines=True, **kw: Any) -> Do:
+        log.debug(f'executing subprocess `{args}`')
         pop = yield IO.delay(Popen, args, stdin=stdin, stdout=stdout, stderr=stderr, env=env,
                              universal_newlines=universal_newlines, **kw)
         out, err = yield IO.delay(pop.communicate, timeout=timeout)
