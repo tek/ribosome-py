@@ -81,6 +81,9 @@ class NMeta(type):
     def intercept(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[B]]) -> NvimIO[B]:
         return nvimio_intercept(fa, f)
 
+    def safe(self, fa: NvimIO[A]) -> NvimIO[NResult[A]]:
+        return N.intercept(fa, N.pure)
+
     def recover_error(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[A]]) -> NvimIO[A]:
         return nvimio_recover_error(fa, f)
 
