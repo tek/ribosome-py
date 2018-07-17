@@ -124,7 +124,7 @@ class ProgApi:
             return NS.pure(func(*p))
         return prog_state(wrap, ProgOutputResult(), func.__module__, func.__name__)
 
-    def do(self, rettype: Type[A]) -> Program[A]:
+    def do(self, rettype: Type[A]=None) -> Program[A]:
         def do_wrap(func: Callable[[P], Do]) -> Program[A]:
             f = do(Prog[A])(func)
             params_spec = ParamsSpec.from_function(f)

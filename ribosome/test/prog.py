@@ -1,6 +1,7 @@
 from typing import Any, Callable
 
-from amino import List, do, Do, Just, Lists
+from amino import List, do, Do, Just, Lists, Map, Nil
+from amino.json import dump_json
 
 from ribosome.rpc.api import RpcProgram
 from ribosome.nvim.io.state import NS
@@ -26,13 +27,15 @@ def no_matching_program(method: str) -> NS[PS, Any]:
 
 
 @do(NS[PS, List[Any]])
-def request(method: str, *args: Any) -> Do:
+def request(method: str, *args: Any, **json_args: Any) -> Do:
     progs = yield NS.inspect(lambda a: a.programs)
     matches = progs.filter(lambda a: a.rpc_name == method)
+    json = yield NS.from_either(dump_json(Map(json_args)))
+    json_arg = List(json) if json_args else Nil
     yield (
         no_matching_program(method)
         if matches.empty else
-        matches.traverse(program_runner(Lists.wrap(args)), NS)
+        matches.traverse(program_runner(Lists.wrap(args) + json_arg), NS)
     )
 
 
