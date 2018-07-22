@@ -263,15 +263,12 @@ class Subprocess(Generic[A], Dat['Subprocess']):
         err_lines = Lists.lines(err or '')
         yield IO.pure((-1 if pop.returncode is None else pop.returncode, out_lines, err_lines))
 
-    @staticmethod
-    def fatal(*a, **kw) -> IO[Either[str, Tuple[int, List[str], List[str]]]]:
-        ...
-
-    def __init__(self, exe: Path, args: List[str], data: A, timeout: float) -> None:
+    def __init__(self, exe: Path, args: List[str], data: A, timeout: float, **kw: Any) -> None:
         self.exe = exe
         self.args = args
         self.data = data
         self.timeout = timeout
+        self.kw = kw
 
     @property
     def args_tuple(self) -> tuple:
@@ -279,7 +276,8 @@ class Subprocess(Generic[A], Dat['Subprocess']):
 
     @do(IO[SubprocessResult[A]])
     def execute(self, **kw: Any) -> Do:
-        retval, out, err = yield Subprocess.popen(*self.args_tuple, timeout=self.timeout, **kw)
+        retval, out, err = yield Subprocess.popen(*self.args_tuple, timeout=self.timeout, **kw, **self.kw)
         yield IO.pure(SubprocessResult(retval, out, err, self.data))
+
 
 __all__ = ('ProcessExecutor', 'Result', 'Job', 'NvimProcessExecutor', 'Subprocess')

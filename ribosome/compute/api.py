@@ -5,9 +5,9 @@ from amino.logging import module_log
 
 from ribosome.compute.tpe import prog_type
 from ribosome.compute.wrap import prog_wrappers
-from ribosome.compute.output import (ProgOutput, ProgOutputUnit, ProgOutputResult, ProgOutputIO,
-                                     ProgScalarIO, ProgGatherIOs, ProgScalarSubprocess, ProgGatherSubprocesses, Echo,
-                                     ProgIOEcho)
+from ribosome.compute.output import (ProgOutput, ProgOutputUnit, ProgOutputResult, ProgOutputIO, ProgScalarIO,
+                                     ProgGatherIOs, ProgScalarSubprocess, ProgGatherSubprocesses, Echo, ProgIOEcho,
+                                     GatherSubprocesses, GatherIOs, Gather, ProgGather)
 from ribosome.nvim.io.state import NS
 from ribosome.compute.wrap_data import ProgWrappers
 from ribosome.config.basic_config import NoData
@@ -94,7 +94,7 @@ class prog_io:
         return prog_state(func, ProgOutputIO(ProgScalarIO()))
 
     @staticmethod
-    def gather(func: Callable[[P], NS[D, List[IO[A]]]]) -> Program[A]:
+    def gather(func: Callable[[P], NS[D, GatherIOs[A]]]) -> Program[List[Either[str, A]]]:
         return prog_state(func, ProgOutputIO(ProgGatherIOs()))
 
 
@@ -104,7 +104,7 @@ class prog_subproc:
         return prog_state(func, ProgOutputIO(ProgScalarSubprocess()))
 
     @staticmethod
-    def gather(func: Callable[[P], NS[D, List[Subprocess[A]]]]) -> Program[A]:
+    def gather(func: Callable[[P], NS[D, GatherSubprocesses[A]]]) -> Program[List[Either[str, A]]]:
         return prog_state(func, ProgOutputIO(ProgGatherSubprocesses()))
 
 
@@ -144,6 +144,9 @@ class ProgApi:
 
     def echo(self, f: Callable[[P], NS[D, Echo]]) -> Program[None]:
         return prog_state(f, ProgOutputIO(ProgIOEcho()))
+
+    def gather(self, func: Callable[[P], NS[D, Gather[A]]]) -> Program[List[Either[str, A]]]:
+        return prog_state(func, ProgOutputIO(ProgGather()))
 
 
 prog = ProgApi()

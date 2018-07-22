@@ -6,10 +6,11 @@ from amino import IO, List, Either, Lists, __, Maybe, Nothing, do, Do
 from amino.io import IOException
 
 from ribosome import ribo_log
-from ribosome.compute.output import (ProgOutput, ProgIO, ProgOutputIO, ProgScalarIO,
-                                     ProgGatherIOs, ProgScalarSubprocess, ProgGatherSubprocesses, GatherIOs,
-                                     GatherSubprocesses, ProgIOCustom, ProgOutputUnit, ProgOutputResult, ProgIOEcho,
-                                     Echo)
+from ribosome.compute.output import (ProgOutput, ProgIO, ProgOutputIO, ProgScalarIO, ProgGatherIOs,
+                                     ProgScalarSubprocess, ProgGatherSubprocesses, GatherIOs, GatherSubprocesses,
+                                     ProgIOCustom, ProgOutputUnit, ProgOutputResult, ProgIOEcho, Echo, GatherItem,
+                                     GatherIO, GatherSubprocess, GatherResult, GatherIOResult, GatherSubprocessResult,
+                                     Gather, ProgGather)
 from ribosome.compute.prog import Prog
 from ribosome.compute.program import Program
 from ribosome.process import Subprocess
@@ -37,6 +38,20 @@ def gather_subprocesses(gio: GatherSubprocesses[A]) -> List[Either[IOException, 
     return gather_ios(GatherIOs(popens, gio.timeout))
 
 
+class gather_item(Case[GatherItem[A], IO[GatherResult[A]]], alg=GatherItem):
+
+    def io(self, a: GatherIO[A]) -> IO[GatherResult[A]]:
+        return a.io.map(GatherIOResult)
+
+    def subproc(self, a: GatherSubprocess[A]) -> IO[GatherResult[A]]:
+        return a.subprocess.execute().map(GatherSubprocessResult)
+
+
+def gather_mixed(gio: Gather[A]) -> List[Either[IOException, GatherSubprocessResult[A]]]:
+    ios = gio.items.map(gather_item.match)
+    return gather_ios(GatherIOs(ios, gio.timeout))
+
+
 ProgIOInterpreter = Callable[[ProgIO, Any], Prog[A]]
 
 
@@ -57,13 +72,14 @@ class interpret_io(Case[ProgIO, Prog[A]], alg=ProgIO):
     def prog_scalar_io(self, po: ProgScalarIO, output: IO[A]) -> Prog[A]:
         return Prog.from_either(output.attempt)
 
-    def prog_gather_ios(self, po: ProgGatherIOs, output: GatherIOs[A]) -> Prog[A]:
+    def prog_gather_ios(self, po: ProgGatherIOs, output: GatherIOs[A]) -> Prog[Prog[List[Either[IOException, A]]]]:
         return Prog.pure(gather_ios(output))
 
     def prog_scalar_subprocess(self, po: ProgScalarSubprocess, output: Subprocess[A]) -> Prog[A]:
         return Prog.from_either(output.execute().attempt)
 
-    def prog_gather_subprocesses(self, po: ProgGatherSubprocesses, output: GatherSubprocesses[A]) -> Prog[A]:
+    def prog_gather_subprocesses(self, po: ProgGatherSubprocesses, output: GatherSubprocesses[A]
+                                 ) -> Prog[List[Either[IOException, A]]]:
         return Prog.pure(gather_subprocesses(output))
 
     @do(Prog[None])
@@ -73,6 +89,9 @@ class interpret_io(Case[ProgIO, Prog[A]], alg=ProgIO):
 
     def prog_io_custom(self, po: ProgIOCustom, output: Any) -> Prog[A]:
         return self.custom(output)
+
+    def prog_gather(self, po: ProgGather, output: Gather[A]) -> Prog[List[Either[IOException, A]]]:
+        return Prog.pure(gather_mixed(output))
 
 
 class interpret(Case[ProgOutput, Prog[B]], alg=ProgOutput):
