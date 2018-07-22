@@ -23,6 +23,8 @@ from ribosome.config.settings import run_internal_init
 from ribosome.compute.ribosome_api import Ribo
 from ribosome.rpc.data.rpc_method import RpcMethod
 from ribosome.rpc.define import ActiveRpcTrigger
+from ribosome.compute.output import Echo
+from ribosome.nvim.api.rpc import plugin_name
 
 log = module_log()
 D = TypeVar('D')
@@ -199,6 +201,17 @@ def internal_init() -> Do:
     if enabled:
         program = yield internal_init_program()
         yield program / bind_nullary_program | Prog.unit
+
+
+@prog.echo
+@do(NS[D, Echo])
+def rpc_job_stderr(id: int, data: list, event: str) -> Do:
+    errors = Lists.wrap(data).filter(lambda a: len(a) > 0)
+    name = yield NS.lift(plugin_name())
+    log.debug(f'error in {name} rpc job on channel {id}:')
+    errors.foreach(log.debug)
+    msg = '' if len(errors) > 1 else errors.head.map(lambda a: f': {a}').get_or_strict('')
+    yield NS.pure(Echo.error(f'fatal error in plugin {name}{msg}'))
 
 
 __all__ = ('internal_init', 'mapping', 'MapOptions', 'enable_components', 'show_python_path', 'append_python_path',
