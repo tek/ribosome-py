@@ -58,7 +58,7 @@ def rpc_handler(guard: StateGuard[A]) -> Callable[[str, List[Any]], NvimIO[List[
     def handler(method: str, raw_args: List[Any]) -> Do:
         yield nvimio_repeat_timeout(lambda: N.pure(guard), lambda a: a.initialized, '''state wasn't initialized''', 20)
         args = decode_args(raw_args)
-        log.debug(f'handling request: {method}({args.args.join_tokens})')
+        log.debug(f'handling request: {method}({args.args.join_comma})')
         programs = guard.state.programs_by_name(method)
         yield (
             no_programs_for_rpc(method, args)

@@ -11,6 +11,7 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
 
 A = TypeVar('A')
+B = TypeVar('B')
 S = TypeVar('S')
 
 
@@ -37,7 +38,7 @@ class NvimIOState(Generic[S, A], StateT[NvimIO, S, A], tpe=NvimIO):
         return st.transform_f(NvimIOState, lambda s: N.pure(s.value))
 
     @staticmethod
-    def from_maybe(a: Maybe[A], err: CallByName) -> 'NvimIOState[S, A]':
+    def from_maybe(a: Maybe[B], err: CallByName) -> 'NvimIOState[S, B]':
         return NvimIOState.lift(N.from_maybe(a, err))
 
     m = from_maybe

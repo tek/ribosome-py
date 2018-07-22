@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Any, Tuple
+from typing import Callable, Any, Tuple, get_type_hints
 
 from amino import Maybe, _, Just, Boolean, Lists, Nothing, Either, L, List, Nil, Map, Left
 from amino.dat import Dat
@@ -17,16 +17,16 @@ def analyse_state_type(tpe: type) -> Tuple[Either[str, type], Either[str, type]]
     )
 
 
-def analyse_return_type(fun: Callable[..., Any], annotations: Map[str, type]
+def analyse_return_type(fun: Callable[..., Any], hints: Map[str, type]
                         ) -> Tuple[type, Either[str, type], Either[str, type]]:
-    main_rettype = getattr(fun, 'tpe', annotations.lift('return') | None)
+    main_rettype = getattr(fun, 'tpe', hints.lift('return') | None)
     state_type, return_type = analyse_state_type(main_rettype)
     return main_rettype, state_type, return_type
 
 
 def cons_params_spec(fun: Callable[..., Any]) -> None:
     argspec = inspect.getfullargspec(fun)
-    annotations = Map(argspec.annotations)
+    hints = Map(get_type_hints(fun))
     params = Lists.wrap(argspec.args)
     defaults = Lists.wrap(argspec.defaults or ())
     method = Boolean(params.head.contains('self'))
@@ -34,8 +34,8 @@ def cons_params_spec(fun: Callable[..., Any]) -> None:
     min = param_count - defaults.length
     max = (~Boolean(argspec.varargs or argspec.varkw)).m(param_count)
     nargs = Nargs.cons(min, max)
-    types = params.traverse(annotations.lift, Maybe) | Nil
-    main_rettype, state_type, return_type = analyse_return_type(fun, annotations)
+    types = params.traverse(hints.lift, Maybe) | Nil
+    main_rettype, state_type, return_type = analyse_return_type(fun, hints)
     return ParamsSpec(nargs, min, max, method, types, main_rettype, state_type, return_type | (lambda: main_rettype))
 
 

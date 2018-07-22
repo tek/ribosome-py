@@ -25,7 +25,7 @@ def nvim_exists(target: str) -> NvimIO[bool]:
 def wait_until_valid(
         name: str,
         check: Callable[[str], NvimIO[bool]],
-        timeout: int=30,
+        timeout: float=30.,
         interval: float=.01,
         desc: str='satify condition',
 ) -> NvimIO[None]:
