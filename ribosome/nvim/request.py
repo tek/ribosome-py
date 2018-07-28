@@ -1,6 +1,6 @@
 from typing import TypeVar, Any, Type, Callable
 
-from amino import Try, curried, Lists, Either, do, Do
+from amino import Try, Lists, Either, do, Do
 
 from msgpack import ExtType
 from amino.util.string import decode

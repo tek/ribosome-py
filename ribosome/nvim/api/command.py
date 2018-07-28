@@ -15,7 +15,9 @@ def nvim_command(cmd: str, *args: Any, verbose: bool=False, sync: bool=False) ->
     arg_string = ' '.join(map(str, args))
     arg_suffix = '' if len(args) == 0 else f' {arg_string}'
     silent = '' if verbose else 'silent! '
-    return N.write('nvim_command', f'{silent}{cmd}{arg_suffix}', sync=sync)
+    cmdline = f'{silent}{cmd}{arg_suffix}'
+    log.debug1(lambda: f'nvim command `{cmdline}`')
+    return N.write('nvim_command', cmdline, sync=sync)
 
 
 def nvim_sync_command(cmd: str, *args: Any, verbose: bool=False) -> NvimIO[None]:
