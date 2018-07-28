@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version_parts = (13, 0, 0, 'a', 69)
+version_parts = (13, 0, 0, 'a', 70)
 version = '.'.join(map(str, version_parts))
 
 setup(
@@ -18,7 +18,7 @@ setup(
         'msgpack-python~=0.5.6'
     ],
     tests_require=[
-        'chiasma~=0.1.0.a25',
+        'chiasma~=0.1.0.a27',
         'kallikrein~=0.22.0a15',
     ],
     entry_points={
