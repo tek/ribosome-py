@@ -13,6 +13,7 @@ from ribosome.compute.output import ProgOutputResult
 from ribosome.compute.tpe_data import StateProg, trivial_state_prog, ribo_state_prog
 from ribosome.compute.wrap import prog_wrappers
 from ribosome.data.plugin_state import PS
+from ribosome.nvim.api.command import doautocmd
 
 A = TypeVar('A')
 D = TypeVar('D')
@@ -42,11 +43,11 @@ class Ribo(metaclass=RMeta):
         return NS.lift(setting.value)
 
     @classmethod
-    def setting_prog_e(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], Either[str, A]]:
+    def setting_prog_e(self, setting: Setting[A]) -> Prog[Either[str, A]]:
         return Ribo.lift(Ribo.setting_e(setting), None)
 
     @classmethod
-    def setting_prog(self, setting: Setting[A]) -> NS[Ribosome[D, CC, C], A]:
+    def setting_prog(self, setting: Setting[A]) -> Prog[A]:
         return Ribo.lift(Ribo.setting(setting), None)
 
     @classmethod
@@ -111,6 +112,14 @@ class Ribo(metaclass=RMeta):
     @classmethod
     def lift_nvimio(self, fa: NvimIO[A]) -> Prog[A]:
         return Ribo.trivial(NS.lift(fa))
+
+    @classmethod
+    def autocmd(self, name: str) -> NS[Ribosome[D, CC, C], None]:
+        return NS.lift(doautocmd('User', name, verbose=True))
+
+    @classmethod
+    def autocmd_prog(self, name: str) -> Prog[None]:
+        return Ribo.lift(Ribo.autocmd(name), None)
 
 
 __all__ = ('Ribosome', 'Ribo')
