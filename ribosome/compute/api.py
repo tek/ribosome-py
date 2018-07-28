@@ -51,9 +51,10 @@ def program_from_data(
         original_module: str=None,
         original_name: str=None,
 ) -> Program[A]:
+    name = original_name or func.__name__
     return Program.cons(
-        func.__name__,
-        ProgramBlock(func.__name__, func, wrappers, interpreter),
+        name,
+        ProgramBlock(name, func, wrappers, interpreter),
         params_spec,
         original_module,
         original_name,
