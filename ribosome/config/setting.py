@@ -1,9 +1,11 @@
 import abc
+import json
 from typing import Callable, Type, TypeVar, Generic, Any
 
 from amino import List, Either, __, Left, Eval, ADT, Right, Try, Path, Map, Lists
 from amino.do import do, Do
 from amino.boolean import false, true
+from amino.json.decoder import decode_json_type
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.variable import variable_prefixed, variable, variable_set, variable_set_prefixed
@@ -132,6 +134,16 @@ def str_list(data: list) -> Either[str, List[str]]:
     return Lists.wrap(data).traverse(lambda a: Right(a) if isinstance(a, str) else Left(f'not a string: {a}'), Either)
 
 
+@do(Either[str, A])
+def decode_json_setting(tpe: Type[A], data: Any) -> Do:
+    js = yield Try(json.dumps, data)
+    yield decode_json_type(js, tpe)
+
+
+def json_setting(tpe: Type[A]) -> SettingCtor[A]:
+    return setting_ctor(object, lambda a: decode_json_setting(tpe, a))
+
+
 str_setting = setting_ctor(str, Right)
 int_setting = setting_ctor(int, Right)
 float_setting = setting_ctor(float, Right)
@@ -146,4 +158,4 @@ bool_setting = setting_ctor(int, lambda a: Right(false if a == 0 else true))
 
 __all__ = ('Setting', 'StrictSetting', 'EvalSetting', 'setting_ctor', 'str_setting', 'int_setting', 'float_setting',
            'list_setting', 'path_setting', 'path_list_setting', 'map_setting', 'path_map_setting', 'bool_setting',
-           'str_list_setting',)
+           'str_list_setting', 'json_setting',)
