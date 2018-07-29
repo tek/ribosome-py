@@ -20,8 +20,9 @@ class RpcOptions(Dat['RpcOptions']):
             prefix: PrefixStyle=Short(),
             json: bool=False,
             write: bool=True,
+            help: str='',
     ) -> 'RpcOptions':
-        return RpcOptions(Maybe.optional(name), methods, prefix, json, write)
+        return RpcOptions(Maybe.optional(name), methods, prefix, json, write, help)
 
 
     def __init__(
@@ -31,12 +32,14 @@ class RpcOptions(Dat['RpcOptions']):
             prefix: PrefixStyle,
             json: bool,
             write: bool,
+            help: str,
     ) -> None:
         self.name = name
         self.methods = methods
         self.prefix = prefix
         self.json = json
         self.write = write
+        self.help = help
 
 
 class RpcProgram(Generic[A], Dat['RpcProgram[A]']):
