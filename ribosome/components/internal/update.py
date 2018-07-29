@@ -27,7 +27,7 @@ def programs(state: PluginState[D, CC]) -> List[RpcProgram]:
     return compo_handlers + cfg_handlers
 
 
-@do(EitherState[PluginState[D, CC], None])
+@do(EitherState[str, PluginState[D, CC], None])
 def update_components(requested: Either[str, List[str]]) -> Do:
     name = yield EitherState.inspect(_.basic.name)
     components_map = yield EitherState.inspect(_.comp.available)

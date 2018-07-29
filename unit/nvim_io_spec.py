@@ -2,9 +2,8 @@ from typing import Tuple, Any
 
 from kallikrein import k, Expectation
 from kallikrein.matchers.either import be_right
-from kallikrein.matchers import contain
 
-from amino import do, List, Map, Right, Nil, Either
+from amino import do, List, Right, Nil, Either
 from amino.do import Do
 from amino.test.spec import SpecBase
 
@@ -13,6 +12,7 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.klk.expectable import kn
 from ribosome.nvim.io.api import N
 from ribosome.nvim.io.data import NError
+from ribosome.test.klk.matchers.nresult import nsuccess
 
 
 vars = dict(a=1)
@@ -41,12 +41,12 @@ class NvimIoSpec(SpecBase):
     def suspend(self) -> Expectation:
         def f(v: NvimApi) -> NvimIO[int]:
             return N.pure(7)
-        return k(N.suspend(f).either(None)).must(be_right(7))
+        return k(N.suspend(f).either(vim)).must(be_right(7))
 
     def delay(self) -> Expectation:
         def f(v: NvimApi) -> int:
             return 7
-        return k(N.delay(f).either(None)).must(be_right(7))
+        return k(N.delay(f).either(vim)).must(be_right(7))
 
     def suspend_flat_map(self) -> Expectation:
         def h(a: int) -> NvimIO[int]:
@@ -55,7 +55,7 @@ class NvimIoSpec(SpecBase):
             return N.suspend(lambda v, b: h(b), a + 1)
         def f(v: NvimApi) -> NvimIO[int]:
             return N.pure(7)
-        return k(N.suspend(f).flat_map(g).flat_map(h).either(None)).must(be_right(12))
+        return k(N.suspend(f).flat_map(g).flat_map(h).either(vim)).must(be_right(12))
 
     def stack(self) -> Expectation:
         @do(NvimIO[int])
@@ -63,7 +63,7 @@ class NvimIoSpec(SpecBase):
             b = yield N.pure(a + 1)
             if b < 1000:
                 yield run(b)
-        return kn(vim, run, 1).must(contain(1000))
+        return kn(vim, run, 1).must(nsuccess(1000))
 
     def request(self) -> Expectation:
         return k(N.request('blub', Nil).run_s(vim).vars) == vars
@@ -79,7 +79,7 @@ class NvimIoSpec(SpecBase):
         updated_vim, result = run().run(vim)
         return (
             (k(updated_vim.vars) == vars) &
-            (k(result).must(contain(34))) &
+            (k(result).must(nsuccess(34))) &
             (k(updated_vim.request_log) == List(('blub', List(5))))
         )
 
@@ -91,7 +91,7 @@ class NvimIoSpec(SpecBase):
             c = yield N.delay(lambda v: b + 3)
             return c + 23
         updated_vim, result = run().run(vim)
-        return k(result).must(contain(28))
+        return k(result).must(nsuccess(28))
 
     def recover_failure(self) -> Expectation:
         def boom(v: NvimApi) -> NvimIO[int]:
@@ -101,7 +101,7 @@ class NvimIoSpec(SpecBase):
             a = yield N.recover_failure(N.delay(boom), lambda e: Right(1))
             return a + 1
         result = run().run_a(vim)
-        return k(result).must(contain(2))
+        return k(result).must(nsuccess(2))
 
     def ensure_failure(self) -> Expectation:
         x = 1

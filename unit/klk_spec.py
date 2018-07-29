@@ -1,10 +1,12 @@
 from kallikrein import k, Expectation
 
 from ribosome.nvim.io.data import NSuccess, NFatal
+
+from amino.test.spec import SpecBase
 from ribosome.test.klk.matchers.nresult import nsuccess, nfatal
 
 
-class KlkSpec:
+class KlkSpec(SpecBase):
     '''
     success $success
     fatal $fatal

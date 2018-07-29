@@ -65,11 +65,11 @@ class ComponentResolver:
         yield instance_from_module(mod, Component)
 
     @curried
-    def check_component(self, name: str, plug: Component) -> Either[str, Component]:
+    def check_component(self, name: str, comp: Component) -> Either[str, Component]:
         return (
-            Right(plug)
-            if isinstance(plug, Component) else
-            Left(List(f'invalid type for auto component: {plug}'))
+            Right(comp)
+            if isinstance(comp, Component) else
+            Left(List(f'invalid type for auto component: {comp}'))
         )
 
 
