@@ -88,7 +88,6 @@ def buffer_number(buffer: Buffer) -> NvimIO[int]:
 
 @do(NvimIO[None])
 def close_buffer(buffer: Buffer) -> Do:
-    yield N.pure(None)
     num = yield buffer_number(buffer)
     yield nvim_command('bdelete', num)
 
@@ -183,9 +182,15 @@ def current_window_height() -> Do:
     yield window_height(window)
 
 
+@do(NvimIO[None])
+def close_window(window: Window) -> Do:
+    num = yield window_number(window)
+    yield nvim_command(f'{num}close!')
+
+
 __all__ = ('current_tabpage', 'current_window', 'current_buffer', 'tabpages', 'windows', 'buffers', 'window_buffer',
            'set_buffer_lines', 'set_buffer_content', 'buffer_lines', 'buffer_content', 'current_buffer_content',
            'buffer_number', 'close_buffer', 'close_current_buffer', 'cursor', 'current_cursor', 'window_line',
            'focus_window', 'buffer_name', 'window_buffer_name', 'current_buffer_name', 'set_cursor', 'set_line',
            'set_local_cursor', 'current_window_number', 'send_input', 'edit_file', 'echo', 'window_number',
-           'window_height', 'current_window_height',)
+           'window_height', 'current_window_height', 'close_window',)
