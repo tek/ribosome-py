@@ -42,4 +42,9 @@ def option_buffer_set(buffer: Buffer, name: str, value: Any) -> NvimIO[None]:
     return N.write('nvim_buf_set_option', buffer.data, name, value)
 
 
-__all__ = ('option', 'option_str', 'option_str_list', 'option_set', 'option_modify', 'option_cat', 'option_buffer_set')
+def cat_rtp(dir: str) -> NvimIO[None]:
+    return option_cat('runtimepath', List(dir))
+
+
+__all__ = ('option', 'option_str', 'option_str_list', 'option_set', 'option_modify', 'option_cat', 'option_buffer_set',
+           'cat_rtp',)
