@@ -7,9 +7,11 @@ from amino.logging import module_log
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.data import Tabpage, Window, Buffer
-from ribosome.nvim.api.util import cons_ext, cons_ext_list, cons_checked_list, cons_checked_e, extract_int_pair
+from ribosome.nvim.api.util import (cons_ext, cons_ext_list, cons_checked_list, cons_checked_e, extract_int_pair,
+                                    cons_decode_bool)
 from ribosome.nvim.api.command import nvim_command
 from ribosome.nvim.io.api import N
+from ribosome.nvim.api.function import nvim_call_tpe, nvim_call_cons
 
 log = module_log()
 
@@ -132,6 +134,12 @@ def window_buffer_name(window: Window) -> Do:
 def current_buffer_name() -> Do:
     buffer = yield current_buffer()
     yield buffer_name(buffer)
+
+
+@do(NvimIO[bool])
+def buflisted(buffer: Buffer) -> Do:
+    num = yield buffer_number(buffer)
+    yield nvim_call_cons(cons_decode_bool, 'buflisted', num)
 
 
 def set_cursor(window: Window, coords: Tuple[int, int]) -> NvimIO[None]:
