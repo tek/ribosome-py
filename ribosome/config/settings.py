@@ -9,20 +9,13 @@ from ribosome.nvim.io.api import N
 from ribosome.nvim.api.rpc import plugin_name
 
 
-@do(Either[str, str])
-def project_name_from_path() -> Do:
-    cwd = yield Try(Path.cwd)
-    name = cwd.name
-    yield Right(name) if name else Left('cwd broken')
-
-
 @do(NvimIO[Either[str, Path]])
 def state_dir_with_name() -> Do:
     plugin = yield plugin_name()
     base = yield state_dir.value_or_default()
     pro_name = yield proteome_main_name.value
     sess_name = yield ribosome_session_name.value
-    path = pro_name.o(sess_name).o(project_name_from_path) / (lambda a: base / plugin / a)
+    path = pro_name.o(sess_name) / (lambda a: base / plugin / a)
     yield N.pure(path)
 
 

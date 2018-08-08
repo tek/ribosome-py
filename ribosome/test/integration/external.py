@@ -2,7 +2,8 @@ from typing import Callable, Any
 
 from kallikrein import Expectation
 
-from amino import do, IO, Do
+from amino import do, IO, Do, Map
+from amino.test import temp_dir
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.integration.embed import setup_test_nvim_embed, TestConfig
@@ -25,7 +26,8 @@ def cleanup(result: NResult) -> Do:
 
 @do(NvimIO[Expectation])
 def run_test(config: TestConfig, io: Callable[..., NS[PS, Expectation]], *a: Any, **kw: Any) -> Do:
-    yield set_nvim_vars(config.vars + ('components', config.components))
+    default_vars = Map(ribosome_session_name='spec', ribosome_state_dir=str(temp_dir('persist')))
+    yield set_nvim_vars(default_vars ** config.vars + ('components', config.components))
     yield config.pre()
     state = yield init_test_state(config)
     yield io(*a, **kw).run_a(state)
