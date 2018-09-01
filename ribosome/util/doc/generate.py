@@ -19,8 +19,7 @@ B = TypeVar('B')
 
 def rpc_doc(rpc: RpcProgram) -> List[DocBlock[A]]:
     name = DocBlock.headline(rpc.program_name, 4, Anchor(rpc.program_name, RpcAnchor(rpc.options.prefix)))
-    help = rpc.options.help.to_list
-    return List(name) + help.cat(DocBlock.empty())
+    return List(name) + List(rpc.options.help, DocBlock.empty())
 
 
 def component_doc(component: Component) -> IO[List[DocBlock[A]]]:

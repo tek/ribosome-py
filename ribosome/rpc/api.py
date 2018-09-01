@@ -23,7 +23,7 @@ class RpcOptions(Dat['RpcOptions']):
             write: bool=True,
             help: DocBlock=None,
     ) -> 'RpcOptions':
-        return RpcOptions(Maybe.optional(name), methods, prefix, json, write, Maybe.optional(help))
+        return RpcOptions(Maybe.optional(name), methods, prefix, json, write, help or DocBlock.empty())
 
 
     def __init__(
@@ -33,7 +33,7 @@ class RpcOptions(Dat['RpcOptions']):
             prefix: PrefixStyle,
             json: bool,
             write: bool,
-            help: Maybe[DocBlock],
+            help: DocBlock,
     ) -> None:
         self.name = name
         self.methods = methods
