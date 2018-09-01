@@ -17,14 +17,14 @@ class MarkdownCompilerConfig(Dat['MarkdownCompilerConfig']):
 
     @staticmethod
     def cons(
-            compiler_config: CompilerConfig,
+            basic: CompilerConfig,
     ) -> 'MarkdownCompilerConfig':
         return MarkdownCompilerConfig(
-            compiler_config,
+            basic,
         )
 
-    def __init__(self, compiler_config: CompilerConfig) -> None:
-        self.compiler_config = compiler_config
+    def __init__(self, basic: CompilerConfig) -> None:
+        self.basic = basic
 
 
 class postproc_anchor(Case[AnchorType, str], alg=AnchorType):
@@ -60,7 +60,7 @@ class compile_string(Case[DocMeta[A], State[MarkdownCompilerConfig, List[str]]],
             a.anchor
             .map(lambda b: compile_anchor(b).map(lambda c: postproc_anchor(c)(b.tpe)))
             .get_or(lambda: State.pure(f'{self.string.text}'))
-            .zoom(lens.compiler_config)
+            .zoom(lens.basic)
         )
         return List(f'{hashes} {anchor}', '')
 

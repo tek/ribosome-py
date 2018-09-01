@@ -1,15 +1,12 @@
 from typing import TypeVar, Tuple
 
-from amino import List, IO, Dat, do, Do, Lists, Nil, Just, Nothing
+from amino import List, IO, Dat, do, Do, Lists, Nil
 from amino.case import Case
 from amino.state import State
-from amino.util.string import camelcase
 from amino.lenses.lens import lens
 
 from ribosome.util.doc.data import (DocLine, DocCompiler, DocCat, DocFragment, DocString, DocBlock, DocMeta, NoMeta,
-                                    Headline, Code, CustomDocMeta, Link, Anchor, AnchorType, VariableAnchor,
-                                    MappingAnchor, GeneralAnchor, RpcAnchor)
-from ribosome.rpc.data.prefix_style import Full, Short
+                                    Headline, Code, CustomDocMeta, Link)
 from ribosome.util.doc.format import CompilerConfig, compile_anchor
 
 A = TypeVar('A')
@@ -19,16 +16,16 @@ class VimCompilerConfig(Dat['VimCompilerConfig']):
 
     @staticmethod
     def cons(
-            compiler_config: CompilerConfig,
+            basic: CompilerConfig,
             width: int=78,
     ) -> 'VimCompilerConfig':
         return VimCompilerConfig(
-            compiler_config,
+            basic,
             width,
         )
 
-    def __init__(self, compiler_config: CompilerConfig, width: int) -> None:
-        self.compiler_config = compiler_config
+    def __init__(self, basic: CompilerConfig, width: int) -> None:
+        self.basic = basic
         self.width = width
 
 
@@ -48,7 +45,13 @@ def break_line(line: str, width: int) -> List[str]:
     return lines.cat(rest) if len(rest) > 0 else lines
 
 
-class compile_string(Case[DocMeta[A], List[str]], alg=DocMeta):
+@do(State[VimCompilerConfig, str])
+def hline(char: str) -> Do:
+    width = yield State.inspect(lambda a: a.width)
+    return char * width
+
+
+class compile_string(Case[DocMeta[A], State[VimCompilerConfig, List[str]]], alg=DocMeta):
 
     def __init__(self, string: DocString[A]) -> None:
         self.string = string
@@ -67,17 +70,18 @@ class compile_string(Case[DocMeta[A], List[str]], alg=DocMeta):
         text = self.string.text
         width = yield State.inspect(lambda a: a.width)
         char = '=' if a.level == 1 else '-'
-        name = yield State.inspect(lambda a: a.name)
+        hl = yield hline(char)
+        name = yield State.inspect(lambda a: a.basic.name)
         anchor = yield (
             a.anchor
             .map(compile_anchor)
             .get_or(lambda: State.pure(f'{name}-{self.string.text.lower()}'))
-            .zoom(lens.compiler_config)
+            .zoom(lens.basic)
         )
         ws_len = width - (len(self.string.text) + len(anchor))
         ws = ' ' * ws_len
         main = text.upper() if a.level == 1 else text
-        return List(char * width, f'{main}{ws}*{anchor}*', '')
+        return List(hl, f'{main}{ws}*{anchor}*', '')
 
     def code(self, a: Code[A]) -> State[VimCompilerConfig, List[str]]:
         return State.pure(List(f'`{self.string.text}`'))
@@ -106,8 +110,17 @@ def compile_block(block: DocBlock[A]) -> State[VimCompilerConfig, List[str]]:
     return block.lines.flat_traverse(compile_line, State)
 
 
+@do(State[VimCompilerConfig, DocBlock[A]])
+def footer() -> Do:
+    hl = yield hline('=')
+    width = yield State.inspect(lambda a: a.width)
+    modeline = f'vim:tw={width}:ft=help:'
+    return DocBlock.none(List(DocLine.string(hl), DocLine.string(modeline)))
+
+
 def compile_vim(blocks: List[DocBlock[A]], conf: VimCompilerConfig) -> IO[List[str]]:
-    return IO.pure(blocks.flat_traverse(compile_block, State).run_a(conf).value)
+    foot = footer().run_a(conf).value
+    return IO.pure(blocks.cat(foot).flat_traverse(compile_block, State).run_a(conf).value)
 
 
 def vim_compiler(conf: VimCompilerConfig) -> DocCompiler[A, VimCompilerConfig]:
