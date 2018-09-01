@@ -6,6 +6,7 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.compute.program import Program
 from ribosome.rpc.data.prefix_style import PrefixStyle, Short, Plain
 from ribosome.rpc.data.rpc_method import RpcMethod, CommandMethod, FunctionMethod, AutocmdMethod
+from ribosome.util.doc.data import DocBlock
 
 A = TypeVar('A')
 default_methods = List(FunctionMethod(), CommandMethod.cons())
@@ -20,9 +21,9 @@ class RpcOptions(Dat['RpcOptions']):
             prefix: PrefixStyle=Short(),
             json: bool=False,
             write: bool=True,
-            help: str='',
+            help: DocBlock=None,
     ) -> 'RpcOptions':
-        return RpcOptions(Maybe.optional(name), methods, prefix, json, write, help)
+        return RpcOptions(Maybe.optional(name), methods, prefix, json, write, Maybe.optional(help))
 
 
     def __init__(
@@ -32,7 +33,7 @@ class RpcOptions(Dat['RpcOptions']):
             prefix: PrefixStyle,
             json: bool,
             write: bool,
-            help: str,
+            help: Maybe[DocBlock],
     ) -> None:
         self.name = name
         self.methods = methods

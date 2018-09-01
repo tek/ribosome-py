@@ -1,6 +1,6 @@
 import abc
 import json
-from typing import Callable, Type, TypeVar, Generic, Any
+from typing import Callable, Type, TypeVar, Generic, Any, Union
 
 from amino import List, Either, __, Left, Eval, ADT, Right, Try, Path, Map, Lists
 from amino.do import do, Do
@@ -11,6 +11,7 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.variable import variable_prefixed, variable, variable_set, variable_set_prefixed
 from ribosome.nvim.api.util import cons_checked_e
 from ribosome.nvim.io.api import N
+from ribosome.util.doc.data import DocBlock
 
 A = TypeVar('A', contravariant=True)
 B = TypeVar('B')
@@ -121,8 +122,22 @@ def no_default(name: str) -> Either[str, A]:
 
 
 def setting_ctor(tpe: Type[A], ctor: Callable[[A], Either[str, B]]) -> SettingCtor:
-    def setting(name: str, desc: str, help: str, prefix: bool, default: Either[str, B]=None) -> Setting[B]:
-        return StrictSetting(name, desc, help, prefix, tpe, ctor, default or no_default(name))
+    def setting(
+            name: str,
+            desc: str,
+            help: Union[str, DocBlock],
+            prefix: bool,
+            default: Either[str, B]=None,
+    ) -> Setting[B]:
+        return StrictSetting(
+            name,
+            desc,
+            DocBlock.string(help) if isinstance(help, str) else help,
+            prefix,
+            tpe,
+            ctor,
+            default or no_default(name),
+        )
     return setting
 
 

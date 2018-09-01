@@ -28,6 +28,7 @@ They receive all messages the core of the plugin processes and have access to th
 They can define nvim request handlers with the decorator `@prog`.
 The entries of this setting can either be names of the builtin components or arbitrary python module paths that define
 custom components.
+Users can use this variable to inject programs into any plugin that can use the plugin's data.
 '''
 
 components = list_setting('components', 'names or paths of active components', components_help, True, Right(Nil))

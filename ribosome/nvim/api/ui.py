@@ -1,7 +1,5 @@
 from typing import Tuple
 
-import msgpack
-
 from amino import List, I, do, Do, Path
 from amino.logging import module_log
 
@@ -11,7 +9,7 @@ from ribosome.nvim.api.util import (cons_ext, cons_ext_list, cons_checked_list, 
                                     cons_decode_bool)
 from ribosome.nvim.api.command import nvim_command
 from ribosome.nvim.io.api import N
-from ribosome.nvim.api.function import nvim_call_tpe, nvim_call_cons
+from ribosome.nvim.api.function import nvim_call_cons
 
 log = module_log()
 

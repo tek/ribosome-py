@@ -7,6 +7,7 @@ from ribosome.nvim.io.state import NS
 from ribosome.data.mapping import Mappings
 from ribosome.rpc.api import RpcProgram
 from ribosome.compute.program import Program
+from ribosome.util.doc.data import DocBlock
 
 D = TypeVar('D')
 CC = TypeVar('CC')
@@ -44,6 +45,7 @@ class Component(Generic[CD, CC], Dat['Component[CD, CC]']):
             state_ctor: Callable[[], CD]=None,
             config: CC=None,
             mappings: Mappings=None,
+            help: DocBlock=None,
     ) -> 'Component[CD, CC]':
         return Component(
             name,
@@ -52,6 +54,7 @@ class Component(Generic[CD, CC], Dat['Component[CD, CC]']):
             Maybe.optional(state_ctor).o(infer_state_ctor(state_type)),
             Maybe.optional(config),
             mappings or Mappings.cons(),
+            Maybe.optional(help),
         )
 
     def __init__(
@@ -62,6 +65,7 @@ class Component(Generic[CD, CC], Dat['Component[CD, CC]']):
             state_ctor: Maybe[Callable[[], CD]],
             config: Maybe[CC],
             mappings: Mappings,
+            help: Maybe[DocBlock],
     ) -> None:
         self.name = name
         self.rpc = rpc
@@ -69,6 +73,7 @@ class Component(Generic[CD, CC], Dat['Component[CD, CC]']):
         self.state_ctor = state_ctor
         self.config = config
         self.mappings = mappings
+        self.help = help
 
     def handler_by_name(self, name: str) -> Either[str, Program]:
         return self.handlers.find(_.name == name).to_either(f'component `{self.name}` has no program `{name}`')
