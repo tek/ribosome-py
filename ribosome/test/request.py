@@ -27,6 +27,11 @@ def pop_first(vim: NvimApi, name: str, args: List[Any]) -> Do:
     yield default_request_handler(vim, name1, args1)
 
 
+def rh_atomic(vim: NvimApi, name: str, args: List[Any]) -> Either[str, Tuple[NvimApi, Any]]:
+    count = args.head.map(len).get_or_strict(0)
+    return Right((vim, [None] * count))
+
+
 default_request_handlers = Map({
     'silent': pop_first,
     'silent!': pop_first,
@@ -34,6 +39,7 @@ default_request_handlers = Map({
     'nvim_command': rh_write,
     'nvim_out_write': rh_write,
     'nvim_call_function': pop_first,
+    'nvim_call_atomic': rh_atomic,
 })
 
 
