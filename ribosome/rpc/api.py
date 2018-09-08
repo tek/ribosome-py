@@ -1,6 +1,6 @@
 from typing import Any, TypeVar, Callable, Generic
 
-from amino import List, Dat, Maybe
+from amino import List, Dat, Maybe, Map
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.compute.program import Program
@@ -22,8 +22,19 @@ class RpcOptions(Dat['RpcOptions']):
             json: bool=False,
             write: bool=True,
             help: DocBlock=None,
+            params_help: List[str]=None,
+            json_help: Map[str, str]=None,
     ) -> 'RpcOptions':
-        return RpcOptions(Maybe.optional(name), methods, prefix, json, write, help or DocBlock.empty())
+        return RpcOptions(
+            Maybe.optional(name),
+            methods,
+            prefix,
+            json,
+            write,
+            help or DocBlock.empty(),
+            Maybe.optional(params_help),
+            Maybe.optional(json_help),
+        )
 
 
     def __init__(
@@ -34,6 +45,8 @@ class RpcOptions(Dat['RpcOptions']):
             json: bool,
             write: bool,
             help: DocBlock,
+            params_help: Maybe[List[str]],
+            json_help=Maybe[Map[str, str]],
     ) -> None:
         self.name = name
         self.methods = methods
@@ -41,6 +54,8 @@ class RpcOptions(Dat['RpcOptions']):
         self.json = json
         self.write = write
         self.help = help
+        self.params_help = params_help
+        self.json_help = json_help
 
 
 class RpcProgram(Generic[A], Dat['RpcProgram[A]']):

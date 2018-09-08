@@ -95,8 +95,10 @@ class compile_string(Case[DocMeta[A], State[VimCompilerConfig, List[str]]], alg=
 
 class compile_fragment(Case[DocFragment[A], List[str]], alg=DocFragment):
 
-    def cat(self, frag: DocCat[A]) -> State[VimCompilerConfig, List[str]]:
-        return frag.fragments.flat_map(self)
+    @do(State[VimCompilerConfig, List[str]])
+    def cat(self, frag: DocCat[A]) -> Do:
+        parts = yield frag.fragments.flat_traverse(self, State)
+        return List(parts.join_tokens)
 
     def string(self, frag: DocString[A]) -> State[VimCompilerConfig, List[str]]:
         return compile_string(frag)(frag.meta)

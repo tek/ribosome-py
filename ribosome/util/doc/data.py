@@ -151,7 +151,7 @@ class DocBlock(Generic[A], Dat['DocBlock[A]']):
         return DocBlock.none(List(DocLine.string(text)))
 
     @staticmethod
-    def headline(text: str, level: int, anchor: Anchor=None) -> 'DocLine[A]':
+    def headline(text: str, level: int, anchor: Anchor=None) -> 'DocLine[B]':
         return DocBlock.none(List(DocLine.headline(text, level, anchor)))
 
     @staticmethod

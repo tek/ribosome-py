@@ -3,30 +3,60 @@ from types import ModuleType
 import pkgutil
 import importlib
 
-from amino import do, Do, IO, List, Either, Lists, Try, Just, Nil
+from amino import do, Do, IO, List, Either, Lists, Try, Just, Nil, Map, Maybe, Right
 from amino.either import ImportFailure
 from amino.mod import instances_from_module
+from amino.dat import DatMeta, Field
+from amino.logging import module_log
 
 from ribosome.config.setting import StrictSetting
 from ribosome.util.doc.data import (StaticDoc, DocCompiler, DocBlock, DocLine, DocString, Headline, Anchor,
-                                    VariableAnchor, RpcAnchor)
+                                    VariableAnchor, RpcAnchor, DocCat, Code)
 from ribosome.config.component import Component
 from ribosome.rpc.api import RpcProgram
 
+log = module_log()
 A = TypeVar('A')
 B = TypeVar('B')
 
 
-def rpc_doc(rpc: RpcProgram) -> List[DocBlock[A]]:
+def json_param(field: Field, help: str) -> DocLine[A]:
+    return DocLine(DocCat(List(
+        DocString(f'{field.name}: {field.tpe}', Code('python')),
+        DocString.none(help),
+    )))
+
+
+def json_params(tpe: DatMeta, help: Map[str, str]) -> Either[str, List[DocLine[A]]]:
+    ps = tpe._dat__fields.traverse(lambda a: help.lift(a.name).map(lambda b: json_param(a, b)), Maybe)
+    return ps.to_either(f'not all fields of {tpe} are documented')
+
+
+@do(Either[str, List[DocBlock[A]]])
+def rpc_params(rpc: RpcProgram) -> Do:
+    params = rpc.program.metadata.params_spec
+    json = yield (
+        params.types.last.zip(rpc.options.json_help).map2(json_params).get_or_strict(Right(Nil))
+        if rpc.options.json else
+        Right(Nil)
+    )
+    return List(DocBlock.none(json))
+
+
+@do(Either[str, List[DocBlock[A]]])
+def rpc_doc(rpc: RpcProgram) -> Do:
     name = DocBlock.headline(rpc.program_name, 4, Anchor(rpc.program_name, RpcAnchor(rpc.options.prefix)))
-    return List(name) + List(rpc.options.help, DocBlock.empty())
+    params = yield rpc_params(rpc)
+    return List(name, rpc.options.help) + params.cat(DocBlock.empty())
 
 
-def component_doc(component: Component) -> IO[List[DocBlock[A]]]:
+@do(IO[List[DocBlock[A]]])
+def component_doc(component: Component) -> Do:
     headline = DocBlock.headline(component.name, 2)
     desc = component.help.to_list
-    rpc = component.rpc.flat_map(rpc_doc).cons(DocBlock.headline('RPC', 3))
-    return IO.pure(List(headline) + desc + rpc.cat(DocBlock.empty()))
+    rpc = yield IO.e(component.rpc.flat_traverse(rpc_doc, Either))
+    rpc_blocks = rpc.cons(DocBlock.headline('RPC', 3))
+    return List(headline) + desc + rpc_blocks.cat(DocBlock.empty())
 
 
 @do(IO[List[DocBlock[A]]])

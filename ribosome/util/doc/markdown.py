@@ -70,15 +70,16 @@ class compile_string(Case[DocMeta[A], State[MarkdownCompilerConfig, List[str]]],
     def link(self, a: Link[A]) -> State[MarkdownCompilerConfig, List[str]]:
         return State.pure(List(f'`[{a.desc}]({self.string.text})`'))
 
-
     def custom(self, a: CustomDocMeta[A]) -> State[MarkdownCompilerConfig, List[str]]:
         return State.pure(List(self.string.text))
 
 
 class compile_fragment(Case[DocFragment[A], List[str]], alg=DocFragment):
 
-    def cat(self, frag: DocCat[A]) -> State[MarkdownCompilerConfig, List[str]]:
-        return State.pure(frag.fragments.flat_map(self))
+    @do(State[MarkdownCompilerConfig, List[str]])
+    def cat(self, frag: DocCat[A]) -> Do:
+        parts = yield frag.fragments.flat_traverse(self, State)
+        return List(parts.join_tokens)
 
     def string(self, frag: DocString[A]) -> State[MarkdownCompilerConfig, List[str]]:
         return compile_string(frag)(frag.meta)
@@ -98,7 +99,6 @@ def compile_markdown(blocks: List[DocBlock[A]], conf: MarkdownCompilerConfig) ->
 
 def markdown_compiler(conf: MarkdownCompilerConfig) -> DocCompiler[A, MarkdownCompilerConfig]:
     return DocCompiler(compile_markdown, conf)
-
 
 
 __all__ = ('compile_markdown', 'markdown_compiler',)
