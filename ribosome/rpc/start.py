@@ -51,7 +51,7 @@ def init_comm(rpc_comm: RpcComm, execute_request: Callable[[Comm, Rpc], IO[None]
 
 def plugin_execute_receive_request(guard: StateGuard[A], plugin_name: str) -> Callable[[Comm, Rpc], IO[None]]:
     def execute(comm: Comm, rpc: Rpc) -> IO[None]:
-        return IO.fork_io(execute_rpc_from_vim, rpc, comm, comm.request_handler(guard), plugin_name)
+        return IO.fork_io(execute_rpc_from_vim, rpc, comm, comm.request_handler(guard), plugin_name, daemon=True)
     return execute
 
 
