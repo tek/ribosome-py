@@ -1,20 +1,22 @@
 from typing import Callable, Any, Tuple
 import subprocess
 
-from kallikrein import Expectation
+from kallikrein import Expectation, k
+from kallikrein.matchers.lines import have_lines
 
 from chiasma.tmux import Tmux
 from chiasma.test.tmux_spec import tmux_spec_socket
 from chiasma.io.compute import TmuxIO
 from chiasma.commands.server import kill_server
 from chiasma.test.terminal import start_tmux
-from chiasma.commands.pane import send_keys
+from chiasma.commands.pane import send_keys, capture_pane
 
 from amino import do, Do, IO, Lists, List, Path, env
 from amino.logging import module_log
 from amino.string.hues import green
-from amino.test import temp_dir
+from amino.test import temp_dir, fixture_path
 from amino.test.path import pkg_dir
+from amino.util.fs import mkdir
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
@@ -26,6 +28,7 @@ from ribosome.test.run import run_test_io, plugin_started
 from ribosome.nvim.api.exists import wait_until_valid
 from ribosome import NvimApi
 from ribosome.test.integration.start import start_plugin_embed
+from ribosome.util.tmux import tmux_to_nvim
 
 log = module_log()
 
@@ -104,4 +107,26 @@ def tmux_plugin_test(config: TestConfig, io: Callable[..., NvimIO[Expectation]],
     return run_test_io(run)
 
 
-__all__ = ('tmux_plugin_test',)
+@do(NvimIO[Expectation])
+def store_screenshot(path: Path, current: List[str]) -> Do:
+    yield N.from_io(IO.delay(path.write_text, current.join_lines))
+    return k(1) == 1
+
+
+@do(NvimIO[Expectation])
+def check_screenshot(path: Path, current: List[str]) -> Do:
+    recorded = yield N.from_io(IO.file(path))
+    return k(current).must(have_lines(recorded))
+
+
+@do(NvimIO[Expectation])
+def screenshot(*segments: str, delay: float=0.5, record: bool=False) -> Do:
+    path = fixture_path('screenshots', *segments)
+    yield N.from_io(mkdir(path.parent))
+    exists = yield N.from_io(IO.delay(path.exists))
+    yield N.sleep(delay)
+    current = yield tmux_to_nvim(capture_pane(0))
+    yield store_screenshot(path, current) if not exists or record else check_screenshot(path, current)
+
+
+__all__ = ('tmux_plugin_test', 'screenshot',)
