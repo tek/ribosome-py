@@ -12,7 +12,7 @@ B = TypeVar('B')
 
 
 def option(name: str, cons: Callable[[A], Either[str, B]]) -> NvimIO[B]:
-    return N.read_cons('nvim_get_option', cons, name)
+    return N.read_cons_strict('nvim_get_option', cons, name)
 
 
 def option_str(name: str) -> NvimIO[str]:

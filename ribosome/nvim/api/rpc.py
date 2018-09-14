@@ -27,7 +27,7 @@ def api_info() -> NvimIO[Tuple[int, dict]]:
             if not isinstance(data[1], dict) else
             Right(data).map2(lambda a, b: (a, Map(b)))
         )
-    return N.read_cons('nvim_get_api_info', cons)
+    return N.read_cons_strict('nvim_get_api_info', cons)
 
 
 @do(NvimIO[int])

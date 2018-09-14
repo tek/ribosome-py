@@ -16,7 +16,7 @@ class NvimApi(Dat['NvimApi']):
         self.name = name
 
     @abc.abstractmethod
-    def request(self, method: str, args: List[Any], sync: bool) -> Either[str, Tuple['NvimApi', Any]]:
+    def request(self, method: str, args: List[Any], sync: bool, timeout: float) -> Either[str, Tuple['NvimApi', Any]]:
         ...
 
 
@@ -51,7 +51,7 @@ class StrictNvimApi(NvimApi):
         self.request_handler = request_handler
         self.request_log = request_log
 
-    def request(self, method: str, args: List[Any], sync: bool) -> Either[str, Tuple[NvimApi, Any]]:
+    def request(self, method: str, args: List[Any], sync: bool, timeout: float) -> Either[str, Tuple[NvimApi, Any]]:
         vim = self.append1.request_log((method, args))
         return self.request_handler(vim, method, args, sync).accum_error_lift(variable_request, vim, method, args)
 

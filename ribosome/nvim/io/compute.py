@@ -1,7 +1,7 @@
 from typing import TypeVar, Callable, Generic, Tuple, cast
 
 from amino.tc.base import F, ImplicitsMeta, Implicits
-from amino import Either, List, options, Do, Boolean
+from amino import Either, List, options, Do, Boolean, Dat
 from amino.state import State
 from amino.do import do
 from amino.dat import ADT, ADTMeta
@@ -49,6 +49,9 @@ class NvimIO(
 
     result = run_a
 
+    def drain(self, vim: NvimApi) -> None:
+        self.run(vim)
+
     def either(self, vim: NvimApi) -> Either[NvimIOException, A]:
         return self.result(vim).to_either
 
@@ -66,12 +69,35 @@ class NvimIOPure(Generic[A], NvimIO[A]):
         self.value = value
 
 
+class NRParams(Dat['NRParams']):
+
+    @staticmethod
+    def cons(
+            sync: bool=True,
+            timeout: float=3.,
+            decode: bool=True,
+            verbose: bool=False,
+    ) -> 'NRParams':
+        return NRParams(
+            sync,
+            timeout,
+            decode,
+            verbose,
+        )
+
+    def __init__(self, sync: bool, timeout: float, decode: bool, verbose: bool) -> None:
+        self.sync = sync
+        self.timeout = timeout
+        self.decode = decode
+        self.verbose = verbose
+
+
 class NvimIORequest(Generic[A], NvimIO[A]):
 
-    def __init__(self, method: str, args: List[str], sync: bool) -> None:
+    def __init__(self, method: str, args: List[str], params: NRParams) -> None:
         self.method = method
         self.args = args
-        self.sync = sync
+        self.params = params
 
 
 class NvimIOSuspend(Generic[A], NvimIO[A]):
@@ -132,10 +158,10 @@ class lift_n_result(Case[NResult[A], NvimIO[A]], alg=NResult):
         return NvimIOFatal(result.exception)
 
 
-@do(State[NvimApi, NvimIO[Either[List[str], A]]])
+@do(State[NvimApi, NvimIO[A]])
 def execute_nvim_request(io: NvimIORequest[A]) -> Do:
-    def make_request(vim: NvimApi) -> Tuple[NvimApi, Either[List[str], A]]:
-        response = vim.request(io.method, io.args, io.sync)
+    def make_request(vim: NvimApi) -> Tuple[NvimApi, NvimIO[A]]:
+        response = vim.request(io.method, io.args, io.params.sync, io.params.timeout)
         updated_vim = response.map2(lambda v, a: v) | vim
         result = response.map2(lambda v, a: a)
         return updated_vim, NvimIOPure(result)

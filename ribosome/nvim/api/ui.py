@@ -9,7 +9,7 @@ from ribosome.nvim.api.util import (cons_ext, cons_ext_list, cons_checked_list, 
                                     cons_decode_bool)
 from ribosome.nvim.api.command import nvim_command
 from ribosome.nvim.io.api import N
-from ribosome.nvim.api.function import nvim_call_cons
+from ribosome.nvim.api.function import nvim_call_cons_strict
 
 log = module_log()
 
@@ -19,27 +19,27 @@ def current_tabpage() -> NvimIO[Tabpage]:
 
 
 def current_window() -> NvimIO[Window]:
-    return N.read_cons('nvim_get_current_win', cons_ext(Window))
+    return N.read_cons_strict('nvim_get_current_win', cons_ext(Window))
 
 
 def current_buffer() -> NvimIO[Buffer]:
-    return N.read_cons('nvim_get_current_buf', cons_ext(Buffer))
+    return N.read_cons_strict('nvim_get_current_buf', cons_ext(Buffer))
 
 
 def tabpages() -> NvimIO[List[Tabpage]]:
-    return N.read_cons('nvim_list_bufs', cons_ext_list(Tabpage))
+    return N.read_cons_strict('nvim_list_bufs', cons_ext_list(Tabpage))
 
 
 def windows() -> NvimIO[List[Window]]:
-    return N.read_cons('nvim_list_wins', cons_ext_list(Window))
+    return N.read_cons_strict('nvim_list_wins', cons_ext_list(Window))
 
 
 def buffers() -> NvimIO[List[Buffer]]:
-    return N.read_cons('nvim_list_bufs', cons_ext_list(Buffer))
+    return N.read_cons_strict('nvim_list_bufs', cons_ext_list(Buffer))
 
 
 def window_buffer(window: Window) -> NvimIO[Buffer]:
-    return N.read_cons('nvim_win_get_buf', cons_ext(Buffer), window.data)
+    return N.read_cons_strict('nvim_win_get_buf', cons_ext(Buffer), window.data)
 
 
 def set_buffer_lines(
@@ -62,7 +62,7 @@ def buffer_lines(
         end: int,
         strict_indexing: bool=False,
 ) -> NvimIO[None]:
-    return N.read_cons(
+    return N.read_cons_strict(
         'nvim_buf_get_lines',
         cons_checked_list(str, I),
         buffer.data,
@@ -99,7 +99,7 @@ def close_current_buffer() -> Do:
 
 
 def cursor(window: Window) -> NvimIO[Tuple[int, int]]:
-    return N.read_cons('nvim_win_get_cursor', cons_checked_e(list, extract_int_pair), window.data)
+    return N.read_cons_strict('nvim_win_get_cursor', cons_checked_e(list, extract_int_pair), window.data)
 
 
 @do(NvimIO[Tuple[int, int]])
@@ -137,7 +137,7 @@ def current_buffer_name() -> Do:
 @do(NvimIO[bool])
 def buflisted(buffer: Buffer) -> Do:
     num = yield buffer_number(buffer)
-    yield nvim_call_cons(cons_decode_bool, 'buflisted', num)
+    yield nvim_call_cons_strict(cons_decode_bool, 'buflisted', num)
 
 
 def set_cursor(window: Window, coords: Tuple[int, int]) -> NvimIO[None]:
@@ -166,7 +166,7 @@ def current_window_number() -> Do:
 
 
 def send_input(data: str) -> NvimIO[None]:
-    return N.write('nvim_input', data)
+    return N.read_tpe('nvim_input', int, data)
 
 
 def edit_file(file: Path) -> NvimIO[None]:

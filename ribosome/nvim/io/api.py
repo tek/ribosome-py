@@ -1,5 +1,6 @@
 import time
 from typing import TypeVar, Callable, Any, Type, Tuple
+from threading import Thread
 
 from msgpack import ExtType
 
@@ -7,8 +8,8 @@ from amino import Either, IO, Maybe, List, Boolean, do, Do
 from amino.func import CallByName
 
 from ribosome.nvim.api.data import NvimApi
-from ribosome.nvim.io.compute import NvimIORequest, NvimIOPure, NvimIOFatal, NvimIOError, NvimIO
-from ribosome.nvim.request import typechecked_request, data_cons_request, nvim_request
+from ribosome.nvim.io.compute import NvimIORequest, NvimIOPure, NvimIOFatal, NvimIOError, NvimIO, NRParams
+from ribosome.nvim.request import typechecked_request, data_cons_request_strict, nvim_request, data_cons_request
 from ribosome.nvim.io.cons import (nvimio_delay, nvimio_recover_error, nvimio_recover_fatal, nvimio_wrap_either,
                                    nvimio_from_either, nvimio_suspend, nvimio_recover_failure, nvimio_ensure,
                                    nvimio_intercept)
@@ -69,14 +70,29 @@ class NMeta(type):
     def read_tpe(self, cmd: str, tpe: Type[A], *args: Any) -> NvimIO[A]:
         return typechecked_request(cmd, tpe, *args)
 
-    def read_cons(self, cmd: str, cons: Callable[[Any], Either[str, A]], *args: Any) -> NvimIO[A]:
-        return data_cons_request(cmd, cons, *args)
+    def read_cons(
+            self,
+            cmd: str,
+            cons: Callable[[Any], NvimIO[Either[str, A]]],
+            *args: Any,
+            params: NRParams=NRParams.cons(),
+    ) -> NvimIO[A]:
+        return data_cons_request(cmd, cons, *args, params=params)
+
+    def read_cons_strict(
+            self,
+            cmd: str,
+            cons: Callable[[Any], Either[str, A]],
+            *args: Any,
+            params: NRParams=NRParams.cons(),
+    ) -> NvimIO[A]:
+        return data_cons_request_strict(cmd, cons, *args, params=params)
 
     def read_ext(self, cmd: str, *args: Any) -> NvimIO[ExtType]:
         return N.read_tpe(cmd, ExtType, *args)
 
-    def write(self, cmd: str, *args: Any, sync: bool=False) -> NvimIO[A]:
-        return nvim_request(cmd, *args, sync=sync).replace(None)
+    def write(self, cmd: str, *args: Any, params: NRParams=NRParams.cons(sync=False)) -> NvimIO[A]:
+        return nvim_request(cmd, *args, params=params).replace(None)
 
     def intercept(self, fa: NvimIO[A], f: Callable[[NResult[A]], NvimIO[B]]) -> NvimIO[B]:
         return nvimio_intercept(fa, f)
@@ -126,6 +142,11 @@ class NMeta(type):
 
     def sleep(self, duration: float) -> NvimIO[None]:
         return N.delay(lambda v: time.sleep(duration))
+
+    def fork(self, f: Callable[..., NvimIO[None]], *a: Any, daemon: bool=True, **kw: Any) -> NvimIO[Thread]:
+        def fork(v: NvimApi) -> NvimIO[Thread]:
+            return N.from_io(IO.fork(lambda: f(*a, **kw).unsafe(v), daemon=daemon))
+        return N.suspend(fork)
 
 
 class N(metaclass=NMeta):

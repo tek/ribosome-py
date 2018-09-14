@@ -6,7 +6,7 @@ from amino.test import temp_dir
 from amino.test.spec import SpecBase
 from amino import do, Do
 
-from ribosome.nvim.api.function import nvim_call_tpe, nvim_call_function, nvim_call_cons
+from ribosome.nvim.api.function import nvim_call_tpe, nvim_call_function, nvim_call_cons_strict
 from ribosome.test.integration.embed import TestConfig, plugin_test
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.util import cons_checked_list
@@ -25,7 +25,7 @@ def append_path_spec() -> Do:
     file.write_text(f'class {class_name}: pass')
     yield nvim_call_function('PlugAppendPythonPath', str(pp))
     name = yield nvim_call_tpe(str, 'TestPath')
-    path = yield nvim_call_cons(cons_checked_list(str, lambda a: a), 'PlugShowPythonPath')
+    path = yield nvim_call_cons_strict(cons_checked_list(str, lambda a: a), 'PlugShowPythonPath')
     return k((name, path)).must(tupled(2)((contain(class_name), contain(str(pp)))))
 
 
