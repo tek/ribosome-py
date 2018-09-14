@@ -10,10 +10,14 @@ from ribosome.nvim.io.api import N
 stderr_handler_name = 'RibosomeSpecStderr'
 stderr_handler_body = '''
 let err = substitute(join(a:data, '\\r'), '"', '\\"', 'g')
-python3 import amino
-python3 from ribosome.logging import ribosome_envvar_file_logging
-python3 ribosome_envvar_file_logging()
-execute 'python3 amino.amino_log.error(f"""error starting rpc job on channel ' . a:id . ':\\r' . err . '""")'
+try
+    python3 import amino
+    python3 from ribosome.logging import ribosome_envvar_file_logging
+    python3 ribosome_envvar_file_logging()
+    execute 'python3 amino.amino_log.error(f"""error starting rpc job on channel ' . a:id . ':\\r' . err . '""")'
+catch //
+    echoerr err
+endtry
 '''
 
 
