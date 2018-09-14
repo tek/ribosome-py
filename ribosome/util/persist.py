@@ -5,6 +5,7 @@ from lenses import UnboundLens
 from amino import IO, Path, Left, do, Do, Either, Right
 from amino.json import decode_json, dump_json
 from amino.logging import module_log
+from amino.util.fs import mkdir
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.state import NS
@@ -14,10 +15,6 @@ from ribosome.config.settings import project_state_dir
 log = module_log()
 A = TypeVar('A')
 D = TypeVar('D')
-
-
-def mkdir(dir: Path) -> IO[None]:
-    return IO.delay(dir.mkdir, parents=True, exist_ok=True)
 
 
 @do(NvimIO[Path])
