@@ -46,7 +46,7 @@ class RpcOptions(Dat['RpcOptions']):
             write: bool,
             help: DocBlock,
             params_help: Maybe[List[str]],
-            json_help=Maybe[Map[str, str]],
+            json_help: Maybe[Map[str, str]],
     ) -> None:
         self.name = name
         self.methods = methods
