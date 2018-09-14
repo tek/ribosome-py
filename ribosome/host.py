@@ -1,24 +1,18 @@
-from typing import TypeVar, Type, Callable, Any
+from typing import Type, Callable, Any
 from types import ModuleType
 
-from amino import Either, _, L, amino_log, __, Path, Nil, Just, IO, List, do, Do
+from amino import Either, _, L, amino_log, __, Path, do, Do
 
 from amino.either import ImportFailure
 from amino.logging import amino_root_file_logging, module_log
 from amino.mod import instance_from_module
 from amino.json import decode_json
 from amino.util.exception import format_exception
-from amino.test.time import timed
 
 from ribosome.config.config import Config
 from ribosome.rpc.uv.uv import start_uv_plugin_sync
 
 log = module_log()
-D = TypeVar('D')
-DIO = TypeVar('DIO')
-B = TypeVar('B')
-CC = TypeVar('CC')
-R = TypeVar('R')
 
 
 def report_runtime_error(result: Any) -> int:
@@ -32,7 +26,7 @@ def run_loop_uv(config: Config) -> int:
     return result.cata(report_runtime_error, lambda a: 0)
 
 
-def config_from_module(mod: ModuleType) -> Either[str, Type[Config]]:
+def config_from_module(mod: ModuleType) -> Either[str, Config]:
     return instance_from_module(mod, Config)
 
 
@@ -106,11 +100,11 @@ def start_json_config(data: str) -> int:
         amino_log.debug('starting plugin from json')
         return decode_and_run().value_or(error)
     except Exception as e:
-        error(e)
+        error(str(e))
         try:
-            error(format_exception(e))
+            error(format_exception(e).join_lines)
         except Exception as e:
-            error(e)
+            error(str(e))
 
 
 __all__ = ('start_module', 'start_file', 'start_json_config', 'start_path',)
