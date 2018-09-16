@@ -85,6 +85,8 @@ cons_decode_str_list_option = cons_checked(str, split_option)
 
 cons_json = cons_checked_e(str, decode_json)
 
+cons_int = cons_checked_e(int, lambda a: Right(a))
+
 
 def cons_json_tpe(tpe: Type[A]) -> NvimIO[A]:
     return cons_checked_e(str, lambda a: decode_json_type(a, tpe))
@@ -159,4 +161,4 @@ def format_windo(cmd: str, start: int, end: Maybe[int]) -> str:
 __all__ = ('cons_checked_e', 'cons_checked', 'cons_ext', 'cons_checked_list', 'cons_ext_list', 'check_str_list',
            'cons_decode_str', 'cons_decode_str_list', 'extract_int_pair', 'split_option', 'cons_decode_str_list_option',
            'cons_split_lines', 'cons_decode_bool', 'nvimio_repeat_timeout', 'cons_json', 'cons_json_tpe',
-           'nvimio_await_success', 'cons_checked_list_e', 'format_bufdo', 'format_windo',)
+           'nvimio_await_success', 'cons_checked_list_e', 'format_bufdo', 'format_windo', 'cons_int',)

@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Any
 from amino import Either, List, do, Do, Right
 
 from ribosome.nvim.io.compute import NvimIO
-from ribosome.nvim.api.util import cons_decode_str, cons_decode_str_list, cons_decode_str_list_option
+from ribosome.nvim.api.util import cons_decode_str, cons_decode_str_list, cons_decode_str_list_option, cons_int
 from ribosome.nvim.api.data import Buffer
 from ribosome.nvim.io.api import N
 
@@ -21,6 +21,10 @@ def option_str(name: str) -> NvimIO[str]:
 
 def option_str_list(name: str) -> NvimIO[List[str]]:
     return option(name, cons_decode_str_list)
+
+
+def option_int(name: str) -> NvimIO[int]:
+    return option(name, cons_int)
 
 
 def option_set(name: str, value: Any) -> NvimIO[None]:
@@ -47,4 +51,4 @@ def cat_rtp(dir: str) -> NvimIO[None]:
 
 
 __all__ = ('option', 'option_str', 'option_str_list', 'option_set', 'option_modify', 'option_cat', 'option_buffer_set',
-           'cat_rtp',)
+           'cat_rtp', 'option_int',)
