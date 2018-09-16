@@ -1,6 +1,6 @@
 from typing import Tuple, Any
 
-from kallikrein import k, Expectation
+from kallikrein import k, Expectation, pending
 from kallikrein.matchers.either import be_right
 
 from amino import do, List, Right, Nil, Either
@@ -31,6 +31,8 @@ class NvimIoSpec(SpecBase):
     delay $delay
     suspend flat_map $suspend_flat_map
     stack safety $stack
+    stack safety with fatal recover $stack_recover_fatal
+    stack safety with error recover $stack_recover_error
     request $request
     bind on request $request_bind
     preserve resource state in `recover` $recover
@@ -65,6 +67,27 @@ class NvimIoSpec(SpecBase):
                 yield run(b)
         return kn(vim, run, 1).must(nsuccess(1000))
 
+    def stack_recover_fatal(self) -> Expectation:
+        @do(NvimIO[int])
+        def run(a: int) -> Do:
+            b = yield N.pure(a + 1)
+            if b < 1000:
+                yield N.recover_fatal(run(b), lambda a: N.pure(2000))
+            else:
+                raise Exception('error')
+        return kn(vim, run, 1).must(nsuccess(2000))
+
+    @pending
+    def stack_recover_error(self) -> Expectation:
+        @do(NvimIO[int])
+        def run(a: int) -> Do:
+            b = yield N.pure(a + 1)
+            if b < 1000:
+                yield N.recover_error(run(b), lambda a: N.pure(2000))
+            else:
+                yield N.error('boom')
+        return kn(vim, run, 1).must(nsuccess(2000))
+
     def request(self) -> Expectation:
         return k(N.request('blub', Nil).run_s(vim).vars) == vars
 
@@ -86,7 +109,7 @@ class NvimIoSpec(SpecBase):
     def recover(self) -> Expectation:
         @do(NvimIO[int])
         def run() -> Do:
-            a = yield N.recover_error(N.error('booh'), lambda e: Right(1))
+            a = yield N.recover_error(N.error('booh'), lambda e: N.pure(1))
             b = yield N.suspend(lambda v: N.pure(a + 1))
             c = yield N.delay(lambda v: b + 3)
             return c + 23
@@ -98,7 +121,7 @@ class NvimIoSpec(SpecBase):
             raise Exception('boom')
         @do(NvimIO[int])
         def run() -> Do:
-            a = yield N.recover_failure(N.delay(boom), lambda e: Right(1))
+            a = yield N.recover_failure(N.delay(boom), lambda e: N.pure(1))
             return a + 1
         result = run().run_a(vim)
         return k(result).must(nsuccess(2))
