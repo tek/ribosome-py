@@ -3,14 +3,14 @@ from typing import TypeVar, Callable
 from amino import do, Do
 from amino.case import Case
 
-from ribosome.util.menu.data import (Menu, MenuAction, MenuQuit, MenuPrompt, MenuRedraw, MenuQuitWith, MenuConfig,
-                                     MenuState, MenuUnit)
+from ribosome.util.menu.data import (Menu, MenuAction, MenuQuit, MenuPrompt, MenuRedraw, MenuQuitWith, MenuUnit,
+                                     MenuState)
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.util.menu.prompt.run import prompt
 from ribosome.nvim.scratch import (create_scratch_buffer, CreateScratchBufferOptions, ScratchBuffer,
                                    set_scratch_buffer_content)
 from ribosome.util.menu.prompt.data import (InputChar, InputState, PromptAction, PromptQuit, PromptUnit, PromptQuitWith,
-                                            PromptStateTrans, PromptUpdate, PromptUpdateChar, PromptUpdateConsumer)
+                                            PromptStateTrans)
 from ribosome.nvim.io.state import NS
 
 A = TypeVar('A')
@@ -34,7 +34,7 @@ class execute_menu_action(Case[MenuAction, NS[InputState[A, B], PromptAction]], 
 
     @do(NS[InputState[A, B], PromptAction])
     def redraw(self, a: MenuRedraw) -> Do:
-        yield NS.lift(set_scratch_buffer_content(self.scratch, a.content.lines.map(lambda a: a.text)))
+        yield NS.lift(set_scratch_buffer_content(self.scratch, a.content.filtered.map(lambda a: a.text)))
         return PromptUnit()
 
     def unit(self, a: MenuUnit) -> NS[InputState[A, B], PromptAction]:
@@ -58,28 +58,4 @@ def run_menu(menu: Menu) -> Do:
     yield prompt(update_menu(menu, scratch), menu.state)
 
 
-class default_menu_handle(Case[PromptUpdate[C], NS[InputState[MenuState[A, B], C], MenuAction]], alg=PromptUpdate):
-
-    def __init__(self, process: Callable[[PromptUpdate[C]], NS[InputState[MenuState[A, B], C], MenuAction]]) -> None:
-        self.process = process
-
-    @do(NS[InputState[MenuState[A, B], C], MenuAction])
-    def char(self, update: PromptUpdateChar[C]) -> Do:
-        yield self.process(update)
-
-    @do(NS[InputState[MenuState[A, B], C], MenuAction])
-    def consumer(self, update: PromptUpdateConsumer[C]) -> Do:
-        yield self.process(update)
-
-
-def default_menu(
-        state: A,
-        process: Callable[[PromptUpdate[C]], NS[InputState[MenuState[A, B], C], MenuAction]],
-        name: str,
-) -> Menu:
-    handle = default_menu_handle(process)
-    config = MenuConfig.cons(handle, name)
-    return Menu.cons(config, MenuState.cons(state))
-
-
-__all__ = ('run_menu', 'default_menu',)
+__all__ = ('run_menu',)

@@ -2,7 +2,7 @@ from kallikrein import Expectation
 from kallikrein.matchers.length import have_length
 
 from amino.test.spec import SpecBase
-from amino import Map, List, do, Do, Dat, Nil, Just
+from amino import Map, List, do, Do, Dat, Nil
 from amino.logging import module_log
 
 from ribosome.test.integration.external import external_state_test
@@ -15,13 +15,14 @@ from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PluginState, PS
 from ribosome.config.basic_config import NoData
 from ribosome.test.prog import fork_request
-from ribosome.util.menu.data import InputChar, MenuAction, MenuRedraw, MenuContent, MenuState, MenuLine
-from ribosome.util.menu.run import run_menu, default_menu
+from ribosome.util.menu.data import MenuAction, MenuContent, MenuState, MenuLine, MenuUnit
+from ribosome.util.menu.run import run_menu
 from ribosome.nvim.api.ui import send_input
 from ribosome.nvim.api.function import define_function
 from ribosome.nvim.api.variable import variable_set
-from ribosome.util.menu.prompt.data import InputState
+from ribosome.util.menu.prompt.data import InputState, PromptUpdate
 from ribosome.test.klk.matchers.buffer import current_buffer_matches
+from ribosome.util.menu.auto import auto_menu, AutoUpdate
 
 log = module_log()
 
@@ -32,19 +33,20 @@ class MState(Dat['MState']):
         pass
 
 
-@do(NS[InputState[MenuState[MState, None], None], MenuAction])
-def handle_input(key: InputChar) -> Do:
+@do(NS[InputState[MenuState[MState, None], AutoUpdate[MState, None]], MenuAction])
+def handle_input(update: PromptUpdate[AutoUpdate[MState, None]]) -> Do:
     yield NS.unit
-    lines = List(
-        MenuLine('first', None),
-        MenuLine('second', None),
-        MenuLine('third', None),
-    )
-    return MenuRedraw(MenuContent(lines, Just(1)))
+    return MenuUnit()
 
 
+lines = List(
+    MenuLine('first', None),
+    MenuLine('second', None),
+    MenuLine('third', None),
+)
+content = MenuContent.cons(lines, lines)
 menu_state = MState()
-menu = default_menu(menu_state, handle_input, 'spec menu')
+menu = auto_menu(menu_state, content, handle_input, 'spec menu')
 
 
 @prog.unit

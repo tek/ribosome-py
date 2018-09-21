@@ -50,6 +50,10 @@ class PromptInputAction(Generic[A], ADT['PromptInputAction[A]']):
     pass
 
 
+class PromptInit(PromptInputAction[A]):
+    pass
+
+
 class PromptInput(PromptInputAction[A]):
 
     def __init__(self, char: InputChar) -> None:
@@ -67,6 +71,10 @@ class PromptConsumerInput(PromptInputAction[A]):
 
 
 class PromptUpdate(Generic[A], ADT['PromptUpdate[A]']):
+    pass
+
+
+class PromptUpdateInit(PromptUpdate[A]):
     pass
 
 
@@ -92,6 +100,10 @@ class Prompt(Dat['Prompt']):
         self.cursor = cursor
         self.pre = pre
         self.post = post
+
+    @property
+    def line(self) -> str:
+        return self.pre + self.post
 
 
 class PromptState(ADT['PromptState']):
@@ -171,7 +183,7 @@ class InputResources(Generic[A, B], Dat['InputResources[A, B]']):
     @staticmethod
     def cons(
             state: InputState[A, B],
-            update: ProcessPrompt,
+            update: Callable[[PromptUpdate[B]], NS[InputState[A, B], None]],
             inputs: Queue=None,
             stop: Event=None,
             interval: float=.01,
@@ -187,7 +199,7 @@ class InputResources(Generic[A, B], Dat['InputResources[A, B]']):
     def __init__(
             self,
             state: InputState[A, B],
-            update: ProcessPrompt,
+            update: Callable[[PromptUpdate[B]], NS[InputState[A, B], None]],
             inputs: Queue,
             stop: Event,
             interval: float,
@@ -203,4 +215,4 @@ __all__ = ('InputChar', 'PrintableChar', 'SpecialChar', 'Input', 'NoInput', 'Nor
            'InputState', 'InputResources', 'InputChar', 'PromptInputAction', 'PromptInput', 'PromptInterrupt',
            'Prompt', 'PromptState', 'PromptEcho', 'PromptQuit', 'PromptPassthrough', 'PromptUnit', 'PromptAction',
            'PromptStateTrans', 'PromptUnit', 'PromptQuitWith', 'PromptConsumerInput', 'PromptUpdate',
-           'PromptUpdateChar', 'PromptUpdateConsumer',)
+           'PromptUpdateChar', 'PromptUpdateConsumer', 'PromptInit', 'PromptUpdateInit',)

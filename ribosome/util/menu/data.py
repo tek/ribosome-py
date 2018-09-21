@@ -31,11 +31,16 @@ class MenuLine(Generic[A], Dat['MenuLine[A]']):
 class MenuContent(Generic[A], Dat['MenuContent[A]']):
 
     @staticmethod
-    def cons(lines: List[MenuLine[A]]=Nil, selected: int=None) -> 'MenuContent[A]':
-        return MenuContent(lines, Maybe.optional(selected))
+    def cons(
+            lines: List[MenuLine[A]]=Nil,
+            filtered: List[MenuLine[A]]=Nil,
+            selected: List[int]=Nil,
+    ) -> 'MenuContent[A]':
+        return MenuContent(lines, filtered, selected)
 
-    def __init__(self, lines: List[MenuLine[A]], selected: Maybe[int]) -> None:
+    def __init__(self, lines: List[MenuLine[A]], filtered: List[MenuLine[A]], selected: List[int]) -> None:
         self.lines = lines
+        self.filtered = filtered
         self.selected = selected
 
 
@@ -75,15 +80,18 @@ class MenuState(Generic[A, B], Dat['MenuState[A, B]']):
     def cons(
             state: A,
             content: MenuContent[B]=None,
+            cursor: int=0,
     ) -> 'MenuState[A, B]':
         return MenuState(
             state,
             content or MenuContent.cons(),
+            cursor,
         )
 
-    def __init__(self, state: A, content: MenuContent[B]) -> None:
+    def __init__(self, state: A, content: MenuContent[B], cursor: int) -> None:
         self.state = state
         self.content = content
+        self.cursor = cursor
 
 
 class MenuConfig(Generic[A, B, C], Dat['MenuConfig[A, B, C]']):

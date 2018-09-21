@@ -12,8 +12,8 @@ from ribosome.nvim.io.state import NS
 from ribosome.util.menu.prompt.data import (Input, InputState, InputResources, InputChar, PrintableChar, SpecialChar,
                                             PromptInputAction, PromptInput, PromptInterrupt, Prompt, ProcessPrompt,
                                             PromptEcho, PromptAction, PromptStateTrans, PromptQuit, PromptUnit,
-                                            PromptQuitWith, PromptUpdate, PromptUpdateChar,
-                                            PromptConsumerInput, PromptUpdateConsumer)
+                                            PromptQuitWith, PromptUpdate, PromptUpdateChar, PromptConsumerInput,
+                                            PromptUpdateConsumer, PromptInit, PromptUpdateInit)
 from ribosome.nvim.api.command import nvim_atomic_commands
 from ribosome.util.menu.prompt.input import input_loop
 from ribosome.util.menu.prompt.interrupt import intercept_interrupt, stop_prompt, stop_prompt_s
@@ -72,6 +72,9 @@ def dequeue(inputs: Queue) -> Do:
 
 class process_input(Case[PromptInputAction[A], Maybe[PromptUpdate[A]]], alg=PromptInputAction):
 
+    def init(self, a: PromptInit[A]) -> Maybe[PromptUpdate[A]]:
+        return Just(PromptUpdateInit())
+
     def input(self, a: PromptInput[A]) -> Maybe[PromptUpdate[A]]:
         return Just(PromptUpdateChar(a.char))
 
@@ -99,6 +102,9 @@ class execute_prompt_action(Case[PromptAction, NS[InputResources[A, B], None]], 
 
 class process_prompt_update_char(Case[PromptUpdate[B], NS[InputState[A, B], None]], alg=PromptUpdate):
 
+    def init(self, a: PromptUpdateInit[B]) -> NS[InputState[A, B], None]:
+        return NS.unit
+
     def char(self, update: PromptUpdateChar[B]) -> NS[InputState[A, B], None]:
         return NS.modify(lambda s: s.mod.prompt(lambda a: update_prompt_text(a)(update.char)))
 
@@ -121,6 +127,9 @@ def update_prompt(process: ProcessPrompt) -> Callable[[List[PromptUpdate[B]]], N
 
 
 class process_action(Case[PromptUpdate[B], NS[InputState[A, B], None]], alg=PromptUpdate):
+
+    def init(self, a: PromptUpdateInit[B]) -> NS[InputState[A, B], None]:
+        return NS.modify(lambda s: s.append1.actions(a))
 
     def input_char(self, a: PromptUpdateChar[B]) -> NS[InputState[A, B], None]:
         return process_char.match(a.char)
@@ -151,6 +160,13 @@ def prompt_loop() -> Do:
     yield actions.cata_strict(prompt_recurse, NS.unit)
 
 
+@do(NS[InputResources[A, B], None])
+def start_prompt_loop() -> Do:
+    inputs = yield NS.inspect(lambda s: s.inputs)
+    yield NS.from_io(IO.delay(inputs.put, PromptInit()))
+    yield prompt_loop()
+
+
 @do(NvimIO[A])
 def prompt(process: ProcessPrompt, initial: A) -> Do:
     log.debug(f'running prompt with {initial}')
@@ -159,7 +175,7 @@ def prompt(process: ProcessPrompt, initial: A) -> Do:
         update_prompt(process),
     )
     input_thread = yield N.fork(input_loop, res)
-    result = yield intercept_interrupt(res.inputs, res.stop, res, prompt_loop().run_s(res))
+    result = yield intercept_interrupt(res.inputs, res.stop, res, start_prompt_loop().run_s(res))
     yield N.from_io(stop_prompt(res.inputs, res.stop))
     yield N.simple(input_thread.join)
     return result.state.data
