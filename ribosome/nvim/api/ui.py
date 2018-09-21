@@ -122,6 +122,10 @@ def buffer_name(buffer: Buffer) -> NvimIO[str]:
     return N.read_tpe('nvim_buf_get_name', str, buffer.data)
 
 
+def set_buffer_name(buffer: Buffer, name: str) -> NvimIO[str]:
+    return N.write('nvim_buf_set_name', buffer.data, name)
+
+
 @do(NvimIO[str])
 def window_buffer_name(window: Window) -> Do:
     buffer = yield window_buffer(window)
@@ -199,4 +203,4 @@ __all__ = ('current_tabpage', 'current_window', 'current_buffer', 'tabpages', 'w
            'buffer_number', 'close_buffer', 'close_current_buffer', 'cursor', 'current_cursor', 'window_line',
            'focus_window', 'buffer_name', 'window_buffer_name', 'current_buffer_name', 'set_cursor', 'set_line',
            'set_local_cursor', 'current_window_number', 'send_input', 'edit_file', 'echo', 'window_number',
-           'window_height', 'current_window_height', 'close_window',)
+           'window_height', 'current_window_height', 'close_window', 'set_buffer_name',)

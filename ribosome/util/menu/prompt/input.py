@@ -14,6 +14,7 @@ from ribosome.util.menu.prompt.interrupt import intercept_interrupt, stop_prompt
 
 log = module_log()
 A = TypeVar('A')
+B = TypeVar('B')
 
 
 @do(NvimIO[List[str]])
@@ -64,9 +65,9 @@ def getchar() -> NvimIO[Input]:
     return nvim_call_cons(parse_input, 'getchar', False, params=NRParams.cons(decode=False, timeout=120))
 
 
-class process_input(Generic[A], Case[Input, NvimIO[None]], alg=Input):
+class process_input(Generic[A, B], Case[Input, NvimIO[None]], alg=Input):
 
-    def __init__(self, res: InputResources[A]) -> None:
+    def __init__(self, res: InputResources[A, B]) -> None:
         self.res = res
 
     @do(NvimIO[None])
@@ -84,16 +85,16 @@ class process_input(Generic[A], Case[Input, NvimIO[None]], alg=Input):
 
 
 @do(NvimIO[None])
-def input_step(res: InputResources[A]) -> Do:
+def input_step(res: InputResources[A, B]) -> Do:
     input = yield getchar()
     yield process_input(res)(input)
 
 
-def input_loop_unsafe(res: InputResources[A]) -> NvimIO[None]:
+def input_loop_unsafe(res: InputResources[A, B]) -> NvimIO[None]:
     return N.unit if res.stop.is_set() else input_step(res)
 
 
-def input_loop(res: InputResources[A]) -> NvimIO[None]:
+def input_loop(res: InputResources[A, B]) -> NvimIO[None]:
     return intercept_interrupt(res.inputs, res.stop, None, input_loop_unsafe(res))
 
 

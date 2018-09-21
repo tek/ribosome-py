@@ -36,7 +36,7 @@ class PromptData(Dat['PromptData']):
         self.line = line
 
 
-def handle_input(keys: List[InputChar]) -> NS[InputState[None], None]:
+def handle_input(keys: List[InputChar]) -> NS[InputState[None, None], None]:
     return NS.unit
 
 

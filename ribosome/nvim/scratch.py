@@ -3,7 +3,7 @@ from amino.logging import module_log
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.ui import (current_tabpage, current_window, window_buffer, set_buffer_content,
-                                  current_window_height)
+                                  current_window_height, set_buffer_name)
 from ribosome.nvim.api.data import Window, Buffer, Tabpage
 from ribosome.nvim.api.option import option_buffer_set
 from ribosome.nvim.api.command import nvim_command
@@ -14,7 +14,7 @@ log = module_log()
 
 class ScratchUi(Dat['ScratchUi']):
 
-    def __init__(self, window: Window, tab: Maybe[Tabpage], previous: Window) -> None:
+    def __init__(self, window: Window, previous: Window, tab: Maybe[Tabpage]) -> None:
         self.window = window
         self.tab = tab
         self.previous = previous
@@ -46,22 +46,23 @@ def create_scratch_ui(use_tab: bool, vertical: bool, size: Maybe[int]) -> Do:
     current = yield current_window()
     tab = yield create_scratch_tab() / Just if use_tab else N.pure(Nothing)
     window = yield current_window() if use_tab else create_scratch_window(vertical, size)
-    return ScratchUi(window, tab, current)
+    return ScratchUi(window, current, tab)
 
 
 @do(NvimIO[None])
-def configure_scratch_buffer(buffer: Buffer) -> Do:
+def configure_scratch_buffer(buffer: Buffer, name: str) -> Do:
     yield option_buffer_set(buffer, 'buftype', 'nofile')
     yield option_buffer_set(buffer, 'bufhidden', 'wipe')
     yield option_buffer_set(buffer, 'buflisted', False)
     yield option_buffer_set(buffer, 'swapfile', False)
     yield option_buffer_set(buffer, 'modifiable', False)
+    yield set_buffer_name(buffer, name)
 
 
 @do(NvimIO[Buffer])
-def setup_scratch_buffer(ui: ScratchUi) -> Do:
+def setup_scratch_buffer(ui: ScratchUi, name: str) -> Do:
     buffer = yield window_buffer(ui.window)
-    yield configure_scratch_buffer(buffer)
+    yield configure_scratch_buffer(buffer, name)
     return buffer
 
 
@@ -73,12 +74,14 @@ class CreateScratchBufferOptions(Dat['CreateScratchBufferOptions']):
             vertical: bool=None,
             size: int=None,
             wrap: bool=None,
+            name: str='',
     ) -> 'CreateScratchBufferOptions':
         return CreateScratchBufferOptions(
             Maybe.optional(tab),
             Maybe.optional(vertical),
             Maybe.optional(size),
             Maybe.optional(wrap),
+            name,
         )
 
     def __init__(
@@ -87,17 +90,19 @@ class CreateScratchBufferOptions(Dat['CreateScratchBufferOptions']):
             vertical: Maybe[bool],
             size: Maybe[int],
             wrap: Maybe[bool],
+            name: str,
     ) -> None:
         self.tab = tab
         self.vertical = vertical
         self.size = size
         self.wrap = wrap
+        self.name = name
 
 
 @do(NvimIO[ScratchBuffer])
 def create_scratch_buffer(options: CreateScratchBufferOptions) -> Do:
     ui = yield create_scratch_ui(options.tab.get_or_strict(False), options.vertical.get_or_strict(False), options.size)
-    buffer = yield setup_scratch_buffer(ui)
+    buffer = yield setup_scratch_buffer(ui, options.name)
     return ScratchBuffer(buffer, ui)
 
 

@@ -5,8 +5,10 @@ from queue import Queue
 from amino import ADT, Dat, List, Nil
 
 from ribosome.nvim.io.state import NS
+from ribosome.compute.prog import Prog
 
 A = TypeVar('A')
+B = TypeVar('B')
 
 
 class InputChar(ADT['InputChar']):
@@ -44,18 +46,40 @@ class InterruptInput(Input):
     pass
 
 
-class PromptAction(ADT['PromptAction']):
+class PromptInputAction(Generic[A], ADT['PromptInputAction[A]']):
     pass
 
 
-class PromptInput(PromptAction):
+class PromptInput(PromptInputAction[A]):
 
     def __init__(self, char: InputChar) -> None:
         self.char = char
 
 
-class PromptInterrupt(PromptAction):
+class PromptInterrupt(PromptInputAction[A]):
     pass
+
+
+class PromptConsumerInput(PromptInputAction[A]):
+
+    def __init__(self, data: A) -> None:
+        self.data = data
+
+
+class PromptUpdate(Generic[A], ADT['PromptUpdate[A]']):
+    pass
+
+
+class PromptUpdateChar(PromptUpdate[A]):
+
+    def __init__(self, char: InputChar) -> None:
+        self.char = char
+
+
+class PromptUpdateConsumer(PromptUpdate[A]):
+
+    def __init__(self, data: A) -> None:
+        self.data = data
 
 
 class Prompt(Dat['Prompt']):
@@ -70,39 +94,88 @@ class Prompt(Dat['Prompt']):
         self.post = post
 
 
-class InputState(Generic[A], Dat['InputState[A]']):
+class PromptState(ADT['PromptState']):
+    pass
+
+
+class PromptEcho(PromptState):
+    pass
+
+
+class PromptPassthrough(PromptState):
+    pass
+
+
+class PromptAction(ADT['PromptAction']):
+    pass
+
+
+class PromptStateTrans(PromptAction):
+
+    def __init__(self, state: PromptState) -> None:
+        self.state = state
+
+
+class PromptQuit(PromptAction):
+    pass
+
+
+class PromptQuitWith(PromptAction):
+
+    def __init__(self, prog: Prog[None]) -> None:
+        self.prog = prog
+
+
+class PromptUnit(PromptAction):
+    pass
+
+
+class InputState(Generic[A, B], Dat['InputState[A, B]']):
 
     @staticmethod
     def cons(
             data: A,
-            keys: List[InputChar]=Nil,
+            actions: List[PromptUpdate[B]]=Nil,
             prompt: Prompt=Prompt.cons(),
             cursor: int=0,
+            state: PromptState=PromptEcho(),
     ) -> 'InputState':
         return InputState(
             data,
-            keys,
+            actions,
             prompt,
             cursor,
+            state,
         )
 
-    def __init__(self, data: A, keys: List[InputChar], prompt: Prompt, cursor: int) -> None:
+    def __init__(
+            self,
+            data: A,
+            actions: List[PromptUpdate[B]],
+            prompt: Prompt,
+            cursor: int,
+            state: PromptState
+    ) -> None:
         self.data = data
-        self.keys = keys
+        self.actions = actions
         self.prompt = prompt
         self.cursor = cursor
+        self.state = state
 
 
-class InputResources(Generic[A], Dat['InputResources[A]']):
+ProcessPrompt = Callable[[PromptUpdate[B]], NS[InputState[A, B], PromptAction]]
+
+
+class InputResources(Generic[A, B], Dat['InputResources[A, B]']):
 
     @staticmethod
     def cons(
-            state: InputState[A],
-            update: Callable[[List[InputChar]], NS[InputState[A], bool]],
+            state: InputState[A, B],
+            update: ProcessPrompt,
             inputs: Queue=None,
             stop: Event=None,
             interval: float=.01,
-    ) -> 'InputResources[A]':
+    ) -> 'InputResources[A, B]':
         return InputResources(
             state,
             update,
@@ -113,8 +186,8 @@ class InputResources(Generic[A], Dat['InputResources[A]']):
 
     def __init__(
             self,
-            state: InputState[A],
-            update: Callable[[List[InputChar]], NS[InputState[A], bool]],
+            state: InputState[A, B],
+            update: ProcessPrompt,
             inputs: Queue,
             stop: Event,
             interval: float,
@@ -127,5 +200,7 @@ class InputResources(Generic[A], Dat['InputResources[A]']):
 
 
 __all__ = ('InputChar', 'PrintableChar', 'SpecialChar', 'Input', 'NoInput', 'NormalInput', 'InterruptInput',
-           'InputChar', 'InputState', 'InputResources', 'InputChar', 'PromptAction', 'PromptInput', 'PromptInterrupt',
-           'Prompt',)
+           'InputState', 'InputResources', 'InputChar', 'PromptInputAction', 'PromptInput', 'PromptInterrupt',
+           'Prompt', 'PromptState', 'PromptEcho', 'PromptQuit', 'PromptPassthrough', 'PromptUnit', 'PromptAction',
+           'PromptStateTrans', 'PromptUnit', 'PromptQuitWith', 'PromptConsumerInput', 'PromptUpdate',
+           'PromptUpdateChar', 'PromptUpdateConsumer',)
