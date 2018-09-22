@@ -112,15 +112,15 @@ class process_prompt_update_char(Case[PromptUpdate[B], NS[InputState[A, B], None
         return NS.unit
 
 
-@do(NS[InputState[A, B], None])
+@do(NS[InputResources[A, B], None])
 def process_prompt_update(process: ProcessPrompt, action: PromptUpdate[B]) -> Do:
-    yield process_prompt_update_char.match(action)
-    yield redraw_if_echoing()
-    action = yield process(action)
+    yield process_prompt_update_char.match(action).zoom(lens.state)
+    yield redraw_if_echoing().zoom(lens.state)
+    action = yield process(action).zoom(lens.state)
     yield execute_prompt_action.match(action)
 
 
-def update_prompt(process: ProcessPrompt) -> Callable[[List[PromptUpdate[B]]], NS[InputState[A, B], None]]:
+def update_prompt(process: ProcessPrompt) -> Callable[[List[PromptUpdate[B]]], NS[InputResources[A, B], None]]:
     def update_prompt(chars: List[PromptUpdate[B]]) -> NS[InputState[A, B], None]:
         return chars.traverse(lambda char: process_prompt_update(process, char), NS).replace(None)
     return update_prompt
@@ -148,7 +148,7 @@ def prompt_recurse(input: List[PromptUpdate[B]]) -> Do:
     yield input.traverse(process_action.match, NS).zoom(lens.state)
     current = yield NS.apply(pop_actions).zoom(lens.state)
     update = yield NS.inspect(lambda s: s.update)
-    yield update(current).zoom(lens.state)
+    yield update(current)
     yield NS.unit if stop.is_set() else prompt_loop()
 
 

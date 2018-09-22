@@ -3,8 +3,8 @@ from typing import TypeVar, Callable
 from amino import do, Do
 from amino.case import Case
 
-from ribosome.util.menu.data import (Menu, MenuAction, MenuQuit, MenuPrompt, MenuRedraw, MenuQuitWith, MenuUnit,
-                                     MenuState)
+from ribosome.util.menu.data import (Menu, MenuAction, MenuQuit, MenuPrompt, MenuUpdateLines, MenuQuitWith, MenuUnit,
+                                     MenuState, MenuUpdateCursor)
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.util.menu.prompt.run import prompt
 from ribosome.nvim.scratch import (create_scratch_buffer, CreateScratchBufferOptions, ScratchBuffer,
@@ -12,32 +12,39 @@ from ribosome.nvim.scratch import (create_scratch_buffer, CreateScratchBufferOpt
 from ribosome.util.menu.prompt.data import (InputChar, InputState, PromptAction, PromptQuit, PromptUnit, PromptQuitWith,
                                             PromptStateTrans)
 from ribosome.nvim.io.state import NS
+from ribosome.nvim.api.ui import set_cursor
 
 A = TypeVar('A')
 B = TypeVar('B')
 C = TypeVar('C')
 
 
-class execute_menu_action(Case[MenuAction, NS[InputState[A, B], PromptAction]], alg=MenuAction):
+class execute_menu_action(Case[MenuAction, NS[InputState[MenuState[A, B], C], PromptAction]], alg=MenuAction):
 
     def __init__(self, scratch: ScratchBuffer) -> None:
         self.scratch = scratch
 
-    def quit(self, a: MenuQuit) -> NS[InputState[A, B], PromptAction]:
+    def quit(self, a: MenuQuit) -> NS[InputState[MenuState[A, B], C], PromptAction]:
         return NS.pure(PromptQuit())
 
-    def quit_with(self, a: MenuQuitWith) -> NS[InputState[A, B], PromptAction]:
+    def quit_with(self, a: MenuQuitWith) -> NS[InputState[MenuState[A, B], C], PromptAction]:
         return NS.pure(PromptQuitWith(a.prog))
 
-    def prompt(self, a: MenuPrompt) -> NS[InputState[A, B], PromptAction]:
+    def prompt(self, a: MenuPrompt) -> NS[InputState[MenuState[A, B], C], PromptAction]:
         return NS.pure(PromptStateTrans(a.state))
 
-    @do(NS[InputState[A, B], PromptAction])
-    def redraw(self, a: MenuRedraw) -> Do:
+    @do(NS[InputState[MenuState[A, B], C], PromptAction])
+    def update_lines(self, a: MenuUpdateLines) -> Do:
         yield NS.lift(set_scratch_buffer_content(self.scratch, a.content.filtered.map(lambda a: a.text)))
         return PromptUnit()
 
-    def unit(self, a: MenuUnit) -> NS[InputState[A, B], PromptAction]:
+    @do(NS[InputState[MenuState[A, B], C], PromptAction])
+    def update_cursor(self, a: MenuUpdateCursor) -> Do:
+        line = yield NS.inspect(lambda a: a.data.cursor)
+        yield NS.lift(set_cursor(self.scratch.ui.window, (line + 1, 0)))
+        return PromptUnit()
+
+    def unit(self, a: MenuUnit) -> NS[InputState[MenuState[A, B], C], PromptAction]:
         return NS.pure(PromptUnit())
 
 

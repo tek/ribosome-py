@@ -1,4 +1,4 @@
-from kallikrein import Expectation
+from kallikrein import Expectation, k
 from kallikrein.matchers.length import have_length
 
 from amino.test.spec import SpecBase
@@ -17,12 +17,13 @@ from ribosome.config.basic_config import NoData
 from ribosome.test.prog import fork_request
 from ribosome.util.menu.data import MenuAction, MenuContent, MenuState, MenuLine, MenuUnit
 from ribosome.util.menu.run import run_menu
-from ribosome.nvim.api.ui import send_input
+from ribosome.nvim.api.ui import send_input, current_cursor
 from ribosome.nvim.api.function import define_function
-from ribosome.nvim.api.variable import variable_set
+from ribosome.nvim.api.variable import var_becomes
 from ribosome.util.menu.prompt.data import InputState, PromptUpdate
 from ribosome.test.klk.matchers.buffer import current_buffer_matches
-from ribosome.util.menu.auto import auto_menu, AutoUpdate
+from ribosome.util.menu.auto.run import auto_menu
+from ribosome.util.menu.auto.data import AutoUpdate
 
 log = module_log()
 
@@ -46,7 +47,7 @@ lines = List(
 )
 content = MenuContent.cons(lines, lines)
 menu_state = MState()
-menu = auto_menu(menu_state, content, handle_input, 'spec menu')
+menu = auto_menu(menu_state, content, handle_input, 'spec menu', Map())
 
 
 @prog.unit
@@ -81,10 +82,12 @@ def menu_spec() -> Do:
     yield NS.lift(define_function('Loop', Nil, loop_fun))
     yield NS.lift(send_input(':call Loop()<cr>'))
     yield fork_request('spec_menu')
+    yield NS.lift(var_becomes('looping', 1))
+    yield NS.lift(send_input('ir<esc>j'))
     yield NS.sleep(1)
-    yield NS.lift(send_input('ir'))
-    yield NS.lift(variable_set('looping', 0))
-    yield NS.lift(current_buffer_matches(have_length(2)))
+    content = yield NS.lift(current_buffer_matches(have_length(2)))
+    line, col = yield NS.lift(current_cursor())
+    return content & (k(line) == 2)
 
 
 class MenuSpec(SpecBase):
