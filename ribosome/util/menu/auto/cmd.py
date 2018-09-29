@@ -1,9 +1,9 @@
 from amino import do, Do, Map
 from amino.lenses.lens import lens
 
-from ribosome.util.menu.auto.data import MenuS, AutoUpdate, S, U, ML, AutoS
+from ribosome.util.menu.auto.data import AutoS
 from ribosome.nvim.io.state import NS
-from ribosome.util.menu.data import MenuPrompt, MenuUnit, MenuUpdateCursor
+from ribosome.util.menu.data import MenuPrompt, MenuUpdateCursor
 from ribosome.util.menu.prompt.data import PromptPassthrough
 
 

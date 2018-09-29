@@ -10,9 +10,12 @@ from ribosome.util.menu.prompt.run import prompt
 from ribosome.nvim.scratch import (create_scratch_buffer, CreateScratchBufferOptions, ScratchBuffer,
                                    set_scratch_buffer_content)
 from ribosome.util.menu.prompt.data import (InputChar, InputState, PromptAction, PromptQuit, PromptUnit, PromptQuitWith,
-                                            PromptStateTrans)
+                                            PromptStateTrans, PromptUpdate)
 from ribosome.nvim.io.state import NS
 from ribosome.nvim.api.ui import set_cursor
+from ribosome.compute.prog import Prog
+from ribosome.compute.api import prog
+from ribosome.compute.ribosome_api import Ribo
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -49,20 +52,27 @@ class execute_menu_action(Case[MenuAction, NS[InputState[MenuState[A, B], C], Pr
 
 
 def update_menu(
-        menu: Menu,
+        menu: Menu[A, B, C],
         scratch: ScratchBuffer,
 ) -> Callable[[InputChar], NS[InputState[MenuState[A, B], C], PromptAction]]:
     @do(NS[InputState[MenuState[A, B], C], PromptAction])
-    def update_menu(char: InputChar) -> Do:
-        action = yield menu.config.handle_input(char)
+    def update_menu(update: PromptUpdate[C]) -> Do:
+        action = yield menu.config.handle_input(update)
         yield execute_menu_action(scratch)(action)
     return update_menu
 
 
-@do(NvimIO[None])
-def run_menu(menu: Menu) -> Do:
+@do(NvimIO[Prog[None]])
+def run_menu(menu: Menu[A, B, C]) -> Do:
     scratch = yield create_scratch_buffer(CreateScratchBufferOptions.cons(wrap=False, name=menu.config.name))
-    yield prompt(update_menu(menu, scratch), menu.state)
+    next, state = yield prompt(update_menu(menu, scratch), menu.state)
+    return next.get_or_strict(Prog.unit).replace(state)
 
 
-__all__ = ('run_menu',)
+@do(Prog[A])
+def run_menu_prog(menu: Menu[A, B, C]) -> Do:
+    next = yield Ribo.lift_nvimio(run_menu(menu))
+    yield next
+
+
+__all__ = ('run_menu', 'run_menu_prog',)

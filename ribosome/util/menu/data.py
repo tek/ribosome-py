@@ -8,9 +8,9 @@ from ribosome.compute.prog import Prog
 
 A = TypeVar('A')
 B = TypeVar('B')
-C = TypeVar('C')
 S = TypeVar('S')
 ML = TypeVar('ML')
+U = TypeVar('U')
 
 
 class MenuLine(Generic[A], Dat['MenuLine[A]']):
@@ -87,7 +87,7 @@ class MenuState(Generic[S, ML], Dat['MenuState[S, ML]']):
             state: S,
             content: MenuContent[ML]=None,
             cursor: int=0,
-    ) -> 'MenuState[A, B]':
+    ) -> 'MenuState[S, ML]':
         return MenuState(
             state,
             content or MenuContent.cons(),
@@ -100,13 +100,13 @@ class MenuState(Generic[S, ML], Dat['MenuState[S, ML]']):
         self.cursor = cursor
 
 
-class MenuConfig(Generic[A, B, C], Dat['MenuConfig[A, B, C]']):
+class MenuConfig(Generic[S, ML, U], Dat['MenuConfig[S, ML, U]']):
 
     @staticmethod
     def cons(
-            handle_input: Callable[[PromptUpdate[C]], NS[InputState[MenuState[A, B], C], MenuAction]],
+            handle_input: Callable[[PromptUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
             name: str='',
-    ) -> 'MenuConfig[A, B, C]':
+    ) -> 'MenuConfig[S, ML, U]':
         return MenuConfig(
             handle_input,
             name,
@@ -114,26 +114,26 @@ class MenuConfig(Generic[A, B, C], Dat['MenuConfig[A, B, C]']):
 
     def __init__(
             self,
-            handle_input: Callable[[PromptUpdate[C]], NS[InputState[MenuState[A, B], C], MenuAction]],
+            handle_input: Callable[[PromptUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
             name: str,
     ) -> None:
         self.handle_input = handle_input
         self.name = name
 
 
-class Menu(Generic[A, B, C], Dat['Menu[A, B, C]']):
+class Menu(Generic[S, ML, U], Dat['Menu[S, ML, U]']):
 
     @staticmethod
     def cons(
-            config: MenuConfig[A, B, C],
-            state: MenuState[A, B],
+            config: MenuConfig[S, ML, U],
+            state: MenuState[S, ML],
     ) -> 'Menu':
         return Menu(
             config,
             state,
         )
 
-    def __init__(self, config: MenuConfig[A, B, C], state: MenuState[A, B]) -> None:
+    def __init__(self, config: MenuConfig[S, ML, U], state: MenuState[S, ML]) -> None:
         self.config = config
         self.state = state
 

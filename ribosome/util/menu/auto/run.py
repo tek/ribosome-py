@@ -1,14 +1,14 @@
-from typing import TypeVar, Callable, Generic, Any
+from typing import TypeVar, Callable
 
-from amino import do, Do, ADT, List, Dat, Map
+from amino import do, Do, Map
 from amino.case import Case
 from amino.lenses.lens import lens
 
-from ribosome.util.menu.data import Menu, MenuAction, MenuConfig, MenuState, MenuLine, MenuContent, MenuUpdateLines
+from ribosome.util.menu.data import Menu, MenuConfig, MenuState, MenuContent, MenuUpdateLines
 from ribosome.util.menu.prompt.data import (InputChar, InputState, PromptUpdate, PromptUpdateChar, PromptUpdateConsumer,
-                                            PrintableChar, SpecialChar, PromptUpdateInit, PromptEcho, PromptPassthrough)
+                                            PrintableChar, SpecialChar, PromptUpdateInit, PromptEcho)
 from ribosome.nvim.io.state import NS
-from ribosome.util.menu.auto.data import AutoUpdate, AutoUpdateRefresh, AutoUpdateConsumer, MenuS, AutoState, AutoS
+from ribosome.util.menu.auto.data import AutoUpdate, AutoUpdateRefresh, AutoUpdateConsumer, AutoState, AutoS
 from ribosome.util.menu.auto.cmd import builtin_mappings
 
 A = TypeVar('A')
@@ -91,7 +91,7 @@ def auto_menu(
         content: MenuContent[ML],
         process: Callable[[PromptUpdate[AutoUpdate[U, ML]]], AutoS],
         name: str,
-        mappings: Map[str, Callable[[], MenuS[S, AutoUpdate[U, ML], ML]]],
+        mappings: Map[str, Callable[[], AutoS]],
 ) -> Menu[AutoState[U, ML, S], ML, C]:
     config: MenuConfig[AutoState[U, ML, S], ML, C] = MenuConfig.cons(auto_menu_handle.match, name)
     all_mappings = builtin_mappings ** mappings

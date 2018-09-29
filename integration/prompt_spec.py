@@ -14,7 +14,7 @@ from ribosome.nvim.io.state import NS
 from ribosome.test.config import TestConfig
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.util.menu.prompt.run import prompt
-from ribosome.util.menu.prompt.data import InputChar, InputState
+from ribosome.util.menu.prompt.data import InputChar, InputState, PromptUnit
 from ribosome.nvim.api.ui import send_input
 from ribosome.nvim.io.api import N
 from ribosome.nvim.api.function import nvim_call_function
@@ -36,8 +36,10 @@ class PromptData(Dat['PromptData']):
         self.line = line
 
 
-def handle_input(keys: List[InputChar]) -> NS[InputState[None, None], None]:
-    return NS.unit
+@do(NS[InputState[None, None], None])
+def handle_input(keys: List[InputChar]) -> Do:
+    yield NS.unit
+    return PromptUnit()
 
 
 @prog

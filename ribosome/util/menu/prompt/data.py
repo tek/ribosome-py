@@ -2,7 +2,7 @@ from typing import Generic, TypeVar, Callable
 from threading import Event
 from queue import Queue
 
-from amino import ADT, Dat, List, Nil
+from amino import ADT, Dat, List, Nil, Maybe
 
 from ribosome.nvim.io.state import NS
 from ribosome.compute.prog import Prog
@@ -151,6 +151,7 @@ class InputState(Generic[A, B], Dat['InputState[A, B]']):
             prompt: Prompt=Prompt.cons(),
             cursor: int=0,
             state: PromptState=PromptEcho(),
+            result: Prog[None]=None,
     ) -> 'InputState':
         return InputState(
             data,
@@ -158,6 +159,7 @@ class InputState(Generic[A, B], Dat['InputState[A, B]']):
             prompt,
             cursor,
             state,
+            Maybe.optional(result),
         )
 
     def __init__(
@@ -166,13 +168,15 @@ class InputState(Generic[A, B], Dat['InputState[A, B]']):
             actions: List[PromptUpdate[B]],
             prompt: Prompt,
             cursor: int,
-            state: PromptState
+            state: PromptState,
+            result: Maybe[Prog[None]],
     ) -> None:
         self.data = data
         self.actions = actions
         self.prompt = prompt
         self.cursor = cursor
         self.state = state
+        self.result = result
 
 
 ProcessPrompt = Callable[[PromptUpdate[B]], NS[InputState[A, B], PromptAction]]

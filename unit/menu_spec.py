@@ -12,11 +12,10 @@ from ribosome.config.component import Component
 from ribosome.rpc.api import rpc
 from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
-from ribosome.data.plugin_state import PluginState, PS
-from ribosome.config.basic_config import NoData
+from ribosome.data.plugin_state import PS
 from ribosome.test.prog import fork_request
 from ribosome.util.menu.data import MenuAction, MenuContent, MenuState, MenuLine, MenuUnit
-from ribosome.util.menu.run import run_menu
+from ribosome.util.menu.run import run_menu_prog
 from ribosome.nvim.api.ui import send_input, current_cursor
 from ribosome.nvim.api.function import define_function
 from ribosome.nvim.api.variable import var_becomes
@@ -50,10 +49,9 @@ menu_state = MState()
 menu = auto_menu(menu_state, content, handle_input, 'spec menu', Map())
 
 
-@prog.unit
-@do(NS[PluginState[NoData, None], None])
+@prog.do(None)
 def spec_menu() -> Do:
-    yield NS.lift(run_menu(menu))
+    yield run_menu_prog(menu)
 
 
 component: Component = Component.cons(
@@ -84,7 +82,6 @@ def menu_spec() -> Do:
     yield fork_request('spec_menu')
     yield NS.lift(var_becomes('looping', 1))
     yield NS.lift(send_input('ir<esc>j'))
-    yield NS.sleep(1)
     content = yield NS.lift(current_buffer_matches(have_length(2)))
     line, col = yield NS.lift(current_cursor())
     return content & (k(line) == 2)
