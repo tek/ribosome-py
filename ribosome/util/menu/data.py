@@ -1,11 +1,13 @@
 from typing import Generic, TypeVar, Callable
 
 from amino import Dat, ADT, List, Nil
+from amino.logging import module_log
 
 from ribosome.util.menu.prompt.data import PromptState, InputState, PromptUpdate
 from ribosome.nvim.io.state import NS
 from ribosome.compute.prog import Prog
 
+log = module_log()
 A = TypeVar('A')
 B = TypeVar('B')
 S = TypeVar('S')
@@ -19,15 +21,21 @@ class MenuLine(Generic[A], Dat['MenuLine[A]']):
     def cons(
             text: str,
             meta: A,
+            visible: bool=True,
+            selected: bool=False,
     ) -> 'MenuLine[A]':
         return MenuLine(
             text,
             meta,
+            visible,
+            selected,
         )
 
-    def __init__(self, text: str, meta: A) -> None:
+    def __init__(self, text: str, meta: A, visible: bool, selected: bool) -> None:
         self.text = text
         self.meta = meta
+        self.visible = visible
+        self.selected = selected
 
 
 class MenuContent(Generic[A], Dat['MenuContent[A]']):
@@ -35,15 +43,21 @@ class MenuContent(Generic[A], Dat['MenuContent[A]']):
     @staticmethod
     def cons(
             lines: List[MenuLine[A]]=Nil,
-            filtered: List[MenuLine[A]]=Nil,
-            selected: List[int]=Nil,
+            visible: List[int]=Nil,
     ) -> 'MenuContent[A]':
-        return MenuContent(lines, filtered, selected)
+        return MenuContent(lines, visible)
 
-    def __init__(self, lines: List[MenuLine[A]], filtered: List[MenuLine[A]], selected: List[int]) -> None:
+    def __init__(self, lines: List[MenuLine[A]], visible: List[int]) -> None:
         self.lines = lines
-        self.filtered = filtered
-        self.selected = selected
+        self.visible = visible
+
+
+def visible_lines(content: MenuContent[A]) -> List[MenuLine[A]]:
+    return content.lines.filter(lambda a: a.visible)
+
+
+def selected_lines(content: MenuContent[A]) -> List[MenuLine[A]]:
+    return content.lines.filter(lambda a: a.visible and a.selected)
 
 
 class MenuAction(ADT['MenuAction']):
@@ -139,4 +153,4 @@ class Menu(Generic[S, ML, U], Dat['Menu[S, ML, U]']):
 
 
 __all__ = ('MenuConfig', 'MenuLine', 'MenuState', 'Menu', 'MenuContent', 'MenuAction', 'MenuQuit', 'MenuQuitWith',
-           'MenuPrompt', 'MenuUpdateLines', 'MenuUnit', 'MenuUpdateCursor',)
+           'MenuPrompt', 'MenuUpdateLines', 'MenuUnit', 'MenuUpdateCursor', 'visible_lines', 'selected_lines',)

@@ -1,16 +1,19 @@
 from typing import TypeVar, Callable
 
-from amino import do, Do, Map
+from amino import do, Do, Map, Nil, List, Just, Nothing
 from amino.case import Case
 from amino.lenses.lens import lens
+from amino.logging import module_log
 
-from ribosome.util.menu.data import Menu, MenuConfig, MenuState, MenuContent, MenuUpdateLines
+from ribosome.util.menu.data import (Menu, MenuConfig, MenuState, MenuContent, MenuUpdateLines, MenuLine,
+                                     selected_lines, MenuUnit)
 from ribosome.util.menu.prompt.data import (InputChar, InputState, PromptUpdate, PromptUpdateChar, PromptUpdateConsumer,
                                             PrintableChar, SpecialChar, PromptUpdateInit, PromptEcho)
 from ribosome.nvim.io.state import NS
 from ribosome.util.menu.auto.data import AutoUpdate, AutoUpdateRefresh, AutoUpdateConsumer, AutoState, AutoS
 from ribosome.util.menu.auto.cmd import builtin_mappings
 
+log = module_log()
 A = TypeVar('A')
 B = TypeVar('B')
 C = TypeVar('C')
@@ -40,16 +43,17 @@ class auto_update(Case[AutoUpdate[U, ML], AutoS], alg=AutoUpdate):
 
     @do(AutoS)
     def consumer(self, update: AutoUpdateConsumer[U, ML]) -> Do:
-        process = yield NS.inspect(lambda a: a.data.state.process)
-        yield process(PromptUpdateConsumer(update))
+        consumer = yield NS.inspect(lambda a: a.data.state.consumer)
+        yield consumer(PromptUpdateConsumer(update))
 
 
 @do(AutoS)
 def filter_menu(char: str) -> Do:
     lines = yield NS.inspect(lambda a: a.data.content.lines)
     filter = yield NS.inspect(lambda a: a.prompt.line)
-    filtered = lines.filter(lambda a: filter in a.text)
-    yield NS.modify(lens.data.content.filtered.set(filtered))
+    updated_lines = lines.map(lambda a: a.set.visible(filter in a.text))
+    visible = lines.with_index.collect(lambda a: Just(a[0]) if a[1].visible else Nothing)
+    yield NS.modify(lens.data.content.modify(lambda a: a.copy(lines=updated_lines, visible=visible)))
     content = yield NS.inspect(lambda a: a.data.content)
     return MenuUpdateLines(content)
 
@@ -57,8 +61,8 @@ def filter_menu(char: str) -> Do:
 @do(AutoS)
 def menu_mapping(code: str, char: InputChar) -> Do:
     mappings = yield NS.inspect(lambda a: a.data.state.mappings)
-    process = yield NS.inspect(lambda a: a.data.state.process)
-    yield mappings.lift(code).map(lambda a: a()).get_or(process, PromptUpdateChar(char))
+    consumer = yield NS.inspect(lambda a: a.data.state.consumer)
+    yield mappings.lift(code).map(lambda a: a()).get_or(consumer, PromptUpdateChar(char))
 
 
 class auto_menu_input_char(Case[InputChar, AutoS[U, ML, S]], alg=InputChar):
@@ -86,17 +90,27 @@ class auto_menu_handle(Case[PromptUpdate[AutoUpdate[U, ML]], AutoS[U, ML, S]], a
         yield auto_update.match(update.data)
 
 
+def no_process() -> AutoS:
+    return NS.pure(MenuUnit())
+
+
 def auto_menu(
         state: S,
         content: MenuContent[ML],
-        process: Callable[[PromptUpdate[AutoUpdate[U, ML]]], AutoS],
         name: str,
-        mappings: Map[str, Callable[[], AutoS]],
+        mappings: Map[str, Callable[[], AutoS]]=Map(),
+        consumer: Callable[[PromptUpdate[AutoUpdate[U, ML]]], AutoS]=no_process,
 ) -> Menu[AutoState[U, ML, S], ML, C]:
     config: MenuConfig[AutoState[U, ML, S], ML, C] = MenuConfig.cons(auto_menu_handle.match, name)
     all_mappings = builtin_mappings ** mappings
-    menu_state: MenuState[AutoState[U, ML, S], ML] = MenuState.cons(AutoState(process, state, all_mappings), content)
+    menu_state: MenuState[AutoState[U, ML, S], ML] = MenuState.cons(AutoState(consumer, state, all_mappings), content)
     return Menu.cons(config, menu_state)
 
 
-__all__ = ('auto_menu',)
+@do(NS[InputState[MenuState[AutoState[U, ML, S], ML], AutoUpdate[U, ML]], List[MenuLine[ML]]])
+def selected_menu_lines() -> Do:
+    content = yield NS.inspect(lambda a: a.data.content)
+    return selected_lines(content)
+
+
+__all__ = ('auto_menu', 'selected_menu_lines',)

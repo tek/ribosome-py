@@ -17,7 +17,6 @@ from ribosome.util.menu.prompt.run import prompt
 from ribosome.util.menu.prompt.data import InputChar, InputState, PromptUnit
 from ribosome.nvim.api.ui import send_input
 from ribosome.nvim.io.api import N
-from ribosome.nvim.api.function import nvim_call_function
 
 log = module_log()
 
@@ -67,8 +66,6 @@ def prompt_spec() -> Do:
     yield send_input('a' * 5)
     yield N.sleep(.5)
     yield send_input('<c-c>')
-    yield N.sleep(.1)
-    s = yield nvim_call_function('PromptState')
     yield screenshot('prompt', 'simple')
 
 

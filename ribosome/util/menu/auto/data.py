@@ -32,11 +32,11 @@ class AutoState(Generic[U, ML, S], Dat['AutoState[U, ML, S]']):
 
     def __init__(
             self,
-            process: Callable[[PromptUpdate[AutoUpdate[U, ML]]], MenuS[Any, AutoUpdate[U, ML], ML]],
+            consumer: Callable[[PromptUpdate[AutoUpdate[U, ML]]], MenuS[Any, AutoUpdate[U, ML], ML]],
             state: S,
             mappings: Map[str, Callable[[], MenuS[S, AutoUpdate[U, ML], ML]]],
     ) -> None:
-        self.process = process
+        self.consumer = consumer
         self.state = state
         self.mappings = mappings
 
