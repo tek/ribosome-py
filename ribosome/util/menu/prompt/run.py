@@ -9,15 +9,14 @@ from amino.lenses.lens import lens
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
 from ribosome.nvim.io.state import NS
-from ribosome.util.menu.prompt.data import (Input, InputState, InputResources, InputChar, PrintableChar, SpecialChar,
+from ribosome.util.menu.prompt.data import (InputState, InputResources, InputChar, PrintableChar, SpecialChar,
                                             PromptInputAction, PromptInput, PromptInterrupt, Prompt, ProcessPrompt,
                                             PromptEcho, PromptAction, PromptStateTrans, PromptQuit, PromptUnit,
-                                            PromptQuitWith, PromptUpdate, PromptUpdateChar, PromptConsumerInput,
-                                            PromptUpdateConsumer, PromptInit, PromptUpdateInit)
+                                            PromptUpdate, PromptUpdateChar, PromptConsumerInput, PromptUpdateConsumer,
+                                            PromptInit, PromptUpdateInit)
 from ribosome.nvim.api.command import nvim_atomic_commands
 from ribosome.util.menu.prompt.input import input_loop
 from ribosome.util.menu.prompt.interrupt import intercept_interrupt, stop_prompt, stop_prompt_s
-from ribosome.compute.prog import Prog
 
 log = module_log()
 A = TypeVar('A')
@@ -94,11 +93,6 @@ class execute_prompt_action(Case[PromptAction, NS[InputResources[A, B], None]], 
     def quit(self, a: PromptQuit) -> NS[InputResources[A, B], None]:
         return stop_prompt_s()
 
-    @do(NS[InputResources[A, B], None])
-    def quit_with(self, a: PromptQuitWith) -> Do:
-        yield NS.modify(lens.state.result.set(Just(a.prog)))
-        yield stop_prompt_s()
-
     def unit(self, a: PromptUnit) -> NS[InputResources[A, B], None]:
         return NS.unit
 
@@ -170,7 +164,7 @@ def start_prompt_loop() -> Do:
     yield prompt_loop()
 
 
-@do(NvimIO[Tuple[Prog[None], A]])
+@do(NvimIO[A])
 def prompt(process: ProcessPrompt, initial: A) -> Do:
     log.debug(f'running prompt with {initial}')
     res = InputResources.cons(
@@ -181,7 +175,7 @@ def prompt(process: ProcessPrompt, initial: A) -> Do:
     result = yield intercept_interrupt(res.inputs, res.stop, res, start_prompt_loop().run_s(res))
     yield N.from_io(stop_prompt(res.inputs, res.stop))
     yield N.simple(input_thread.join)
-    return (result.state.result, result.state.data)
+    return result.state.data
 
 
 __all__ = ('prompt',)

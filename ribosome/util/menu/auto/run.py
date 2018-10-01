@@ -90,7 +90,7 @@ class auto_menu_handle(Case[PromptUpdate[AutoUpdate[U, ML]], AutoS[U, ML, S]], a
         yield auto_update.match(update.data)
 
 
-def no_process() -> AutoS:
+def no_process(update: PromptUpdate[AutoUpdate[U, ML]]) -> AutoS:
     return NS.pure(MenuUnit())
 
 
@@ -110,7 +110,8 @@ def auto_menu(
 @do(NS[InputState[MenuState[AutoState[U, ML, S], ML], AutoUpdate[U, ML]], List[MenuLine[ML]]])
 def selected_menu_lines() -> Do:
     content = yield NS.inspect(lambda a: a.data.content)
-    return selected_lines(content)
+    cursor = yield NS.inspect(lambda a: a.data.cursor)
+    return selected_lines(content, cursor)
 
 
 __all__ = ('auto_menu', 'selected_menu_lines',)

@@ -132,12 +132,6 @@ class PromptQuit(PromptAction):
     pass
 
 
-class PromptQuitWith(PromptAction):
-
-    def __init__(self, prog: Prog[None]) -> None:
-        self.prog = prog
-
-
 class PromptUnit(PromptAction):
     pass
 
@@ -151,7 +145,6 @@ class InputState(Generic[A, B], Dat['InputState[A, B]']):
             prompt: Prompt=Prompt.cons(),
             cursor: int=0,
             state: PromptState=PromptEcho(),
-            result: Prog[None]=None,
     ) -> 'InputState':
         return InputState(
             data,
@@ -159,7 +152,6 @@ class InputState(Generic[A, B], Dat['InputState[A, B]']):
             prompt,
             cursor,
             state,
-            Maybe.optional(result),
         )
 
     def __init__(
@@ -169,14 +161,12 @@ class InputState(Generic[A, B], Dat['InputState[A, B]']):
             prompt: Prompt,
             cursor: int,
             state: PromptState,
-            result: Maybe[Prog[None]],
     ) -> None:
         self.data = data
         self.actions = actions
         self.prompt = prompt
         self.cursor = cursor
         self.state = state
-        self.result = result
 
 
 ProcessPrompt = Callable[[PromptUpdate[B]], NS[InputState[A, B], PromptAction]]
