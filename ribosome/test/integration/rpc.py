@@ -12,6 +12,7 @@ from ribosome.rpc.comm import Comm
 from ribosome.test.config import TestConfig
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.variable import variable_set
+from ribosome.rpc.nvim_api import RiboNvimApi
 
 nvim_cmdline = List('nvim', '-n', '-u', 'NONE')
 env_vars = List(
@@ -24,6 +25,14 @@ env_vars = List(
 
 def test_env_vars(config: TestConfig) -> List[Tuple[str, Any]]:
     return env_vars.cat(('RIBOSOME_LOG_FILE', str(config.log_file)))
+
+
+class TestNvimApi(RiboNvimApi):
+
+    def __init__(self, name: str, comm: Comm, config: TestConfig) -> None:
+        self.name = name
+        self.comm = comm
+        self.config = config
 
 
 class TestNvim(Dat['TestNvim']):
@@ -61,14 +70,14 @@ def start_uv_socket(config: TestConfig, socket: Path) -> IO[NvimApi]:
 def setup_test_nvim_embed(config: TestConfig) -> Do:
     yield setup_env(config)
     api = yield start_uv_embed(config)
-    return TestNvim(api.comm, api)
+    return TestNvim(api.comm, TestNvimApi(api.name, api.comm, config))
 
 
 @do(IO[TestNvim])
 def setup_test_nvim_socket(config: TestConfig, socket: Path) -> Do:
     yield setup_env(config)
     api = yield start_uv_socket(config, socket)
-    return TestNvim(api.comm, api)
+    return TestNvim(api.comm, TestNvimApi(api.name, api.comm, config))
 
 
 def set_nvim_vars(vars: Map[str, Any]) -> NvimIO[None]:

@@ -1,4 +1,4 @@
-from typing import Callable, Any, Tuple
+from typing import Callable, Any, Tuple, TypeVar
 import subprocess
 
 from kallikrein import Expectation, k
@@ -28,9 +28,21 @@ from ribosome.test.run import run_test_io, plugin_started
 from ribosome.nvim.api.exists import wait_until_valid
 from ribosome import NvimApi
 from ribosome.test.integration.start import start_plugin_embed
-from ribosome.util.tmux import tmux_to_nvim
 
 log = module_log()
+A = TypeVar('A')
+
+
+@do(NvimIO[Tmux])
+def test_tmux_from_vim() -> Do:
+    socket = yield N.delay(lambda v: v.config.tmux_socket.get_or_strict(tmux_spec_socket))
+    return Tmux.cons(socket=socket)
+
+
+@do(NvimIO[A])
+def test_tmux_to_nvim(fa: TmuxIO[A]) -> Do:
+    tmux = yield test_tmux_from_vim()
+    yield N.from_either(fa.either(tmux).lmap(str))
 
 
 @do(IO[Tuple[subprocess.Popen, Tmux, Any]])
@@ -125,7 +137,7 @@ def screenshot(*segments: str, delay: float=0.5, record: bool=False) -> Do:
     yield N.from_io(mkdir(path.parent))
     exists = yield N.from_io(IO.delay(path.exists))
     yield N.sleep(delay)
-    current = yield tmux_to_nvim(capture_pane(0))
+    current = yield test_tmux_to_nvim(capture_pane(0, True))
     yield store_screenshot(path, current) if not exists or record else check_screenshot(path, current)
 
 

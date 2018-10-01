@@ -78,14 +78,15 @@ def submenu_spec() -> Do:
     yield send_input(':call SubmenuRun()<cr>')
     yield N.sleep(.1)
     yield send_input('ir')
+    shot1 = yield screenshot('menu', 'sub', 'filtered')
     yield send_input('<esc>')
     yield send_input('<space>')
     yield send_input('*')
-    yield N.sleep(.5)
     yield send_input('<tab>')
-    yield N.sleep(.5)
+    shot2 = yield screenshot('menu', 'sub', 'submenu')
     yield send_input('<cr>')
-    yield screenshot('menu', 'sub', 'final')
+    shot3 = yield screenshot('menu', 'sub', 'final')
+    return shot1 & shot2 & shot3
 
 
 class SubMenuSpec(SpecBase):

@@ -35,6 +35,7 @@ class TestConfig(Dat['TestConfig']):
             command_handler: Handler=no_handler,
             autostart: bool=True,
             config_path: str=None,
+            tmux_socket: str=None,
     ) -> 'TestConfig':
         ld = log_dir or temp_dir('log')
         lf = log_file or ld / config.basic.name
@@ -52,6 +53,7 @@ class TestConfig(Dat['TestConfig']):
             command_handler,
             autostart,
             Maybe.optional(config_path),
+            Maybe.optional(tmux_socket),
         )
 
     def __init__(
@@ -69,6 +71,7 @@ class TestConfig(Dat['TestConfig']):
             command_handler: Handler,
             autostart: bool,
             config_path: Maybe[str],
+            tmux_socket: Maybe[str],
     ) -> None:
         self.config = config
         self.pre = pre
@@ -83,6 +86,7 @@ class TestConfig(Dat['TestConfig']):
         self.command_handler = command_handler
         self.autostart = autostart
         self.config_path = config_path
+        self.tmux_socket = tmux_socket
 
     def with_vars(self, **kw: Any) -> 'TestConfig':
         return self.copy(vars=self.vars ** Map(kw))
