@@ -7,7 +7,7 @@ from amino import do, Do, _, Either
 from ribosome.nvim.io.state import NS
 from ribosome.compute.ribosome import Ribosome
 from ribosome.config.setting import Setting
-from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.compute import NvimIO, NRParams
 from ribosome.compute.prog import Prog, ProgExec
 from ribosome.compute.output import ProgOutputResult
 from ribosome.compute.tpe_data import StateProg, trivial_state_prog, ribo_state_prog
@@ -115,7 +115,7 @@ class Ribo(metaclass=RMeta):
 
     @classmethod
     def autocmd(self, name: str) -> NS[Ribosome[D, CC, C], None]:
-        return NS.lift(doautocmd('User', name, verbose=True))
+        return NS.lift(doautocmd('User', name, params=NRParams.cons(verbose=True, sync=False)))
 
     @classmethod
     def autocmd_prog(self, name: str) -> Prog[None]:

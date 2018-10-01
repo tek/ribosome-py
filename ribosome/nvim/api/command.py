@@ -29,8 +29,8 @@ def nvim_command_output(cmd: str, *args: Any) -> NvimIO[None]:
     return N.read_cons_strict('nvim_command_output', cons_split_lines, cmdline)
 
 
-def doautocmd(name: str, pattern: str='', verbose: bool=False, sync: bool=False) -> NvimIO[None]:
-    return nvim_command(f'doautocmd', '<nomodeline>', name, pattern, verbose=verbose, sync=sync)
+def doautocmd(name: str, pattern: str='', params: NRParams=NRParams.cons(verbose=False, sync=False)) -> NvimIO[None]:
+    return nvim_command(f'doautocmd', '<nomodeline>', name, pattern, params=params)
 
 
 def runtime(path: str, params: NRParams=NRParams.cons(verbose=True, sync=False)) -> NvimIO[None]:
