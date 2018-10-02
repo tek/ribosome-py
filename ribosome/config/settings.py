@@ -1,5 +1,5 @@
 from amino.options import env_xdg_data_dir
-from amino import Either, Path, Right, Try, Nil, Left, Eval, Do
+from amino import Either, Path, Right, Nil, Eval, Do
 from amino.do import do
 from amino.boolean import true
 
@@ -15,7 +15,7 @@ def state_dir_with_name() -> Do:
     base = yield state_dir.value_or_default()
     pro_name = yield proteome_main_name.value
     sess_name = yield ribosome_session_name.value
-    path = pro_name.o(sess_name) / (lambda a: base / plugin / a)
+    path = sess_name.o(pro_name) / (lambda a: base / plugin / a)
     yield N.pure(path)
 
 
