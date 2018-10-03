@@ -16,7 +16,7 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.ui import send_input, current_buffer, set_buffer_content
 from ribosome.nvim.io.api import N
 from ribosome.util.menu.auto.run import auto_menu, selected_menu_lines
-from ribosome.util.menu.run import run_menu_prog, run_menu, update_menu
+from ribosome.util.menu.run import run_menu_prog, update_menu
 from ribosome.util.menu.data import MenuContent, Menu, MenuLine, MenuQuitWith, MenuPush
 from ribosome.util.menu.auto.data import AutoS, AutoState
 from ribosome.compute.prog import Prog
@@ -53,7 +53,10 @@ def start_sub() -> Do:
 
 lines = List('first', 'second', 'third').map(lambda a: MenuLine.cons(a, None))
 main_menu: Menu[AutoState, None, None] = auto_menu(
-    None, MenuContent.cons(lines), 'mainmenu', Map({'<tab>': start_sub})
+    None,
+    MenuContent.cons(lines),
+    'mainmenu',
+    Map({'<tab>': start_sub}),
 )
 
 

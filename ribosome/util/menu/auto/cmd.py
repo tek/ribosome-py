@@ -2,12 +2,14 @@ from typing import TypeVar
 
 from amino import do, Do, Map, List, Maybe
 from amino.lenses.lens import lens
+from amino.logging import module_log
 
 from ribosome.util.menu.auto.data import AutoS
 from ribosome.nvim.io.state import NS
-from ribosome.util.menu.data import MenuPrompt, MenuUpdateCursor, MenuLine
+from ribosome.util.menu.data import MenuPrompt, MenuUpdateCursor, MenuLine, visible_menu_indexes
 from ribosome.util.menu.prompt.data import PromptPassthrough
 
+log = module_log()
 A = TypeVar('A')
 
 
@@ -25,8 +27,11 @@ def menu_cmd_up() -> Do:
 
 @do(AutoS)
 def menu_cmd_down() -> Do:
-    count = yield NS.inspect(lambda a: a.data.content.filtered.length)
+    visible_indexes = yield NS.inspect(lambda a: visible_menu_indexes(a.data.content))
+    count = visible_indexes.length
+    c = yield NS.inspect(lambda a: a.data.cursor)
     yield NS.modify(lens.data.cursor.modify(lambda a: min(a + 1, count)))
+    c = yield NS.inspect(lambda a: a.data.cursor)
     return MenuUpdateCursor()
 
 
@@ -41,7 +46,8 @@ visibility_error = 'broken visibility map for menu'
 def menu_cmd_select_cursor() -> Do:
     cursor = yield NS.inspect(lambda a: a.cursor)
     content = yield NS.inspect(lambda a: a.data.content)
-    index = yield NS.from_maybe(content.visible.lift(cursor), lambda: visibility_error)
+    visible_indexes = visible_menu_indexes(content)
+    index = yield NS.from_maybe(visible_indexes.lift(cursor), lambda: visibility_error)
     toggled = yield NS.from_maybe(toggle_selected(content.lines, index), lambda: visibility_error)
     yield NS.modify(lens.data.content.lines.set(toggled))
     return MenuUpdateCursor()

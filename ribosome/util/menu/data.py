@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar, Callable, Any
 
-from amino import Dat, ADT, List, Nil, Maybe
+from amino import Dat, ADT, List, Nil, Maybe, Lists
 from amino.logging import module_log
 
 from ribosome.util.menu.prompt.data import PromptState, InputState, PromptUpdate
@@ -44,13 +44,17 @@ class MenuContent(Generic[A], Dat['MenuContent[A]']):
     @staticmethod
     def cons(
             lines: List[MenuLine[A]]=Nil,
-            visible: List[int]=Nil,
+            visible: List[int]=None,
     ) -> 'MenuContent[A]':
-        return MenuContent(lines, visible)
+        return MenuContent(lines, Maybe.optional(visible))
 
-    def __init__(self, lines: List[MenuLine[A]], visible: List[int]) -> None:
+    def __init__(self, lines: List[MenuLine[A]], visible: Maybe[List[int]]) -> None:
         self.lines = lines
         self.visible = visible
+
+
+def visible_menu_indexes(content: MenuContent[A]) -> List[int]:
+    return content.visible.get_or(Lists.range, len(content.lines))
 
 
 def visible_lines(content: MenuContent[A]) -> List[MenuLine[A]]:
@@ -58,7 +62,7 @@ def visible_lines(content: MenuContent[A]) -> List[MenuLine[A]]:
 
 
 def selected_lines(content: MenuContent[A], cursor: int) -> List[MenuLine[A]]:
-    visible = content.lines.filter(lambda a: a.visible)
+    visible = visible_lines(content)
     selected = visible.filter(lambda a: a.selected)
     return (
         visible.lift(cursor).to_list
