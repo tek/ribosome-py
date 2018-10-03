@@ -114,8 +114,8 @@ class Ribo(metaclass=RMeta):
         return Ribo.trivial(NS.lift(fa))
 
     @classmethod
-    def autocmd(self, name: str) -> NS[Ribosome[D, CC, C], None]:
-        return NS.lift(doautocmd('User', name, params=NRParams.cons(verbose=True, sync=False)))
+    def autocmd(self, name: str, verbose: bool=False) -> NS[Ribosome[D, CC, C], None]:
+        return NS.lift(doautocmd('User', name, params=NRParams.cons(verbose=verbose, sync=False)))
 
     @classmethod
     def autocmd_prog(self, name: str) -> Prog[None]:
