@@ -90,6 +90,30 @@ class PromptUpdateConsumer(PromptUpdate[A]):
         self.data = data
 
 
+class PromptConsumerUpdate(Generic[A], ADT['PromptConsumerUpdate[A]']):
+    pass
+
+
+class PromptConsumerInit(PromptConsumerUpdate[A]):
+    pass
+
+
+class PromptConsumerUnhandled(PromptConsumerUpdate[A]):
+
+    def __init__(self, char: InputChar) -> None:
+        self.char = char
+
+
+class PromptConsumerChanged(PromptConsumerUpdate[A]):
+    pass
+
+
+class PromptConsumerLocal(PromptConsumerUpdate[A]):
+
+    def __init__(self, data: A) -> None:
+        self.data = data
+
+
 class Prompt(Dat['Prompt']):
 
     @staticmethod
@@ -170,6 +194,7 @@ class InputState(Generic[A, B], Dat['InputState[A, B]']):
 
 
 ProcessPrompt = Callable[[PromptUpdate[B]], NS[InputState[A, B], PromptAction]]
+PromptConsumer = Callable[[PromptConsumerUpdate[B]], NS[InputState[A, B], PromptAction]]
 
 
 class InputResources(Generic[A, B], Dat['InputResources[A, B]']):
@@ -209,4 +234,6 @@ __all__ = ('InputChar', 'PrintableChar', 'SpecialChar', 'Input', 'NoInput', 'Nor
            'InputState', 'InputResources', 'InputChar', 'PromptInputAction', 'PromptInput', 'PromptInterrupt',
            'Prompt', 'PromptState', 'PromptEcho', 'PromptQuit', 'PromptPassthrough', 'PromptUnit', 'PromptAction',
            'PromptStateTrans', 'PromptUnit', 'PromptQuitWith', 'PromptConsumerInput', 'PromptUpdate',
-           'PromptUpdateChar', 'PromptUpdateConsumer', 'PromptInit', 'PromptUpdateInit',)
+           'PromptUpdateChar', 'PromptUpdateConsumer', 'PromptInit', 'PromptUpdateInit', 'PromptConsumerUpdate',
+           'PromptConsumerInit', 'PromptConsumerUnhandled', 'PromptConsumerChanged', 'PromptConsumerLocal',
+           'PromptConsumer',)

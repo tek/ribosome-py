@@ -77,10 +77,18 @@ test_config = TestConfig.cons(config, vars=vars)
 
 
 @do(NvimIO[Expectation])
+def initial_spec() -> Do:
+    yield send_input(':call SubmenuRun()<cr>')
+    yield screenshot('menu', 'initial', 'screen')
+
+
+@do(NvimIO[Expectation])
 def submenu_spec() -> Do:
     yield send_input(':call SubmenuRun()<cr>')
-    yield N.sleep(.1)
+    shot0 = yield screenshot('menu', 'sub', 'initial')
     yield send_input('ir')
+    yield send_input('<space>')
+    yield send_input('<bs>')
     shot1 = yield screenshot('menu', 'sub', 'filtered')
     yield send_input('<esc>')
     yield send_input('<space>')
@@ -89,13 +97,17 @@ def submenu_spec() -> Do:
     shot2 = yield screenshot('menu', 'sub', 'submenu')
     yield send_input('<cr>')
     shot3 = yield screenshot('menu', 'sub', 'final')
-    return shot1 & shot2 & shot3
+    return shot0 & shot1 & shot2 & shot3
 
 
 class SubMenuSpec(SpecBase):
     '''
+    draw lines at startup $initial
     launch a submenu $submenu
     '''
+
+    def initial(self) -> Expectation:
+        return tmux_plugin_test(test_config, initial_spec)
 
     def submenu(self) -> Expectation:
         return tmux_plugin_test(test_config, submenu_spec)

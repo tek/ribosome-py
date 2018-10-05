@@ -11,14 +11,15 @@ from ribosome.util.menu.data import (Menu, MenuAction, MenuQuit, MenuPrompt, Men
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.util.menu.prompt.run import prompt
 from ribosome.nvim.scratch import (create_scratch_buffer, CreateScratchBufferOptions, ScratchBuffer,
-                                   set_scratch_buffer_content)
+                                   set_scratch_buffer_content, focus_scratch_window)
 from ribosome.util.menu.prompt.data import (InputChar, InputState, PromptAction, PromptUnit, PromptStateTrans,
-                                            PromptUpdate, PromptQuit)
+                                            PromptConsumerUpdate, PromptQuit)
 from ribosome.nvim.io.state import NS
 from ribosome.nvim.api.ui import set_cursor, close_buffer
 from ribosome.compute.prog import Prog
 from ribosome.compute.ribosome_api import Ribo
 from ribosome.nvim.io.api import N
+from ribosome.nvim.api.command import nvim_command
 
 log = module_log()
 S = TypeVar('S')
@@ -57,12 +58,14 @@ class execute_menu_action(Case[MenuAction, NS[InputState[MenuState[S, ML], U], P
     @do(NS[InputState[MenuState[S, ML], U], PromptAction])
     def update_lines(self, action: MenuUpdateLines) -> Do:
         yield NS.lift(set_scratch_buffer_content(self.scratch, visible_lines(action.content).map(lambda a: a.text)))
+        yield NS.lift(nvim_command('redraw'))
         return PromptUnit()
 
     @do(NS[InputState[MenuState[S, ML], U], PromptAction])
     def update_cursor(self, a: MenuUpdateCursor) -> Do:
         line = yield NS.inspect(lambda a: a.data.cursor)
         yield NS.lift(set_cursor(self.scratch.ui.window, (line + 1, 0)))
+        yield NS.lift(nvim_command('redraw'))
         return PromptUnit()
 
     @do(NS[InputState[MenuState[S, ML], U], PromptAction])
@@ -85,7 +88,7 @@ def update_menu(
         scratch: ScratchBuffer,
 ) -> Callable[[InputChar], NS[InputState[MenuState[S, ML], U], PromptAction]]:
     @do(NS[InputState[MenuState[S, ML], U], PromptAction])
-    def update_menu(update: PromptUpdate[U]) -> Do:
+    def update_menu(update: PromptConsumerUpdate[U]) -> Do:
         action = yield config.handle_input(update)
         yield execute_menu_action(scratch, config)(action)
     return update_menu
@@ -129,6 +132,7 @@ def menu_loop(menu: Menu[S, ML, U], scratch: ScratchBuffer) -> Do:
 @do(NvimIO[Prog[None]])
 def run_menu(menu: Menu[S, ML, U]) -> Do:
     scratch = yield create_scratch_buffer(CreateScratchBufferOptions.cons(wrap=False, name=menu.config.name))
+    yield focus_scratch_window(scratch)
     state, next = yield N.ensure(menu_loop(menu, scratch).run(Menus.cons()), lambda a: cleanup_menu(scratch))
     return next.get_or_strict(Prog.unit).replace(state)
 

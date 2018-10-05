@@ -3,7 +3,7 @@ from typing import Generic, TypeVar, Callable, Any
 from amino import Dat, ADT, List, Nil, Maybe, Lists
 from amino.logging import module_log
 
-from ribosome.util.menu.prompt.data import PromptState, InputState, PromptUpdate
+from ribosome.util.menu.prompt.data import PromptState, InputState, PromptConsumerUpdate
 from ribosome.nvim.io.state import NS
 from ribosome.compute.prog import Prog
 from ribosome.nvim.scratch import ScratchBuffer
@@ -171,7 +171,7 @@ class MenuConfig(Generic[S, ML, U], Dat['MenuConfig[S, ML, U]']):
 
     @staticmethod
     def cons(
-            handle_input: Callable[[PromptUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
+            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
             name: str='',
     ) -> 'MenuConfig[S, ML, U]':
         return MenuConfig(
@@ -181,7 +181,7 @@ class MenuConfig(Generic[S, ML, U], Dat['MenuConfig[S, ML, U]']):
 
     def __init__(
             self,
-            handle_input: Callable[[PromptUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
+            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
             name: str,
     ) -> None:
         self.handle_input = handle_input

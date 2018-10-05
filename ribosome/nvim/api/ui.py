@@ -198,9 +198,13 @@ def close_window(window: Window) -> Do:
     yield nvim_command(f'{num}close!')
 
 
+def window_focus(window: Window) -> NvimIO[None]:
+    return N.write('nvim_set_current_window', window.data)
+
+
 __all__ = ('current_tabpage', 'current_window', 'current_buffer', 'tabpages', 'windows', 'buffers', 'window_buffer',
            'set_buffer_lines', 'set_buffer_content', 'buffer_lines', 'buffer_content', 'current_buffer_content',
            'buffer_number', 'close_buffer', 'close_current_buffer', 'cursor', 'current_cursor', 'window_line',
            'focus_window', 'buffer_name', 'window_buffer_name', 'current_buffer_name', 'set_cursor', 'set_line',
            'set_local_cursor', 'current_window_number', 'send_input', 'edit_file', 'echo', 'window_number',
-           'window_height', 'current_window_height', 'close_window', 'set_buffer_name',)
+           'window_height', 'current_window_height', 'close_window', 'set_buffer_name', 'window_focus',)

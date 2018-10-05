@@ -3,7 +3,7 @@ from amino.logging import module_log
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.ui import (current_tabpage, current_window, window_buffer, set_buffer_content,
-                                  current_window_height, set_buffer_name)
+                                  current_window_height, set_buffer_name, window_focus)
 from ribosome.nvim.api.data import Window, Buffer, Tabpage
 from ribosome.nvim.api.option import option_buffer_set
 from ribosome.nvim.api.command import nvim_command
@@ -132,5 +132,9 @@ def show_in_scratch_buffer_default(lines: List[str], max_height: Maybe[float]) -
     yield show_in_scratch_buffer(lines, CreateScratchBufferOptions.cons(size=size))
 
 
+def focus_scratch_window(scratch: ScratchBuffer) -> NvimIO[None]:
+    return window_focus(scratch.ui.window)
+
+
 __all__ = ('setup_scratch_buffer', 'CreateScratchBufferOptions', 'create_scratch_buffer', 'show_in_scratch_buffer',
-           'show_in_scratch_buffer_default')
+           'show_in_scratch_buffer_default', 'focus_scratch_window',)

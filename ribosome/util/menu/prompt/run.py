@@ -1,7 +1,7 @@
 from typing import TypeVar, Callable, Tuple
 from queue import Queue
 
-from amino import do, Do, IO, List, Nil, Maybe, Nothing, Just
+from amino import do, Do, IO, List, Nil, Maybe, Nothing, Just, Map
 from amino.logging import module_log
 from amino.case import Case
 from amino.lenses.lens import lens
@@ -10,10 +10,11 @@ from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.io.api import N
 from ribosome.nvim.io.state import NS
 from ribosome.util.menu.prompt.data import (InputState, InputResources, InputChar, PrintableChar, SpecialChar,
-                                            PromptInputAction, PromptInput, PromptInterrupt, Prompt, ProcessPrompt,
+                                            PromptInputAction, PromptInput, PromptInterrupt, Prompt, PromptConsumer,
                                             PromptEcho, PromptAction, PromptStateTrans, PromptQuit, PromptUnit,
                                             PromptUpdate, PromptUpdateChar, PromptConsumerInput, PromptUpdateConsumer,
-                                            PromptInit, PromptUpdateInit)
+                                            PromptInit, PromptUpdateInit, PromptConsumerUpdate, PromptConsumerInit,
+                                            PromptConsumerChanged, PromptConsumerUnhandled, PromptConsumerLocal)
 from ribosome.nvim.api.command import nvim_atomic_commands
 from ribosome.util.menu.prompt.input import input_loop
 from ribosome.util.menu.prompt.interrupt import intercept_interrupt, stop_prompt, stop_prompt_s
@@ -21,6 +22,24 @@ from ribosome.util.menu.prompt.interrupt import intercept_interrupt, stop_prompt
 log = module_log()
 A = TypeVar('A')
 B = TypeVar('B')
+C = TypeVar('C')
+
+
+@do(NS[InputState[A, B], C])
+def prompt_state_fork(
+        echo: Callable[[], NS[InputState[A, B], C]],
+        passthrough: Callable[[], NS[InputState[A, B], C]],
+) -> Do:
+    state = yield NS.inspect(lambda a: a.state)
+    yield (
+        echo()
+        if isinstance(state, PromptEcho) else
+        passthrough()
+    )
+
+
+def prompt_if_echoing(thunk: Callable[[], NS[InputState[A, B], C]]) -> NS[InputState[A, B], C]:
+    return prompt_state_fork(thunk, lambda: NS.unit)
 
 
 class process_char(Case[InputChar, NS[InputState[A, B], None]], alg=InputChar):
@@ -51,16 +70,35 @@ def redraw_if_echoing() -> Do:
     yield redraw_prompt() if isinstance(state, PromptEcho) else NS.unit
 
 
-class update_prompt_text(Case[InputChar, Prompt], alg=InputChar):
+def insert_char(char: str) -> Callable[[Prompt], Prompt]:
+    def insert_char(prompt: Prompt) -> Prompt:
+        log.debug(f'inserting {char} into prompt')
+        return prompt.copy(cursor=prompt.cursor + 1, pre=prompt.pre + char)
+    return insert_char
+
+
+def backspace(prompt: Prompt) -> Prompt:
+    log.debug('applying backspace to prompt')
+    parts = Just((prompt.pre[-1:], prompt.pre[:-1])) if len(prompt.pre) > 0 else Nothing
+    return parts.map2(lambda l, i: prompt.copy(pre=i, cursor=prompt.cursor - 1)).get_or_strict(prompt)
+
+
+special_prompt_keys = Map({
+    '<space>': insert_char(' '),
+    '<bs>': backspace,
+})
+
+
+class update_prompt_text(Case[InputChar, Maybe[Prompt]], alg=InputChar):
 
     def __init__(self, prompt: Prompt) -> None:
         self.prompt = prompt
 
     def printable(self, a: PrintableChar) -> Prompt:
-        return self.prompt.copy(cursor=self.prompt.cursor + 1, pre=self.prompt.pre + a.char)
+        return Just(insert_char(a.char)(self.prompt))
 
     def special(self, a: SpecialChar) -> Prompt:
-        return self.prompt
+        return special_prompt_keys.lift(a.char).map(lambda f: f(self.prompt))
 
 
 @do(IO[List[PromptInputAction[A]]])
@@ -97,27 +135,38 @@ class execute_prompt_action(Case[PromptAction, NS[InputResources[A, B], None]], 
         return NS.unit
 
 
-class process_prompt_update_char(Case[PromptUpdate[B], NS[InputState[A, B], None]], alg=PromptUpdate):
+class process_prompt_update_char(
+        Case[PromptUpdate[B], NS[InputState[A, B], PromptConsumerUpdate[B]]],
+        alg=PromptUpdate,
+):
 
-    def init(self, a: PromptUpdateInit[B]) -> NS[InputState[A, B], None]:
-        return NS.unit
+    def init(self, a: PromptUpdateInit[B]) -> NS[InputState[A, B], PromptConsumerUpdate[B]]:
+        return NS.pure(PromptConsumerInit())
 
-    def char(self, update: PromptUpdateChar[B]) -> NS[InputState[A, B], None]:
-        return NS.modify(lambda s: s.mod.prompt(lambda a: update_prompt_text(a)(update.char)))
+    def char(self, update: PromptUpdateChar[B]) -> NS[InputState[A, B], PromptConsumerUpdate[B]]:
+        def apply_char(s: InputState[A, B]) -> NvimIO[Tuple[InputState[A, B], PromptConsumerUpdate[B]]]:
+            return N.pure(update_prompt_text(s.prompt)(update.char).cata(
+                lambda prompt: (s.set.prompt(prompt), PromptConsumerChanged()),
+                lambda: (s, PromptConsumerUnhandled(update.char)),
+            ))
+        return prompt_state_fork(
+            lambda: NS.apply(apply_char),
+            lambda: NS.pure(PromptConsumerUnhandled(update.char)),
+        )
 
-    def consumer(self, a: PromptUpdateConsumer[B]) -> NS[InputState[A, B], None]:
-        return NS.unit
+    def consumer(self, a: PromptUpdateConsumer[B]) -> NS[InputState[A, B], PromptConsumerUpdate[B]]:
+        return NS.pure(PromptConsumerLocal(a.data))
 
 
 @do(NS[InputResources[A, B], None])
-def process_prompt_update(process: ProcessPrompt, action: PromptUpdate[B]) -> Do:
-    yield process_prompt_update_char.match(action).zoom(lens.state)
-    yield redraw_if_echoing().zoom(lens.state)
-    action = yield process(action).zoom(lens.state)
-    yield execute_prompt_action.match(action)
+def process_prompt_update(process: PromptConsumer, action: PromptUpdate[B]) -> Do:
+    consumer = yield process_prompt_update_char.match(action).zoom(lens.state)
+    yield prompt_if_echoing(redraw_prompt).zoom(lens.state)
+    prompt_action = yield process(consumer).zoom(lens.state)
+    yield execute_prompt_action.match(prompt_action)
 
 
-def update_prompt(process: ProcessPrompt) -> Callable[[List[PromptUpdate[B]]], NS[InputResources[A, B], None]]:
+def update_prompt(process: PromptConsumer) -> Callable[[List[PromptUpdate[B]]], NS[InputResources[A, B], None]]:
     def update_prompt(chars: List[PromptUpdate[B]]) -> NS[InputState[A, B], None]:
         return chars.traverse(lambda char: process_prompt_update(process, char), NS).replace(None)
     return update_prompt
@@ -165,7 +214,7 @@ def start_prompt_loop() -> Do:
 
 
 @do(NvimIO[A])
-def prompt(process: ProcessPrompt, initial: A) -> Do:
+def prompt(process: PromptConsumer, initial: A) -> Do:
     log.debug(f'running prompt with {initial}')
     res = InputResources.cons(
         InputState.cons(initial),
