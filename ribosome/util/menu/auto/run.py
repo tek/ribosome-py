@@ -53,7 +53,7 @@ def filter_menu(char: str) -> Do:
     filter = yield NS.inspect(lambda a: a.prompt.line)
     updated_lines = lines.map(lambda a: a.set.visible(filter in a.text))
     visible = lines.with_index.collect(lambda a: Just(a[0]) if a[1].visible else Nothing)
-    yield NS.modify(lens.data.content.modify(lambda a: a.copy(lines=updated_lines, visible=visible)))
+    yield NS.modify(lens.data.content.modify(lambda a: a.copy(lines=updated_lines, visible=Just(visible))))
     content = yield NS.inspect(lambda a: a.data.content)
     return MenuUpdateLines(content)
 
