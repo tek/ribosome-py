@@ -35,7 +35,7 @@ def menu_cmd_scroll(offset: int) -> Do:
     direction = yield menu_direction()
     visible_indexes = yield NS.inspect(lambda a: visible_menu_indexes(a.data.content))
     count = visible_indexes.length
-    yield NS.modify(lens.data.cursor.modify(lambda a: max(0, min(a + direction * offset, count))))
+    yield NS.modify(lens.data.cursor.modify(lambda a: (a + direction * offset) % count))
     return MenuUpdateCursor()
 
 
@@ -73,6 +73,7 @@ def menu_cmd_select_all() -> Do:
 
 builtin_mappings = Map({
     '<esc>': menu_cmd_esc,
+    'q': menu_cmd_esc,
     'k': menu_cmd_up,
     'j': menu_cmd_down,
     '<space>': menu_cmd_select_cursor,
