@@ -75,7 +75,9 @@ builtin_mappings = Map({
     '<esc>': menu_cmd_esc,
     'q': menu_cmd_esc,
     'k': menu_cmd_up,
+    '<c-k>': menu_cmd_up,
     'j': menu_cmd_down,
+    '<c-j>': menu_cmd_down,
     '<space>': menu_cmd_select_cursor,
     '*': menu_cmd_select_all,
 })

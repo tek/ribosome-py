@@ -14,7 +14,7 @@ from ribosome.compute.api import prog
 from ribosome.nvim.io.state import NS
 from ribosome.data.plugin_state import PS
 from ribosome.test.prog import fork_request
-from ribosome.util.menu.data import MenuAction, MenuContent, MenuState, MenuLine, MenuUnit
+from ribosome.util.menu.data import MenuAction, MenuContent, MenuState, MenuLine, MenuUnit, MenuConfig
 from ribosome.util.menu.run import run_menu_prog
 from ribosome.nvim.api.ui import send_input, current_cursor
 from ribosome.nvim.api.function import define_function
@@ -23,6 +23,7 @@ from ribosome.util.menu.prompt.data import InputState, PromptUpdate
 from ribosome.test.klk.matchers.buffer import current_buffer_matches
 from ribosome.util.menu.auto.run import auto_menu
 from ribosome.util.menu.auto.data import AutoUpdate
+from ribosome.test.klk.matchers.window import current_cursor_is
 
 log = module_log()
 
@@ -33,20 +34,13 @@ class MState(Dat['MState']):
         pass
 
 
-@do(NS[InputState[MenuState[MState, None], AutoUpdate[MState, None]], MenuAction])
-def handle_input(update: PromptUpdate[AutoUpdate[MState, None]]) -> Do:
-    yield NS.unit
-    return MenuUnit()
-
-
 lines = List(
-    MenuLine('first', None),
-    MenuLine('second', None),
-    MenuLine('third', None),
+    MenuLine.cons('first', None),
+    MenuLine.cons('second', None),
+    MenuLine.cons('third', None),
 )
-content = MenuContent.cons(lines, lines)
 menu_state = MState()
-menu = auto_menu(menu_state, content, handle_input, 'spec menu', Map())
+menu = auto_menu(menu_state, lines, MenuConfig.cons('spec menu', False))
 
 
 @prog.do(None)
@@ -81,10 +75,14 @@ def menu_spec() -> Do:
     yield NS.lift(send_input(':call Loop()<cr>'))
     yield fork_request('spec_menu')
     yield NS.lift(var_becomes('looping', 1))
-    yield NS.lift(send_input('ir<esc>j'))
+    yield NS.lift(send_input('ir<esc>'))
+    yield NS.lift(send_input('<c-j>'))
+    yield NS.lift(send_input('<c-k>'))
+    yield NS.lift(send_input('<c-j>'))
     content = yield NS.lift(current_buffer_matches(have_length(2)))
     line, col = yield NS.lift(current_cursor())
-    return content & (k(line) == 2)
+    cursor = yield NS.lift(current_cursor_is(2, 0))
+    return content & cursor
 
 
 class MenuSpec(SpecBase):
