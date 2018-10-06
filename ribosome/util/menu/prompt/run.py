@@ -38,6 +38,13 @@ def prompt_state_fork(
     )
 
 
+def prompt_state_fork_strict(echo: C, passthrough: C) -> NS[InputState[A, B], C]:
+    return prompt_state_fork(
+        lambda: NS.pure(echo),
+        lambda: NS.pure(passthrough),
+    )
+
+
 def prompt_if_echoing(thunk: Callable[[], NS[InputState[A, B], C]]) -> NS[InputState[A, B], C]:
     return prompt_state_fork(thunk, lambda: NS.unit)
 
@@ -227,4 +234,4 @@ def prompt(process: PromptConsumer, initial: A) -> Do:
     return result.state.data
 
 
-__all__ = ('prompt',)
+__all__ = ('prompt', 'prompt_state_fork', 'prompt_state_fork_strict', 'prompt_if_echoing',)

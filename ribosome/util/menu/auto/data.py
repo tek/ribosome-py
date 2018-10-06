@@ -3,13 +3,13 @@ from typing import TypeVar, Callable, Generic, Any
 from amino import ADT, List, Dat, Map
 
 from ribosome.util.menu.data import MenuAction, MenuState, MenuLine
-from ribosome.util.menu.prompt.data import InputState, PromptUpdate
+from ribosome.util.menu.prompt.data import InputState, PromptConsumerUpdate
 from ribosome.nvim.io.state import NS
 
 S = TypeVar('S')
 ML = TypeVar('ML')
 U = TypeVar('U')
-MenuS = NS[InputState[MenuState[S, ML], U], MenuAction]
+MenuS = NS[InputState[MenuState[S, ML, U], U], MenuAction]
 
 
 class AutoUpdate(Generic[U, ML], ADT['AutoUpdate[U, ML]']):
@@ -28,11 +28,12 @@ class AutoUpdateConsumer(AutoUpdate[U, ML]):
         self.data = data
 
 
-class AutoState(Generic[U, ML, S], Dat['AutoState[U, ML, S]']):
+class AutoState(Generic[S, ML, U], Dat['AutoState[S, ML, U]']):
 
     def __init__(
             self,
-            consumer: Callable[[PromptUpdate[AutoUpdate[U, ML]]], MenuS[Any, AutoUpdate[U, ML], ML]],
+            consumer: Callable[[PromptConsumerUpdate[AutoUpdate[U, ML]]],
+                               NS[InputState[MenuState[Any, ML, U], AutoUpdate[U, ML]], MenuAction]],
             state: S,
             mappings: Map[str, Callable[[], MenuS[S, AutoUpdate[U, ML], ML]]],
     ) -> None:
@@ -41,6 +42,6 @@ class AutoState(Generic[U, ML, S], Dat['AutoState[U, ML, S]']):
         self.mappings = mappings
 
 
-AutoS = MenuS[AutoState[U, ML, S], ML, AutoUpdate[U, ML]]
+AutoS = MenuS[AutoState[S, ML, U], ML, AutoUpdate[U, ML]]
 
 __all__ = ('S', 'ML', 'U', 'MenuS', 'AutoUpdate', 'AutoUpdateRefresh', 'AutoUpdateConsumer', 'AutoState', 'AutoS',)

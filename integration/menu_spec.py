@@ -3,7 +3,7 @@ from kallikrein import Expectation
 from chiasma.test.tmux_spec import tmux_spec_socket
 
 from amino.test.spec import SpecBase
-from amino import List, do, Do, Map, Dat
+from amino import List, do, Do, Map
 from amino.logging import module_log
 
 from ribosome.test.integration.tmux import tmux_plugin_test, screenshot
@@ -14,14 +14,12 @@ from ribosome.nvim.io.state import NS
 from ribosome.test.config import TestConfig
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.ui import send_input, current_buffer, set_buffer_content
-from ribosome.nvim.io.api import N
 from ribosome.util.menu.auto.run import auto_menu, selected_menu_lines
-from ribosome.util.menu.run import run_menu_prog, update_menu
-from ribosome.util.menu.data import MenuContent, Menu, MenuLine, MenuQuitWith, MenuPush, MenuConfig
+from ribosome.util.menu.run import run_menu_prog, menu_push
+from ribosome.util.menu.data import Menu, MenuLine, MenuQuitWith, MenuConfig
 from ribosome.util.menu.auto.data import AutoS, AutoState
 from ribosome.compute.prog import Prog
 from ribosome.data.plugin_state import PS
-from ribosome.util.menu.prompt.run import prompt
 
 log = module_log()
 
@@ -41,20 +39,19 @@ def sub_item_selected() -> Do:
 
 def sub_menu(primary: List[MenuLine[None]]) -> Menu[AutoState[None, None, None], None, None]:
     lines = primary.map(lambda a: MenuLine.cons(f'sub {a.text}', None))
-    return auto_menu(None, MenuContent.cons(lines), MenuConfig.cons('submenu', False), Map({'<cr>': sub_item_selected}))
+    return auto_menu(None, lines, MenuConfig.cons('submenu', False), Map({'<cr>': sub_item_selected}))
 
 
 @do(AutoS)
 def start_sub() -> Do:
     items = yield selected_menu_lines()
-    menu = sub_menu(items)
-    return MenuPush(lambda scratch: NS.lift(prompt(update_menu(menu.handle_input, scratch, menu.config), menu.state)))
+    return menu_push(sub_menu(items))
 
 
 lines = List('first', 'second', 'third').map(lambda a: MenuLine.cons(a, None))
 main_menu: Menu[AutoState, None, None] = auto_menu(
     None,
-    MenuContent.cons(lines),
+    lines,
     MenuConfig.cons('mainmenu', False),
     Map({'<tab>': start_sub}),
 )

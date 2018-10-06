@@ -134,39 +134,6 @@ class MenuStackPop(MenuStackAction):
     pass
 
 
-class MenuState(Generic[S, ML], Dat['MenuState[S, ML]']):
-
-    @staticmethod
-    def cons(
-            state: S,
-            content: MenuContent[ML]=None,
-            cursor: int=0,
-            next: MenuStackAction=MenuStackQuit(),
-            result: Prog[None]=None,
-    ) -> 'MenuState[S, ML]':
-        return MenuState(
-            state,
-            content or MenuContent.cons(),
-            cursor,
-            next,
-            Maybe.optional(result),
-        )
-
-    def __init__(
-            self,
-            state: S,
-            content: MenuContent[ML],
-            cursor: int,
-            next: MenuStackAction,
-            result: Maybe[Prog[None]],
-    ) -> None:
-        self.state = state
-        self.content = content
-        self.cursor = cursor
-        self.next = next
-        self.result = result
-
-
 class MenuConfig(Generic[S, ML, U], Dat['MenuConfig[S, ML, U]']):
 
     @staticmethod
@@ -192,29 +159,70 @@ class MenuConfig(Generic[S, ML, U], Dat['MenuConfig[S, ML, U]']):
         self.max_size = max_size
 
 
-class Menu(Generic[S, ML, U], Dat['Menu[S, ML, U]']):
+class MenuState(Generic[S, ML, U], Dat['MenuState[S, ML, U]']):
 
     @staticmethod
     def cons(
-            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
+            state: S,
             config: MenuConfig[S, ML, U],
-            state: MenuState[S, ML],
-    ) -> 'Menu':
-        return Menu(
-            handle_input,
-            config,
+            content: MenuContent[ML]=None,
+            cursor: int=0,
+            next: MenuStackAction=MenuStackQuit(),
+            result: Prog[None]=None,
+    ) -> 'MenuState[S, ML, U]':
+        return MenuState(
             state,
+            config,
+            content or MenuContent.cons(),
+            cursor,
+            next,
+            Maybe.optional(result),
         )
 
     def __init__(
             self,
-            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
+            state: S,
             config: MenuConfig[S, ML, U],
-            state: MenuState[S, ML],
+            content: MenuContent[ML],
+            cursor: int,
+            next: MenuStackAction,
+            result: Maybe[Prog[None]],
+    ) -> None:
+        self.state = state
+        self.config = config
+        self.content = content
+        self.cursor = cursor
+        self.next = next
+        self.result = result
+
+
+class Menu(Generic[S, ML, U], Dat['Menu[S, ML, U]']):
+
+    @staticmethod
+    def cons(
+            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML, U], U], MenuAction]],
+            config: MenuConfig[S, ML, U],
+            initial_state: S,
+            lines: List[MenuLine[ML]]=Nil,
+    ) -> 'Menu':
+        return Menu(
+            handle_input,
+            config,
+            initial_state,
+            lines,
+        )
+
+    def __init__(
+            self,
+            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML, U], U], MenuAction]],
+            config: MenuConfig[S, ML, U],
+            initial_state: S,
+            lines: List[MenuLine[ML]],
     ) -> None:
         self.handle_input = handle_input
         self.config = config
-        self.state = state
+        self.initial_state = initial_state
+        self.lines = lines
 
 
 class Menus(Dat['Menus']):

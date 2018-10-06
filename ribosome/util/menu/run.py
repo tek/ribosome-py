@@ -32,9 +32,9 @@ def cleanup_menu(scratch: ScratchBuffer) -> Do:
     yield N.recover_failure(close_buffer(scratch.buffer), lambda a: N.unit)
 
 
-@do(NS[InputState[MenuState[S, ML], U], PromptAction])
+@do(NS[InputState[MenuState[S, ML, U], U], PromptAction])
 def menu_reentry(
-        handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
+        handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML, U], U], MenuAction]],
         scratch: ScratchBuffer,
         config: MenuConfig[S, ML, U],
 ) -> Do:
@@ -51,30 +51,30 @@ def display_lines(config: MenuConfig[S, ML, U], content: MenuContent[ML]) -> Lis
     )
 
 
-class execute_menu_action(Case[MenuAction, NS[InputState[MenuState[S, ML], U], PromptAction]], alg=MenuAction):
+class execute_menu_action(Case[MenuAction, NS[InputState[MenuState[S, ML, U], U], PromptAction]], alg=MenuAction):
 
     def __init__(
             self,
             scratch: ScratchBuffer,
-            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
+            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML, U], U], MenuAction]],
             config: MenuConfig[S, ML, U],
     ) -> None:
         self.scratch = scratch
         self.handle_input = handle_input
         self.config = config
 
-    def quit(self, action: MenuQuit) -> NS[InputState[MenuState[S, ML], U], PromptAction]:
+    def quit(self, action: MenuQuit) -> NS[InputState[MenuState[S, ML, U], U], PromptAction]:
         return NS.pure(PromptQuit())
 
-    @do(NS[InputState[MenuState[S, ML], U], PromptAction])
+    @do(NS[InputState[MenuState[S, ML, U], U], PromptAction])
     def quit_with(self, action: MenuQuitWith) -> Do:
         yield NS.modify(lens.data.result.set(Just(action.next)))
         return PromptQuit()
 
-    def prompt_state_trans(self, action: MenuPrompt) -> NS[InputState[MenuState[S, ML], U], PromptAction]:
+    def prompt_state_trans(self, action: MenuPrompt) -> NS[InputState[MenuState[S, ML, U], U], PromptAction]:
         return NS.pure(PromptStateTrans(action.state))
 
-    @do(NS[InputState[MenuState[S, ML], U], PromptAction])
+    @do(NS[InputState[MenuState[S, ML, U], U], PromptAction])
     def update_lines(self, action: MenuUpdateLines) -> Do:
         lines = display_lines(self.config, action.content)
         height = max(1, min(len(lines), self.config.max_size.get_or_strict(1000)))
@@ -84,7 +84,7 @@ class execute_menu_action(Case[MenuAction, NS[InputState[MenuState[S, ML], U], P
         yield NS.lift(nvim_command('redraw'))
         return PromptUnit()
 
-    @do(NS[InputState[MenuState[S, ML], U], PromptAction])
+    @do(NS[InputState[MenuState[S, ML, U], U], PromptAction])
     def update_cursor(self, a: MenuUpdateCursor) -> Do:
         cursor = yield NS.inspect(lambda a: a.data.cursor)
         total = yield NS.inspect(lambda a: len(a.data.content.lines))
@@ -93,27 +93,27 @@ class execute_menu_action(Case[MenuAction, NS[InputState[MenuState[S, ML], U], P
         yield NS.lift(nvim_command('redraw'))
         return PromptUnit()
 
-    @do(NS[InputState[MenuState[S, ML], U], PromptAction])
+    @do(NS[InputState[MenuState[S, ML, U], U], PromptAction])
     def push(self, action: MenuPush) -> Do:
         current = yield menu_reentry(self.handle_input, self.scratch, self.config)
         yield NS.modify(lens.data.next.set(MenuStackPush(current, action.thunk(self.scratch))))
         return PromptQuit()
 
-    @do(NS[InputState[MenuState[S, ML], U], PromptAction])
+    @do(NS[InputState[MenuState[S, ML, U], U], PromptAction])
     def pop(self, action: MenuPop) -> Do:
         yield NS.modify(lens.data.next.set(MenuStackPop()))
         return PromptQuit()
 
-    def unit(self, a: MenuUnit) -> NS[InputState[MenuState[S, ML], U], PromptAction]:
+    def unit(self, a: MenuUnit) -> NS[InputState[MenuState[S, ML, U], U], PromptAction]:
         return NS.pure(PromptUnit())
 
 
 def update_menu(
-        handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
+        handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML, U], U], MenuAction]],
         scratch: ScratchBuffer,
         config: MenuConfig[S, ML, U],
-) -> Callable[[InputChar], NS[InputState[MenuState[S, ML], U], PromptAction]]:
-    @do(NS[InputState[MenuState[S, ML], U], PromptAction])
+) -> Callable[[InputChar], NS[InputState[MenuState[S, ML, U], U], PromptAction]]:
+    @do(NS[InputState[MenuState[S, ML, U], U], PromptAction])
     def update_menu(update: PromptConsumerUpdate[U]) -> Do:
         action = yield handle_input(update)
         yield execute_menu_action(scratch, handle_input, config)(action)
@@ -122,7 +122,7 @@ def update_menu(
 
 class menu_recurse(Generic[S, ML], Case[MenuStackAction, NS[Menus, Prog[None]]], alg=MenuStackAction):
 
-    def __init__(self, result: MenuState[S, ML]) -> None:
+    def __init__(self, result: MenuState[S, ML, U]) -> None:
         self.result = result
 
     def quit(self, action: MenuStackQuit) -> NS[Menus, Prog[None]]:
@@ -131,8 +131,7 @@ class menu_recurse(Generic[S, ML], Case[MenuStackAction, NS[Menus, Prog[None]]],
     @do(NS[Menus, Prog[None]])
     def push(self, action: MenuStackPush) -> Do:
         yield NS.modify(lambda a: a.mod.stack(lambda b: b.cons(action.current)))
-        result = yield action.thunk
-        yield menu_recurse(result)(result.next)
+        yield action.thunk
 
     @do(NS[Menus, Prog[None]])
     def pop(self, action: MenuStackPop) -> Do:
@@ -149,9 +148,14 @@ class menu_recurse(Generic[S, ML], Case[MenuStackAction, NS[Menus, Prog[None]]],
         yield next
 
 
+def menu_prompt(menu: Menu[S, ML, U], scratch: ScratchBuffer) -> NvimIO[MenuState[S, ML, U]]:
+    state = MenuState.cons(menu.initial_state, menu.config, MenuContent.cons(menu.lines))
+    return prompt(update_menu(menu.handle_input, scratch, menu.config), state)
+
+
 @do(NS[Menus, Prog[None]])
 def menu_loop(menu: Menu[S, ML, U], scratch: ScratchBuffer) -> Do:
-    result = yield NS.lift(prompt(update_menu(menu.handle_input, scratch, menu.config), menu.state))
+    result = yield NS.lift(menu_prompt(menu, scratch))
     yield menu_recurse(result)(result.next)
 
 
@@ -168,6 +172,10 @@ def run_menu(menu: Menu[S, ML, U]) -> Do:
 def run_menu_prog(menu: Menu[S, ML, U]) -> Do:
     next = yield Ribo.lift_nvimio(run_menu(menu))
     yield next
+
+
+def menu_push(menu: Menu[S, ML, U]) -> MenuPush:
+    return MenuPush(lambda scratch: menu_loop(menu, scratch))
 
 
 __all__ = ('run_menu', 'run_menu_prog',)

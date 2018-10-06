@@ -89,17 +89,17 @@ def no_process(update: PromptConsumerUpdate[AutoUpdate[U, ML]]) -> AutoS:
 
 def auto_menu(
         state: S,
-        content: MenuContent[ML],
-        config: MenuConfig[AutoState[U, ML, S], ML, U],
+        lines: List[MenuLine[ML]],
+        config: MenuConfig[AutoState[S, ML, U], ML, U],
         mappings: Map[str, Callable[[], AutoS]]=Map(),
-        consumer: Callable[[PromptConsumerUpdate[AutoUpdate[U, ML]]], AutoS]=no_process,
-) -> Menu[AutoState[U, ML, S], ML, C]:
+        consumer: Callable[[PromptConsumerUpdate[AutoUpdate[U, ML]]], AutoS[U, ML, S]]=no_process,
+) -> Menu[AutoState[S, ML, U], ML, C]:
     all_mappings = builtin_mappings ** mappings
-    menu_state: MenuState[AutoState[U, ML, S], ML] = MenuState.cons(AutoState(consumer, state, all_mappings), content)
-    return Menu.cons(auto_menu_handle.match, config, menu_state)
+    initial_state = AutoState(consumer, state, all_mappings)
+    return Menu.cons(auto_menu_handle.match, config, initial_state, lines)
 
 
-@do(NS[InputState[MenuState[AutoState[U, ML, S], ML], AutoUpdate[U, ML]], List[MenuLine[ML]]])
+@do(NS[InputState[MenuState[AutoState[S, ML, U], ML, U], AutoUpdate[U, ML]], List[MenuLine[ML]]])
 def selected_menu_lines() -> Do:
     content = yield NS.inspect(lambda a: a.data.content)
     cursor = yield NS.inspect(lambda a: a.data.cursor)

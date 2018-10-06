@@ -71,10 +71,10 @@ def prompt_spec() -> Do:
 
 class PromptSpec(SpecBase):
     '''
-    write a prompt $prompt
+    write a prompt $write_prompt
     '''
 
-    def prompt(self) -> Expectation:
+    def write_prompt(self) -> Expectation:
         return tmux_plugin_test(test_config, prompt_spec)
 
 
