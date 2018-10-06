@@ -186,6 +186,10 @@ def window_height(window: Window) -> NvimIO[int]:
     return N.read_tpe('nvim_win_get_height', int, window.data)
 
 
+def window_set_height(window: Window, height: int) -> NvimIO[None]:
+    return N.write('nvim_win_set_height', window.data, height)
+
+
 @do(NvimIO[int])
 def current_window_height() -> Do:
     window = yield current_window()
@@ -202,9 +206,15 @@ def window_focus(window: Window) -> NvimIO[None]:
     return N.write('nvim_set_current_window', window.data)
 
 
+@do(NvimIO[None])
+def wincmd(window: Window, cmd: str) -> Do:
+    number = yield window_number(window)
+    yield nvim_command(f'{number}wincmd {cmd}')
+
+
 __all__ = ('current_tabpage', 'current_window', 'current_buffer', 'tabpages', 'windows', 'buffers', 'window_buffer',
            'set_buffer_lines', 'set_buffer_content', 'buffer_lines', 'buffer_content', 'current_buffer_content',
            'buffer_number', 'close_buffer', 'close_current_buffer', 'cursor', 'current_cursor', 'window_line',
            'focus_window', 'buffer_name', 'window_buffer_name', 'current_buffer_name', 'set_cursor', 'set_line',
            'set_local_cursor', 'current_window_number', 'send_input', 'edit_file', 'echo', 'window_number',
-           'window_height', 'current_window_height', 'close_window', 'set_buffer_name', 'window_focus',)
+           'window_height', 'current_window_height', 'close_window', 'set_buffer_name', 'window_focus', 'wincmd',)

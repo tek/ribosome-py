@@ -173,19 +173,23 @@ class MenuConfig(Generic[S, ML, U], Dat['MenuConfig[S, ML, U]']):
     def cons(
             name: str='',
             bottom: bool=True,
+            max_size: int=None,
     ) -> 'MenuConfig[S, ML, U]':
         return MenuConfig(
             name,
             bottom,
+            Maybe.optional(max_size),
         )
 
     def __init__(
             self,
             name: str,
             bottom: bool,
+            max_size: Maybe[int],
     ) -> None:
         self.name = name
         self.bottom = bottom
+        self.max_size = max_size
 
 
 class Menu(Generic[S, ML, U], Dat['Menu[S, ML, U]']):

@@ -1,5 +1,4 @@
-first
-third
+
 [94m~
 ~
 ~
@@ -32,9 +31,7 @@ third
 ~
 ~
 ~
-[1;7m[39mmainmenu                                                                                                                                                                                                                                                       1,1            All
-
-[0m[94m[49m~
+~
 ~
 ~
 ~
@@ -67,4 +64,7 @@ third
 ~
 ~
 [7m[39m[No Name]                                                                                                                                                                                                                                                      0,0-1          All
+[0m[39m[49mfirst
+third
+[1;7mmainmenu                                                                                                                                                                                                                                                       1,1            All
 [0m[39m[49mir

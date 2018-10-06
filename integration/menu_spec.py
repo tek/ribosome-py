@@ -41,21 +41,21 @@ def sub_item_selected() -> Do:
 
 def sub_menu(primary: List[MenuLine[None]]) -> Menu[AutoState[None, None, None], None, None]:
     lines = primary.map(lambda a: MenuLine.cons(f'sub {a.text}', None))
-    return auto_menu(None, MenuContent.cons(lines), MenuConfig.cons('submenu'), Map({'<cr>': sub_item_selected}))
+    return auto_menu(None, MenuContent.cons(lines), MenuConfig.cons('submenu', False), Map({'<cr>': sub_item_selected}))
 
 
 @do(AutoS)
 def start_sub() -> Do:
     items = yield selected_menu_lines()
     menu = sub_menu(items)
-    return MenuPush(lambda scratch: NS.lift(prompt(update_menu(menu.handle_input, scratch), menu.state)))
+    return MenuPush(lambda scratch: NS.lift(prompt(update_menu(menu.handle_input, scratch, menu.config), menu.state)))
 
 
 lines = List('first', 'second', 'third').map(lambda a: MenuLine.cons(a, None))
 main_menu: Menu[AutoState, None, None] = auto_menu(
     None,
     MenuContent.cons(lines),
-    MenuConfig.cons('mainmenu'),
+    MenuConfig.cons('mainmenu', False),
     Map({'<tab>': start_sub}),
 )
 
