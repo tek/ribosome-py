@@ -20,6 +20,7 @@ from ribosome.util.menu.data import Menu, MenuLine, MenuQuitWith, MenuConfig
 from ribosome.util.menu.auto.data import AutoS, AutoState
 from ribosome.compute.prog import Prog
 from ribosome.data.plugin_state import PS
+from ribosome.nvim.api.option import option_set
 
 log = module_log()
 
@@ -97,10 +98,26 @@ def submenu_spec() -> Do:
     return shot0 & shot1 & shot2 & shot3
 
 
+@do(NvimIO[Expectation])
+def wrap_spec() -> Do:
+    yield option_set('cursorline', True)
+    yield send_input(':call SubmenuRun()<cr>')
+    yield send_input('<esc>')
+    shot0 = yield screenshot('menu', 'wrap', '1')
+    yield send_input('<c-j>')
+    shot1 = yield screenshot('menu', 'wrap', '2')
+    yield send_input('<c-j>')
+    shot2 = yield screenshot('menu', 'wrap', '3')
+    yield send_input('<c-j>')
+    shot3 = yield screenshot('menu', 'wrap', '1')
+    return shot0 & shot1 & shot2 & shot3
+
+
 class SubMenuSpec(SpecBase):
     '''
     draw lines at startup $initial
     launch a submenu $submenu
+    wrap around the end of the list $wrap
     '''
 
     def initial(self) -> Expectation:
@@ -108,6 +125,9 @@ class SubMenuSpec(SpecBase):
 
     def submenu(self) -> Expectation:
         return tmux_plugin_test(test_config, submenu_spec)
+
+    def wrap(self) -> Expectation:
+        return tmux_plugin_test(test_config, wrap_spec)
 
 
 __all__ = ('SubMenuSpec',)
