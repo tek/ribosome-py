@@ -1,7 +1,7 @@
 from typing import Any, Callable, TypeVar, Generic, Optional
 from threading import Lock
 
-from amino import Dat, List, Either, IO, do, Do, Try
+from amino import Dat, List, IO, do, Do, Try
 from amino.logging import module_log
 
 from ribosome.nvim.io.api import N
@@ -9,7 +9,6 @@ from ribosome.nvim.io.state import NS
 from ribosome.nvim.io.compute import NvimIO, lift_n_result
 from ribosome.nvim.io.data import NResult
 from ribosome.rpc.concurrency import RpcConcurrency, OnMessage, OnError
-from ribosome.rpc.data.rpc import Rpc
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -47,7 +46,7 @@ class Comm(Dat['Comm']):
 
     def __init__(
             self,
-            request_handler: Callable[[str, List[Any], bool], Either[str, Any]],
+            request_handler: Exec,
             rpc: RpcComm,
             concurrency: RpcConcurrency,
     ) -> None:
@@ -71,7 +70,7 @@ class StateGuard(Generic[A], Dat['StateGuard']):
         self.initialized = initialized
         self.lock = lock
 
-    def exclusive(self, f: Callable[..., A], *a: Any, **kw: Any) -> Any:
+    def exclusive(self, f: Callable[..., Any], *a: Any, **kw: Any) -> Any:
         with self.lock:
             return f(*a, **kw)
 

@@ -4,7 +4,7 @@ from amino import IO, do, Do, Nil
 from amino.state import State
 from amino.logging import module_log
 
-from ribosome.rpc.comm import Comm, Rpc, RpcComm, StateGuard
+from ribosome.rpc.comm import Comm, RpcComm, StateGuard
 from ribosome.config.config import Config
 from ribosome.rpc.handle_receive import rpc_receive
 from ribosome.components.internal.update import init_rpc_plugin
@@ -21,6 +21,7 @@ from ribosome.rpc.from_vim import execute_rpc_from_vim
 from ribosome.rpc.nvim_api import RiboNvimApi
 from ribosome.components.internal.prog import internal_init
 from ribosome.compute.run import run_prog
+from ribosome.rpc.data.rpc import Rpc
 
 A = TypeVar('A')
 log = module_log()

@@ -3,17 +3,16 @@ from typing import Any, Callable, TypeVar, Union, Tuple
 
 import msgpack
 
-from amino import do, Do, IO, Either, List, ADT
+from amino import do, Do, IO, Either
 from amino.state import IOState
 from amino.lenses.lens import lens
 from amino.logging import module_log
 from amino.case import Case
 
 from ribosome.rpc.error import RpcReadError
-from ribosome.rpc.comm import Comm, RpcComm, RpcConcurrency, Rpc
-from ribosome.nvim.io.data import NResult, NSuccess, NError, NFatal
+from ribosome.rpc.comm import Comm, RpcComm, RpcConcurrency
 from ribosome.rpc.concurrency import register_rpc
-from ribosome.rpc.data.rpc import ActiveRpc
+from ribosome.rpc.data.rpc import ActiveRpc, Rpc
 from ribosome.rpc.response import RpcResponse, RpcSyncError, RpcSyncSuccess
 
 log = module_log()

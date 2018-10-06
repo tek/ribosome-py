@@ -4,8 +4,9 @@ from amino import List, do, Either, Do, Left
 from amino.logging import module_log
 
 from ribosome import NvimApi
-from ribosome.rpc.comm import Comm, Rpc
+from ribosome.rpc.comm import Comm
 from ribosome.rpc.to_vim import send_request, send_notification
+from ribosome.rpc.data.rpc import Rpc
 
 log = module_log()
 

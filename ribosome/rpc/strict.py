@@ -5,8 +5,9 @@ import msgpack
 
 from amino import Dat, Map, IO
 
-from ribosome.rpc.uv.uv import OnMessage, processing_error
 from ribosome.rpc.comm import OnError
+from ribosome.rpc.concurrency import OnMessage
+from ribosome.rpc.error import processing_error
 
 
 class StrictRpc(Dat['StrictRpc']):

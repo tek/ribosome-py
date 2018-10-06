@@ -2,18 +2,18 @@ import sys
 import abc
 from typing import Callable, Optional, Tuple, Any
 from threading import Thread
-from concurrent.futures import Future
 
 import pyuv
 from pyuv import (Pipe, Loop, Process, StdIO, UV_CREATE_PIPE, UV_READABLE_PIPE, UV_WRITABLE_PIPE,  # type: ignore
                   UV_PROCESS_WINDOWS_HIDE, TCP)
+from pyuv import errno
 
 from amino import Dat, Try, Either, ADT, IO, List, do, Do, Maybe, Just, Nothing, Path
 from amino.logging import module_log
 from amino.case import Case
 
 from ribosome.rpc.comm import RpcComm, OnMessage, OnError
-from ribosome.rpc.error import RpcReadErrorUnknown, RpcProcessExit
+from ribosome.rpc.error import RpcReadErrorUnknown, RpcProcessExit, processing_error
 from ribosome.rpc.start import start_plugin_sync, init_comm, cannot_execute_request
 from ribosome.config.config import Config
 from ribosome.rpc.nvim_api import RiboNvimApi
@@ -176,7 +176,7 @@ class Uv(Dat['Uv']):
 # TODO this must stop the loop
 def uv_write_error(handle: Pipe, error: Optional[int]) -> None:
     if error is not None:
-        log.debug(f'uv write error: {pyuv.errno.strerror(error)}')
+        log.debug(f'uv write error: {errno.strerror(error)}')
 
 
 def uv_send(write: Pipe) -> Callable[[bytes], Either[str, None]]:
@@ -223,14 +223,6 @@ def on_exit(handle: Pipe, exit_status: int, term_signal: int) -> None:
 OnRead = Callable[[Pipe, Optional[bytes], Optional[int]], None]
 
 
-def processing_error(data: Optional[bytes]) -> Callable[[Exception], None]:
-    def processing_error(error: Exception) -> None:
-        if data:
-            log.debug(f'{error}: {data}')
-        log.error(f'error processing message from nvim: {error}')
-    return processing_error
-
-
 def read_pipe(on_data: OnMessage, on_error: OnError) -> OnRead:
     def read(handle: Pipe, data: Optional[bytes], error: Optional[int]) -> None:
         '''error -4095 is EOF, regular message when quitting
@@ -238,7 +230,7 @@ def read_pipe(on_data: OnMessage, on_error: OnError) -> OnRead:
         if data is not None:
             on_data(data).attempt.leffect(processing_error(data))
         if error is not None:
-            message = pyuv.errno.strerror(error)
+            message = errno.strerror(error)
             info = RpcProcessExit() if error == -4095 else RpcReadErrorUnknown(message)
             on_error(info).attempt.leffect(processing_error(None))
     return read
@@ -360,13 +352,6 @@ class connect_uv(Case[UvResources, IO[UvConnection]], alg=UvResources):
         yield IO.delay(resources.pipe.start_read, self.on_read)
 
 
-class ConnectedUv(Dat['ConnectedUv']):
-
-    def __init__(self, uv: Uv, connection: UvConnection) -> None:
-        self.uv = uv
-        self.connection = connection
-
-
 def start_uv_plugin_sync(config: Config) -> IO[None]:
     uv, rpc_comm = cons_uv_stdio()
     return start_plugin_sync(config, rpc_comm)
@@ -386,4 +371,5 @@ def start_uv_embed_nvim_sync_log(name: str, log: Path) -> IO[RiboNvimApi]:
     return start_uv_embed_nvim_sync(name, List(f'-V{log}'))
 
 
-__all__ = ()
+__all__ = ('start_uv_embed_nvim_sync_log', 'start_uv_embed_nvim_sync', 'cons_uv_embed', 'cons_uv_stdio', 'cons_uv_tcp',
+           'cons_uv_socket', 'start_uv_plugin_sync',)

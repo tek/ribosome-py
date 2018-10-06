@@ -1,4 +1,4 @@
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, Tuple
 
 from kallikrein import Expectation, pending, k
 from kallikrein.matchers import contain
@@ -77,7 +77,7 @@ def ping() -> Do:
 config: Config = Config.cons('uv', rpc=List(rpc.write(ping)))
 
 
-def embed_nvim(log: Path) -> Uv:
+def embed_nvim(log: Path) -> Tuple[Uv, RpcComm]:
     embed_nvim_cmdline = List('nvim', f'-V{log}', '-n', '-u', 'NONE', '--embed')
     return cons_uv_embed(embed_nvim_cmdline)
 
