@@ -141,11 +141,13 @@ class MenuConfig(Generic[S, ML, U], Dat['MenuConfig[S, ML, U]']):
             name: str='',
             bottom: bool=True,
             max_size: int=None,
+            insert: bool=True,
     ) -> 'MenuConfig[S, ML, U]':
         return MenuConfig(
             name,
             bottom,
             Maybe.optional(max_size),
+            insert,
         )
 
     def __init__(
@@ -153,10 +155,12 @@ class MenuConfig(Generic[S, ML, U], Dat['MenuConfig[S, ML, U]']):
             name: str,
             bottom: bool,
             max_size: Maybe[int],
+            insert: bool,
     ) -> None:
         self.name = name
         self.bottom = bottom
         self.max_size = max_size
+        self.insert = insert
 
 
 class MenuState(Generic[S, ML, U], Dat['MenuState[S, ML, U]']):

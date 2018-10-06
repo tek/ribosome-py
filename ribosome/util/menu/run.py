@@ -39,7 +39,7 @@ def menu_reentry(
         config: MenuConfig[S, ML, U],
 ) -> Do:
     state = yield NS.get()
-    return NS.lift(prompt(update_menu(handle_input, scratch, config), state))
+    return NS.lift(prompt(update_menu(handle_input, scratch, config), state, config.insert))
 
 
 def display_lines(config: MenuConfig[S, ML, U], content: MenuContent[ML]) -> List[str]:
@@ -150,7 +150,7 @@ class menu_recurse(Generic[S, ML], Case[MenuStackAction, NS[Menus, Prog[None]]],
 
 def menu_prompt(menu: Menu[S, ML, U], scratch: ScratchBuffer) -> NvimIO[MenuState[S, ML, U]]:
     state = MenuState.cons(menu.initial_state, menu.config, MenuContent.cons(menu.lines))
-    return prompt(update_menu(menu.handle_input, scratch, menu.config), state)
+    return prompt(update_menu(menu.handle_input, scratch, menu.config), state, menu.config.insert)
 
 
 @do(NS[Menus, Prog[None]])

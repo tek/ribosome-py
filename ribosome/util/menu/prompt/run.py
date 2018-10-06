@@ -14,7 +14,8 @@ from ribosome.util.menu.prompt.data import (InputState, InputResources, InputCha
                                             PromptEcho, PromptAction, PromptStateTrans, PromptQuit, PromptUnit,
                                             PromptUpdate, PromptUpdateChar, PromptConsumerInput, PromptUpdateConsumer,
                                             PromptInit, PromptUpdateInit, PromptConsumerUpdate, PromptConsumerInit,
-                                            PromptConsumerChanged, PromptConsumerUnhandled, PromptConsumerLocal)
+                                            PromptConsumerChanged, PromptConsumerUnhandled, PromptConsumerLocal,
+                                            PromptPassthrough)
 from ribosome.nvim.api.command import nvim_atomic_commands
 from ribosome.util.menu.prompt.input import input_loop
 from ribosome.util.menu.prompt.interrupt import intercept_interrupt, stop_prompt, stop_prompt_s
@@ -221,10 +222,11 @@ def start_prompt_loop() -> Do:
 
 
 @do(NvimIO[A])
-def prompt(process: PromptConsumer, initial: A) -> Do:
+def prompt(process: PromptConsumer, initial: A, start_insert: bool) -> Do:
     log.debug(f'running prompt with {initial}')
+    state = PromptEcho() if start_insert else PromptPassthrough()
     res = InputResources.cons(
-        InputState.cons(initial),
+        InputState.cons(initial, state=state),
         update_prompt(process),
     )
     input_thread = yield N.fork(input_loop, res)

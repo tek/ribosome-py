@@ -44,7 +44,7 @@ def handle_input(keys: List[InputChar]) -> Do:
 @prog
 @do(NS[None, None])
 def write_prompt() -> Do:
-    yield NS.lift(prompt(handle_input, None))
+    yield NS.lift(prompt(handle_input, None, False))
     yield NS.unit
 
 
