@@ -90,14 +90,13 @@ def no_process(update: PromptConsumerUpdate[AutoUpdate[U, ML]]) -> AutoS:
 def auto_menu(
         state: S,
         content: MenuContent[ML],
-        name: str,
+        config: MenuConfig[AutoState[U, ML, S], ML, U],
         mappings: Map[str, Callable[[], AutoS]]=Map(),
         consumer: Callable[[PromptConsumerUpdate[AutoUpdate[U, ML]]], AutoS]=no_process,
 ) -> Menu[AutoState[U, ML, S], ML, C]:
-    config: MenuConfig[AutoState[U, ML, S], ML, C] = MenuConfig.cons(auto_menu_handle.match, name)
     all_mappings = builtin_mappings ** mappings
     menu_state: MenuState[AutoState[U, ML, S], ML] = MenuState.cons(AutoState(consumer, state, all_mappings), content)
-    return Menu.cons(config, menu_state)
+    return Menu.cons(auto_menu_handle.match, config, menu_state)
 
 
 @do(NS[InputState[MenuState[AutoState[U, ML, S], ML], AutoUpdate[U, ML]], List[MenuLine[ML]]])

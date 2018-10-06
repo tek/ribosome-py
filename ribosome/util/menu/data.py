@@ -171,36 +171,44 @@ class MenuConfig(Generic[S, ML, U], Dat['MenuConfig[S, ML, U]']):
 
     @staticmethod
     def cons(
-            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
             name: str='',
+            bottom: bool=True,
     ) -> 'MenuConfig[S, ML, U]':
         return MenuConfig(
-            handle_input,
             name,
+            bottom,
         )
 
     def __init__(
             self,
-            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
             name: str,
+            bottom: bool,
     ) -> None:
-        self.handle_input = handle_input
         self.name = name
+        self.bottom = bottom
 
 
 class Menu(Generic[S, ML, U], Dat['Menu[S, ML, U]']):
 
     @staticmethod
     def cons(
+            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
             config: MenuConfig[S, ML, U],
             state: MenuState[S, ML],
     ) -> 'Menu':
         return Menu(
+            handle_input,
             config,
             state,
         )
 
-    def __init__(self, config: MenuConfig[S, ML, U], state: MenuState[S, ML]) -> None:
+    def __init__(
+            self,
+            handle_input: Callable[[PromptConsumerUpdate[U]], NS[InputState[MenuState[S, ML], U], MenuAction]],
+            config: MenuConfig[S, ML, U],
+            state: MenuState[S, ML],
+    ) -> None:
+        self.handle_input = handle_input
         self.config = config
         self.state = state
 

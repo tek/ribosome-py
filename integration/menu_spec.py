@@ -17,7 +17,7 @@ from ribosome.nvim.api.ui import send_input, current_buffer, set_buffer_content
 from ribosome.nvim.io.api import N
 from ribosome.util.menu.auto.run import auto_menu, selected_menu_lines
 from ribosome.util.menu.run import run_menu_prog, update_menu
-from ribosome.util.menu.data import MenuContent, Menu, MenuLine, MenuQuitWith, MenuPush
+from ribosome.util.menu.data import MenuContent, Menu, MenuLine, MenuQuitWith, MenuPush, MenuConfig
 from ribosome.util.menu.auto.data import AutoS, AutoState
 from ribosome.compute.prog import Prog
 from ribosome.data.plugin_state import PS
@@ -41,21 +41,21 @@ def sub_item_selected() -> Do:
 
 def sub_menu(primary: List[MenuLine[None]]) -> Menu[AutoState[None, None, None], None, None]:
     lines = primary.map(lambda a: MenuLine.cons(f'sub {a.text}', None))
-    return auto_menu(None, MenuContent.cons(lines), 'submenu', Map({'<cr>': sub_item_selected}))
+    return auto_menu(None, MenuContent.cons(lines), MenuConfig.cons('submenu'), Map({'<cr>': sub_item_selected}))
 
 
 @do(AutoS)
 def start_sub() -> Do:
     items = yield selected_menu_lines()
     menu = sub_menu(items)
-    return MenuPush(lambda scratch: NS.lift(prompt(update_menu(menu.config, scratch), menu.state)))
+    return MenuPush(lambda scratch: NS.lift(prompt(update_menu(menu.handle_input, scratch), menu.state)))
 
 
 lines = List('first', 'second', 'third').map(lambda a: MenuLine.cons(a, None))
 main_menu: Menu[AutoState, None, None] = auto_menu(
     None,
     MenuContent.cons(lines),
-    'mainmenu',
+    MenuConfig.cons('mainmenu'),
     Map({'<tab>': start_sub}),
 )
 
