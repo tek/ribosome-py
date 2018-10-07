@@ -51,6 +51,15 @@ def display_lines(config: MenuConfig[S, ML, U], content: MenuContent[ML]) -> Lis
     )
 
 
+@do(NS[InputState[MenuState[S, ML, U], U], None])
+def menu_update_cursor(bottom: bool, scratch: ScratchBuffer) -> Do:
+    cursor = yield NS.inspect(lambda a: a.data.cursor)
+    total = yield NS.inspect(lambda a: len(a.data.content.lines))
+    line = total - cursor if bottom else cursor + 1
+    yield NS.lift(set_cursor(scratch.ui.window, (line, 0)))
+    yield NS.lift(nvim_command('redraw'))
+
+
 class execute_menu_action(Case[MenuAction, NS[InputState[MenuState[S, ML, U], U], PromptAction]], alg=MenuAction):
 
     def __init__(
@@ -81,16 +90,12 @@ class execute_menu_action(Case[MenuAction, NS[InputState[MenuState[S, ML, U], U]
         yield NS.modify(lens.data.content.set(action.content))
         yield NS.lift(window_set_height(self.scratch.ui.window, height))
         yield NS.lift(set_scratch_buffer_content(self.scratch, lines))
-        yield NS.lift(nvim_command('redraw'))
+        yield menu_update_cursor(self.config.bottom, self.scratch)
         return PromptUnit()
 
     @do(NS[InputState[MenuState[S, ML, U], U], PromptAction])
     def update_cursor(self, a: MenuUpdateCursor) -> Do:
-        cursor = yield NS.inspect(lambda a: a.data.cursor)
-        total = yield NS.inspect(lambda a: len(a.data.content.lines))
-        line = total - cursor if self.config.bottom else cursor
-        yield NS.lift(set_cursor(self.scratch.ui.window, (line + 1, 0)))
-        yield NS.lift(nvim_command('redraw'))
+        yield menu_update_cursor(self.config.bottom, self.scratch)
         return PromptUnit()
 
     @do(NS[InputState[MenuState[S, ML, U], U], PromptAction])
