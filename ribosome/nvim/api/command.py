@@ -20,8 +20,8 @@ def nvim_command(cmd: str, *args: Any, params: NRParams=NRParams.cons(verbose=Fa
     return N.write('nvim_command', cmdline, params=params)
 
 
-def nvim_sync_command(cmd: str, *args: Any, verbose: bool=False) -> NvimIO[None]:
-    return nvim_command(cmd, *args, verbose=verbose, sync=True)
+def nvim_sync_command(cmd: str, *args: Any, params: NRParams=NRParams.cons(verbose=False, sync=True)) -> NvimIO[None]:
+    return nvim_command(cmd, *args, params=params)
 
 
 def nvim_command_output(cmd: str, *args: Any) -> NvimIO[None]:

@@ -1,4 +1,4 @@
-from typing import Type, Callable, Any
+from typing import Callable, Any
 from types import ModuleType
 
 from amino import Either, _, L, amino_log, __, Path, do, Do
@@ -11,6 +11,7 @@ from amino.util.exception import format_exception
 
 from ribosome.config.config import Config
 from ribosome.rpc.uv.uv import start_uv_plugin_sync
+from ribosome.rpc.native.io import start_asyncio_plugin_sync
 
 log = module_log()
 
@@ -21,9 +22,17 @@ def report_runtime_error(result: Any) -> int:
 
 
 def run_loop_uv(config: Config) -> int:
-    amino_log.debug(f'starting plugin from {config.basic}')
+    amino_log.debug(f'starting uv plugin from {config.basic}')
     result = start_uv_plugin_sync(config).attempt
     return result.cata(report_runtime_error, lambda a: 0)
+
+
+def run_loop_native(config: Config) -> int:
+    amino_log.debug(f'starting native plugin from {config.basic}')
+    return start_asyncio_plugin_sync(config).attempt.cata(
+        report_runtime_error,
+        lambda a: 0,
+    )
 
 
 def config_from_module(mod: ModuleType) -> Either[str, Config]:
@@ -55,7 +64,7 @@ def exception(e: Exception, desc: str) -> int:
 
 
 def start_module_config(mod: ModuleType) -> int:
-    return config_from_module(mod).cata(error, run_loop_uv)
+    return config_from_module(mod).cata(error, run_loop_native)
 
 
 def setup_log() -> None:
@@ -79,7 +88,7 @@ def start_path(path: str) -> int:
     try:
         setup_log()
         amino_log.debug(f'start_path: {path}')
-        return Either.import_path(path).cata(L(import_error)(_, path), run_loop_uv)
+        return Either.import_path(path).cata(L(import_error)(_, path), run_loop_native)
     except Exception as e:
         return exception(e, path)
 
@@ -94,7 +103,7 @@ def start_json_config(data: str) -> int:
     @do(Either[str, int])
     def decode_and_run() -> Do:
         config = yield decode_json(data)
-        return run_loop_uv(config)
+        return run_loop_native(config)
     try:
         setup_log()
         amino_log.debug('starting plugin from json')

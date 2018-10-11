@@ -8,13 +8,14 @@ from ribosome.nvim.api.exists import command_once_defined
 from ribosome.test.klk.matchers.variable import var_must_become
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.integration.embed import TestConfig, plugin_test
+from ribosome.nvim.api.function import nvim_call_function
 
 from test.settings import settings_spec_config
 
 
 @do(NvimIO[Expectation])
 def settings_spec() -> Do:
-    yield command_once_defined('PlugCheck')
+    yield nvim_call_function('PlugCheck')
     yield var_must_become('counter', 21)
 
 

@@ -3,7 +3,7 @@ import json
 
 from amino import List, Lists
 
-from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.compute import NvimIO, NRParams
 from ribosome.nvim.api.command import nvim_command
 
 
@@ -13,7 +13,7 @@ def format_json_cmd(args: List[str], data: dict) -> str:
 
 
 def json_cmd(cmd: str, *args: str, **data: Any) -> NvimIO[str]:
-    return nvim_command(cmd, format_json_cmd(Lists.wrap(args), data), verbose=True)
+    return nvim_command(cmd, format_json_cmd(Lists.wrap(args), data), params=NRParams.cons(verbose=True, sync=False))
 
 
 __all__ = ('json_cmd',)

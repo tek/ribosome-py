@@ -13,6 +13,7 @@ from ribosome.test.config import TestConfig
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.variable import variable_set
 from ribosome.rpc.nvim_api import RiboNvimApi
+from ribosome.rpc.native.io import cons_asyncio_embed
 
 nvim_cmdline = List('nvim', '-n', '-u', 'NONE')
 env_vars = List(
@@ -57,7 +58,7 @@ def start_uv_embed(config: TestConfig) -> IO[NvimApi]:
     '''
     log = temp_dir('log') / 'vim'
     argv = nvim_cmdline + List('--embed', f'-V{log}')
-    uv, rpc_comm = cons_uv_embed(argv)
+    uv, rpc_comm = cons_asyncio_embed(argv)
     return start_external(config.config.basic.name, rpc_comm)
 
 

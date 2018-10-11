@@ -2,7 +2,7 @@ from typing import Callable, TypeVar, Any
 
 from amino import do, Do, Either, Right, Left
 
-from ribosome.nvim.io.compute import NvimIO
+from ribosome.nvim.io.compute import NvimIO, NRParams
 from ribosome.nvim.api.function import nvim_call_cons_strict, nvim_call_function
 from ribosome.nvim.api.util import nvimio_repeat_timeout, cons_checked_e
 from ribosome.nvim.api.command import nvim_command
@@ -73,7 +73,7 @@ def wait_for_command(name: str, timeout: int=30) -> NvimIO[None]:
 @do(NvimIO[A])
 def command_once_defined(name: str, *args: str, timeout: int=30, verbose: bool=False) -> Do:
     yield wait_for_command(name, timeout=timeout)
-    yield nvim_command(name, *args, verbose=verbose)
+    yield nvim_command(name, *args, params=NRParams.cons(verbose=verbose, sync=False))
 
 
 @do(NvimIO[A])
