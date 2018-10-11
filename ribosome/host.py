@@ -10,8 +10,7 @@ from amino.json import decode_json
 from amino.util.exception import format_exception
 
 from ribosome.config.config import Config
-from ribosome.rpc.uv.uv import start_uv_plugin_sync
-from ribosome.rpc.native.io import start_asyncio_plugin_sync
+from ribosome.rpc.io.start import start_asyncio_plugin_sync
 
 log = module_log()
 

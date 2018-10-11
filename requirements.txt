@@ -1,5 +1,4 @@
 amino~=13.0.1a4
-pyuv~=1.4.0
 msgpack-python~=0.5.6
 chiasma~=0.1.0.a28
 kallikrein~=0.22.0a15

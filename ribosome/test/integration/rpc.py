@@ -6,14 +6,13 @@ from amino.test.path import pkg_dir
 from amino.env_vars import set_env
 
 from ribosome import NvimApi
-from ribosome.rpc.uv.uv import cons_uv_embed, cons_uv_socket
 from ribosome.rpc.start import start_external
 from ribosome.rpc.comm import Comm
 from ribosome.test.config import TestConfig
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.nvim.api.variable import variable_set
 from ribosome.rpc.nvim_api import RiboNvimApi
-from ribosome.rpc.native.io import cons_asyncio_embed
+from ribosome.rpc.io.start import cons_asyncio_socket, cons_asyncio_embed
 
 nvim_cmdline = List('nvim', '-n', '-u', 'NONE')
 env_vars = List(
@@ -63,7 +62,7 @@ def start_uv_embed(config: TestConfig) -> IO[NvimApi]:
 
 
 def start_uv_socket(config: TestConfig, socket: Path) -> IO[NvimApi]:
-    uv, rpc_comm = cons_uv_socket(socket)
+    uv, rpc_comm = cons_asyncio_socket(socket)
     return start_external(config.config.basic.name, rpc_comm)
 
 
