@@ -81,7 +81,7 @@ def menu_spec() -> Do:
     yield NS.lift(send_input('<c-j>'))
     content = yield NS.lift(current_buffer_matches(have_length(2)))
     line, col = yield NS.lift(current_cursor())
-    cursor = yield NS.lift(current_cursor_is(2, 0))
+    cursor = yield NS.lift(current_cursor_is(1, 0))
     return content & cursor
 
 

@@ -98,8 +98,10 @@ def close_current_buffer() -> Do:
     yield close_buffer(buffer)
 
 
-def cursor(window: Window) -> NvimIO[Tuple[int, int]]:
-    return N.read_cons_strict('nvim_win_get_cursor', cons_checked_e(list, extract_int_pair), window.data)
+@do(NvimIO[Tuple[int, int]])
+def cursor(window: Window) -> Do:
+    line, col = yield N.read_cons_strict('nvim_win_get_cursor', cons_checked_e(list, extract_int_pair), window.data)
+    return line - 1, col
 
 
 @do(NvimIO[Tuple[int, int]])
@@ -146,7 +148,7 @@ def buflisted(buffer: Buffer) -> Do:
 
 def set_cursor(window: Window, coords: Tuple[int, int]) -> NvimIO[None]:
     line, col = coords
-    return N.write('nvim_win_set_cursor', window.data, coords)
+    return N.write('nvim_win_set_cursor', window.data, (line + 1, col))
 
 
 def set_line(window: Window, line: int) -> NvimIO[None]:
@@ -157,6 +159,11 @@ def set_line(window: Window, line: int) -> NvimIO[None]:
 def set_local_cursor(coords: Tuple[int, int]) -> Do:
     window = yield current_window()
     yield set_cursor(window, coords)
+
+
+@do(NvimIO[None])
+def set_local_line(line: int) -> Do:
+    yield set_local_cursor((line, 0))
 
 
 def window_number(window: Window) -> NvimIO[int]:
@@ -217,4 +224,5 @@ __all__ = ('current_tabpage', 'current_window', 'current_buffer', 'tabpages', 'w
            'buffer_number', 'close_buffer', 'close_current_buffer', 'cursor', 'current_cursor', 'window_line',
            'focus_window', 'buffer_name', 'window_buffer_name', 'current_buffer_name', 'set_cursor', 'set_line',
            'set_local_cursor', 'current_window_number', 'send_input', 'edit_file', 'echo', 'window_number',
-           'window_height', 'current_window_height', 'close_window', 'set_buffer_name', 'window_focus', 'wincmd',)
+           'window_height', 'current_window_height', 'close_window', 'set_buffer_name', 'window_focus', 'wincmd',
+           'set_local_line',)

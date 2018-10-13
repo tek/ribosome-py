@@ -55,7 +55,7 @@ def display_lines(config: MenuConfig[S, ML, U], content: MenuContent[ML]) -> Lis
 def menu_update_cursor(bottom: bool, scratch: ScratchBuffer) -> Do:
     cursor = yield NS.inspect(lambda a: a.data.cursor)
     total = yield NS.inspect(lambda a: len(a.data.content.lines))
-    line = total - cursor if bottom else cursor + 1
+    line = total - cursor - 1 if bottom else cursor
     yield NS.lift(set_cursor(scratch.ui.window, (line, 0)))
     yield NS.lift(nvim_command('redraw'))
 
