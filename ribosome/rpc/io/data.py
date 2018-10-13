@@ -92,10 +92,10 @@ class EmbedProto(Dat['EmbedProto']):
         self.asio.resources.transport.set_result(transport.get_pipe_transport(0))
 
     def connection_lost(self, exc: Exception) -> None:
-        log.error(f'lost: {exc}')
+        pass
 
     def pipe_connection_lost(self, fd: int, exc: Exception) -> None:
-        log.error(f'lost: {fd}/{exc}')
+        pass
 
     def pipe_data_received(self, fd: int, data: bytes) -> None:
         if fd == 1:
@@ -122,7 +122,7 @@ class BasicProto(Dat['BasicProto']):
             log.caught_exception(f'setting transport {transport}', e)
 
     def connection_lost(self, exc: Exception) -> None:
-        log.error(f'lost: {exc}')
+        pass
 
     def data_received(self, data: bytes) -> None:
         self.on_message(data).attempt.leffect(processing_error(data))
