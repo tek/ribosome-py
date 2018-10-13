@@ -108,6 +108,10 @@ class Echo(Dat['Echo'], metaclass=EchoMeta):
     def debugs(msg: List[str]) -> 'Echo':
         return Echo(msg, Echo.debug_level)
 
+    @staticmethod
+    def none() -> 'Echo':
+        return Echo(Nil, Echo.info_level)
+
     def __init__(self, messages: List[str], level: int) -> None:
         self.messages = messages
         self.level = level
