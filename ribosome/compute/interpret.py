@@ -29,7 +29,7 @@ def gather_ios(gio: GatherIOs[A]) -> List[Either[IOException, A]]:
         ribo_log.debug(f'completed ios {completed}')
         if timed_out:
             ribo_log.debug(f'ios timed out: {timed_out}')
-        return Lists.wrap(completed).map(__.result(timeout=gio.timeout))
+        return Lists.wrap(completed).map(lambda a: a.result(timeout=gio.timeout))
 
 
 def gather_subprocesses(gio: GatherSubprocesses[A]) -> List[Either[IOException, A]]:

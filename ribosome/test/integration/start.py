@@ -1,24 +1,14 @@
-from amino import do, Do, List
+from amino import do, Do
 from amino.json import dump_json
 
 from ribosome.nvim.io.compute import NvimIO
 from ribosome.test.config import TestConfig
-from ribosome.nvim.api.function import define_function, nvim_call_function
+from ribosome.nvim.api.function import nvim_call_function
 from ribosome.config.config import Config
 from ribosome.nvim.io.api import N
+from ribosome.rpc.error import define_rpc_stderr_handler
 
-stderr_handler_name = 'RibosomeSpecStderr'
-stderr_handler_body = '''
-let err = substitute(join(a:data, '\\r'), '"', '\\"', 'g')
-try
-    python3 import amino
-    python3 from ribosome.logging import ribosome_envvar_file_logging
-    python3 ribosome_envvar_file_logging()
-    execute 'python3 amino.amino_log.error(f"""error starting rpc job on channel ' . a:id . ':\\r' . err . '""")'
-catch //
-    echoerr err
-endtry
-'''
+stderr_handler_prefix = 'RibosomeSpec'
 
 
 def start_plugin_cmd_import(path: str) -> NvimIO[str]:
@@ -33,7 +23,7 @@ def start_plugin_cmd_json(config: Config) -> Do:
 
 @do(NvimIO[None])
 def start_plugin_embed(config: TestConfig) -> Do:
-    yield define_function(stderr_handler_name, List('id', 'data', 'event'), stderr_handler_body)
+    stderr_handler_name = yield define_rpc_stderr_handler(stderr_handler_prefix)
     cmd = yield (
         config.config_path.cata(
             start_plugin_cmd_import,

@@ -139,7 +139,7 @@ class ProgApi:
         params_spec, wrappers = func_state_data(f)
         @do(NS[Ribosome[D, CC, C], A])
         def zoomed(*p: P) -> Do:
-            comp_lens = yield NS.inspect(_.comp_lens)
+            comp_lens = yield NS.inspect(lambda a: a.comp_lens)
             yield f(*p).zoom(comp_lens)
         return program_from_data(zoomed, params_spec, wrappers, ProgOutputResult(), f.__module__, f.__name__)
 
