@@ -127,6 +127,9 @@ class BasicProto(Dat['BasicProto']):
     def data_received(self, data: bytes) -> None:
         self.on_message(data).attempt.leffect(processing_error(data))
 
+    def eof_received(self) -> None:
+        pass
+
 
 __all__ = ('EmbedProto', 'BasicProto', 'AsyncioPipes', 'AsyncioEmbed', 'AsyncioStdio', 'AsyncioSocket',
            'AsyncioLoopThread', 'AsyncioResources', 'Asyncio',)

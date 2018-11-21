@@ -34,10 +34,10 @@ class connect_asyncio(Case[AsyncioPipes, IO[None]], alg=AsyncioPipes):
         return IO.pure(connect())
 
     def socket(self, pipes: AsyncioSocket) -> IO[Coroutine]:
-        return self.asio.loop.create_unix_connection(
+        return IO.pure(self.asio.loop.create_unix_connection(
             lambda: BasicProto(self.asio, self.on_message, self.on_error),
             str(pipes.path),
-        )
+        ))
 
 
 def asyncio_main_loop(asio: Asyncio) -> None:

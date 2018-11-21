@@ -50,33 +50,33 @@ def setup_env(config: TestConfig) -> Do:
     yield set_env('RIBOSOME_LOG_FILE', str(config.log_file))
 
 
-def start_uv_embed(config: TestConfig) -> IO[NvimApi]:
+def start_asio_embed(config: TestConfig) -> IO[NvimApi]:
     ''' start an embedded vim session that loads no init.vim.
     `_temp/log/vim` is set as log file. aside from being convenient, this is crucially necessary, as the first use of
     the session will block if stdout is used for output.
     '''
     log = temp_dir('log') / 'vim'
     argv = nvim_cmdline + List('--embed', f'-V{log}')
-    uv, rpc_comm = cons_asyncio_embed(argv)
+    asio, rpc_comm = cons_asyncio_embed(argv)
     return start_external(config.config.basic.name, rpc_comm)
 
 
-def start_uv_socket(config: TestConfig, socket: Path) -> IO[NvimApi]:
-    uv, rpc_comm = cons_asyncio_socket(socket)
+def start_asio_socket(config: TestConfig, socket: Path) -> IO[NvimApi]:
+    asio, rpc_comm = cons_asyncio_socket(socket)
     return start_external(config.config.basic.name, rpc_comm)
 
 
 @do(IO[TestNvim])
 def setup_test_nvim_embed(config: TestConfig) -> Do:
     yield setup_env(config)
-    api = yield start_uv_embed(config)
+    api = yield start_asio_embed(config)
     return TestNvim(api.comm, TestNvimApi(api.name, api.comm, config))
 
 
 @do(IO[TestNvim])
 def setup_test_nvim_socket(config: TestConfig, socket: Path) -> Do:
     yield setup_env(config)
-    api = yield start_uv_socket(config, socket)
+    api = yield start_asio_socket(config, socket)
     return TestNvim(api.comm, TestNvimApi(api.name, api.comm, config))
 
 
