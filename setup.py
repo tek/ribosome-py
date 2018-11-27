@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version_parts = (13, 0, 1, 'a', 5)
+version_parts = (13, 0, 1, 'a', 6)
 version = '.'.join(map(str, version_parts))
 
 setup(
@@ -13,7 +13,7 @@ setup(
     url='https://github.com/tek/ribosome',
     packages=find_packages(exclude=['unit', 'unit.*', 'integration', 'integration.*', 'test', 'test.*']),
     install_requires=[
-        'amino~=13.0.1a7',
+        'amino~=13.0.1a9',
         'msgpack-python~=0.5.6'
     ],
     tests_require=[
