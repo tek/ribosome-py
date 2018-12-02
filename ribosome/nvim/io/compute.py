@@ -74,7 +74,7 @@ class NRParams(Dat['NRParams']):
     @staticmethod
     def cons(
             sync: bool=True,
-            timeout: float=3.,
+            timeout: float=10.,
             decode: bool=True,
             verbose: bool=False,
     ) -> 'NRParams':
