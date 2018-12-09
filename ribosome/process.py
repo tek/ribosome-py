@@ -254,10 +254,11 @@ class Subprocess(Generic[A], Dat['Subprocess']):
     @staticmethod
     @do(IO[Tuple[int, List[str], List[str]]])
     def popen(*args: str, timeout: float=None, stdin: int=PIPE, stdout: int=PIPE, stderr: int=PIPE, env: dict=dict(),
-              universal_newlines=True, **kw: Any) -> Do:
-        log.debug(f'executing subprocess `{args}`')
-        pop = yield IO.delay(Popen, args, stdin=stdin, stdout=stdout, stderr=stderr, env=env,
-                             universal_newlines=universal_newlines, **kw)
+              universal_newlines=True, shell=False, **kw: Any) -> Do:
+        cmdline = (Lists.wrap(args).join_tokens if shell else args)
+        log.debug(f'executing subprocess `{cmdline}`')
+        pop = yield IO.delay(Popen, cmdline, stdin=stdin, stdout=stdout, stderr=stderr, env=env,
+                             universal_newlines=universal_newlines, shell=shell, **kw)
         out, err = yield IO.delay(pop.communicate, timeout=timeout)
         out_lines = Lists.lines(out or '')
         err_lines = Lists.lines(err or '')
