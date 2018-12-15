@@ -46,10 +46,15 @@ def no_programs_for_rpc(method: str, args: RpcArgs) -> NvimIO[A]:
     return N.error(f'no programs defined for request {method}({args.string})')
 
 
-def decode_args(args: List[Any]) -> RpcArgs:
+def decode_args(method: str, args: List[Any]) -> RpcArgs:
+    is_event = method.endswith('_event')
     decoded_args = decode(args)
-    fun_args = decoded_args.head | Nil
-    bang = decoded_args.lift(1).contains(1)
+    fun_args = (
+        decoded_args
+        if is_event else
+        decoded_args.head | Nil
+    )
+    bang = not is_event and decoded_args.lift(1).contains(1)
     return RpcArgs(fun_args, bang)
 
 
@@ -57,7 +62,7 @@ def rpc_handler(guard: StateGuard[A]) -> Callable[[str, List[Any]], NvimIO[List[
     @do(NvimIO[List[Any]])
     def handler(method: str, raw_args: List[Any]) -> Do:
         yield nvimio_repeat_timeout(lambda: N.pure(guard), lambda a: a.initialized, '''state wasn't initialized''', 20)
-        args = decode_args(raw_args)
+        args = decode_args(method, raw_args)
         log.debug(f'handling request: {method}({args.args.join_comma})')
         programs = guard.state.programs_by_name(method)
         yield (
