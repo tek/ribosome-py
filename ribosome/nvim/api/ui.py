@@ -210,7 +210,7 @@ def close_window(window: Window) -> Do:
 
 
 def window_focus(window: Window) -> NvimIO[None]:
-    return N.write('nvim_set_current_window', window.data)
+    return N.write('nvim_set_current_win', window.data)
 
 
 @do(NvimIO[None])
