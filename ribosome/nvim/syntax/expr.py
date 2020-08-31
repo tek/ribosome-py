@@ -1,3 +1,5 @@
+from typing import Union
+
 from amino import Dat, Map, ADT, List, Nil, Maybe, Lists
 
 
@@ -112,14 +114,14 @@ class Highlight(Dat['Highlight']):
     @staticmethod
     def cons(
             group: str,
-            **values: int,
+            **values: Union[str, int],
     ) -> 'Highlight':
         return Highlight(
             group,
             Map(values),
         )
 
-    def __init__(self, group: str, values: Map[str, int]) -> None:
+    def __init__(self, group: str, values: Map[str, Union[str, int]]) -> None:
         self.group = group
         self.values = values
 

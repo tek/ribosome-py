@@ -1,8 +1,6 @@
-[![gitter](https://badges.gitter.im/tek/ribosome.svg)](https://gitter.im/tek/ribosome)
-
-# Under Construction
-
 # Intro
+
+**Note**: this project is deprecated and not maintained anymore. Try the new [Haskell version] instead!
 
 **ribosome** is a framework for building and testing **neovim** python remote plugins.
 It builds on the official [neovim-python] host, providing a more flexible and modular startup mechanism.
@@ -65,3 +63,4 @@ call jobstart()
 
 [neovim-python]: https://github.com/neovim/python-client
 [chromatin]: https://github.com/tek/chromatin
+[Haskell version]: https://github.com/tek/ribosome
